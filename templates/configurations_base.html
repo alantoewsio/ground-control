@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set show_configurations_sidebar = true %}
+{% set top_nav_active = "firewalls" %}
+{% block app_sidebar %}
+<div class="app-sidebar__inner">
+  <button
+    type="button"
+    class="app-sidebar__toggle"
+    id="app-sidebar-toggle"
+    aria-expanded="true"
+    title="Collapse navigation"
+    aria-label="Collapse navigation"
+  >
+    <span class="app-sidebar__toggle-icon" aria-hidden="true">
+      <svg
+        class="app-sidebar__collapse-svg"
+        viewBox="0 0 28 22"
+        width="25"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          class="app-sidebar__collapse-bars"
+          fill="currentColor"
+          d="M1.25 4.25h14.5v2.35H1.25zm0 5.575h10.25v2.35H1.25zm0 5.575h16.25v2.35H1.25z"
+        />
+        <g class="app-sidebar__collapse-arrow-wrap">
+          <path fill="currentColor" d="M16.35 11L25 3.35v15.3L16.35 11z" />
+        </g>
+      </svg>
+    </span>
+  </button>
+  <p class="app-sidebar__title" id="app-nav-heading">Configuration</p>
+  <nav class="app-nav" aria-labelledby="app-nav-heading" aria-orientation="vertical">
+    <a
+      href="/firewalls?tab=configurations"
+      class="app-nav__item{% if cfg_subnav_active == 'inventory' %} is-active{% endif %}"
+    >
+      <span class="app-nav__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path
+            fill="currentColor"
+            d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"
+          />
+        </svg>
+      </span>
+      <span class="app-nav__label">Inventory</span>
+    </a>
+    <a
+      href="/configurations/network"
+      class="app-nav__item{% if cfg_subnav_active == 'network' %} is-active{% endif %}"
+    >
+      <span class="app-nav__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path
+            fill="currentColor"
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+          />
+        </svg>
+      </span>
+      <span class="app-nav__label">Network</span>
+    </a>
+    <a
+      href="/configurations/hosts-services"
+      class="app-nav__item{% if cfg_subnav_active == 'hosts_services' %} is-active{% endif %}"
+    >
+      <span class="app-nav__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path
+            fill="currentColor"
+            d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"
+          />
+        </svg>
+      </span>
+      <span class="app-nav__label">Hosts &amp; Services</span>
+    </a>
+  </nav>
+</div>
+{% endblock %}

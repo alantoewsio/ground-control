@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% set top_nav_active = "firewalls" %}
+{% block title %}Monitor · {{ fw.name or fw.host }} · Ground Control{% endblock %}
+{% block page_title %}{{ fw.name or fw.host }}{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item"><span class="breadcrumbs__text">{{ fw.name or fw.host }}</span></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Monitor</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle page-header__subtitle--mono">{{ fw.host }}:{{ fw.port }} · TCP reachability &amp; latency</p>
+{% endblock %}
+{% block content %}
+<main class="layout single monitor-page">
+  <section class="panel grow">
+    <div class="monitor-page__toolbar">
+      <label class="monitor-page__range">
+        <span class="monitor-page__range-label">Range</span>
+        <select id="gc-monitor-range" class="settings-form__input monitor-page__select" aria-label="Time range">
+          <option value="24h">Last 24 hours (per probe)</option>
+          <option value="48h">Last 48 hours (per probe)</option>
+          <option value="7d">Last 7 days (hourly)</option>
+          <option value="30d">Last 30 days (hourly)</option>
+          <option value="365d">Last year (daily)</option>
+        </select>
+      </label>
+      <p id="gc-monitor-meta" class="muted monitor-page__meta" aria-live="polite"></p>
+    </div>
+    <p id="gc-monitor-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+    <div class="monitor-page__chart-wrap">
+      <canvas id="gc-monitor-chart" aria-label="Connectivity chart"></canvas>
+    </div>
+    <p class="muted monitor-page__footnote">
+      Longer ranges use rolled-up summaries (hourly or daily), similar to MRTG. Raw samples are kept in the monitor database;
+      rollups run each UTC hour and day.
+    </p>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script>
+  (function () {
+    var API_URL = {{ api_series_url | tojson }};
+    var rangeEl = document.getElementById("gc-monitor-range");
+    var statusEl = document.getElementById("gc-monitor-status");
+    var metaEl = document.getElementById("gc-monitor-meta");
+    var canvas = document.getElementById("gc-monitor-chart");
+    if (!canvas || !window.Chart) return;
+
+    var chart = null;
+
+    function formatLabel(iso) {
+      try {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function renderChart(payload) {
+      var pts = payload.points || [];
+      var labels = pts.map(function (p) {
+        return formatLabel(p.t);
+      });
+      var up = pts.map(function (p) {
+        return typeof p.up_pct === "number" ? p.up_pct : 0;
+      });
+      var ms = pts.map(function (p) {
+        return p.avg_ms != null && typeof p.avg_ms === "number" ? p.avg_ms : null;
+      });
+
+      if (pts.length === 0) {
+        if (chart) {
+          chart.destroy();
+          chart = null;
+        }
+        statusEl.textContent = "No samples in this range yet. Data appears after the background monitor runs.";
+        metaEl.textContent = "";
+        return;
+      }
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      statusEl.textContent = "";
+
+      var gran = payload.granularity || "";
+      var gtxt =
+        gran === "raw"
+          ? "per probe"
+          : gran === "hour"
+            ? "hourly rollup"
+            : gran === "day"
+              ? "daily rollup"
+              : gran;
+      metaEl.textContent =
+        pts.length +
+        " point" +
+        (pts.length === 1 ? "" : "s") +
+        " · " +
+        gtxt +
+        " · range " +
+        (payload.range || "");
+
+      var root = getComputedStyle(document.documentElement);
+      var accent = (root.getPropertyValue("--accent") || "#0066cc").trim();
+      var success = (root.getPropertyValue("--success") || "#1a9b4a").trim();
+      var muted = (root.getPropertyValue("--muted") || "#666666").trim();
+
+      chart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Reachability %",
+              data: up,
+              yAxisID: "y",
+              stepped: gran === "raw",
+              borderColor: success,
+              backgroundColor: success + "22",
+              fill: false,
+              tension: 0.15,
+              pointRadius: pts.length > 120 ? 0 : 2,
+              borderWidth: 2,
+            },
+            {
+              label: "Latency (ms)",
+              data: ms,
+              yAxisID: "y1",
+              spanGaps: true,
+              borderColor: accent,
+              backgroundColor: "transparent",
+              fill: false,
+              tension: 0.2,
+              pointRadius: pts.length > 120 ? 0 : 2,
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { position: "top" },
+            tooltip: {
+              callbacks: {
+                title: function (items) {
+                  var i = items.length ? items[0].dataIndex : 0;
+                  return pts[i] && pts[i].t ? pts[i].t : "";
+                },
+                afterBody: function (items) {
+                  var i = items.length ? items[0].dataIndex : 0;
+                  var p = pts[i];
+                  if (!p) return "";
+                  var lines = [];
+                  if (p.samples && p.samples > 1) lines.push("Samples in bucket: " + p.samples);
+                  return lines;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxRotation: 45,
+                minRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 12,
+                color: muted,
+              },
+              grid: { color: "rgba(0,0,0,0.06)" },
+            },
+            y: {
+              type: "linear",
+              position: "left",
+              min: 0,
+              max: 100,
+              title: { display: true, text: "Reachability %" },
+              ticks: { color: muted },
+              grid: { color: "rgba(0,0,0,0.06)" },
+            },
+            y1: {
+              type: "linear",
+              position: "right",
+              min: 0,
+              title: { display: true, text: "Latency (ms)" },
+              ticks: { color: muted },
+              grid: { drawOnChartArea: false },
+            },
+          },
+        },
+      });
+    }
+
+    function loadRange() {
+      var r = rangeEl && rangeEl.value ? rangeEl.value : "24h";
+      statusEl.textContent = "Loading…";
+      var url = API_URL + (API_URL.indexOf("?") >= 0 ? "&" : "?") + "range=" + encodeURIComponent(r);
+      fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (res) {
+          return res.json().then(function (j) {
+            return { ok: res.ok, body: j };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) {
+            var d = x.body && x.body.detail;
+            statusEl.textContent =
+              typeof d === "string"
+                ? d
+                : d
+                  ? JSON.stringify(d)
+                  : "Could not load series.";
+            return;
+          }
+          renderChart(x.body);
+        })
+        .catch(function () {
+          statusEl.textContent = "Could not load series (network error).";
+        });
+    }
+
+    if (rangeEl) rangeEl.addEventListener("change", loadRange);
+    loadRange();
+  })();
+</script>
+{% endblock %}

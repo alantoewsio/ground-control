@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% set top_nav_active = "dashboard" %}
+{% block title %}Dashboard · Ground Control{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Reachability, sync history, task outcomes, approval queue, cache freshness, and admin latency at a glance.
+</p>
+{% endblock %}
+{% block content %}
+{% if ac.authenticated %}
+<main
+  class="layout single dashboard-page"
+  data-gc-dashboard-api="{{ request.url_for('api_dashboard') }}"
+>
+  <p id="gc-dashboard-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+  <p id="gc-dashboard-empty-hint" class="dashboard-page__hint muted" hidden>
+    Choose firewalls or tags in <strong>Firewalls</strong> to load this page.
+  </p>
+
+  <section class="dashboard-page__stats" aria-label="Summary">
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Managed firewalls</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-managed">—</p>
+      <p class="dashboard-page__stat-note muted">Same device count the charts use</p>
+    </article>
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Offline (monitored)</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-offline">—</p>
+      <p class="dashboard-page__stat-note muted">Monitored devices only—down or not seen yet</p>
+    </article>
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Pending approval</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-pending">—</p>
+      <p class="dashboard-page__stat-note muted">
+        Tasks on the <a href="/task-queue">task queue</a> awaiting review or send
+      </p>
+    </article>
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Approved (7 days)</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-hist-approved-7d">—</p>
+      <p class="dashboard-page__stat-note muted">
+        <a href="/firewalls/history#outgoing">Task queue history</a> — sent to firewall (UTC window)
+      </p>
+    </article>
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Denied (7 days)</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-hist-denied-7d">—</p>
+      <p class="dashboard-page__stat-note muted">
+        Removed from queue without send (same as History “Rejected”)
+      </p>
+    </article>
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Approved today</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-hist-approved-today">—</p>
+      <p class="dashboard-page__stat-note muted">UTC calendar day (now)</p>
+    </article>
+    <article class="dashboard-page__stat panel">
+      <h2 class="dashboard-page__stat-label">Denied today</h2>
+      <p class="dashboard-page__stat-value" id="gc-dashboard-hist-denied-today">—</p>
+      <p class="dashboard-page__stat-note muted">UTC calendar day (now)</p>
+    </article>
+  </section>
+
+  <section class="dashboard-page__widgets" id="gc-dashboard-widgets" aria-label="Dashboard widgets">
+    <section class="panel grow dashboard-page__panel dashboard-page__widget" id="gc-dashboard-connected-panel" data-widget-id="connected">
+      <h2 class="dashboard-page__panel-title">Connected firewalls (7 days)</h2>
+      <p class="muted dashboard-page__panel-desc">
+        Monitored devices that were reachable each hour (green) versus hours with failed checks (red), over the last week in local time.
+      </p>
+      <div class="dashboard-page__chart-wrap">
+        <canvas id="gc-dashboard-connected-chart" aria-label="Weekly reachability: monitored firewalls up vs probe failures by hour"></canvas>
+      </div>
+    </section>
+
+    <section class="panel grow dashboard-page__panel dashboard-page__widget" data-widget-id="sync-runs">
+      <h2 class="dashboard-page__panel-title">Config sync attempts (7 days)</h2>
+      <p class="muted dashboard-page__panel-desc">
+        Stack shows successful runs, API or save errors, and anything still marked running—UTC calendar days.
+      </p>
+      <p id="gc-dashboard-sync-runs-empty" class="muted dashboard-page__chart-empty" hidden>
+        No sync runs in this window for the selected firewalls.
+      </p>
+      <div class="dashboard-page__chart-wrap dashboard-page__chart-wrap--compact">
+        <canvas id="gc-dashboard-sync-runs-chart" aria-label="Sync outcomes by day"></canvas>
+      </div>
+    </section>
+
+    <section class="panel grow dashboard-page__panel dashboard-page__widget" data-widget-id="pending-approval">
+      <h2 class="dashboard-page__panel-title">Pending approval by firewall</h2>
+      <p class="muted dashboard-page__panel-desc">
+        <a href="/task-queue">Task queue</a> rows still in pending (or awaiting action) per device.
+      </p>
+      <p id="gc-dashboard-deploy-empty" class="muted dashboard-page__chart-empty" hidden>
+        Nothing pending—queue is clear for this selection.
+      </p>
+      <div class="dashboard-page__chart-wrap dashboard-page__chart-wrap--hbar">
+        <canvas id="gc-dashboard-deploy-chart" aria-label="Pending approval task count by firewall"></canvas>
+      </div>
+    </section>
+
+    <section class="panel grow dashboard-page__panel dashboard-page__widget" data-widget-id="cache-freshness">
+      <h2 class="dashboard-page__panel-title">Cache freshness by type</h2>
+      <p class="muted dashboard-page__panel-desc">
+        Cached rows per sync type, stacked by how long since last update—shows where the cache is fresh vs aging.
+      </p>
+      <p id="gc-dashboard-cache-empty" class="muted dashboard-page__chart-empty" hidden>
+        No cached config rows yet—run a sync to populate the local cache.
+      </p>
+      <div class="dashboard-page__chart-wrap dashboard-page__chart-wrap--stacked">
+        <canvas id="gc-dashboard-cache-chart" aria-label="Cache row counts by type and freshness bucket"></canvas>
+      </div>
+    </section>
+
+    <section class="panel grow dashboard-page__panel dashboard-page__widget" data-widget-id="cache-volume">
+      <h2 class="dashboard-page__panel-title">Cached records by sync type</h2>
+      <p class="muted dashboard-page__panel-desc">
+        Cached config volume by category and firewall: flow thickness reflects how many rows are stored.
+      </p>
+      <div
+        class="dashboard-page__sankey-toolbar"
+        id="gc-dashboard-sankey-toolbar"
+        hidden
+      >
+        <div class="dashboard-page__sankey-select" id="gc-dashboard-sankey-root">
+          <button
+            type="button"
+            class="dashboard-page__sankey-select-trigger"
+            id="gc-dashboard-sankey-trigger"
+            aria-expanded="false"
+            aria-haspopup="listbox"
+            aria-controls="gc-dashboard-sankey-panel"
+          >
+            <span id="gc-dashboard-sankey-trigger-label">Sync types</span>
+          </button>
+          <div
+            class="dashboard-page__sankey-select-panel"
+            id="gc-dashboard-sankey-panel"
+            role="listbox"
+            aria-multiselectable="true"
+            hidden
+          >
+            <input
+              type="search"
+              class="dashboard-page__sankey-select-search"
+              id="gc-dashboard-sankey-search"
+              placeholder="Search types…"
+              autocomplete="off"
+              aria-label="Search sync types"
+            />
+            <div class="dashboard-page__sankey-select-actions">
+              <button type="button" class="dashboard-page__sankey-select-action" id="gc-dashboard-sankey-all">
+                Select all
+              </button>
+              <button type="button" class="dashboard-page__sankey-select-action" id="gc-dashboard-sankey-none">
+                Clear
+              </button>
+            </div>
+            <div class="dashboard-page__sankey-select-list" id="gc-dashboard-sankey-list"></div>
+          </div>
+        </div>
+      </div>
+      <p id="gc-dashboard-sync-sankey-empty" class="muted dashboard-page__sankey-empty" hidden>
+        Nothing cached yet for this selection—run sync or widen your firewall list.
+      </p>
+      <p id="gc-dashboard-sankey-filter-empty" class="muted dashboard-page__sankey-empty" hidden>
+        Select at least one type to show the chart.
+      </p>
+      <div class="dashboard-page__chart-wrap dashboard-page__chart-wrap--sync">
+        <canvas id="gc-dashboard-sync-chart" aria-label="Cached config volume from each sync type to each firewall"></canvas>
+      </div>
+    </section>
+
+    <section class="panel grow dashboard-page__panel dashboard-page__panel--latency dashboard-page__widget" data-widget-id="latency">
+      <h2 class="dashboard-page__panel-title">Latency (24 hours)</h2>
+      <p class="muted dashboard-page__panel-desc">
+        How quickly each firewall’s admin interface responds to checks—helps spot a slow path or a device under stress.
+      </p>
+      <div class="dashboard-page__latency-grid" id="gc-dashboard-latency-grid"></div>
+    </section>
+  </section>
+</main>
+{% else %}
+<main class="layout single">
+  <section class="panel grow">
+    <h2>Welcome</h2>
+    <p class="muted">
+      Sign in to see the dashboard. Use <strong>Firewalls</strong> in the top navigation to register Sophos firewalls and test API connectivity.
+    </p>
+  </section>
+</main>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if ac.authenticated %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.14.0/dist/chartjs-chart-sankey.min.js" crossorigin="anonymous"></script>
+<script src="/static/dashboard.js"></script>
+{% endif %}
+{% endblock %}

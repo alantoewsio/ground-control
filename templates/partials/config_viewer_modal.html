@@ -1,0 +1,62 @@
+<div
+  id="gc-config-viewer-modal"
+  class="gc-config-viewer-modal task-queue-compare-modal"
+  hidden
+  aria-hidden="true"
+>
+  <div class="task-queue-compare-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="task-queue-compare-modal__panel gc-config-viewer-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-config-viewer-title"
+    tabindex="-1"
+  >
+    <div class="task-queue-compare-modal__header">
+      <h2 id="gc-config-viewer-title" class="task-queue-compare-modal__title">Config viewer</h2>
+      <button
+        type="button"
+        class="task-queue-compare-modal__close"
+        id="gc-config-viewer-close"
+        aria-label="Close"
+        title="Close"
+      >
+        ×
+      </button>
+    </div>
+    <p id="gc-config-viewer-meta" class="task-queue-compare-modal__meta muted"></p>
+    <div id="gc-config-viewer-status" class="gc-config-viewer-modal__status muted" hidden></div>
+    <div id="gc-config-viewer-tree" class="gc-config-viewer-tree task-queue-compare-scroll" tabindex="-1"></div>
+  </div>
+</div>
+
+<div
+  id="gc-config-viewer-detail-modal"
+  class="gc-config-viewer-detail-modal task-queue-compare-modal"
+  hidden
+  aria-hidden="true"
+>
+  <div class="task-queue-compare-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="task-queue-compare-modal__panel gc-config-viewer-detail-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-config-viewer-detail-title"
+    tabindex="-1"
+  >
+    <div class="task-queue-compare-modal__header">
+      <h2 id="gc-config-viewer-detail-title" class="task-queue-compare-modal__title">Object</h2>
+      <button
+        type="button"
+        class="task-queue-compare-modal__close"
+        id="gc-config-viewer-detail-close"
+        aria-label="Close"
+        title="Close"
+      >
+        ×
+      </button>
+    </div>
+    <p id="gc-config-viewer-detail-meta" class="task-queue-compare-modal__meta muted"></p>
+    <div id="gc-config-viewer-detail-body" class="gc-config-viewer-detail-body task-queue-compare-scroll"></div>
+  </div>
+</div>

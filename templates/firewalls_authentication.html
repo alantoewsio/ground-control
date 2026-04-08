@@ -1,0 +1,121 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "authentication" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% block title %}Authentication · Firewalls · Ground Control{% endblock %}
+{% block page_title %}Authentication{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Authentication</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Local users and user groups from the configuration cache. Enable <strong>Users</strong> and
+  <strong>User groups</strong> in Inventory sync, then use the toolbar sync control to refresh.
+</p>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ net_filters_aside("gc-auth-u", false) }}
+        {{ net_filters_aside("gc-auth-g", true) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        <div class="gc-tabs" role="tablist" aria-label="Authentication views">
+          <button
+            type="button"
+            class="gc-tabs__tab is-active"
+            role="tab"
+            aria-selected="true"
+            data-gc-auth-tab="users"
+            id="gc-tab-auth-users"
+          >
+            Users
+          </button>
+          <button
+            type="button"
+            class="gc-tabs__tab"
+            role="tab"
+            aria-selected="false"
+            data-gc-auth-tab="groups"
+            id="gc-tab-auth-groups"
+          >
+            Groups
+          </button>
+        </div>
+        <div class="gc-tab-panels">
+          <div
+            class="gc-tab-panel is-active"
+            role="tabpanel"
+            id="gc-panel-auth-users"
+            aria-labelledby="gc-tab-auth-users"
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-auth-u",
+                "Users",
+                "Search users",
+                primary_btn_id="gc-auth-u-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-auth-u-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div
+            class="gc-tab-panel"
+            role="tabpanel"
+            id="gc-panel-auth-groups"
+            aria-labelledby="gc-tab-auth-groups"
+            hidden
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-auth-g",
+                "Groups",
+                "Search groups",
+                primary_btn_id="gc-auth-g-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-auth-g-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ net_cols_modal("gc-auth-u") }}
+{{ net_cols_modal("gc-auth-g") }}
+{% include "partials/gc_auth_identity_flyouts.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-hosts-services-flyout.js"></script>
+<script src="/static/gc-auth-identity-pages.js"></script>
+<script>
+  window.gcInitAuthenticationPage({
+    urlUsers: {{ url_api_auth_user_table | tojson }},
+    urlGroups: {{ url_api_auth_user_group_table | tojson }},
+    urlAdminProfileOptions: {{ url_api_auth_admin_profile_options | tojson }},
+    urlUserGroupOptions: {{ url_api_auth_user_group_options | tojson }},
+    urlUserCreate: {{ url_api_task_queue_enqueue_auth_user_create | tojson }},
+    urlUserUpdate: {{ url_api_task_queue_enqueue_auth_user_update | tojson }},
+    urlUserDeletes: {{ url_api_task_queue_enqueue_auth_user_deletes_batch | tojson }},
+    urlGroupCreate: {{ url_api_task_queue_enqueue_auth_user_group_create | tojson }},
+    urlGroupUpdate: {{ url_api_task_queue_enqueue_auth_user_group_update | tojson }},
+    urlGroupDeletes: {{ url_api_task_queue_enqueue_auth_user_group_deletes_batch | tojson }},
+  });
+</script>
+{% endblock %}

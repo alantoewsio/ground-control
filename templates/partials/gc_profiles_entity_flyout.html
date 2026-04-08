@@ -1,0 +1,528 @@
+{% set gc_vpn_dh_groups = [
+  "1(DH768)",
+  "2(DH1024)",
+  "5(DH1536)",
+  "14(DH2048)",
+  "15(DH3072)",
+  "16(DH4096)",
+  "17(DH6144)",
+  "18(DH8192)",
+  "19(ecp256)",
+  "20(ecp384)",
+  "21(ecp521)",
+  "25(ecp192)",
+  "26(ecp224)",
+  "27(ecp224bp)",
+  "28(ecp256bp)",
+  "29(ecp384bp)",
+  "30(ecp512bp)",
+  "31(curve25519)",
+] %}
+{% set gc_vpn_auth = [
+  ("SHA2_512", "SHA2 512"),
+  ("SHA2_384", "SHA2 384"),
+  ("SHA2_256", "SHA2 256"),
+  ("SHA1", "SHA1"),
+  ("MD5", "MD5"),
+] %}
+{% set gc_vpn_p1_enc = [
+  ("AES256", "AES256", ""),
+  ("AES192", "AES192", ""),
+  ("AES128", "AES128", ""),
+  ("AES256GCM16", "AES256GCM16", ""),
+  ("AES192GCM16", "AES192GCM16", ""),
+  ("AES128GCM16", "AES128GCM16", ""),
+  ("3DES", "3DES", ""),
+  ("BlowFish", "BlowFish", "gc-pe-vpn-opt-weak"),
+  ("DES", "DES", "gc-pe-vpn-opt-weak"),
+  ("TwoFish", "TwoFish", ""),
+  ("Serpent", "Serpent", ""),
+] %}
+{% set gc_vpn_p2_enc = [
+  ("AES256", "AES256", ""),
+  ("AES192", "AES192", ""),
+  ("AES128", "AES128", ""),
+  ("3DES", "3DES", ""),
+  ("AES256GCM16", "AES256GCM16", ""),
+  ("AES192GCM16", "AES192GCM16", ""),
+  ("AES128GCM16", "AES128GCM16", ""),
+  ("AES256GMAC", "AES256GMAC", ""),
+  ("AES192GMAC", "AES192GMAC", ""),
+  ("AES128GMAC", "AES128GMAC", ""),
+  ("BlowFish", "BlowFish", "gc-pe-vpn-opt-weak"),
+  ("DES", "DES", "gc-pe-vpn-opt-weak"),
+  ("TwoFish", "TwoFish", ""),
+  ("Serpent", "Serpent", ""),
+] %}
+<div id="gc-pe-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    style="width: min(960px, 100vw - 24px)"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-pe-flyout-title"
+  >
+    <div class="gc-if-flyout__resize" aria-hidden="true"></div>
+    <form id="gc-pe-form" class="gc-if-flyout__panel-form" novalidate>
+      <header class="gc-if-flyout__header">
+        <h2 id="gc-pe-flyout-title" class="gc-if-flyout__title">Profile object</h2>
+        <button type="button" class="gc-wfp-flyout__close" id="gc-pe-flyout-close" aria-label="Close" title="Close">
+          <span aria-hidden="true">×</span>
+        </button>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div id="gc-pe-fw-field" class="gc-if-flyout__field gc-hs-ip-host-flyout__fw-field">
+            <span class="gc-if-flyout__label">Firewalls</span>
+            <div
+              class="gc-hs-ip-host-flyout__fw-ms"
+              data-gc-fw-ms="1"
+              data-fw-picker-mode="add"
+              data-fw-initial-selected="[]"
+              data-fw-assigned-ids="[]"
+            >
+              <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+                <button
+                  type="button"
+                  class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text">Select firewalls…</span>
+                  <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown" hidden>
+                  <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                    <input type="search" class="gc-if-flyout__input gc-hs-ip-host-flyout__fw-search" placeholder="Search firewalls" autocomplete="off" />
+                  </div>
+                  <div class="gc-hs-ip-host-flyout__fw-ms-options" role="listbox" aria-multiselectable="true"></div>
+                  <p class="gc-hs-ip-host-flyout__fw-empty muted" hidden>No firewalls available.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            id="gc-pe-section-schedule"
+            class="gc-pe-section gc-combine-flyout-conflict-scope"
+            data-gc-combine-field-keys="__schedule_detail"
+            hidden
+          >
+            <p class="muted" style="margin: 0 0 12px">Schedule (Sophos XML <code>Schedule</code>)</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-sched-name">Name *</label>
+              <input type="text" id="gc-pe-sched-name" class="gc-if-flyout__input" autocomplete="off" required />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-sched-desc">Description</label>
+              <textarea id="gc-pe-sched-desc" class="gc-if-flyout__textarea" rows="2"></textarea>
+            </div>
+            <div class="gc-if-flyout__field">
+              <span class="gc-if-flyout__label">Type</span>
+              <label><input type="radio" name="gc-pe-sched-type" value="Recurring" checked /> Recurring</label>
+              <label><input type="radio" name="gc-pe-sched-type" value="OneTime" /> One time</label>
+            </div>
+            <div id="gc-pe-sched-onetime-wrap" class="gc-pe-sched-onetime-wrap" hidden>
+              <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                <label class="gc-if-flyout__label" for="gc-pe-sched-start">Start date</label>
+                <input type="datetime-local" id="gc-pe-sched-start" class="gc-if-flyout__input" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                <label class="gc-if-flyout__label" for="gc-pe-sched-end">End date</label>
+                <input type="datetime-local" id="gc-pe-sched-end" class="gc-if-flyout__input" autocomplete="off" />
+              </div>
+            </div>
+            <div id="gc-pe-sched-recurring-wrap" class="gc-pe-sched-recurring-wrap">
+              <div class="gc-if-flyout__field">
+                <span class="gc-if-flyout__label">Recurring periods</span>
+                <p class="muted gc-pe-sched-recurring-hint" style="margin: 0 0 8px">
+                  Add rows for each interval. A blank row is kept at the end for quick entry.
+                </p>
+                <div class="gc-pe-sched-detail-table-wrap">
+                  <table class="gc-pe-sched-detail-table" aria-label="Recurring schedule periods">
+                    <thead>
+                      <tr>
+                        <th scope="col">Days</th>
+                        <th scope="col">Start time</th>
+                        <th scope="col">Stop time</th>
+                        <th scope="col" class="gc-pe-sched-detail-table__actions" aria-label="Remove row"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="gc-pe-sched-detail-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="gc-pe-section-at" class="gc-pe-section" hidden>
+            <div
+              class="gc-if-flyout__field gc-combine-flyout-conflict-scope"
+              data-gc-combine-field-keys="__name"
+            >
+              <label class="gc-if-flyout__label" for="gc-pe-at-name">Name *</label>
+              <input type="text" id="gc-pe-at-name" class="gc-if-flyout__input" required />
+            </div>
+            <div
+              class="gc-if-flyout__field gc-combine-flyout-conflict-scope"
+              data-gc-combine-field-keys="__description"
+            >
+              <label class="gc-if-flyout__label" for="gc-pe-at-desc">Description</label>
+              <textarea id="gc-pe-at-desc" class="gc-if-flyout__textarea" rows="2"></textarea>
+            </div>
+            <div
+              class="gc-if-flyout__field gc-combine-flyout-conflict-scope"
+              data-gc-combine-field-keys="__strategy"
+            >
+              <label class="gc-if-flyout__label" for="gc-pe-at-strategy">Strategy</label>
+              <select id="gc-pe-at-strategy" class="gc-if-flyout__input">
+                <option value="Allow">Allow</option>
+                <option value="Deny">Deny</option>
+              </select>
+            </div>
+            <div
+              class="gc-if-flyout__field gc-combine-flyout-conflict-scope"
+              data-gc-combine-field-keys="__schedule"
+            >
+              <label class="gc-if-flyout__label" for="gc-pe-at-schedule">Schedule</label>
+              <select id="gc-pe-at-schedule" class="gc-if-flyout__input">
+                <option value="All the time">All the time</option>
+                <option value="Work hours (5 Day week)">Work hours (5 Day week)</option>
+                <option value="Work hours (6 Day week)">Work hours (6 Day week)</option>
+                <option value="All Time on Weekdays">All Time on Weekdays</option>
+                <option value="All Time on Weekends">All Time on Weekends</option>
+                <option value="All Time on Sunday">All Time on Sunday</option>
+                <option value="All Days 10:00 to 19:00">All Days 10:00 to 19:00</option>
+              </select>
+            </div>
+          </div>
+
+          <div
+            id="gc-pe-section-sq"
+            class="gc-pe-section gc-combine-flyout-conflict-scope"
+            data-gc-combine-field-keys="__sq_detail"
+            hidden
+          >
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-sq-name">Name *</label>
+              <input type="text" id="gc-pe-sq-name" class="gc-if-flyout__input" required />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-sq-desc">Description</label>
+              <textarea id="gc-pe-sq-desc" class="gc-if-flyout__textarea" rows="2"></textarea>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-sq-cycle">Cycle type</label>
+              <select id="gc-pe-sq-cycle" class="gc-if-flyout__input">
+                <option value="Cyclic">Cyclic</option>
+                <option value="NonCyclic">NonCyclic</option>
+              </select>
+            </div>
+            <div id="gc-pe-sq-cycle-hm-wrap">
+              <div class="gc-if-flyout__field-row">
+                <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                  <label class="gc-if-flyout__label" for="gc-pe-sq-ch">Cycle hours</label>
+                  <input
+                    type="number"
+                    id="gc-pe-sq-ch"
+                    class="gc-if-flyout__input"
+                    inputmode="numeric"
+                    step="1"
+                  />
+                </div>
+                <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                  <label class="gc-if-flyout__label" for="gc-pe-sq-cm">Cycle minutes</label>
+                  <input
+                    type="number"
+                    id="gc-pe-sq-cm"
+                    class="gc-if-flyout__input"
+                    inputmode="numeric"
+                    min="0"
+                    max="59"
+                    step="1"
+                    placeholder="0–59"
+                  />
+                </div>
+              </div>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-sq-period">Period</label>
+              <select id="gc-pe-sq-period" class="gc-if-flyout__input">
+                <option value="Days">Day</option>
+                <option value="Weekly">Week</option>
+                <option value="Monthly" selected>Month</option>
+                <option value="Yearly">Year</option>
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <span class="gc-if-flyout__label">Validity</span>
+              <label class="gc-if-flyout__field-inline"
+                ><input type="checkbox" id="gc-pe-sq-val-unl" /> Unlimited</label>
+              <label class="gc-if-flyout__label" for="gc-pe-sq-val-months">Months</label>
+              <input
+                type="number"
+                id="gc-pe-sq-val-months"
+                class="gc-if-flyout__input"
+                inputmode="numeric"
+                min="1"
+                max="122"
+                step="1"
+              />
+            </div>
+            <div class="gc-if-flyout__field">
+              <span class="gc-if-flyout__label">Maximum hours</span>
+              <label class="gc-if-flyout__field-inline"
+                ><input type="checkbox" id="gc-pe-sq-mxh-unl" /> Unlimited</label>
+              <div class="gc-if-flyout__field-row">
+                <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                  <label class="gc-if-flyout__label" for="gc-pe-sq-mxh-hours">Hours</label>
+                  <input
+                    type="number"
+                    id="gc-pe-sq-mxh-hours"
+                    class="gc-if-flyout__input"
+                    inputmode="numeric"
+                    min="0"
+                    step="1"
+                  />
+                </div>
+                <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                  <label class="gc-if-flyout__label" for="gc-pe-sq-mxh-min">Minutes</label>
+                  <input
+                    type="number"
+                    id="gc-pe-sq-mxh-min"
+                    class="gc-if-flyout__input"
+                    inputmode="numeric"
+                    min="0"
+                    max="59"
+                    step="1"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            id="gc-pe-section-dt"
+            class="gc-pe-section gc-combine-flyout-conflict-scope"
+            data-gc-combine-field-keys="__dt_detail"
+            hidden
+          >
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-dt-name">Name *</label>
+              <input type="text" id="gc-pe-dt-name" class="gc-if-flyout__input" required />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-dt-desc">Description</label>
+              <textarea id="gc-pe-dt-desc" class="gc-if-flyout__textarea" rows="2"></textarea>
+            </div>
+            <div class="gc-if-flyout__field">
+              <span class="gc-if-flyout__label">Restriction based on</span>
+              <label><input type="radio" name="gc-pe-dt-restrict" value="TotalDataTransfer" checked /> Total</label>
+              <label><input type="radio" name="gc-pe-dt-restrict" value="IndividualDataTransfer" /> Individual</label>
+            </div>
+            <div class="gc-if-flyout__field">
+              <span class="gc-if-flyout__label">Cycle type</span>
+              <label><input type="radio" name="gc-pe-dt-cyclic" value="Cyclic" checked /> Cyclic</label>
+              <label><input type="radio" name="gc-pe-dt-cyclic" value="NonCyclic" /> Non-cyclic</label>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-dt-period">Cycle period</label>
+              <select id="gc-pe-dt-period" class="gc-if-flyout__input">
+                <option value="Day">Day</option>
+                <option value="Week">Week</option>
+                <option value="Month">Month</option>
+                <option value="Year">Year</option>
+              </select>
+            </div>
+            <div class="gc-if-flyout__field" id="gc-pe-dt-total-wrap">
+              <label class="gc-if-flyout__label" for="gc-pe-dt-cycmb">Cycle traffic (MB)</label>
+              <input type="text" id="gc-pe-dt-cycmb" class="gc-if-flyout__input" />
+            </div>
+            <div class="gc-if-flyout__field" id="gc-pe-dt-max-wrap">
+              <label><input type="checkbox" id="gc-pe-dt-max-unl" /> Unlimited maximum</label>
+              <label class="gc-if-flyout__label" for="gc-pe-dt-maxmb">Maximum (MB)</label>
+              <input type="text" id="gc-pe-dt-maxmb" class="gc-if-flyout__input" />
+            </div>
+            <div id="gc-pe-dt-indiv-wrap" hidden>
+              <div class="gc-if-flyout__field">
+                <label><input type="checkbox" id="gc-pe-dt-cu-unl" /> Unlimited cycle upload</label>
+                <input type="text" id="gc-pe-dt-cumb" class="gc-if-flyout__input" placeholder="Cycle upload MB" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label><input type="checkbox" id="gc-pe-dt-cd-unl" /> Unlimited cycle download</label>
+                <input type="text" id="gc-pe-dt-cdmb" class="gc-if-flyout__input" placeholder="Cycle download MB" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label><input type="checkbox" id="gc-pe-dt-mu-unl" /> Unlimited max upload</label>
+                <input type="text" id="gc-pe-dt-mumb" class="gc-if-flyout__input" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label><input type="checkbox" id="gc-pe-dt-md-unl" /> Unlimited max download</label>
+                <input type="text" id="gc-pe-dt-mdmb" class="gc-if-flyout__input" />
+              </div>
+            </div>
+          </div>
+
+          <div
+            id="gc-pe-section-vpn"
+            class="gc-pe-section gc-combine-flyout-conflict-scope"
+            data-gc-combine-field-keys="__vpn_detail"
+            hidden
+          >
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-name">Name *</label>
+              <input type="text" id="gc-pe-vpn-name" class="gc-if-flyout__input" required />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-desc">Description</label>
+              <textarea id="gc-pe-vpn-desc" class="gc-if-flyout__textarea" rows="2"></textarea>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-keying">Keying method</label>
+              <select id="gc-pe-vpn-keying" class="gc-if-flyout__input">
+                <option value="Automatic">Automatic</option>
+                <option value="Manual">Manual</option>
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-rekey">Allow re-keying</label>
+              <select id="gc-pe-vpn-rekey" class="gc-if-flyout__input">
+                <option value="Enable">Enable</option>
+                <option value="Disable">Disable</option>
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-tries">Key negotiation tries (0 = unlimited)</label>
+              <input type="text" id="gc-pe-vpn-tries" class="gc-if-flyout__input" value="0" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-authmode">Authentication mode</label>
+              <select id="gc-pe-vpn-authmode" class="gc-if-flyout__input">
+                <option value="MainMode">Main mode</option>
+                <option value="AggressiveMode">Aggressive mode</option>
+              </select>
+            </div>
+            <p class="gc-if-flyout__section-label">Phase 1</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p1-kl">Key life (seconds)</label>
+              <input type="text" id="gc-pe-vpn-p1-kl" class="gc-if-flyout__input" value="5400" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p1-rm">Re-key margin</label>
+              <input type="text" id="gc-pe-vpn-p1-rm" class="gc-if-flyout__input" value="360" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p1-rnd">Randomize re-key margin %</label>
+              <input type="text" id="gc-pe-vpn-p1-rnd" class="gc-if-flyout__input" value="50" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-dh-trigger">DH group (key group)</label>
+              <div class="gc-multiselect__control gc-pe-vpn-dh-control" id="gc-pe-vpn-dh-root">
+                <button
+                  type="button"
+                  id="gc-pe-vpn-dh-trigger"
+                  class="gc-multiselect__trigger gc-pe-vpn-dh-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="gc-pe-vpn-dh-dropdown"
+                >
+                  <span id="gc-pe-vpn-dh-trigger-text" class="gc-multiselect__trigger-text">Select DH groups…</span>
+                  <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                </button>
+                <div
+                  id="gc-pe-vpn-dh-dropdown"
+                  class="gc-multiselect__dropdown gc-pe-vpn-dh-dropdown"
+                  hidden
+                  role="listbox"
+                  aria-multiselectable="true"
+                >
+                  <div id="gc-pe-vpn-dh-options" class="gc-pe-vpn-dh-options">
+                    {% for g in gc_vpn_dh_groups %}
+                      <label class="gc-multiselect__option gc-pe-vpn-dh-option">
+                        <input type="checkbox" value="{{ g }}" data-gc-vpn-dh="1" />
+                        <span>{{ g }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p1-enc">Encryption</label>
+              <select id="gc-pe-vpn-p1-enc" class="gc-if-flyout__input">
+                {% for v, lab, cls in gc_vpn_p1_enc %}
+                  <option value="{{ v }}" {% if cls %}class="{{ cls }}"{% endif %}>{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p1-auth">Authentication</label>
+              <select id="gc-pe-vpn-p1-auth" class="gc-if-flyout__input">
+                {% for v, lab in gc_vpn_auth %}
+                  <option value="{{ v }}">{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <p class="gc-if-flyout__section-label">Phase 2</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p2-pfs">PFS group (DH group)</label>
+              <select id="gc-pe-vpn-p2-pfs" class="gc-if-flyout__input">
+                <option value="">—</option>
+                <option value="None">None</option>
+                <option value="SameasPhase-I">Same as phase-I</option>
+                {% for g in gc_vpn_dh_groups %}
+                  <option value="{{ g }}">{{ g }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p2-kl">Key life (seconds)</label>
+              <input type="text" id="gc-pe-vpn-p2-kl" class="gc-if-flyout__input" value="3600" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p2-enc">Encryption</label>
+              <select id="gc-pe-vpn-p2-enc" class="gc-if-flyout__input">
+                {% for v, lab, cls in gc_vpn_p2_enc %}
+                  <option value="{{ v }}" {% if cls %}class="{{ cls }}"{% endif %}>{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-p2-auth">Authentication</label>
+              <select id="gc-pe-vpn-p2-auth" class="gc-if-flyout__input">
+                {% for v, lab in gc_vpn_auth %}
+                  <option value="{{ v }}">{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <p class="gc-if-flyout__section-label">Dead peer detection</p>
+            <div class="gc-if-flyout__field">
+              <label><input type="checkbox" id="gc-pe-vpn-dpd" /> Enable</label>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-dpd-every">Check peer after every (sec)</label>
+              <input type="text" id="gc-pe-vpn-dpd-every" class="gc-if-flyout__input" value="30" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-dpd-wait">Wait for response (sec)</label>
+              <input type="text" id="gc-pe-vpn-dpd-wait" class="gc-if-flyout__input" value="120" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-pe-vpn-dpd-act">When peer unreachable</label>
+              <select id="gc-pe-vpn-dpd-act" class="gc-if-flyout__input">
+                <option value="Hold">Hold</option>
+                <option value="Disconnect">Disconnect</option>
+                <option value="ReInitiate">Re-initiate</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-wfp-flyout__footer">
+        <button type="button" class="btn btn--secondary" id="gc-pe-cancel">Cancel</button>
+        <button type="submit" class="btn primary" id="gc-pe-save">Save</button>
+      </footer>
+    </form>
+  </div>
+</div>

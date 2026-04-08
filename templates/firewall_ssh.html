@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block body_class %}gc-page-ssh-terminal{% endblock %}
+{% block title %}SSH: {{ fw.name or fw.host }} · Ground Control{% endblock %}
+{% block page_title %}SSH: {{ fw.name or fw.host }}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+{% block app_content_dock %}{% endblock %}
+{% block content %}
+<main class="layout single gc-firewall-ssh-page">
+  <div class="gc-firewall-ssh-toolbar">
+    <button type="button" class="btn" id="gc-firewall-ssh-disconnect">Disconnect</button>
+    <button type="button" class="btn btn--primary" id="gc-firewall-ssh-reconnect">Reconnect</button>
+  </div>
+  <p id="gc-firewall-ssh-status" class="gc-firewall-ssh-status settings-form__status muted" role="status" aria-live="polite">
+    Connecting…
+  </p>
+  <section class="panel grow gc-firewall-ssh-panel">
+    <div id="gc-firewall-ssh-terminal" class="gc-firewall-ssh-terminal" aria-label="SSH terminal"></div>
+  </section>
+</main>
+<style>
+  .gc-firewall-ssh-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+    margin: 0;
+  }
+  .gc-firewall-ssh-status {
+    flex-shrink: 0;
+    margin: 0;
+    min-height: 1.25em;
+  }
+  .gc-firewall-ssh-page.layout {
+    padding: 0;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+  }
+  .gc-firewall-ssh-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+  .gc-firewall-ssh-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+  .gc-firewall-ssh-terminal {
+    flex: 1;
+    min-height: 0;
+    border-radius: 0;
+    overflow: hidden;
+    border: 0;
+    background: #0d1117;
+  }
+  .gc-firewall-ssh-terminal .xterm {
+    height: 100%;
+    padding: 0;
+  }
+</style>
+{% endblock %}
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" crossorigin="anonymous" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js" crossorigin="anonymous"></script>
+<script>
+  (function () {
+    var WS_PATH = {{ ssh_ws_path | tojson }};
+    var WS_LAUNCH_URL = {{ ssh_ws_launch_url | tojson }};
+    var statusEl = document.getElementById("gc-firewall-ssh-status");
+    var hostEl = document.getElementById("gc-firewall-ssh-terminal");
+    var btnDisc = document.getElementById("gc-firewall-ssh-disconnect");
+    var btnRec = document.getElementById("gc-firewall-ssh-reconnect");
+    if (!hostEl || typeof Terminal === "undefined") {
+      if (statusEl) statusEl.textContent = "Terminal library failed to load.";
+      return;
+    }
+
+    var term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: "Consolas, 'Cascadia Code', 'Courier New', monospace",
+      theme: { background: "#0d1117", foreground: "#e6edf3" },
+    });
+    var fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(hostEl);
+
+    var dec = new TextDecoder("utf-8", { fatal: false });
+    var ws = null;
+    var intentionalClose = false;
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+
+    function detachWsHandlers(sock) {
+      if (!sock) return;
+      sock.onopen = null;
+      sock.onmessage = null;
+      sock.onerror = null;
+      sock.onclose = null;
+    }
+
+    function setConnected(connected) {
+      if (btnDisc) btnDisc.disabled = !connected;
+      if (btnRec) btnRec.disabled = connected;
+    }
+
+    function sendResize() {
+      try {
+        fitAddon.fit();
+      } catch (e) {}
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            t: "resize",
+            cols: term.cols,
+            rows: term.rows,
+          }),
+        );
+      }
+    }
+
+    function attachWsHandlers(socket) {
+      socket.onopen = function () {
+        if (socket !== ws) return;
+        intentionalClose = false;
+        if (statusEl) statusEl.textContent = "";
+        setConnected(true);
+        sendResize();
+        term.focus();
+      };
+
+      socket.onmessage = function (ev) {
+        if (socket !== ws) return;
+        if (typeof ev.data === "string") {
+          try {
+            var j = JSON.parse(ev.data);
+            if (j && j.type === "error") {
+              if (statusEl) statusEl.textContent = j.message || "Error";
+              term.writeln("\r\n\x1b[31m" + (j.message || "Error") + "\x1b[0m");
+              return;
+            }
+          } catch (e) {}
+          term.write(ev.data);
+          return;
+        }
+        var u8 = new Uint8Array(ev.data);
+        term.write(dec.decode(u8, { stream: true }));
+      };
+
+      socket.onerror = function () {
+        if (socket !== ws) return;
+        if (statusEl) statusEl.textContent = "WebSocket error.";
+      };
+
+      socket.onclose = function (ev) {
+        if (socket !== ws) return;
+        setConnected(false);
+        if (intentionalClose) {
+          if (statusEl) statusEl.textContent = "Disconnected.";
+        } else if (statusEl && !statusEl.textContent) {
+          var code = ev && typeof ev.code === "number" ? ev.code : 0;
+          if (code && code !== 1000) {
+            statusEl.textContent = "Disconnected (connection closed, code " + code + ").";
+          } else {
+            statusEl.textContent = "Disconnected.";
+          }
+        }
+      };
+    }
+
+    async function resolveWsPath() {
+      if (!WS_LAUNCH_URL) return WS_PATH;
+      try {
+        var res = await fetch(WS_LAUNCH_URL, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) return WS_PATH;
+        var data = await res.json();
+        if (data && typeof data.websocket_path === "string" && data.websocket_path) {
+          return data.websocket_path;
+        }
+      } catch (e) {}
+      return WS_PATH;
+    }
+
+    async function connectWs() {
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+      dec = new TextDecoder("utf-8", { fatal: false });
+      if (statusEl) statusEl.textContent = "Connecting…";
+      setConnected(false);
+      var prev = ws;
+      detachWsHandlers(prev);
+      if (prev && (prev.readyState === WebSocket.OPEN || prev.readyState === WebSocket.CONNECTING)) {
+        try {
+          prev.close();
+        } catch (e) {}
+      }
+      var path = await resolveWsPath();
+      try {
+        ws = new WebSocket(proto + "//" + location.host + path);
+      } catch (e) {
+        ws = null;
+        if (statusEl) statusEl.textContent = "Invalid WebSocket URL.";
+        return;
+      }
+      ws.binaryType = "arraybuffer";
+      attachWsHandlers(ws);
+    }
+
+    term.onData(function (data) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(new TextEncoder().encode(data));
+    });
+
+    if (btnDisc) {
+      btnDisc.addEventListener("click", function () {
+        intentionalClose = true;
+        var cur = ws;
+        detachWsHandlers(cur);
+        if (cur && (cur.readyState === WebSocket.OPEN || cur.readyState === WebSocket.CONNECTING)) {
+          try {
+            cur.close();
+          } catch (e) {}
+        }
+        ws = null;
+        if (statusEl) statusEl.textContent = "Disconnected.";
+        setConnected(false);
+      });
+    }
+    if (btnRec) {
+      btnRec.addEventListener("click", function () {
+        intentionalClose = false;
+        term.reset();
+        if (statusEl) statusEl.textContent = "";
+        connectWs();
+      });
+    }
+
+    connectWs();
+
+    window.addEventListener("resize", function () {
+      sendResize();
+    });
+  })();
+</script>
+{% endblock %}

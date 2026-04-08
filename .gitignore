@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.coverage
+
+# Editor / local tooling
+.cursor/
+
+# Virtual environments
+.venv
+
+# App
+logs/
+ground_control.db
+ground_control_monitor.db
+ground_control_secrets.db
+*.db-shm
+*.db-wal
+.env
+.fernet_key
+.session_secret
+.gc_security_state.json
+.gc_tls/
+sophos-central-gui/
+Design.png

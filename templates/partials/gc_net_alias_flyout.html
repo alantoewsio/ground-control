@@ -1,0 +1,78 @@
+{# Alias add/edit — see mocks/alias add.png; parent list includes configured interfaces, bridge pairs, and LAG masters; IP version follows parent IPv4/IPv6 flags. #}
+<div id="gc-net-alias-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-alias-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-alias-flyout-title" class="gc-if-flyout__title">Edit alias</h2>
+    </header>
+    <form id="gc-alias-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="gc-if-flyout__section-label">General settings</p>
+          <div id="gc-alias-flyout-target-fw-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-alias-flyout-add-firewall">Firewall <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-alias-flyout-add-firewall" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div id="gc-alias-flyout-target-cfg-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-alias-flyout-add-configuration">Configuration <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-alias-flyout-add-configuration" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-alias-flyout-iface">Parent interface <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-alias-flyout-iface" class="gc-if-flyout__input gc-if-flyout__select" required></select>
+            <p id="gc-alias-flyout-iface-addr-hint" class="gc-alias-flyout__parent-addr" hidden aria-live="polite"></p>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">IP version</span>
+            <div class="gc-if-flyout__radios">
+              <label><input type="radio" name="gc-alias-ipfam" value="ipv4" checked /> IPv4</label>
+              <label><input type="radio" name="gc-alias-ipfam" value="ipv6" /> IPv6</label>
+            </div>
+          </div>
+          <div id="gc-alias-flyout-ipv4-block" class="gc-if-flyout__field-row">
+            <div class="gc-if-flyout__field gc-if-flyout__field--half">
+              <label class="gc-if-flyout__label" for="gc-alias-flyout-ipv4">IPv4 <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+              <input type="text" id="gc-alias-flyout-ipv4" class="gc-if-flyout__input mono" autocomplete="off" />
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--half">
+              <label class="gc-if-flyout__label" for="gc-alias-flyout-netmask">Netmask <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+              <select id="gc-alias-flyout-netmask" class="gc-if-flyout__input gc-if-flyout__select"></select>
+            </div>
+          </div>
+          <div id="gc-alias-flyout-ipv6-block" class="gc-if-flyout__field-row" hidden aria-hidden="true">
+            <div class="gc-if-flyout__field gc-if-flyout__field--grow">
+              <label class="gc-if-flyout__label" for="gc-alias-flyout-ipv6">IPv6 <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+              <input type="text" id="gc-alias-flyout-ipv6" class="gc-if-flyout__input mono" autocomplete="off" />
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--narrow">
+              <label class="gc-if-flyout__label" for="gc-alias-flyout-prefix">Prefix</label>
+              <input
+                type="text"
+                id="gc-alias-flyout-prefix"
+                class="gc-if-flyout__input mono gc-if-flyout__input--w-short"
+                inputmode="numeric"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-alias-flyout-save" disabled>Save</button>
+        <button type="button" class="link-btn" id="gc-alias-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

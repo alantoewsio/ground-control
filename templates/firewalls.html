@@ -1,0 +1,3133 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "inventory" %}
+{% set inventory_tab = inventory_tab | default("firewalls") %}
+{% block title %}{% if inventory_tab == "configurations" %}Configurations · Firewalls · Ground Control{% else %}Firewalls · Ground Control{% endif %}{% endblock %}
+{% block page_title %}{% if inventory_tab == "configurations" %}Configurations{% else %}Firewalls{% endif %}{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">
+      {% if inventory_tab == "configurations" %}Configurations{% else %}Inventory{% endif %}
+    </li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<div id="gc-fw-inv-subtitle-group">
+  <p class="page-header__subtitle" id="gc-fw-inv-subtitle-firewalls" {% if inventory_tab != "firewalls" %}hidden{% endif %}>
+    Register hosts and test Sophos API access.
+  </p>
+  <p class="page-header__subtitle" id="gc-fw-inv-subtitle-configurations" {% if inventory_tab != "configurations" %}hidden{% endif %}>
+    Virtual firewalls: name, describe, set assigned firewalls, then edit Network and Hosts &amp; Services in the sidebar.
+    Changes are stored locally — not sent through the task queue.
+  </p>
+</div>
+{% endblock %}
+{% block content %}
+<main class="layout single">
+  <section class="firewalls-page">
+    <dialog class="modal" id="add-firewall-modal" aria-labelledby="add-firewall-title">
+      <form method="post" action="{{ url_firewall_create }}" class="form modal-form" id="add-firewall-form">
+        <h3 id="add-firewall-title" class="modal-title">Add firewall</h3>
+        <label>
+          <span>Name <span class="muted">(optional)</span></span>
+          <input type="text" name="name" autocomplete="off" placeholder="e.g. NYC primary" />
+        </label>
+        <label>
+          <span>Description <span class="muted">(optional)</span></span>
+          <textarea name="description" rows="3" placeholder="Notes about this firewall"></textarea>
+        </label>
+        <label>
+          <span>Host</span>
+          <input type="text" name="host" required autocomplete="off" placeholder="10.0.0.1 or hostname" />
+        </label>
+        <label>
+          <span>Port</span>
+          <input type="number" name="port" value="4444" min="1" max="65535" required />
+        </label>
+        <label>
+          <span>API request timeout (seconds)</span>
+          <input
+            type="number"
+            name="api_request_timeout_seconds"
+            value="120"
+            min="5"
+            max="600"
+            required
+            title="HTTP read timeout for Sophos XML API (task queue, sync, test connection)"
+          />
+        </label>
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" required autocomplete="username" />
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" required autocomplete="new-password" />
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="verify_ssl" checked />
+          <span>Verify TLS certificate</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="monitor_enabled" id="add-fw-monitor-enabled" checked />
+          <span>Monitor</span>
+        </label>
+        <p class="muted" style="margin: -0.25rem 0 0 1.75rem; font-size: 0.875rem">
+          When enabled, the scheduler probes this firewall&rsquo;s web admin port on a repeating interval and logs latency or errors.
+        </p>
+        <label class="add-fw-monitor-interval-row" for="add-fw-monitor-interval">
+          <span>Monitoring interval (minutes)</span>
+          <input
+            type="number"
+            id="add-fw-monitor-interval"
+            name="monitor_interval_minutes"
+            min="1"
+            max="1440"
+            value="5"
+            required
+          />
+        </label>
+        <div class="gc-tag-editor gc-tag-editor--modal" data-gc-tag-editor>
+          <span class="gc-if-flyout__label">Tags <span class="muted">(optional)</span></span>
+          <div class="gc-tag-editor__chips" data-gc-tag-chips aria-live="polite"></div>
+          <div class="gc-tag-editor__combo">
+            <div class="gc-tag-editor__row">
+              <input
+                type="text"
+                class="gc-tag-editor__input gc-if-flyout__input"
+                data-gc-tag-input
+                maxlength="64"
+                placeholder="Search tags or type a new one"
+                autocomplete="off"
+                aria-label="Add tag"
+                aria-autocomplete="list"
+                aria-controls="gc-tag-suggest-list-add"
+                aria-expanded="false"
+              />
+              <button type="button" class="btn btn--secondary" data-gc-tag-add>Add</button>
+            </div>
+            <div class="gc-tag-editor__suggest-wrap" data-gc-tag-suggest-wrap hidden>
+              <ul
+                id="gc-tag-suggest-list-add"
+                class="gc-tag-editor__suggest"
+                role="listbox"
+                aria-label="Tags used on other firewalls"
+                data-gc-tag-suggest-list
+              ></ul>
+            </div>
+          </div>
+          <input type="hidden" name="tags_json" data-gc-tag-hidden value="[]" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="cancel-add-firewall">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal gc-delete-confirm-dialog" id="gc-fw-delete-dialog" aria-labelledby="gc-fw-delete-dialog-title">
+      <div class="form modal-form">
+        <h3 id="gc-fw-delete-dialog-title" class="modal-title">Delete firewalls</h3>
+        <p id="gc-fw-delete-dialog-lead" class="muted"></p>
+        <div class="modal-actions gc-delete-confirm-dialog__actions">
+          <button type="button" class="btn" id="gc-fw-delete-dialog-cancel">Cancel</button>
+          <button type="button" class="btn destructive" id="gc-fw-delete-dialog-confirm"></button>
+        </div>
+      </div>
+    </dialog>
+    <dialog class="modal" id="gc-fw-tags-dialog" aria-labelledby="gc-fw-tags-dialog-title">
+      <div class="form modal-form">
+        <h3 id="gc-fw-tags-dialog-title" class="modal-title">Set tags on selected firewalls</h3>
+        <p id="gc-fw-tags-dialog-lead" class="muted"></p>
+        <div class="gc-tag-editor gc-tag-editor--modal" data-gc-tag-editor data-gc-fw-batch-tag-editor>
+          <span class="gc-if-flyout__label">Tags to add</span>
+          <div class="gc-tag-editor__chips" data-gc-tag-chips aria-live="polite"></div>
+          <div class="gc-tag-editor__combo">
+            <div class="gc-tag-editor__row">
+              <input
+                type="text"
+                class="gc-tag-editor__input gc-if-flyout__input"
+                data-gc-tag-input
+                maxlength="64"
+                placeholder="Search tags or type a new one"
+                autocomplete="off"
+                aria-label="Add tag"
+                aria-autocomplete="list"
+                aria-controls="gc-tag-suggest-list-batch"
+                aria-expanded="false"
+              />
+              <button type="button" class="btn btn--secondary" data-gc-tag-add>Add</button>
+            </div>
+            <div class="gc-tag-editor__suggest-wrap" data-gc-tag-suggest-wrap hidden>
+              <ul
+                id="gc-tag-suggest-list-batch"
+                class="gc-tag-editor__suggest"
+                role="listbox"
+                aria-label="Tags used on other firewalls"
+                data-gc-tag-suggest-list
+              ></ul>
+            </div>
+          </div>
+          <input type="hidden" data-gc-tag-hidden value="[]" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="gc-fw-tags-dialog-cancel">Cancel</button>
+          <button type="button" class="btn primary" id="gc-fw-tags-dialog-apply">Apply tags</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div
+      class="gc-tabs gc-fw-inventory-tabs"
+      role="tablist"
+      aria-label="Inventory views"
+      id="gc-fw-inv-main-tablist"
+    >
+      <button
+        type="button"
+        class="gc-tabs__tab{% if inventory_tab == 'firewalls' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{% if inventory_tab == 'firewalls' %}true{% else %}false{% endif %}"
+        id="gc-fw-inv-tab-firewalls"
+        data-gc-fw-inv-tab="firewalls"
+      >
+        Firewalls
+      </button>
+      <button
+        type="button"
+        class="gc-tabs__tab{% if inventory_tab == 'configurations' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{% if inventory_tab == 'configurations' %}true{% else %}false{% endif %}"
+        id="gc-fw-inv-tab-configurations"
+        data-gc-fw-inv-tab="configurations"
+      >
+        Configurations
+      </button>
+    </div>
+    <div class="gc-tab-panels gc-fw-inventory-tab-panels">
+      <div
+        class="gc-tab-panel{% if inventory_tab == 'firewalls' %} is-active{% endif %}"
+        role="tabpanel"
+        aria-labelledby="gc-fw-inv-tab-firewalls"
+        id="gc-fw-inv-panel-firewalls"
+        {% if inventory_tab != "firewalls" %}hidden{% endif %}
+      >
+    <div class="split">
+      <aside class="filters filters--collapsed" aria-label="Filters" id="gc-fw-filters-aside">
+        <div id="gc-fw-filters-drawer" class="filters__drawer" hidden></div>
+      </aside>
+
+      <div class="content-pane">
+        <div class="table-wrap">
+          <div class="firewalls-page__head">
+            <h2>Registered firewalls</h2>
+          </div>
+          <div class="toolbar">
+            <div class="toolbar__sheet">
+              <div class="toolbar__line toolbar__line--main">
+                <div class="toolbar__filters">
+                  <div class="filters__head">
+                    <button
+                      type="button"
+                      class="filters__toggle"
+                      id="gc-fw-filters-toggle"
+                      aria-expanded="false"
+                      aria-controls="gc-fw-filters-drawer"
+                      aria-label="Filters"
+                      title="Filters"
+                    >
+                      <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                      </svg>
+                      <span class="filters__title-label">Filters</span>
+                    </button>
+                    <div class="filters__head-trail">
+                      <div class="filters__head-actions" id="gc-fw-facet-head-actions" hidden>
+                        <span class="filters__facet-count" id="gc-fw-facet-count" aria-live="polite"></span>
+                        <button type="button" class="filters__facet-reset link-btn" id="gc-fw-facet-reset" hidden>
+                          Reset
+                        </button>
+                      </div>
+                      <nav class="gc-net-entity-quick-type" aria-label="Quick filters">
+                        <button type="button" class="gc-net-entity-quick-type__btn" id="gc-fw-quick-selected-scope">
+                          Selected firewalls
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
+                <div class="toolbar__fw-toolbar-end">
+                  <div class="toolbar__bulk-actions">
+                    <button type="button" class="btn btn--secondary" id="gc-fw-delete-selected" disabled>
+                      Delete
+                    </button>
+                    <button type="button" class="btn btn--secondary" id="gc-fw-set-tags-selected" disabled>
+                      Set tags
+                    </button>
+                    <button type="button" class="btn btn--secondary" id="gc-fw-sync-all">Sync all</button>
+                    <button type="button" class="btn btn--secondary" id="gc-fw-sync-selected" disabled>
+                      Sync selected
+                    </button>
+                    <button type="button" class="btn primary" id="open-add-firewall">Add firewall</button>
+                  </div>
+                  <div class="toolbar__search-cluster">
+                    <div class="search-field">
+                      <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                        />
+                      </svg>
+                      <input
+                        type="search"
+                        id="gc-fw-search"
+                        class="search-field__input"
+                        placeholder="Search"
+                        autocomplete="off"
+                        aria-label="Search firewalls"
+                      />
+                    </div>
+                    <span
+                      id="gc-fw-cols-trigger"
+                      class="toolbar__cols-icon"
+                      role="button"
+                      tabindex="0"
+                      aria-expanded="false"
+                      aria-haspopup="true"
+                      aria-controls="gc-fw-cols-panel"
+                      title="Columns"
+                      aria-label="Choose table columns"
+                    >
+                      <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                        />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-scroll">
+            <table class="data-table data-table--dense" id="gc-fw-table">
+              <thead>
+                <tr>
+                  <th class="th-check" scope="col">
+                    <input type="checkbox" id="gc-fw-select-all" title="Select all" aria-label="Select all visible firewalls" />
+                  </th>
+                  <th scope="col" data-gc-col="name">Name</th>
+                  <th scope="col" data-gc-col="description">Description</th>
+                  <th scope="col" data-gc-col="host">Host</th>
+                  <th scope="col" data-gc-col="port" data-gc-sort="number">Port</th>
+                  <th scope="col" data-gc-col="user">User</th>
+                  <th scope="col" data-gc-col="device_hostname">Device hostname</th>
+                  <th scope="col" data-gc-col="serial">Serial number</th>
+                  <th scope="col" data-gc-col="model">Model</th>
+                  <th scope="col" data-gc-col="firmware_version">Firmware</th>
+                  <th scope="col" data-gc-col="tls">TLS verify</th>
+                  <th scope="col" data-gc-col="monitor">Monitor</th>
+                  <th scope="col" data-gc-col="tags">Tags</th>
+                  <th scope="col" data-gc-col="sync">Sync</th>
+                  <th scope="col" class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="gc-fw-tbody">
+                {% for fw in firewalls %}
+                {% set fw_cached = fw_cached_sync_entities.get(fw.id, []) %}
+                {% set fw_tags = fw.tags_list() %}
+                {% set fw_tags_sorted = fw.tags_sorted() %}
+                {% set fw_tags_search = (fw_tags | join(' ')) | lower %}
+                <tr
+                  class="gc-fw-data-row gc-fw-row--clickable"
+                  data-fw-id="{{ fw.id }}"
+                  data-fw-sync-url="{{ request.url_for('api_firewall_config_sync', firewall_id=fw.id) | string }}"
+                  data-fw-sync-cached="{{ (fw_cached | join(' ')) | e }}"
+                  data-fw-tags-json="{{ fw.tags_json | e }}"
+                  data-fw-tags-search="{{ fw_tags_search | e }}"
+                  data-tls="{{ 'yes' if fw.verify_ssl else 'no' }}"
+                  data-fw-name="{{ (fw.name or '') | e }}"
+                  data-fw-description="{{ (fw.description or '') | e }}"
+                  data-fw-device-display="{{ ((fw.device_hostname ~ (' · ' ~ fw.model if fw.model else '')) if fw.device_hostname else '') | e }}"
+                  data-fw-device-hostname="{{ (fw.device_hostname or '') | e }}"
+                  data-fw-serial="{{ (fw.serial_number or '') | e }}"
+                  data-fw-model="{{ (fw.model or '') | e }}"
+                  data-fw-firmware="{{ (fw.firmware_version or '') | e }}"
+                  data-fw-host="{{ fw.host | e }}"
+                  data-fw-port="{{ fw.port }}"
+                  data-fw-api-timeout="{{ fw.api_request_timeout_seconds }}"
+                  data-fw-username="{{ fw.username | e }}"
+                  data-fw-verify="{{ 1 if fw.verify_ssl else 0 }}"
+                  data-fw-monitor="{{ 1 if fw.monitor_enabled else 0 }}"
+                  data-fw-monitor-interval="{{ fw.monitor_interval_minutes }}"
+                  data-search-base="{{ (
+                    (fw.name or '') ~ ' ' ~ (fw.description or '') ~ ' ' ~ fw.host ~ ' ' ~ (fw.port | string) ~ ' '
+                    ~ fw.username ~ ' ' ~ ('yes' if fw.verify_ssl else 'no') ~ ' '
+                    ~ ('yes' if fw.monitor_enabled else 'no') ~ ' '
+                    ~ (fw.device_hostname or '') ~ ' ' ~ (fw.serial_number or '') ~ ' ' ~ (fw.model or '') ~ ' '
+                    ~ (fw.firmware_version or '') ~ ' '
+                    ~ (fw_cached | join(' ')) ~ ' ' ~ fw_tags_search
+                  ) | lower | e }}"
+                  data-search="{{ (
+                    (fw.name or '') ~ ' ' ~ (fw.description or '') ~ ' ' ~ fw.host ~ ' ' ~ (fw.port | string) ~ ' '
+                    ~ fw.username ~ ' ' ~ ('yes' if fw.verify_ssl else 'no') ~ ' '
+                    ~ ('yes' if fw.monitor_enabled else 'no') ~ ' '
+                    ~ (fw.device_hostname or '') ~ ' ' ~ (fw.serial_number or '') ~ ' ' ~ (fw.model or '') ~ ' '
+                    ~ (fw.firmware_version or '') ~ ' '
+                    ~ (fw_cached | join(' ')) ~ ' ' ~ fw_tags_search
+                  ) | lower | e }}"
+                >
+                  <td class="td-check" data-select-stop="1">
+                    <input type="checkbox" class="gc-fw-row-select" value="{{ fw.id }}" aria-label="Select firewall" />
+                  </td>
+                  <td data-gc-col="name" class="gc-net-firewall-pills">
+                    {% set fw_label = fw.name or "—" %}
+                    {% if fw_label != "—" %}
+                    {% set fw_online = fw_online_map.get(fw.id, false) %}
+                    <span class="gc-zone-pill gc-firewall-pill">
+                      <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if fw_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if fw_online else 'offline' }}">
+                        {% if fw_online %}&check;{% else %}-{% endif %}
+                      </span>
+                      {{ fw_label }}
+                    </span>
+                    {% else %}
+                    <span class="muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="desc-cell" data-gc-col="description">{{ (fw.description or "—") | truncate(80) }}</td>
+                  <td class="mono" data-gc-col="host">{{ fw.host }}</td>
+                  <td class="mono" data-gc-col="port">{{ fw.port }}</td>
+                  <td data-gc-col="user">{{ fw.username }}</td>
+                  <td class="mono" data-gc-col="device_hostname">{{ (fw.device_hostname or "—") | truncate(48) }}</td>
+                  <td class="mono" data-gc-col="serial">{{ (fw.serial_number or "—") | truncate(32) }}</td>
+                  <td class="mono" data-gc-col="model">{{ (fw.model or "—") | truncate(40) }}</td>
+                  <td class="mono" data-gc-col="firmware_version">{{ (fw.firmware_version or "—") | truncate(40) }}</td>
+                  <td data-gc-col="tls" class="gc-table-toggle-cell">
+                    <span class="gc-table-toggle gc-table-toggle--static gc-table-toggle--{{ 'on' if fw.verify_ssl else 'off' }}" role="img" aria-label="TLS verify {{ 'on' if fw.verify_ssl else 'off' }}">
+                      <span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span>
+                    </span>
+                  </td>
+                  <td data-gc-col="monitor" class="gc-table-toggle-cell">
+                    <span class="gc-table-toggle gc-table-toggle--static gc-table-toggle--{{ 'on' if fw.monitor_enabled else 'off' }}" role="img" aria-label="Monitor {{ 'on' if fw.monitor_enabled else 'off' }}">
+                      <span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span>
+                    </span>
+                  </td>
+                  <td data-gc-col="tags" class="gc-fw-user-tags">
+                    <div class="gc-fw-sync-pills">
+                      {% if fw_tags_sorted %}
+                      {% for t in fw_tags_sorted %}
+                      <span class="gc-user-tag-pill" title="{{ t | e }}">{{ t | e }}</span>
+                      {% endfor %}
+                      {% else %}
+                      <span class="muted">—</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td data-gc-col="sync" class="gc-fw-sync-pills gc-col-hidden"></td>
+                  <td class="actions">
+                    <a
+                      href="{{ webadmin_browser_url(request, fw) }}"
+                      class="btn-icon"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open WebAdmin{% if request_is_https_session(request) %} (proxied via Ground Control){% else %} (HTTPS to this host and API port){% endif %}"
+                      aria-label="Open WebAdmin in new tab"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+                        />
+                      </svg>
+                    </a>
+                    <a
+                      href="{{ ssh_browser_url(request, fw) }}"
+                      class="btn-icon"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Browser SSH (port 22; sign in interactively in the terminal)"
+                      aria-label="Open browser SSH in new tab"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M4 5a2 2 0 012-2h12a2 2 0 012 2v4H4V5zm0 6h16v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8zm3.5 2.5l2 2-2 2 1.06 1.06L11.56 14 8.56 11l-1.06 1.06zm4.5 4.5h5v1.5h-5V14z"
+                        />
+                      </svg>
+                    </a>
+                    <a
+                      href="{{ request.url_for('firewall_monitor_page', firewall_id=fw.id) }}"
+                      class="btn-icon"
+                      title="Monitor history"
+                      aria-label="Monitor history"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M3 17h2v-7H3v7zm4 0h2V7H7v10zm4 0h2v-4h-2v4zm4 0h2v-8h-2v8zm4 0h2V3h-2v14z"
+                        />
+                      </svg>
+                    </a>
+                    <button
+                      type="button"
+                      class="btn-icon gc-config-viewer-open"
+                      title="View cached configuration"
+                      aria-label="View cached configuration summary"
+                      data-gc-cv-kind="firewall"
+                      data-gc-cv-scope-id="{{ fw.id }}"
+                      data-gc-cv-label="{{ ((fw.name or fw.host) or '') | e }}"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-icon gc-fw-sync-btn"
+                      data-id="{{ fw.id }}"
+                      data-sync-url="{{ request.url_for('api_firewall_config_sync', firewall_id=fw.id) | string }}"
+                      title="Sync cached objects (types chosen in edit panel)"
+                      aria-label="Sync firewall configuration cache"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-icon test-btn"
+                      data-id="{{ fw.id }}"
+                      data-test-url="{{ request.url_for('gc_test_firewall', firewall_id=fw.id) | string }}"
+                      title="Test connection"
+                      aria-label="Test connection"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"
+                        />
+                      </svg>
+                    </button>
+                    <span class="test-result" data-result-for="{{ fw.id }}" hidden></span>
+                  </td>
+                </tr>
+                {% else %}
+                <tr class="gc-fw-placeholder-row">
+                  <td colspan="15" class="muted">No firewalls yet. Click <strong>Add firewall</strong>.</td>
+                </tr>
+                {% endfor %}
+                <tr id="gc-fw-filter-empty" class="gc-fw-filter-empty" hidden>
+                  <td colspan="15" class="muted">No firewalls match the current filters or search.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <footer class="table-footer">
+            <span class="table-footer__count" id="gc-fw-count" aria-live="polite"></span>
+          </footer>
+        </div>
+      </div>
+    </div>
+      </div>
+      <div
+        class="gc-tab-panel{% if inventory_tab == 'configurations' %} is-active{% endif %}"
+        role="tabpanel"
+        aria-labelledby="gc-fw-inv-tab-configurations"
+        id="gc-fw-inv-panel-configurations"
+        {% if inventory_tab != "configurations" %}hidden{% endif %}
+      >
+        {% include "partials/configuration_inventory_main.html" %}
+      </div>
+    </div>
+  </section>
+</main>
+
+{% include "partials/configuration_inventory_overlays.html" %}
+
+<div id="gc-fw-edit-flyout" class="gc-if-flyout gc-fw-inv-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-fw-edit-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-fw-edit-flyout-title" class="gc-if-flyout__title">Edit firewall</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-fw-edit-flyout-close" aria-label="Close" title="Close">
+        ×
+      </button>
+    </header>
+    <form method="post" action="{{ url_firewall_update }}" class="gc-if-flyout__panel-form" id="edit-firewall-form" novalidate>
+      <input type="hidden" name="firewall_id" id="edit-fw-id" value="" />
+      <div class="gc-tabs gc-fw-inv-flyout__tabs" role="tablist" aria-label="Firewall settings" id="gc-fw-edit-flyout-tablist">
+        <button
+          type="button"
+          class="gc-tabs__tab is-active"
+          role="tab"
+          aria-selected="true"
+          id="gc-fw-edit-tab-connection"
+          data-gc-fw-edit-tab="connection"
+        >
+          Connection
+        </button>
+        <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-fw-edit-tab-sync" data-gc-fw-edit-tab="sync">
+          Sync
+        </button>
+        <button
+          type="button"
+          class="gc-tabs__tab"
+          role="tab"
+          aria-selected="false"
+          id="gc-fw-edit-tab-properties"
+          data-gc-fw-edit-tab="properties"
+        >
+          Properties
+        </button>
+      </div>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-tab-panels gc-fw-inv-flyout__tab-panels">
+          <div
+            class="gc-tab-panel gc-if-flyout__form-body is-active"
+            role="tabpanel"
+            aria-labelledby="gc-fw-edit-tab-connection"
+            id="gc-fw-edit-panel-connection"
+          >
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-name">Name <span class="muted">(optional)</span></label>
+              <input type="text" id="edit-fw-name" name="name" class="gc-if-flyout__input" autocomplete="off" placeholder="e.g. NYC primary" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-description">Description <span class="muted">(optional)</span></label>
+              <textarea id="edit-fw-description" name="description" class="gc-if-flyout__input" rows="3" placeholder="Notes about this firewall"></textarea>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-host">Host</label>
+              <input type="text" id="edit-fw-host" name="host" class="gc-if-flyout__input mono" required autocomplete="off" placeholder="10.0.0.1 or hostname" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-port">Port</label>
+              <input type="number" id="edit-fw-port" name="port" class="gc-if-flyout__input mono" value="4444" min="1" max="65535" required />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-api-timeout">API request timeout (seconds)</label>
+              <input
+                type="number"
+                id="edit-fw-api-timeout"
+                name="api_request_timeout_seconds"
+                class="gc-if-flyout__input mono"
+                value="120"
+                min="5"
+                max="600"
+                required
+                title="HTTP timeout for Sophos XML API calls from Ground Control"
+              />
+            </div>
+            <p class="gc-fw-inv-flyout__hint muted">
+              Used for sync, task queue pushes, and test connection. Minimum 5s, maximum 600s.
+            </p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-username">Username</label>
+              <input type="text" id="edit-fw-username" name="username" class="gc-if-flyout__input" required autocomplete="username" />
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="edit-fw-password">Password</label>
+              <input
+                type="password"
+                id="edit-fw-password"
+                name="password"
+                class="gc-if-flyout__input"
+                autocomplete="new-password"
+                placeholder="Leave blank to keep current password"
+              />
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+              <label class="gc-if-flyout__toggle-label">
+                <input type="checkbox" id="edit-fw-verify_ssl" name="verify_ssl" />
+                <span>Verify TLS certificate</span>
+              </label>
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+              <label class="gc-if-flyout__toggle-label">
+                <input type="checkbox" id="edit-fw-monitor_enabled" name="monitor_enabled" />
+                <span>Monitor</span>
+              </label>
+            </div>
+            <div class="gc-if-flyout__field" id="edit-fw-monitor-interval-wrap">
+              <label class="gc-if-flyout__label" for="edit-fw-monitor-interval">Monitoring interval (minutes)</label>
+              <input
+                type="number"
+                id="edit-fw-monitor-interval"
+                name="monitor_interval_minutes"
+                class="gc-if-flyout__input mono"
+                min="1"
+                max="1440"
+                value="5"
+                required
+              />
+            </div>
+            <p class="gc-fw-inv-flyout__hint muted">When monitor is on, the scheduler probes host:port at this interval (1&ndash;1440 minutes).</p>
+          </div>
+          <div
+            class="gc-tab-panel gc-if-flyout__form-body"
+            role="tabpanel"
+            aria-labelledby="gc-fw-edit-tab-sync"
+            id="gc-fw-edit-panel-sync"
+            hidden
+          >
+            <p class="gc-fw-inv-flyout__hint muted">
+              Cached objects for the Network page. Only checked types are requested when you sync.
+            </p>
+            <div id="gc-fw-sync-toggles" class="gc-fw-sync-toggles" aria-label="Object types to sync"></div>
+          </div>
+          <div
+            class="gc-tab-panel gc-if-flyout__form-body"
+            role="tabpanel"
+            aria-labelledby="gc-fw-edit-tab-properties"
+            id="gc-fw-edit-panel-properties"
+            hidden
+          >
+            <datalist id="gc-fw-edit-tag-names-datalist"></datalist>
+            <div class="gc-fw-kv-tags" data-gc-fw-kv-tags>
+              <label class="gc-if-flyout__label">Tags <span class="muted">(optional)</span></label>
+              <p class="gc-fw-inv-flyout__hint muted">Name can be an existing tag from your inventory or a new one. Value is optional and stored for your records only.</p>
+              <div class="gc-fw-kv-tags__table-wrap">
+                <table class="gc-fw-kv-tags__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col">Value <span class="muted">(optional)</span></th>
+                      <th class="gc-fw-kv-tags__col-actions" scope="col" aria-label="Remove row"></th>
+                    </tr>
+                  </thead>
+                  <tbody data-gc-fw-kv-tbody></tbody>
+                </table>
+              </div>
+              <input type="hidden" name="tags_json" data-gc-fw-kv-tags-hidden value="[]" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer gc-fw-inv-flyout__footer">
+        <button type="submit" class="btn primary">Save changes</button>
+        <button type="button" class="btn btn--secondary" id="gc-fw-flyout-sync-btn">Sync now</button>
+        <button type="button" class="link-btn" id="cancel-edit-firewall">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div id="gc-fw-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="gc-fw-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-fw-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="gc-fw-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="gc-fw-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="gc-fw-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="gc-fw-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var SYNC_CATALOG = {{ sync_entity_catalog | tojson }};
+    var LS_KEY_SYNC = "ground-control-fw-sync-entities-v1";
+    var gcFwFlyoutSyncUrl = "";
+    var GC_DELETE_BATCH_URL = {{ url_firewall_delete_batch | tojson }};
+    var GC_SET_TAGS_BATCH_URL = {{ (url_for("gc_firewalls_set_tags_batch") | string) | tojson }};
+    var GC_CACHED_SYNC_TYPES_URL = {{ (request.url_for('api_firewalls_cached_sync_entity_types') | string) | tojson }};
+    var COLS = [
+      { id: "name", label: "Name" },
+      { id: "description", label: "Description" },
+      { id: "host", label: "Host" },
+      { id: "port", label: "Port" },
+      { id: "user", label: "User" },
+      { id: "device_hostname", label: "Device hostname" },
+      { id: "serial", label: "Serial number" },
+      { id: "model", label: "Model" },
+      { id: "firmware_version", label: "Firmware" },
+      { id: "tls", label: "TLS verify" },
+      { id: "monitor", label: "Monitor" },
+      { id: "tags", label: "Tags" },
+      { id: "sync", label: "Sync", defaultHidden: true },
+    ];
+    var GC_TAG_MAX_LEN = 64;
+    var GC_TAG_MAX_COUNT = 50;
+    var GC_TAG_VALUE_MAX_LEN = 512;
+    var FIREWALL_TAG_SUGGESTIONS = {{ firewall_tag_suggestions | tojson }};
+    if (!Array.isArray(FIREWALL_TAG_SUGGESTIONS)) FIREWALL_TAG_SUGGESTIONS = [];
+    var LS_KEY = "ground-control-fw-columns-v1";
+    var LS_KEY_INV_UI = "ground-control-fw-inventory-filter-ui-v1";
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function escapeAttr(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;");
+    }
+
+    function gcTagEditorGetTags(root) {
+      var h = root && root.querySelector("[data-gc-tag-hidden]");
+      if (!h || !h.value) return [];
+      try {
+        var a = JSON.parse(h.value);
+        return Array.isArray(a) ? a.filter(function (x) {
+          return typeof x === "string" && String(x).trim();
+        }) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function gcTagEditorSetTags(root, tags) {
+      var h = root && root.querySelector("[data-gc-tag-hidden]");
+      var chips = root && root.querySelector("[data-gc-tag-chips]");
+      if (!h || !chips) return;
+      var seen = Object.create(null);
+      var out = [];
+      (tags || []).forEach(function (t) {
+        if (typeof t !== "string") return;
+        var u = t.trim().slice(0, GC_TAG_MAX_LEN);
+        if (!u) return;
+        var k = u.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        out.push(u);
+      });
+      out = out.slice(0, GC_TAG_MAX_COUNT);
+      h.value = JSON.stringify(out);
+      chips.innerHTML = out
+        .map(function (t, i) {
+          return (
+            '<span class="gc-tag-editor__chip"><span class="gc-tag-editor__chip-text">' +
+            escapeHtml(t) +
+            '</span><button type="button" class="gc-tag-editor__chip-remove" data-gc-tag-idx="' +
+            i +
+            '" aria-label="Remove tag">&times;</button></span>'
+          );
+        })
+        .join("");
+    }
+
+    function gcTagEditorTryAdd(root, rawTag) {
+      var raw = String(rawTag || "")
+        .trim()
+        .slice(0, GC_TAG_MAX_LEN);
+      if (!raw) return false;
+      var cur = gcTagEditorGetTags(root);
+      var k = raw.toLowerCase();
+      for (var i = 0; i < cur.length; i++) {
+        if (String(cur[i]).toLowerCase() === k) return false;
+      }
+      if (cur.length >= GC_TAG_MAX_COUNT) return false;
+      cur.push(raw);
+      gcTagEditorSetTags(root, cur);
+      return true;
+    }
+
+    function gcTagFilterSuggestions(query, currentTags) {
+      var q = (query || "").trim().toLowerCase();
+      var have = Object.create(null);
+      (currentTags || []).forEach(function (t) {
+        have[String(t).toLowerCase()] = true;
+      });
+      var pool = FIREWALL_TAG_SUGGESTIONS || [];
+      var cand = pool.filter(function (t) {
+        if (t == null || t === "") return false;
+        var s = String(t);
+        if (have[s.toLowerCase()]) return false;
+        if (!q) return true;
+        return s.toLowerCase().indexOf(q) !== -1;
+      });
+      cand.sort(function (a, b) {
+        var al = String(a).toLowerCase();
+        var bl = String(b).toLowerCase();
+        var as = q && al.indexOf(q) === 0 ? 0 : 1;
+        var bs = q && bl.indexOf(q) === 0 ? 0 : 1;
+        if (as !== bs) return as - bs;
+        return al.localeCompare(bl);
+      });
+      return cand.slice(0, 12);
+    }
+
+    function gcTagEditorBind(root) {
+      if (!root || root.dataset.gcTagEditorBound === "1") return;
+      root.dataset.gcTagEditorBound = "1";
+      var input = root.querySelector("[data-gc-tag-input]");
+      var addBtn = root.querySelector("[data-gc-tag-add]");
+      var chips = root.querySelector("[data-gc-tag-chips]");
+      var suggestWrap = root.querySelector("[data-gc-tag-suggest-wrap]");
+      var suggestList = root.querySelector("[data-gc-tag-suggest-list]");
+      var highlightIdx = -1;
+      var blurTimer = null;
+      var scrollRepositionBound = false;
+
+      function setExpanded(on) {
+        if (input) input.setAttribute("aria-expanded", on ? "true" : "false");
+      }
+
+      function positionSuggestDropdown() {
+        var combo = root.querySelector(".gc-tag-editor__combo");
+        if (!combo || !suggestWrap) return;
+        var r = combo.getBoundingClientRect();
+        var w = Math.min(r.width, window.innerWidth - 16);
+        var left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+        suggestWrap.style.cssText = [
+          "position:fixed",
+          "left:" + left + "px",
+          "top:" + (r.bottom + 2) + "px",
+          "width:" + w + "px",
+          "z-index:400",
+        ].join(";");
+      }
+
+      function onSuggestScrollOrResize() {
+        if (suggestWrap && !suggestWrap.hasAttribute("hidden")) positionSuggestDropdown();
+      }
+
+      function bindSuggestReposition() {
+        if (scrollRepositionBound) return;
+        scrollRepositionBound = true;
+        window.addEventListener("scroll", onSuggestScrollOrResize, true);
+        window.addEventListener("resize", onSuggestScrollOrResize);
+      }
+
+      function unbindSuggestReposition() {
+        if (!scrollRepositionBound) return;
+        scrollRepositionBound = false;
+        window.removeEventListener("scroll", onSuggestScrollOrResize, true);
+        window.removeEventListener("resize", onSuggestScrollOrResize);
+      }
+
+      function hideSuggest() {
+        highlightIdx = -1;
+        unbindSuggestReposition();
+        if (suggestWrap) {
+          suggestWrap.setAttribute("hidden", "");
+          suggestWrap.style.cssText = "";
+        }
+        setExpanded(false);
+        if (suggestList) suggestList.innerHTML = "";
+      }
+
+      function renderSuggestLis(items) {
+        if (!suggestList) return;
+        suggestList.innerHTML = items
+          .map(function (t, i) {
+            return (
+              '<li role="presentation">' +
+              '<button type="button" role="option" class="gc-tag-editor__suggest-opt" data-gc-suggest-idx="' +
+              i +
+              '" data-gc-suggest-val="' +
+              escapeAttr(t) +
+              '">' +
+              escapeHtml(t) +
+              "</button></li>"
+            );
+          })
+          .join("");
+      }
+
+      function updateHighlight() {
+        if (!suggestList) return;
+        var lis = suggestList.querySelectorAll("li");
+        for (var i = 0; i < lis.length; i++) {
+          lis[i].classList.toggle("is-active", i === highlightIdx);
+        }
+      }
+
+      function visibleSuggestCount() {
+        return suggestList ? suggestList.querySelectorAll("button[data-gc-suggest-val]").length : 0;
+      }
+
+      function syncSuggestPanel() {
+        if (!suggestWrap || !input) return;
+        var items = gcTagFilterSuggestions(input.value, gcTagEditorGetTags(root));
+        if (items.length < 1) {
+          hideSuggest();
+          return;
+        }
+        renderSuggestLis(items);
+        suggestWrap.removeAttribute("hidden");
+        positionSuggestDropdown();
+        bindSuggestReposition();
+        setExpanded(true);
+        highlightIdx = 0;
+        updateHighlight();
+      }
+
+      function refreshSuggestIfOpen() {
+        if (!suggestWrap || suggestWrap.hasAttribute("hidden")) return;
+        syncSuggestPanel();
+      }
+
+      function addFromInput(onlyTyped) {
+        if (!input) return;
+        var raw = (input.value || "").trim().slice(0, GC_TAG_MAX_LEN);
+        if (raw && gcTagEditorTryAdd(root, raw)) {
+          input.value = "";
+          hideSuggest();
+          return;
+        }
+        if (onlyTyped) return;
+        var n = visibleSuggestCount();
+        if (n > 0 && highlightIdx >= 0 && highlightIdx < n && suggestList) {
+          var btn = suggestList.querySelector('button[data-gc-suggest-idx="' + highlightIdx + '"]');
+          var v = btn && btn.getAttribute("data-gc-suggest-val");
+          if (v != null && gcTagEditorTryAdd(root, v)) {
+            input.value = "";
+            hideSuggest();
+          }
+        }
+      }
+
+      function onInputKeydown(e) {
+        var n = visibleSuggestCount();
+        if (e.key === "ArrowDown") {
+          if (suggestWrap && suggestWrap.hasAttribute("hidden")) syncSuggestPanel();
+          n = visibleSuggestCount();
+          if (n < 1) return;
+          e.preventDefault();
+          highlightIdx = Math.min((highlightIdx < 0 ? -1 : highlightIdx) + 1, n - 1);
+          updateHighlight();
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          if (suggestWrap && suggestWrap.hasAttribute("hidden")) syncSuggestPanel();
+          n = visibleSuggestCount();
+          if (n < 1) return;
+          e.preventDefault();
+          highlightIdx = Math.max((highlightIdx < 0 ? 0 : highlightIdx) - 1, 0);
+          updateHighlight();
+          return;
+        }
+        if (e.key === "Escape") {
+          if (suggestWrap && !suggestWrap.hasAttribute("hidden")) {
+            e.preventDefault();
+            hideSuggest();
+          }
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addFromInput(false);
+        }
+      }
+
+      if (addBtn) addBtn.addEventListener("click", function () { addFromInput(true); });
+      if (input) {
+        input.addEventListener("input", function () {
+          syncSuggestPanel();
+        });
+        input.addEventListener("focus", function () {
+          syncSuggestPanel();
+        });
+        input.addEventListener("keydown", onInputKeydown);
+        input.addEventListener("blur", function () {
+          if (blurTimer) clearTimeout(blurTimer);
+          blurTimer = setTimeout(function () {
+            hideSuggest();
+          }, 180);
+        });
+      }
+      if (suggestList) {
+        suggestList.addEventListener("mousedown", function (e) {
+          var btn = e.target && e.target.closest && e.target.closest("button[data-gc-suggest-val]");
+          if (!btn) return;
+          e.preventDefault();
+          if (blurTimer) clearTimeout(blurTimer);
+          var v = btn.getAttribute("data-gc-suggest-val");
+          if (v != null && gcTagEditorTryAdd(root, v)) {
+            if (input) input.value = "";
+            hideSuggest();
+            if (input) input.focus();
+          }
+        });
+        suggestList.addEventListener("mousemove", function (e) {
+          var btn = e.target && e.target.closest && e.target.closest("button[data-gc-suggest-idx]");
+          if (!btn) return;
+          var idx = parseInt(btn.getAttribute("data-gc-suggest-idx"), 10);
+          if (!isNaN(idx)) {
+            highlightIdx = idx;
+            updateHighlight();
+          }
+        });
+      }
+      if (chips) {
+        chips.addEventListener("click", function (e) {
+          var btn = e.target && e.target.closest && e.target.closest(".gc-tag-editor__chip-remove");
+          if (!btn) return;
+          var idx = parseInt(btn.getAttribute("data-gc-tag-idx"), 10);
+          if (isNaN(idx)) return;
+          var cur = gcTagEditorGetTags(root).slice();
+          cur.splice(idx, 1);
+          gcTagEditorSetTags(root, cur);
+          refreshSuggestIfOpen();
+        });
+      }
+    }
+
+    function gcFwKvTagParseJson(raw) {
+      var rows = [];
+      try {
+        var a = JSON.parse(raw || "[]");
+        if (!Array.isArray(a)) return rows;
+        a.forEach(function (x) {
+          if (typeof x === "string") {
+            var u = String(x).trim().slice(0, GC_TAG_MAX_LEN);
+            if (u) rows.push({ name: u, value: "" });
+          } else if (x && typeof x === "object") {
+            var rn = x.name != null ? String(x.name) : x.n != null ? String(x.n) : "";
+            var n = rn.trim().slice(0, GC_TAG_MAX_LEN);
+            var rv = x.value != null ? String(x.value) : x.v != null ? String(x.v) : "";
+            var v = rv.trim().slice(0, GC_TAG_VALUE_MAX_LEN);
+            if (n) rows.push({ name: n, value: v });
+          }
+        });
+      } catch (e) {}
+      return rows;
+    }
+
+    function gcFwKvTagsUsedLowerExcept(tbody, exceptRow) {
+      var have = Object.create(null);
+      var trs = tbody.querySelectorAll("tr");
+      for (var i = 0; i < trs.length; i++) {
+        var tr = trs[i];
+        if (tr === exceptRow) continue;
+        var inp = tr.querySelector("[data-gc-kv-name]");
+        var v = inp && String(inp.value || "").trim();
+        if (v) have[v.toLowerCase()] = true;
+      }
+      return have;
+    }
+
+    function gcFwKvTagsRefreshDatalist(focusRow) {
+      var dl = document.getElementById("gc-fw-edit-tag-names-datalist");
+      if (!dl) return;
+      var tb = document.querySelector("#edit-firewall-form [data-gc-fw-kv-tbody]");
+      if (!tb) {
+        dl.innerHTML = "";
+        return;
+      }
+      var ex = gcFwKvTagsUsedLowerExcept(tb, focusRow || null);
+      dl.innerHTML = "";
+      (FIREWALL_TAG_SUGGESTIONS || []).forEach(function (t) {
+        if (t == null || String(t) === "") return;
+        var s = String(t);
+        if (ex[s.toLowerCase()]) return;
+        var opt = document.createElement("option");
+        opt.value = s;
+        dl.appendChild(opt);
+      });
+    }
+
+    function gcFwKvTagsSyncToHidden(root) {
+      var h = root && root.querySelector("[data-gc-fw-kv-tags-hidden]");
+      var tb = root && root.querySelector("[data-gc-fw-kv-tbody]");
+      if (!h || !tb) return;
+      var items = [];
+      var seen = Object.create(null);
+      tb.querySelectorAll("tr").forEach(function (tr) {
+        var ni = tr.querySelector("[data-gc-kv-name]");
+        var vi = tr.querySelector("[data-gc-kv-value]");
+        var name = ni && String(ni.value || "").trim().slice(0, GC_TAG_MAX_LEN);
+        if (!name) return;
+        var k = name.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        if (items.length >= GC_TAG_MAX_COUNT) return;
+        var val = vi && String(vi.value || "").trim().slice(0, GC_TAG_VALUE_MAX_LEN);
+        items.push(val ? { name: name, value: val } : name);
+      });
+      h.value = JSON.stringify(items);
+    }
+
+    function gcFwKvTagsEnsureTrailingBlank(tb) {
+      if (!tb) return;
+      var rows = tb.querySelectorAll("tr");
+      if (!rows.length) {
+        gcFwKvTagsAppendRow(tb, "", "");
+        return;
+      }
+      var last = rows[rows.length - 1];
+      var ni = last.querySelector("[data-gc-kv-name]");
+      var lastName = ni && String(ni.value || "").trim();
+      if (lastName) gcFwKvTagsAppendRow(tb, "", "");
+    }
+
+    function gcFwKvTagsAppendRow(tb, name, value) {
+      var removeSvg =
+        '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11H7v-2h10v2z"/></svg>';
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><input type="text" class="gc-if-flyout__input" data-gc-kv-name list="gc-fw-edit-tag-names-datalist" maxlength="' +
+        GC_TAG_MAX_LEN +
+        '" value="' +
+        escapeAttr(name || "") +
+        '" autocomplete="off" spellcheck="false" aria-label="Tag name" /></td>' +
+        '<td><input type="text" class="gc-if-flyout__input" data-gc-kv-value maxlength="' +
+        GC_TAG_VALUE_MAX_LEN +
+        '" value="' +
+        escapeAttr(value || "") +
+        '" autocomplete="off" placeholder="Optional" aria-label="Tag value (optional)" /></td>' +
+        '<td class="gc-fw-kv-tags__col-actions"><button type="button" class="gc-fw-kv-tags__remove icon-btn" aria-label="Remove tag">' +
+        removeSvg +
+        "</button></td>";
+      tb.appendChild(tr);
+    }
+
+    function gcFwKvTagsLoad(root, jsonStr) {
+      var tb = root && root.querySelector("[data-gc-fw-kv-tbody]");
+      if (!tb) return;
+      tb.innerHTML = "";
+      var rows = gcFwKvTagParseJson(jsonStr);
+      if (!rows.length) gcFwKvTagsAppendRow(tb, "", "");
+      else {
+        rows.forEach(function (r) {
+          gcFwKvTagsAppendRow(tb, r.name, r.value || "");
+        });
+      }
+      gcFwKvTagsEnsureTrailingBlank(tb);
+      gcFwKvTagsSyncToHidden(root);
+      gcFwKvTagsRefreshDatalist(null);
+    }
+
+    function bindGcFwKvTags(root) {
+      if (!root || root.dataset.gcFwKvTagsBound === "1") return;
+      root.dataset.gcFwKvTagsBound = "1";
+      var tb = root.querySelector("[data-gc-fw-kv-tbody]");
+      if (!tb) return;
+      tb.addEventListener("focusin", function (e) {
+        var t = e.target;
+        if (t && t.matches && t.matches("[data-gc-kv-name]")) gcFwKvTagsRefreshDatalist(t.closest("tr"));
+      });
+      tb.addEventListener("input", function (e) {
+        var t = e.target;
+        if (t && t.matches && (t.matches("[data-gc-kv-name]") || t.matches("[data-gc-kv-value]"))) {
+          if (t.matches("[data-gc-kv-name]")) gcFwKvTagsEnsureTrailingBlank(tb);
+          gcFwKvTagsSyncToHidden(root);
+        }
+      });
+      tb.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest && e.target.closest(".gc-fw-kv-tags__remove");
+        if (!btn) return;
+        var tr = btn.closest("tr");
+        if (!tr || !tb.contains(tr)) return;
+        tr.remove();
+        if (!tb.querySelector("tr")) gcFwKvTagsAppendRow(tb, "", "");
+        gcFwKvTagsEnsureTrailingBlank(tb);
+        gcFwKvTagsSyncToHidden(root);
+        gcFwKvTagsRefreshDatalist(null);
+      });
+    }
+
+    function gcTagEditorLoadFromJsonAttr(root, jsonStr) {
+      if (!root) return;
+      var tags = [];
+      try {
+        var a = JSON.parse(jsonStr || "[]");
+        if (Array.isArray(a)) tags = a;
+      } catch (e2) {}
+      gcTagEditorSetTags(root, tags);
+    }
+
+    function loadColVis() {
+      var d = {};
+      COLS.forEach(function (c) {
+        d[c.id] = c.defaultHidden ? false : true;
+      });
+      try {
+        var raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+          var o = JSON.parse(raw);
+          if (o && typeof o === "object") {
+            COLS.forEach(function (c) {
+              if (Object.prototype.hasOwnProperty.call(o, c.id)) d[c.id] = !!o[c.id];
+            });
+          }
+        }
+      } catch (e) {}
+      var visible = 0;
+      COLS.forEach(function (c) {
+        if (d[c.id]) visible++;
+      });
+      if (visible < 1 && COLS.length) d[COLS[0].id] = true;
+      return d;
+    }
+
+    function persistColVis(vis) {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(vis));
+      } catch (e) {}
+    }
+
+    function applyColVis(vis) {
+      COLS.forEach(function (c) {
+        var on = !!vis[c.id];
+        document.querySelectorAll('[data-gc-col="' + c.id + '"]').forEach(function (el) {
+          el.classList.toggle("gc-col-hidden", !on);
+        });
+      });
+    }
+
+    function syncFilterEmptyColspan() {
+      var table = document.getElementById("gc-fw-table");
+      var cell = document.querySelector("#gc-fw-filter-empty td");
+      var ph = document.querySelector(".gc-fw-placeholder-row td");
+      if (!table) return;
+      var n = table.querySelectorAll("thead th").length;
+      if (cell) cell.setAttribute("colspan", String(n));
+      if (ph) ph.setAttribute("colspan", String(n));
+    }
+
+    var colVis = loadColVis();
+    applyColVis(colVis);
+    syncFilterEmptyColspan();
+
+    var addTagRoot = document.querySelector("#add-firewall-form [data-gc-tag-editor]");
+    var batchTagRoot = document.querySelector("#gc-fw-tags-dialog [data-gc-fw-batch-tag-editor]");
+    var editKvTagsRoot = document.querySelector("#edit-firewall-form [data-gc-fw-kv-tags]");
+    if (addTagRoot) gcTagEditorBind(addTagRoot);
+    if (batchTagRoot) gcTagEditorBind(batchTagRoot);
+    if (editKvTagsRoot) bindGcFwKvTags(editKvTagsRoot);
+
+    var filtersDrawerEl = document.getElementById("gc-fw-filters-drawer");
+    /** "global" = table follows top-bar firewall scope (and Name facet mirrors it); "saved" = localStorage + session facet snapshot only. */
+    var fwInvFacetMode = "global";
+    var fwInvFacetInitDone = false;
+    var inventoryFacetSessionPrimed = false;
+    var inventoryPrimedLsSnapshot = null;
+
+    function loadInventoryUiFromLs() {
+      try {
+        var raw = localStorage.getItem(LS_KEY_INV_UI);
+        if (!raw) return null;
+        var o = JSON.parse(raw);
+        if (!o || o.v !== 1 || (o.mode !== "saved" && o.mode !== "global")) return null;
+        return o;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function persistInventoryUiFull() {
+      try {
+        var o = { v: 1, mode: fwInvFacetMode };
+        if (fwInvFacetMode === "saved") {
+          var raw = sessionStorage.getItem("gc-facet-values:gc-fw");
+          if (raw) o.drawer = JSON.parse(raw);
+          var syncRoot = document.getElementById("gc-fw-sync-facet-block");
+          var sf = [];
+          if (syncRoot) {
+            syncRoot.querySelectorAll("input[data-gc-fw-sync-facet]:checked").forEach(function (cb) {
+              var eid = cb.getAttribute("data-gc-fw-sync-facet");
+              if (eid) sf.push(eid);
+            });
+          }
+          o.syncFacet = sf;
+        }
+        localStorage.setItem(LS_KEY_INV_UI, JSON.stringify(o));
+      } catch (e2) {}
+    }
+
+    function markInventoryFiltersSaved() {
+      fwInvFacetMode = "saved";
+      persistInventoryUiFull();
+    }
+
+    function primeInventoryFacetSession() {
+      if (inventoryFacetSessionPrimed) return inventoryPrimedLsSnapshot;
+      inventoryFacetSessionPrimed = true;
+      var st = loadInventoryUiFromLs();
+      try {
+        if (st && st.mode === "saved") {
+          if (st.drawer) sessionStorage.setItem("gc-facet-values:gc-fw", JSON.stringify(st.drawer));
+          else sessionStorage.removeItem("gc-facet-values:gc-fw");
+          if (st.syncFacet && st.syncFacet.length) {
+            sessionStorage.setItem("gc-fw-sync-facet-sel", JSON.stringify(st.syncFacet));
+          } else {
+            sessionStorage.removeItem("gc-fw-sync-facet-sel");
+          }
+        } else {
+          sessionStorage.removeItem("gc-facet-values:gc-fw");
+          sessionStorage.removeItem("gc-fw-sync-facet-sel");
+        }
+      } catch (e) {}
+      inventoryPrimedLsSnapshot = st;
+      return st;
+    }
+
+    function applyGlobalNameFacetsFromTopBar() {
+      if (!filtersDrawerEl) return;
+      var idsFn = window.gcGetSelectedFirewallIds;
+      var ids = typeof idsFn === "function" ? idsFn() : [];
+      ids = Array.isArray(ids) ? ids : [];
+      filtersDrawerEl.querySelectorAll('input[data-gc-facet-enum="name"]').forEach(function (cb) {
+        cb.checked = false;
+      });
+      if (!ids.length) {
+        if (window.gcTableFacets && typeof window.gcTableFacets.syncFacetGroupOpenState === "function") {
+          window.gcTableFacets.syncFacetGroupOpenState(filtersDrawerEl, "gc-fw");
+        }
+        return;
+      }
+      var wantVal = Object.create(null);
+      document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row").forEach(function (tr) {
+        var id = parseInt(tr.getAttribute("data-fw-id") || "", 10);
+        if (isNaN(id) || ids.indexOf(id) === -1) return;
+        var nm = (tr.getAttribute("data-fw-name") || "").trim();
+        wantVal[encodeURIComponent(nm)] = true;
+      });
+      filtersDrawerEl.querySelectorAll('input[data-gc-facet-enum="name"]').forEach(function (cb) {
+        if (wantVal[cb.value]) cb.checked = true;
+      });
+      var nameGroup = filtersDrawerEl.querySelector('.filter-group[data-gc-facet-for-col="name"]');
+      if (nameGroup && filtersDrawerEl.querySelector('input[data-gc-facet-enum="name"]:checked')) {
+        nameGroup.classList.add("is-open");
+        var nh = nameGroup.querySelector(".filter-group__head");
+        if (nh) nh.setAttribute("aria-expanded", "true");
+      }
+      if (window.gcTableFacets && typeof window.gcTableFacets.syncFacetGroupOpenState === "function") {
+        window.gcTableFacets.syncFacetGroupOpenState(filtersDrawerEl, "gc-fw");
+      }
+    }
+
+    function initInventoryFacetScopeAfterRebuild(st) {
+      if (st && st.v === 1 && st.mode === "saved") {
+        fwInvFacetMode = "saved";
+      } else {
+        fwInvFacetMode = "global";
+        applyGlobalNameFacetsFromTopBar();
+        try {
+          if (window.gcTableFacets && filtersDrawerEl) {
+            window.gcTableFacets.persistFilterDrawerState(filtersDrawerEl, "gc-fw");
+          }
+        } catch (e) {}
+      }
+      persistGcFwSyncFacetChecks();
+    }
+
+    function applySelectedFirewallsQuickFilter() {
+      fwInvFacetMode = "global";
+      try {
+        localStorage.setItem(LS_KEY_INV_UI, JSON.stringify({ v: 1, mode: "global" }));
+      } catch (e) {}
+      var fwSearchIn = document.getElementById("gc-fw-search");
+      if (fwSearchIn) fwSearchIn.value = "";
+      if (window.gcTableFacets && typeof window.gcTableFacets.clearToolbarSearchStorage === "function") {
+        window.gcTableFacets.clearToolbarSearchStorage("gc-fw");
+      }
+      if (filtersDrawerEl && window.gcTableFacets) {
+        window.gcTableFacets.reset(filtersDrawerEl, "gc-fw");
+      }
+      var sroot = document.getElementById("gc-fw-sync-facet-block");
+      if (sroot) {
+        sroot.querySelectorAll("input[data-gc-fw-sync-facet]").forEach(function (cb) {
+          cb.checked = false;
+        });
+      }
+      try {
+        sessionStorage.removeItem("gc-fw-sync-facet-sel");
+      } catch (e2) {}
+      applyGlobalNameFacetsFromTopBar();
+      try {
+        if (window.gcTableFacets && filtersDrawerEl) {
+          window.gcTableFacets.persistFilterDrawerState(filtersDrawerEl, "gc-fw");
+        }
+      } catch (e3) {}
+      persistGcFwSyncFacetChecks();
+      updateFacetChrome();
+      applyRowFilter();
+    }
+
+    function rowMatchesGlobalInventoryScope(tr) {
+      if (!tr.classList.contains("gc-fw-data-row")) return true;
+      if (fwInvFacetMode !== "global") return true;
+      var idsFn = window.gcGetSelectedFirewallIds;
+      var ids = typeof idsFn === "function" ? idsFn() : [];
+      if (!ids || !ids.length) return true;
+      var id = parseInt(tr.getAttribute("data-fw-id") || "", 10);
+      if (isNaN(id)) return false;
+      return ids.indexOf(id) !== -1;
+    }
+
+    /** True when the table is narrowed by the header firewall scope (independent of column facet UI). */
+    function globalInventoryScopeFilterActive() {
+      if (fwInvFacetMode !== "global") return false;
+      var idsFn = window.gcGetSelectedFirewallIds;
+      var ids = typeof idsFn === "function" ? idsFn() : [];
+      return Array.isArray(ids) && ids.length > 0;
+    }
+
+    function mountGcFwInventoryScopeBlock() {
+      if (!filtersDrawerEl) return;
+      var id = "gc-fw-inventory-scope-facet";
+      var prev = document.getElementById(id);
+      if (prev) prev.remove();
+      var wrap = document.createElement("div");
+      wrap.id = id;
+      wrap.hidden = true;
+      wrap.innerHTML =
+        '<div class="filter-group is-open" data-gc-fw-inventory-scope-root>' +
+        '<button type="button" class="filter-group__head" aria-expanded="true">' +
+        "<span>Top-bar scope</span>" +
+        '<span class="filter-group__chev" aria-hidden="true">▼</span>' +
+        "</button>" +
+        '<div class="filter-group__body">' +
+        '<p class="muted" data-gc-fw-scope-body></p>' +
+        "<p class=\"muted\">Reset clears this table filter only (not the header picker).</p>" +
+        "</div></div>";
+      filtersDrawerEl.insertBefore(wrap, filtersDrawerEl.firstChild);
+      var head = wrap.querySelector(".filter-group__head");
+      if (head && head.dataset.gcFwScopeHeadBound !== "1") {
+        head.dataset.gcFwScopeHeadBound = "1";
+        head.addEventListener("click", function () {
+          var g = head.closest(".filter-group");
+          if (!g) return;
+          var open = g.classList.toggle("is-open");
+          head.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+      }
+    }
+
+    function syncGcFwInventoryScopeBlock() {
+      var el = document.getElementById("gc-fw-inventory-scope-facet");
+      if (!el) return;
+      var active = globalInventoryScopeFilterActive();
+      el.hidden = !active;
+      var body = el.querySelector("[data-gc-fw-scope-body]");
+      if (body) {
+        if (!active) {
+          body.textContent = "";
+        } else {
+          var idsFn = window.gcGetSelectedFirewallIds;
+          var ids = typeof idsFn === "function" ? idsFn() : [];
+          ids = Array.isArray(ids) ? ids : [];
+          body.textContent =
+            ids.length === 1
+              ? "Showing 1 firewall that matches the header selection."
+              : "Showing " + ids.length + " firewalls that match the header selection.";
+        }
+      }
+    }
+
+    function loadSyncEntityPrefs() {
+      var d = {};
+      (SYNC_CATALOG || []).forEach(function (x) {
+        d[x.id] = true;
+      });
+      try {
+        var raw = localStorage.getItem(LS_KEY_SYNC);
+        if (raw) {
+          var o = JSON.parse(raw);
+          if (o && typeof o === "object") {
+            (SYNC_CATALOG || []).forEach(function (x) {
+              if (Object.prototype.hasOwnProperty.call(o, x.id)) d[x.id] = !!o[x.id];
+            });
+          }
+        }
+      } catch (e) {}
+      return d;
+    }
+
+    function persistSyncEntityPrefs(prefs) {
+      try {
+        localStorage.setItem(LS_KEY_SYNC, JSON.stringify(prefs));
+      } catch (e) {}
+    }
+
+    function getEnabledSyncEntityIds() {
+      var p = loadSyncEntityPrefs();
+      var out = [];
+      (SYNC_CATALOG || []).forEach(function (x) {
+        if (p[x.id]) out.push(x.id);
+      });
+      return out;
+    }
+
+    function mountGcFwSyncFacetBlock() {
+      if (!filtersDrawerEl || !SYNC_CATALOG || !SYNC_CATALOG.length) return;
+      var id = "gc-fw-sync-facet-block";
+      var prev = document.getElementById(id);
+      if (prev) prev.remove();
+      var wrap = document.createElement("div");
+      wrap.id = id;
+      var showSearch = SYNC_CATALOG.length >= 8;
+      var opts = (SYNC_CATALOG || [])
+        .map(function (x) {
+          return (
+            '<label class="filter-opt" data-gc-facet-opt title="' +
+            escapeHtml(x.label) +
+            '"><input type="checkbox" data-gc-fw-sync-facet="' +
+            escapeHtml(x.id) +
+            '" /><span>' +
+            escapeHtml(x.label) +
+            "</span></label>"
+          );
+        })
+        .join("");
+      wrap.innerHTML =
+        '<div class="filter-group" data-gc-fw-sync-facet-root>' +
+        '<button type="button" class="filter-group__head" aria-expanded="false">' +
+        "<span>Sync</span>" +
+        '<span class="filter-group__chev" aria-hidden="true">▼</span>' +
+        "</button>" +
+        '<div class="filter-group__body">' +
+        '<p class="gc-fw-sync-facet-hint muted">Matches the Sync column: types enabled in the edit panel (same list as the pill tags).</p>' +
+        '<div class="filter-group__facet-search"' +
+        (showSearch ? "" : " hidden") +
+        '><input type="search" class="filter-group__facet-search-input" placeholder="Search types…" autocomplete="off" aria-label="Search sync types" id="gc-fw-sync-facet-search" /></div>' +
+        opts +
+        "</div></div>";
+      filtersDrawerEl.insertBefore(wrap, filtersDrawerEl.firstChild);
+      var root = wrap.querySelector("[data-gc-fw-sync-facet-root]");
+      var head = root && root.querySelector(".filter-group__head");
+      if (head && head.dataset.gcFwSyncFacetHeadBound !== "1") {
+        head.dataset.gcFwSyncFacetHeadBound = "1";
+        head.addEventListener("click", function () {
+          var g = head.closest(".filter-group");
+          if (!g) return;
+          var open = g.classList.toggle("is-open");
+          head.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+      }
+      var searchIn = document.getElementById("gc-fw-sync-facet-search");
+      if (searchIn && searchIn.dataset.gcFwSyncFacetSearchBound !== "1") {
+        searchIn.dataset.gcFwSyncFacetSearchBound = "1";
+        searchIn.addEventListener("input", function () {
+          var q = (searchIn.value || "").trim().toLowerCase();
+          wrap.querySelectorAll("[data-gc-facet-opt]").forEach(function (lab) {
+            var t = (lab.textContent || "").trim().toLowerCase();
+            lab.style.display = !q || t.indexOf(q) !== -1 ? "" : "none";
+          });
+        });
+      }
+      (function restoreGcFwSyncFacetChecks() {
+        try {
+          var raw = sessionStorage.getItem("gc-fw-sync-facet-sel");
+          if (!raw) return;
+          var ids = JSON.parse(raw);
+          if (!Array.isArray(ids)) return;
+          var want = Object.create(null);
+          for (var si = 0; si < ids.length; si++) want[String(ids[si])] = true;
+          wrap.querySelectorAll("input[data-gc-fw-sync-facet]").forEach(function (cb) {
+            var eid = cb.getAttribute("data-gc-fw-sync-facet");
+            if (eid && want[eid]) cb.checked = true;
+          });
+          if (wrap.querySelector("input[data-gc-fw-sync-facet]:checked") && root) {
+            root.classList.add("is-open");
+            if (head) head.setAttribute("aria-expanded", "true");
+          }
+        } catch (ex) {}
+      })();
+    }
+
+    function persistGcFwSyncFacetChecks() {
+      var r = document.getElementById("gc-fw-sync-facet-block");
+      if (!r) return;
+      var ids = [];
+      r.querySelectorAll("input[data-gc-fw-sync-facet]:checked").forEach(function (cb) {
+        var eid = cb.getAttribute("data-gc-fw-sync-facet");
+        if (eid) ids.push(eid);
+      });
+      try {
+        if (ids.length) sessionStorage.setItem("gc-fw-sync-facet-sel", JSON.stringify(ids));
+        else sessionStorage.removeItem("gc-fw-sync-facet-sel");
+      } catch (ex2) {}
+    }
+
+    /** OR-match: row matches if its Sync column (enabled sync prefs) includes any checked facet type. */
+    function syncColumnFacetRowMatches(tr) {
+      var root = document.getElementById("gc-fw-sync-facet-block");
+      if (!root) return true;
+      var checked = root.querySelectorAll("input[data-gc-fw-sync-facet]:checked");
+      if (!checked.length) return true;
+      var prefs = loadSyncEntityPrefs();
+      for (var i = 0; i < checked.length; i++) {
+        var eid = checked[i].getAttribute("data-gc-fw-sync-facet");
+        if (eid && prefs[eid]) return true;
+      }
+      return false;
+    }
+
+    function refreshInventorySyncColumn() {
+      var prefs = loadSyncEntityPrefs();
+      var extra = [];
+      var labels = [];
+      (SYNC_CATALOG || []).forEach(function (x) {
+        if (prefs[x.id]) {
+          labels.push(String(x.label));
+          extra.push(String(x.label).toLowerCase());
+          extra.push(String(x.id).toLowerCase());
+        }
+      });
+      var extraStr = extra.join(" ");
+      function syncPillHtml(t) {
+        return '<span class="gc-sync-pill">' + escapeHtml(String(t)) + "</span>";
+      }
+      document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row").forEach(function (tr) {
+        var td = tr.querySelector('td[data-gc-col="sync"]');
+        if (!td) return;
+        if (
+          labels.length >= 2 &&
+          window.gcTableListCellPreviewHtml &&
+          window.gcTableBindListCell
+        ) {
+          var fresh = document.createElement("td");
+          fresh.setAttribute("data-gc-col", "sync");
+          td.classList.forEach(function (cls) {
+            fresh.classList.add(cls);
+          });
+          td.parentNode.replaceChild(fresh, td);
+          td = fresh;
+          td.classList.add("gc-fw-sync-pills");
+          td.innerHTML = window.gcTableListCellPreviewHtml(labels, function (lab) {
+            return syncPillHtml(lab);
+          });
+          window.gcTableBindListCell(td, labels.slice(), "Sync", function (lab) {
+            return syncPillHtml(lab);
+          });
+          td.classList.add("gc-hs-multi-pills");
+        } else {
+          td.textContent = "";
+          td.classList.remove("gc-table-cell--list", "gc-hs-multi-pills");
+          td.removeAttribute("role");
+          td.removeAttribute("tabindex");
+          td.removeAttribute("aria-label");
+          td.classList.add("gc-fw-sync-pills");
+          (SYNC_CATALOG || []).forEach(function (x) {
+            if (!prefs[x.id]) return;
+            var span = document.createElement("span");
+            span.className = "gc-sync-pill";
+            span.textContent = x.label;
+            td.appendChild(span);
+          });
+        }
+        var base = tr.getAttribute("data-search-base") || "";
+        tr.setAttribute("data-search", (base + " " + extraStr).trim().toLowerCase());
+      });
+    }
+
+    function firewallRowFacetMap(tr) {
+      return {
+        name: (tr.getAttribute("data-fw-name") || "").trim(),
+        description: (tr.getAttribute("data-fw-description") || "").trim(),
+        host: (tr.getAttribute("data-fw-host") || "").trim(),
+        port: String(tr.getAttribute("data-fw-port") || "").trim(),
+        user: (tr.getAttribute("data-fw-username") || "").trim(),
+        device_hostname: (tr.getAttribute("data-fw-device-hostname") || "").trim(),
+        serial: (tr.getAttribute("data-fw-serial") || "").trim(),
+        model: (tr.getAttribute("data-fw-model") || "").trim(),
+        firmware_version: (tr.getAttribute("data-fw-firmware") || "").trim(),
+        tls: tr.getAttribute("data-tls") || "",
+        monitor: tr.getAttribute("data-fw-monitor") === "1" ? "yes" : "no",
+        tags: (tr.getAttribute("data-fw-tags-search") || "").trim(),
+      };
+    }
+
+    function rebuildFirewallFacets(done) {
+      if (!filtersDrawerEl || !window.gcTableFacets) {
+        if (typeof done === "function") done();
+        return;
+      }
+      var primedSt = primeInventoryFacetSession();
+      var facetCols = COLS.filter(function (c) {
+        return c.id !== "sync";
+      }).map(function (c) {
+        var lab = c.label;
+        if (typeof window.gcTableColumnDisplayLabel === "function") {
+          lab = window.gcTableColumnDisplayLabel(lab);
+        }
+        return { id: c.id, label: lab };
+      });
+      var rowEls = Array.prototype.slice.call(document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row"));
+      var maps = rowEls.map(firewallRowFacetMap);
+      function finishFirewallFacetRebuild() {
+        window.gcTableFacets.rebuild(filtersDrawerEl, facetCols, maps, "gc-fw");
+        mountGcFwSyncFacetBlock();
+        mountGcFwInventoryScopeBlock();
+        if (!fwInvFacetInitDone) {
+          fwInvFacetInitDone = true;
+          initInventoryFacetScopeAfterRebuild(primedSt);
+        }
+        if (typeof done === "function") done();
+      }
+      var lazy = window.gcTableLazy;
+      if (!lazy || typeof lazy.forEachChunked !== "function" || rowEls.length <= lazy.DEFAULT_THRESHOLD) {
+        rowEls.forEach(function (tr, i) {
+          window.gcTableFacets.setRowFacets(tr, maps[i]);
+        });
+        finishFirewallFacetRebuild();
+        return;
+      }
+      lazy.forEachChunked(
+        rowEls,
+        lazy.DEFAULT_CHUNK,
+        function (tr, i) {
+          window.gcTableFacets.setRowFacets(tr, maps[i]);
+        },
+        finishFirewallFacetRebuild,
+      );
+    }
+
+    function getGcFwToolbarSearchTrimmed() {
+      var el = document.getElementById("gc-fw-search");
+      return el ? String(el.value || "").trim() : "";
+    }
+
+    function facetAppliedCount() {
+      var n = filtersDrawerEl && window.gcTableFacets ? window.gcTableFacets.appliedCount(filtersDrawerEl) : 0;
+      var syncRoot = document.getElementById("gc-fw-sync-facet-block");
+      if (syncRoot) {
+        n += syncRoot.querySelectorAll("input[data-gc-fw-sync-facet]:checked").length;
+      }
+      if (globalInventoryScopeFilterActive()) n += 1;
+      if (getGcFwToolbarSearchTrimmed()) n += 1;
+      return n;
+    }
+
+    function updateFacetChrome() {
+      syncGcFwInventoryScopeBlock();
+      var n = facetAppliedCount();
+      var head = document.getElementById("gc-fw-facet-head-actions");
+      var countEl = document.getElementById("gc-fw-facet-count");
+      var resetBtn = document.getElementById("gc-fw-facet-reset");
+      if (!head || !countEl || !resetBtn) return;
+      if (n > 0) {
+        head.hidden = false;
+        countEl.innerHTML = '<span class="filters__facet-count-num">' + n + "</span> applied";
+        resetBtn.hidden = false;
+      } else {
+        head.hidden = true;
+        countEl.textContent = "";
+        resetBtn.hidden = true;
+      }
+    }
+
+    function rowMatchesFacets(tr) {
+      if (!tr.classList.contains("gc-fw-data-row")) return true;
+      if (!filtersDrawerEl || !window.gcTableFacets) return true;
+      if (!window.gcTableFacets.rowMatches(tr, filtersDrawerEl)) return false;
+      return syncColumnFacetRowMatches(tr);
+    }
+
+    function rowMatchesSearch(tr, q) {
+      if (!q) return true;
+      if (!tr.classList.contains("gc-fw-data-row")) return true;
+      var s = tr.getAttribute("data-search") || "";
+      return s.indexOf(q) !== -1;
+    }
+
+    function visibleDataRows() {
+      return Array.prototype.filter.call(document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row"), function (tr) {
+        return !tr.hidden;
+      });
+    }
+
+    function getSelectedIds() {
+      var ids = [];
+      document.querySelectorAll(".gc-fw-row-select:checked").forEach(function (cb) {
+        var id = parseInt(cb.value, 10);
+        if (!isNaN(id)) ids.push(id);
+      });
+      return ids;
+    }
+
+    function updateSelectionChrome() {
+      var n = getSelectedIds().length;
+      var delBtn = document.getElementById("gc-fw-delete-selected");
+      if (delBtn) delBtn.disabled = n < 1;
+      var setTagsBtn = document.getElementById("gc-fw-set-tags-selected");
+      if (setTagsBtn) setTagsBtn.disabled = n < 1;
+      var syncSelBtn = document.getElementById("gc-fw-sync-selected");
+      if (syncSelBtn) syncSelBtn.disabled = n < 1;
+      var syncAllBtn = document.getElementById("gc-fw-sync-all");
+      if (syncAllBtn) {
+        var rowCount = document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row").length;
+        syncAllBtn.disabled = rowCount < 1;
+      }
+      var all = document.getElementById("gc-fw-select-all");
+      if (!all) return;
+      var vis = visibleDataRows();
+      var visChecked = vis.filter(function (tr) {
+        return tr.querySelector(".gc-fw-row-select") && tr.querySelector(".gc-fw-row-select").checked;
+      }).length;
+      if (vis.length === 0) {
+        all.checked = false;
+        all.indeterminate = false;
+      } else if (visChecked === 0) {
+        all.checked = false;
+        all.indeterminate = false;
+      } else if (visChecked === vis.length) {
+        all.checked = true;
+        all.indeterminate = false;
+      } else {
+        all.checked = false;
+        all.indeterminate = true;
+      }
+    }
+
+    function applyRowFilter() {
+      var q = (document.getElementById("gc-fw-search") && document.getElementById("gc-fw-search").value || "")
+        .trim()
+        .toLowerCase();
+      var rows = document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row");
+      var place = document.querySelector("#gc-fw-tbody tr.gc-fw-placeholder-row");
+      var emptyFilter = document.getElementById("gc-fw-filter-empty");
+      var visible = 0;
+      var totalData = rows.length;
+      rows.forEach(function (tr) {
+        var ok =
+          rowMatchesFacets(tr) && rowMatchesGlobalInventoryScope(tr) && rowMatchesSearch(tr, q);
+        tr.hidden = !ok;
+        if (ok) visible++;
+      });
+      if (place) place.hidden = totalData > 0;
+      if (emptyFilter) {
+        emptyFilter.hidden = !(totalData > 0 && visible === 0);
+        syncFilterEmptyColspan();
+      }
+      var countEl = document.getElementById("gc-fw-count");
+      if (countEl) {
+        if (totalData === 0) {
+          countEl.textContent = "";
+        } else if (visible === totalData) {
+          countEl.textContent = visible === 1 ? "1 firewall" : visible + " firewalls";
+        } else {
+          countEl.textContent = "Showing " + visible + " of " + totalData + " firewalls";
+        }
+      }
+      updateSelectionChrome();
+    }
+
+    function setFiltersAsideCollapsed(collapsed) {
+      var aside = document.getElementById("gc-fw-filters-aside");
+      var drawer = document.getElementById("gc-fw-filters-drawer");
+      var btn = document.getElementById("gc-fw-filters-toggle");
+      if (!aside || !drawer || !btn) return;
+      aside.classList.toggle("filters--collapsed", collapsed);
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      if (collapsed) drawer.setAttribute("hidden", "");
+      else drawer.removeAttribute("hidden");
+    }
+
+    document.getElementById("gc-fw-filters-toggle") &&
+      document.getElementById("gc-fw-filters-toggle").addEventListener("click", function () {
+        var aside = document.getElementById("gc-fw-filters-aside");
+        var collapsed = aside && aside.classList.contains("filters--collapsed");
+        setFiltersAsideCollapsed(!collapsed);
+      });
+
+    document.getElementById("gc-fw-facet-reset") &&
+      document.getElementById("gc-fw-facet-reset").addEventListener("click", function () {
+        var fwSearchIn = document.getElementById("gc-fw-search");
+        if (fwSearchIn) fwSearchIn.value = "";
+        if (window.gcTableFacets && typeof window.gcTableFacets.clearToolbarSearchStorage === "function") {
+          window.gcTableFacets.clearToolbarSearchStorage("gc-fw");
+        }
+        if (filtersDrawerEl && window.gcTableFacets) window.gcTableFacets.reset(filtersDrawerEl, "gc-fw");
+        var sroot = document.getElementById("gc-fw-sync-facet-block");
+        if (sroot) {
+          sroot.querySelectorAll("input[data-gc-fw-sync-facet]").forEach(function (cb) {
+            cb.checked = false;
+          });
+        }
+        try {
+          sessionStorage.removeItem("gc-fw-sync-facet-sel");
+        } catch (e) {}
+        markInventoryFiltersSaved();
+        updateFacetChrome();
+        applyRowFilter();
+      });
+
+    var filtersAsideEl = document.getElementById("gc-fw-filters-aside");
+    if (filtersAsideEl && window.gcTableFacets) {
+      window.gcTableFacets.bindAside(
+        filtersAsideEl,
+        function () {
+          markInventoryFiltersSaved();
+          updateFacetChrome();
+          applyRowFilter();
+        },
+        "gc-fw",
+      );
+      filtersAsideEl.addEventListener("change", function (e) {
+        var t = e.target;
+        if (t && t.matches && t.matches("input[data-gc-fw-sync-facet]")) {
+          var g = t.closest(".filter-group");
+          if (g && t.checked) g.classList.add("is-open");
+          persistGcFwSyncFacetChecks();
+          markInventoryFiltersSaved();
+          updateFacetChrome();
+          applyRowFilter();
+        }
+      });
+    }
+
+    document.getElementById("gc-fw-quick-selected-scope") &&
+      document.getElementById("gc-fw-quick-selected-scope").addEventListener("click", function () {
+        applySelectedFirewallsQuickFilter();
+      });
+
+    document.addEventListener("gc-firewall-selection-changed", function () {
+      if (fwInvFacetMode !== "global" || !fwInvFacetInitDone) return;
+      applyGlobalNameFacetsFromTopBar();
+      try {
+        if (window.gcTableFacets && filtersDrawerEl) {
+          window.gcTableFacets.persistFilterDrawerState(filtersDrawerEl, "gc-fw");
+        }
+      } catch (e) {}
+      updateFacetChrome();
+      applyRowFilter();
+    });
+
+    var searchIn = document.getElementById("gc-fw-search");
+    if (searchIn) {
+      if (window.gcTableFacets && window.gcTableFacets.bindToolbarSearch) {
+        window.gcTableFacets.bindToolbarSearch(searchIn, "gc-fw", applyRowFilter);
+      } else {
+        searchIn.addEventListener("input", applyRowFilter);
+      }
+    }
+
+    document.getElementById("gc-fw-select-all") &&
+      document.getElementById("gc-fw-select-all").addEventListener("change", function () {
+        var on = document.getElementById("gc-fw-select-all").checked;
+        visibleDataRows().forEach(function (tr) {
+          var cb = tr.querySelector(".gc-fw-row-select");
+          if (cb) cb.checked = on;
+        });
+        updateSelectionChrome();
+      });
+
+    document.getElementById("gc-fw-tbody") &&
+      document.getElementById("gc-fw-tbody").addEventListener("change", function (e) {
+        if (e.target.classList && e.target.classList.contains("gc-fw-row-select")) updateSelectionChrome();
+      });
+
+    rebuildFirewallFacets(function () {
+      refreshInventorySyncColumn();
+      applyRowFilter();
+      updateFacetChrome();
+    });
+
+    function filterColMenuList() {
+      var q = (document.getElementById("gc-fw-cols-filter") && document.getElementById("gc-fw-cols-filter").value || "")
+        .trim()
+        .toLowerCase();
+      var list = document.getElementById("gc-fw-cols-list");
+      if (!list) return;
+      list.querySelectorAll("li[data-col-label]").forEach(function (li) {
+        var lab = (li.dataset.colLabel || "").toLowerCase();
+        li.hidden = q !== "" && lab.indexOf(q) === -1;
+      });
+    }
+
+    function buildColMenuList() {
+      var list = document.getElementById("gc-fw-cols-list");
+      if (!list) return;
+      list.innerHTML = COLS.map(function (c) {
+        return (
+          '<li class="toolbar__cols-item" data-col-id="' +
+          escapeHtml(c.id) +
+          '" data-col-label="' +
+          escapeHtml(c.label.toLowerCase()) +
+          '">' +
+          '<label class="toolbar__cols-label">' +
+          '<input type="checkbox" data-gc-fw-col="' +
+          escapeHtml(c.id) +
+          '" ' +
+          (colVis[c.id] ? "checked" : "") +
+          " />" +
+          "<span>" +
+          escapeHtml(c.label) +
+          "</span>" +
+          "</label>" +
+          "</li>"
+        );
+      }).join("");
+      filterColMenuList();
+    }
+
+    function positionGcFwColsDropdown() {
+      var btn = document.getElementById("gc-fw-cols-trigger");
+      var panel = document.getElementById("gc-fw-cols-panel");
+      var modal = document.getElementById("gc-fw-cols-modal");
+      if (!btn || !panel || !modal || modal.hidden) return;
+      panel.style.maxHeight = "";
+      var r = btn.getBoundingClientRect();
+      var gap = 6;
+      var margin = 8;
+      var pw = panel.offsetWidth || Math.min(380, window.innerWidth - 2 * margin);
+      var left = r.left;
+      if (left + pw > window.innerWidth - margin) left = window.innerWidth - margin - pw;
+      left = Math.max(margin, left);
+      var topBelow = r.bottom + gap;
+      panel.style.left = left + "px";
+      panel.style.top = topBelow + "px";
+      var after = panel.getBoundingClientRect();
+      if (after.bottom > window.innerHeight - margin) {
+        var aboveTop = r.top - gap - after.height;
+        if (aboveTop >= margin) panel.style.top = aboveTop + "px";
+        else {
+          panel.style.top = margin + "px";
+          panel.style.maxHeight = Math.max(120, window.innerHeight - 2 * margin) + "px";
+        }
+      }
+    }
+
+    function setColPanelOpen(open) {
+      var modal = document.getElementById("gc-fw-cols-modal");
+      var btn = document.getElementById("gc-fw-cols-trigger");
+      var panel = document.getElementById("gc-fw-cols-panel");
+      if (!modal || !btn) return;
+      modal.hidden = !open;
+      modal.setAttribute("aria-hidden", open ? "false" : "true");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (!open && panel) {
+        panel.style.top = "";
+        panel.style.left = "";
+        panel.style.maxHeight = "";
+      }
+      if (open) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(positionGcFwColsDropdown);
+        });
+      }
+    }
+
+    buildColMenuList();
+    var colsTrigger = document.getElementById("gc-fw-cols-trigger");
+    var colsModal = document.getElementById("gc-fw-cols-modal");
+    var colsPanel = document.getElementById("gc-fw-cols-panel");
+    var colsFilter = document.getElementById("gc-fw-cols-filter");
+    var colsList = document.getElementById("gc-fw-cols-list");
+    var colsClose = document.getElementById("gc-fw-cols-close");
+
+    function openColsFromTrigger() {
+      var willOpen = colsModal.hidden;
+      setColPanelOpen(willOpen);
+      if (willOpen) {
+        buildColMenuList();
+        colsFilter && colsFilter.focus();
+      }
+    }
+
+    if (colsTrigger) {
+      colsTrigger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openColsFromTrigger();
+      });
+      colsTrigger.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openColsFromTrigger();
+        }
+      });
+    }
+    colsFilter &&
+      colsFilter.addEventListener("input", function () {
+        filterColMenuList();
+      });
+    colsClose &&
+      colsClose.addEventListener("click", function () {
+        setColPanelOpen(false);
+        colsTrigger && colsTrigger.focus();
+      });
+    colsModal &&
+      colsModal.querySelector(".fw-cols-modal__backdrop") &&
+      colsModal.querySelector(".fw-cols-modal__backdrop").addEventListener("click", function () {
+        setColPanelOpen(false);
+        colsTrigger && colsTrigger.focus();
+      });
+    colsList &&
+      colsList.addEventListener("change", function (e) {
+        var t = e.target;
+        var cb = t instanceof Element ? t.closest("input[data-gc-fw-col]") : null;
+        if (!cb) return;
+        var id = cb.getAttribute("data-gc-fw-col");
+        if (!id || !Object.prototype.hasOwnProperty.call(colVis, id)) return;
+        colVis[id] = cb.checked;
+        var n = 0;
+        COLS.forEach(function (c) {
+          if (colVis[c.id]) n++;
+        });
+        if (n < 1) {
+          cb.checked = true;
+          colVis[id] = true;
+          return;
+        }
+        persistColVis(colVis);
+        applyColVis(colVis);
+        syncFilterEmptyColspan();
+        applyRowFilter();
+      });
+    document.addEventListener("mousedown", function (e) {
+      if (!colsModal || colsModal.hidden) return;
+      var t = e.target;
+      if (!(t instanceof Node)) return;
+      if ((colsTrigger && colsTrigger.contains(t)) || (colsPanel && colsPanel.contains(t))) return;
+      setColPanelOpen(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && colsModal && !colsModal.hidden) {
+        setColPanelOpen(false);
+        colsTrigger && colsTrigger.focus();
+      }
+      if (e.key === "Escape" && editFlyout && !editFlyout.hidden) {
+        closeEditFlyout();
+      }
+    });
+    function repositionColsIfOpen() {
+      if (colsModal && !colsModal.hidden) positionGcFwColsDropdown();
+    }
+    window.addEventListener("resize", repositionColsIfOpen);
+    window.addEventListener("scroll", repositionColsIfOpen, true);
+
+    var addModal = document.getElementById("add-firewall-modal");
+    var addForm = document.getElementById("add-firewall-form");
+    var openBtn = document.getElementById("open-add-firewall");
+    var cancelBtn = document.getElementById("cancel-add-firewall");
+    if (openBtn && addModal) {
+      openBtn.addEventListener("click", function () {
+        if (addForm) addForm.reset();
+        var v = addForm && addForm.querySelector('input[name="verify_ssl"]');
+        if (v) v.checked = true;
+        var mon = addForm && addForm.querySelector('input[name="monitor_enabled"]');
+        if (mon) mon.checked = true;
+        var addInt = addForm && addForm.querySelector("#add-fw-monitor-interval");
+        if (addInt) addInt.value = "5";
+        syncAddMonitorIntervalUi();
+        var p = addForm && addForm.querySelector('input[name="port"]');
+        if (p) p.value = "4444";
+        var addTagEd = addForm && addForm.querySelector("[data-gc-tag-editor]");
+        if (addTagEd) gcTagEditorSetTags(addTagEd, []);
+        addModal.showModal();
+      });
+    }
+    if (cancelBtn && addModal) {
+      cancelBtn.addEventListener("click", function () {
+        addModal.close();
+      });
+    }
+    if (addModal) {
+      addModal.addEventListener("click", function (e) {
+        if (e.target === addModal) addModal.close();
+      });
+    }
+
+    function syncEditMonitorIntervalUi() {
+      var mon = document.getElementById("edit-fw-monitor_enabled");
+      var inp = document.getElementById("edit-fw-monitor-interval");
+      if (!mon || !inp) return;
+      var on = mon.checked;
+      inp.readOnly = !on;
+      inp.classList.toggle("gc-if-flyout__input--readonly", !on);
+    }
+
+    function syncAddMonitorIntervalUi() {
+      var mon = document.getElementById("add-fw-monitor-enabled");
+      var inp = document.getElementById("add-fw-monitor-interval");
+      if (!mon || !inp) return;
+      var on = mon.checked;
+      inp.readOnly = !on;
+      inp.classList.toggle("gc-if-flyout__input--readonly", !on);
+    }
+
+    var editFlyout = document.getElementById("gc-fw-edit-flyout");
+    var editForm = document.getElementById("edit-firewall-form");
+    var cancelEdit = document.getElementById("cancel-edit-firewall");
+    var flyoutClose = document.getElementById("gc-fw-edit-flyout-close");
+    var flyoutBackdrop = editFlyout && editFlyout.querySelector(".gc-if-flyout__backdrop");
+    var flyoutPanel = editFlyout && editFlyout.querySelector(".gc-if-flyout__panel");
+
+    var gcFwEditFlyoutActiveTab = "connection";
+    var gcFwEditTablist = document.getElementById("gc-fw-edit-flyout-tablist");
+    var gcFwEditTabButtons = gcFwEditTablist
+      ? gcFwEditTablist.querySelectorAll("[data-gc-fw-edit-tab]")
+      : document.querySelectorAll("#gc-fw-edit-flyout-tablist [data-gc-fw-edit-tab]");
+    var gcFwEditTabPanels = {
+      connection: document.getElementById("gc-fw-edit-panel-connection"),
+      sync: document.getElementById("gc-fw-edit-panel-sync"),
+      properties: document.getElementById("gc-fw-edit-panel-properties"),
+    };
+
+    function gcFwEditFlyoutApplyTabs() {
+      Object.keys(gcFwEditTabPanels).forEach(function (key) {
+        var p = gcFwEditTabPanels[key];
+        if (!p) return;
+        var show = key === gcFwEditFlyoutActiveTab;
+        p.classList.toggle("is-active", show);
+        p.hidden = !show;
+      });
+      gcFwEditTabButtons.forEach(function (t) {
+        var tid = t.getAttribute("data-gc-fw-edit-tab");
+        var on = tid === gcFwEditFlyoutActiveTab;
+        t.classList.toggle("is-active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    }
+
+    gcFwEditTabButtons.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var id = tab.getAttribute("data-gc-fw-edit-tab");
+        if (!id || !gcFwEditTabPanels[id]) return;
+        gcFwEditFlyoutActiveTab = id;
+        gcFwEditFlyoutApplyTabs();
+      });
+    });
+    gcFwEditFlyoutApplyTabs();
+
+    function closeEditFlyout() {
+      if (!editFlyout) return;
+      editFlyout.hidden = true;
+      editFlyout.setAttribute("aria-hidden", "true");
+      gcFwFlyoutSyncUrl = "";
+      gcFwEditFlyoutActiveTab = "connection";
+      gcFwEditFlyoutApplyTabs();
+    }
+
+    function openEditFlyout(tr) {
+      if (!editFlyout || !editForm) return;
+      var id = tr.getAttribute("data-fw-id");
+      if (!id) return;
+      gcFwEditFlyoutActiveTab = "connection";
+      gcFwEditFlyoutApplyTabs();
+      gcFwFlyoutSyncUrl = tr.getAttribute("data-fw-sync-url") || "";
+      var idField = document.getElementById("edit-fw-id");
+      if (idField) idField.value = id;
+      document.getElementById("edit-fw-name").value = tr.getAttribute("data-fw-name") || "";
+      document.getElementById("edit-fw-description").value = tr.getAttribute("data-fw-description") || "";
+      document.getElementById("edit-fw-host").value = tr.getAttribute("data-fw-host") || "";
+      document.getElementById("edit-fw-port").value = tr.getAttribute("data-fw-port") || "4444";
+      var apiToEl = document.getElementById("edit-fw-api-timeout");
+      if (apiToEl) {
+        var at = parseInt(tr.getAttribute("data-fw-api-timeout") || "120", 10);
+        if (isNaN(at) || at < 5) at = 120;
+        if (at > 600) at = 600;
+        apiToEl.value = String(at);
+      }
+      document.getElementById("edit-fw-username").value = tr.getAttribute("data-fw-username") || "";
+      document.getElementById("edit-fw-password").value = "";
+      document.getElementById("edit-fw-verify_ssl").checked = tr.getAttribute("data-fw-verify") === "1";
+      var monEl = document.getElementById("edit-fw-monitor_enabled");
+      if (monEl) monEl.checked = tr.getAttribute("data-fw-monitor") === "1";
+      var intInp = document.getElementById("edit-fw-monitor-interval");
+      if (intInp) {
+        var mi = parseInt(tr.getAttribute("data-fw-monitor-interval") || "5", 10);
+        if (isNaN(mi) || mi < 1) mi = 5;
+        if (mi > 1440) mi = 1440;
+        intInp.value = String(mi);
+      }
+      syncEditMonitorIntervalUi();
+      var kvRoot = editForm && editForm.querySelector("[data-gc-fw-kv-tags]");
+      if (kvRoot) gcFwKvTagsLoad(kvRoot, tr.getAttribute("data-fw-tags-json"));
+      editFlyout.hidden = false;
+      editFlyout.setAttribute("aria-hidden", "false");
+      if (flyoutPanel) {
+        try {
+          flyoutPanel.focus();
+        } catch (e2) {}
+      }
+    }
+
+    function bindFwFlyoutResize(root) {
+      var panel = root.querySelector(".gc-if-flyout__panel");
+      var handle = root.querySelector(".gc-if-flyout__resize");
+      if (!panel || !handle || handle.dataset.gcFwResizeBound === "1") return;
+      handle.dataset.gcFwResizeBound = "1";
+      handle.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var startX = e.clientX;
+        var startW = panel.getBoundingClientRect().width;
+        var maxW = Math.min(720, window.innerWidth - 24);
+        function onMove(e2) {
+          var w = startW + (startX - e2.clientX);
+          w = Math.max(280, Math.min(maxW, w));
+          panel.style.width = w + "px";
+        }
+        function onUp() {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        }
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+    if (editFlyout) bindFwFlyoutResize(editFlyout);
+
+    var editMonCb = document.getElementById("edit-fw-monitor_enabled");
+    if (editMonCb && editMonCb.dataset.gcMonitorIntervalBound !== "1") {
+      editMonCb.dataset.gcMonitorIntervalBound = "1";
+      editMonCb.addEventListener("change", syncEditMonitorIntervalUi);
+    }
+    var addMonCb = document.getElementById("add-fw-monitor-enabled");
+    if (addMonCb && addMonCb.dataset.gcMonitorIntervalBound !== "1") {
+      addMonCb.dataset.gcMonitorIntervalBound = "1";
+      addMonCb.addEventListener("change", syncAddMonitorIntervalUi);
+    }
+
+    if (cancelEdit) {
+      cancelEdit.addEventListener("click", closeEditFlyout);
+    }
+    if (flyoutClose) {
+      flyoutClose.addEventListener("click", closeEditFlyout);
+    }
+    if (flyoutBackdrop) {
+      flyoutBackdrop.addEventListener("click", closeEditFlyout);
+    }
+
+    function buildSyncToggleRows() {
+      var root = document.getElementById("gc-fw-sync-toggles");
+      if (!root || !SYNC_CATALOG || !SYNC_CATALOG.length) return;
+      var prefs = loadSyncEntityPrefs();
+      root.innerHTML = (SYNC_CATALOG || [])
+        .map(function (x) {
+          var on = !!prefs[x.id];
+          return (
+            '<div class="gc-if-flyout__field gc-if-flyout__field--toggle gc-fw-sync-toggles__row">' +
+            '<label class="gc-if-flyout__toggle-label">' +
+            '<input type="checkbox" class="gc-fw-sync-entity-cb" data-sync-entity-id="' +
+            escapeHtml(x.id) +
+            '" ' +
+            (on ? "checked" : "") +
+            " />" +
+            "<span>" +
+            escapeHtml(x.label) +
+            "</span>" +
+            "</label>" +
+            "</div>"
+          );
+        })
+        .join("");
+      root.querySelectorAll(".gc-fw-sync-entity-cb").forEach(function (cb) {
+        cb.addEventListener("change", function () {
+          var pr = loadSyncEntityPrefs();
+          var eid = cb.getAttribute("data-sync-entity-id");
+          if (eid) pr[eid] = cb.checked;
+          persistSyncEntityPrefs(pr);
+          refreshInventorySyncColumn();
+          applyRowFilter();
+        });
+      });
+    }
+    buildSyncToggleRows();
+
+    function configSyncBannerMessage(res) {
+      var body = res.body || {};
+      if (res.status === 404) return { ok: false, text: "Firewall not found." };
+      if (res.status === 202 && body.accepted) {
+        return {
+          ok: true,
+          text:
+            "Configuration sync started in the background. You can keep navigating; refresh this list when it finishes.",
+        };
+      }
+      if (body.skipped) return { ok: false, text: body.message || "Nothing selected." };
+      if (body.ok) {
+        var a = body.added || 0;
+        var c = body.changed || 0;
+        var d = body.deleted || 0;
+        if (a + c + d === 0) return { ok: true, text: "Sync finished — no changes." };
+        return {
+          ok: true,
+          text: "Sync finished — " + a + " added, " + c + " updated, " + d + " removed.",
+        };
+      }
+      return { ok: false, text: body.error || body.detail || "Sync failed." };
+    }
+
+    function gcDispatchConfigCacheSynced(fwId) {
+      var n = parseInt(fwId, 10);
+      if (isNaN(n) || n < 1) return;
+      try {
+        document.dispatchEvent(
+          new CustomEvent("gc-config-cache-synced", { detail: { firewall_ids: [n] } }),
+        );
+      } catch (e) {}
+    }
+
+    function rebuildFwInventorySearchAfterSync(tr, cachedTypesArr) {
+      var prefs = loadSyncEntityPrefs();
+      var tls = tr.getAttribute("data-tls") || "no";
+      var mon = tr.getAttribute("data-fw-monitor") === "1" ? "yes" : "no";
+      var dev = (tr.getAttribute("data-fw-device-display") || "").trim();
+      var dhost = (tr.getAttribute("data-fw-device-hostname") || "").trim();
+      var serial = (tr.getAttribute("data-fw-serial") || "").trim();
+      var model = (tr.getAttribute("data-fw-model") || "").trim();
+      var firmware = (tr.getAttribute("data-fw-firmware") || "").trim();
+      var cacheStr = (cachedTypesArr || []).join(" ");
+      var tagPart = (tr.getAttribute("data-fw-tags-search") || "").trim();
+      var base = [
+        tr.getAttribute("data-fw-name") || "",
+        tr.getAttribute("data-fw-description") || "",
+        tr.getAttribute("data-fw-host") || "",
+        String(tr.getAttribute("data-fw-port") || ""),
+        tr.getAttribute("data-fw-username") || "",
+        tls,
+        mon,
+        dev,
+        dhost,
+        serial,
+        model,
+        firmware,
+        cacheStr,
+        tagPart,
+      ]
+        .join(" ")
+        .trim()
+        .toLowerCase();
+      tr.setAttribute("data-fw-sync-cached", cacheStr);
+      tr.setAttribute("data-search-base", base);
+      var extra = [];
+      (SYNC_CATALOG || []).forEach(function (x) {
+        if (prefs[x.id]) {
+          extra.push(String(x.label).toLowerCase());
+          extra.push(String(x.id).toLowerCase());
+        }
+      });
+      tr.setAttribute("data-search", (base + " " + extra.join(" ")).trim().toLowerCase());
+    }
+
+    function refreshInventoryTableAfterCacheSync(ids) {
+      if (!GC_CACHED_SYNC_TYPES_URL || !ids || !ids.length) return;
+      var need = ids.filter(function (id) {
+        return document.querySelector('#gc-fw-tbody tr.gc-fw-data-row[data-fw-id="' + id + '"]');
+      });
+      if (!need.length) return;
+      var url = GC_CACHED_SYNC_TYPES_URL + "?firewall_ids=" + encodeURIComponent(need.join(","));
+      fetch(url, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (map) {
+          need.forEach(function (fid) {
+            var tr = document.querySelector('#gc-fw-tbody tr.gc-fw-data-row[data-fw-id="' + fid + '"]');
+            if (!tr) return;
+            var types = map[String(fid)] || [];
+            rebuildFwInventorySearchAfterSync(tr, types);
+          });
+          refreshInventorySyncColumn();
+          rebuildFirewallFacets(function () {
+            applyRowFilter();
+            updateFacetChrome();
+          });
+        })
+        .catch(function () {});
+    }
+
+    function configSyncUseBatchApi() {
+      return (
+        typeof window.gcGlobalBannerSyncBegin === "function" &&
+        typeof window.gcGlobalBannerSyncEnd === "function"
+      );
+    }
+
+    var CONFIG_SYNC_PROGRESS_MSG = "Syncing configuration cache from the firewall…";
+    var CONFIG_SYNC_MULTI_MSG = "Syncing configuration cache from firewalls…";
+
+    function fetchFirewallConfigSync(syncUrl, entityIds) {
+      return fetch(syncUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({ entities: entityIds }),
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, status: r.status, body: j };
+        });
+      });
+    }
+
+    function runConfigSync(syncUrl, busyBtn) {
+      if (!syncUrl) return;
+      var batch = configSyncUseBatchApi();
+      var bid = batch ? window.gcGlobalBannerSyncBegin(CONFIG_SYNC_PROGRESS_MSG) : 0;
+      var ids = getEnabledSyncEntityIds();
+      if (ids.length < 1) {
+        if (batch) window.gcGlobalBannerSyncEnd(bid, false, "Turn on at least one object type in the panel.");
+        else if (typeof window.gcGlobalBannerShowResult === "function") {
+          window.gcGlobalBannerShowResult(false, "Turn on at least one object type in the panel.");
+        }
+        return;
+      }
+      if (busyBtn) {
+        busyBtn.disabled = true;
+        if (busyBtn.classList.contains("btn-icon")) busyBtn.classList.add("btn-icon--busy");
+      }
+      fetchFirewallConfigSync(syncUrl, ids)
+        .then(function (res) {
+          if (busyBtn) {
+            busyBtn.disabled = false;
+            busyBtn.classList.remove("btn-icon--busy");
+          }
+          var msg = configSyncBannerMessage(res);
+          var body = res.body || {};
+          if (res.status === 202 && body.accepted) {
+            if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
+              window.gcGlobalBannerTrackBackgroundSync(msg.text);
+            } else if (batch) {
+              window.gcGlobalBannerSyncEnd(bid, true, msg.text);
+            } else if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(true, msg.text);
+            }
+          } else {
+            if (batch) window.gcGlobalBannerSyncEnd(bid, msg.ok, msg.text);
+            else if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(msg.ok, msg.text);
+            }
+            if (msg.ok && !body.skipped && res.status !== 202) {
+              var ef = document.getElementById("edit-fw-id");
+              if (ef && ef.value) gcDispatchConfigCacheSynced(ef.value);
+            }
+          }
+        })
+        .catch(function () {
+          if (busyBtn) {
+            busyBtn.disabled = false;
+            busyBtn.classList.remove("btn-icon--busy");
+          }
+          if (batch) window.gcGlobalBannerSyncEnd(bid, false, "Request failed.");
+          else if (typeof window.gcGlobalBannerShowResult === "function") {
+            window.gcGlobalBannerShowResult(false, "Request failed.");
+          }
+        });
+    }
+
+    function getSelectedFirewallRowsForSync() {
+      var rows = [];
+      document.querySelectorAll(".gc-fw-row-select:checked").forEach(function (cb) {
+        var tr = cb.closest("tr.gc-fw-data-row");
+        if (tr && tr.getAttribute("data-fw-sync-url")) rows.push(tr);
+      });
+      return rows;
+    }
+
+    function runSequentialInventorySyncs(rows) {
+      var entityIds = getEnabledSyncEntityIds();
+      if (entityIds.length < 1) {
+        var noTypes = "Open the firewall panel and enable at least one sync type.";
+        if (typeof window.gcGlobalBannerShowResult === "function") {
+          window.gcGlobalBannerShowResult(false, noTypes);
+        } else {
+          alert(noTypes);
+        }
+        return;
+      }
+      var list = rows.filter(function (tr) {
+        return tr.getAttribute("data-fw-sync-url");
+      });
+      if (list.length < 1) return;
+      var batch = configSyncUseBatchApi();
+      var bid = batch ? window.gcGlobalBannerSyncBegin(CONFIG_SYNC_MULTI_MSG) : 0;
+      var syncAllBtn = document.getElementById("gc-fw-sync-all");
+      var syncSelBtn = document.getElementById("gc-fw-sync-selected");
+      var toDisable = [syncAllBtn, syncSelBtn].filter(Boolean);
+      toDisable.forEach(function (b) {
+        b.disabled = true;
+      });
+      var ok = 0;
+      var fail = 0;
+      var asyncOk = 0;
+      var lastFail = "";
+      var i = 0;
+      function finishMulti() {
+        toDisable.forEach(function (b) {
+          b.disabled = false;
+        });
+        updateSelectionChrome();
+        var n = list.length;
+        if (batch) {
+          if (fail === 0) {
+            var allAsync = ok === n && asyncOk === n && n > 0;
+            var doneMsg = allAsync
+              ? "Started background configuration sync for " +
+                n +
+                " firewall" +
+                (n === 1 ? "" : "s") +
+                ". You can keep navigating; refresh when it finishes."
+              : "Synced " + n + " firewall" + (n === 1 ? "" : "s") + ".";
+            if (allAsync && typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
+              window.gcGlobalBannerTrackBackgroundSync(doneMsg);
+            } else {
+              window.gcGlobalBannerSyncEnd(bid, true, doneMsg);
+            }
+          } else if (ok === 0) {
+            window.gcGlobalBannerSyncEnd(bid, false, lastFail || "Sync failed.");
+          } else {
+            window.gcGlobalBannerSyncEnd(
+              bid,
+              false,
+              ok + " of " + n + " succeeded. " + (lastFail || ""),
+            );
+          }
+        } else if (typeof window.gcGlobalBannerShowResult === "function") {
+          var allAsyncNb = fail === 0 && ok === n && asyncOk === n && n > 0;
+          var doneMsgNb = allAsyncNb
+            ? "Started background configuration sync for " +
+              n +
+              " firewall" +
+              (n === 1 ? "" : "s") +
+              ". You can keep navigating; refresh when it finishes."
+            : fail === 0
+              ? "Synced " + n + " firewall" + (n === 1 ? "" : "s") + "."
+              : ok + " of " + n + " succeeded. " + (lastFail || "");
+          if (fail === 0 && allAsyncNb && typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
+            window.gcGlobalBannerTrackBackgroundSync(doneMsgNb);
+          } else {
+            window.gcGlobalBannerShowResult(fail === 0, doneMsgNb);
+          }
+        }
+      }
+      function step() {
+        if (i >= list.length) {
+          finishMulti();
+          return;
+        }
+        var tr = list[i++];
+        var url = tr.getAttribute("data-fw-sync-url");
+        fetchFirewallConfigSync(url, entityIds)
+          .then(function (res) {
+            var msg = configSyncBannerMessage(res);
+            var body = res.body || {};
+            if (msg.ok && !body.skipped) {
+              ok++;
+              if (res.status === 202) asyncOk++;
+              else gcDispatchConfigCacheSynced(tr.getAttribute("data-fw-id"));
+            } else {
+              fail++;
+              lastFail = msg.text;
+            }
+          })
+          .catch(function () {
+            fail++;
+            lastFail = "Request failed.";
+          })
+          .then(function () {
+            step();
+          });
+      }
+      step();
+    }
+
+    var flyoutSyncBtn = document.getElementById("gc-fw-flyout-sync-btn");
+    if (flyoutSyncBtn) {
+      flyoutSyncBtn.addEventListener("click", function () {
+        runConfigSync(gcFwFlyoutSyncUrl, flyoutSyncBtn);
+      });
+    }
+
+    var syncAllToolbar = document.getElementById("gc-fw-sync-all");
+    if (syncAllToolbar) {
+      syncAllToolbar.addEventListener("click", function () {
+        var rows = Array.prototype.slice.call(document.querySelectorAll("#gc-fw-tbody tr.gc-fw-data-row"));
+        runSequentialInventorySyncs(rows);
+      });
+    }
+    var syncSelToolbar = document.getElementById("gc-fw-sync-selected");
+    if (syncSelToolbar) {
+      syncSelToolbar.addEventListener("click", function () {
+        runSequentialInventorySyncs(getSelectedFirewallRowsForSync());
+      });
+    }
+
+    if (editForm) {
+      editForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var kvR = document.querySelector("#edit-firewall-form [data-gc-fw-kv-tags]");
+        if (kvR) gcFwKvTagsSyncToHidden(kvR);
+        var idField = document.getElementById("edit-fw-id");
+        if (!idField || !String(idField.value || "").trim()) {
+          alert("Missing firewall id. Close and open the panel again.");
+          return;
+        }
+        var fd = new FormData(editForm);
+        var submitBtn = editForm.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        fetch(editForm.getAttribute("action") || {{ url_firewall_update | tojson }}, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+        })
+          .then(function (r) {
+            return r.text().then(function (text) {
+              return { ok: r.ok, status: r.status, text: text };
+            });
+          })
+          .then(function (res) {
+            if (submitBtn) submitBtn.disabled = false;
+            if (res.ok) {
+              try {
+                var j = JSON.parse(res.text);
+                if (j && j.ok) {
+                  closeEditFlyout();
+                  window.location.reload();
+                  return;
+                }
+              } catch (err) {}
+              closeEditFlyout();
+              window.location.reload();
+              return;
+            }
+            var msg = res.text || "";
+            try {
+              var j2 = JSON.parse(res.text);
+              if (j2.detail) msg = typeof j2.detail === "string" ? j2.detail : JSON.stringify(j2.detail);
+            } catch (err2) {}
+            alert("Could not save changes (" + res.status + "). " + (msg || "").slice(0, 400));
+          })
+          .catch(function () {
+            if (submitBtn) submitBtn.disabled = false;
+            alert("Could not save changes (network error).");
+          });
+      });
+    }
+
+    function openEditFromRow(tr) {
+      openEditFlyout(tr);
+    }
+
+    document.querySelectorAll(".gc-fw-row--clickable").forEach(function (tr) {
+      tr.addEventListener("click", function (e) {
+        var t = e.target;
+        var el = t instanceof Element ? t : t && t.parentElement;
+        if (el && el.closest("input, button, a, label, .td-check, .gc-table-toggle")) return;
+        openEditFromRow(tr);
+      });
+    });
+
+    document.querySelectorAll(".test-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var id = btn.getAttribute("data-id");
+        var out = document.querySelector('[data-result-for="' + id + '"]');
+        if (out) {
+          out.hidden = false;
+          out.textContent = "Testing…";
+          out.className = "test-result";
+        }
+        var testUrl = btn.getAttribute("data-test-url");
+        if (!testUrl) return;
+        fetch(testUrl, { method: "POST", credentials: "same-origin" })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, body: j };
+            });
+          })
+          .then(function (_ref) {
+            if (!out) return;
+            var body = _ref.body;
+            var success = _ref.ok && body.ok;
+            out.textContent = body.message || (success ? "OK" : "Failed");
+            out.className = "test-result " + (success ? "ok" : "err");
+          })
+          .catch(function () {
+            if (out) {
+              out.textContent = "Request failed";
+              out.className = "test-result err";
+            }
+          });
+      });
+    });
+
+    document.querySelectorAll(".gc-fw-sync-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var row = btn.closest("tr.gc-fw-data-row");
+        var syncUrl = (row && row.getAttribute("data-fw-sync-url")) || btn.getAttribute("data-sync-url");
+        if (!syncUrl) return;
+        var batch = configSyncUseBatchApi();
+        var bid = batch ? window.gcGlobalBannerSyncBegin(CONFIG_SYNC_PROGRESS_MSG) : 0;
+        var ids = getEnabledSyncEntityIds();
+        if (ids.length < 1) {
+          if (batch) {
+            window.gcGlobalBannerSyncEnd(
+              bid,
+              false,
+              "Open the firewall panel and enable at least one sync type.",
+            );
+          } else if (typeof window.gcGlobalBannerShowResult === "function") {
+            window.gcGlobalBannerShowResult(false, "Open the firewall panel and enable at least one sync type.");
+          }
+          return;
+        }
+        btn.classList.add("btn-icon--busy");
+        btn.disabled = true;
+        fetchFirewallConfigSync(syncUrl, ids)
+          .then(function (res) {
+            btn.classList.remove("btn-icon--busy");
+            btn.disabled = false;
+            var msg = configSyncBannerMessage(res);
+            var body = res.body || {};
+            if (res.status === 202 && body.accepted) {
+              if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
+                window.gcGlobalBannerTrackBackgroundSync(msg.text);
+              } else if (batch) {
+                window.gcGlobalBannerSyncEnd(bid, true, msg.text);
+              } else if (typeof window.gcGlobalBannerShowResult === "function") {
+                window.gcGlobalBannerShowResult(true, msg.text);
+              }
+            } else {
+              if (batch) window.gcGlobalBannerSyncEnd(bid, msg.ok, msg.text);
+              else if (typeof window.gcGlobalBannerShowResult === "function") {
+                window.gcGlobalBannerShowResult(msg.ok, msg.text);
+              }
+              if (msg.ok && !body.skipped && row && res.status !== 202) {
+                gcDispatchConfigCacheSynced(row.getAttribute("data-fw-id"));
+              }
+            }
+          })
+          .catch(function () {
+            btn.classList.remove("btn-icon--busy");
+            btn.disabled = false;
+            if (batch) window.gcGlobalBannerSyncEnd(bid, false, "Request failed.");
+            else if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(false, "Request failed.");
+            }
+          });
+      });
+    });
+
+    document.querySelectorAll(".td-check input, .gc-fw-row-select").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+      });
+    });
+
+    var delDialog = document.getElementById("gc-fw-delete-dialog");
+    var delLead = document.getElementById("gc-fw-delete-dialog-lead");
+    var delConfirm = document.getElementById("gc-fw-delete-dialog-confirm");
+    var delCancel = document.getElementById("gc-fw-delete-dialog-cancel");
+    var delToolbar = document.getElementById("gc-fw-delete-selected");
+    var setTagsDialog = document.getElementById("gc-fw-tags-dialog");
+    var setTagsLead = document.getElementById("gc-fw-tags-dialog-lead");
+    var setTagsApply = document.getElementById("gc-fw-tags-dialog-apply");
+    var setTagsCancel = document.getElementById("gc-fw-tags-dialog-cancel");
+    var setTagsToolbar = document.getElementById("gc-fw-set-tags-selected");
+
+    function closeDelDialog() {
+      if (delDialog) delDialog.close();
+    }
+
+    if (delCancel && delDialog) {
+      delCancel.addEventListener("click", closeDelDialog);
+    }
+    if (delDialog) {
+      delDialog.addEventListener("click", function (e) {
+        if (e.target === delDialog) closeDelDialog();
+      });
+    }
+
+    if (delToolbar && delDialog && delLead && delConfirm) {
+      delToolbar.addEventListener("click", function () {
+        var ids = getSelectedIds();
+        if (ids.length < 1) return;
+        delConfirm.disabled = false;
+        var n = ids.length;
+        delLead.textContent =
+          "Are you sure you want to delete " + n + " firewall" + (n === 1 ? "" : "s") + "? This cannot be undone.";
+        delConfirm.textContent = "Delete " + n + " firewall" + (n === 1 ? "" : "s");
+        delDialog.showModal();
+      });
+    }
+
+    if (delConfirm) {
+      delConfirm.addEventListener("click", function () {
+        var ids = getSelectedIds();
+        if (ids.length < 1) {
+          closeDelDialog();
+          return;
+        }
+        delConfirm.disabled = true;
+        fetch(GC_DELETE_BATCH_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: ids }),
+        })
+          .then(function (r) {
+            if (r.ok) location.reload();
+            else {
+              delConfirm.disabled = false;
+              alert("Delete failed");
+            }
+          })
+          .catch(function () {
+            delConfirm.disabled = false;
+            alert("Delete failed");
+          });
+      });
+    }
+
+    function closeSetTagsDialog() {
+      if (setTagsDialog) setTagsDialog.close();
+    }
+
+    if (setTagsCancel && setTagsDialog) {
+      setTagsCancel.addEventListener("click", closeSetTagsDialog);
+    }
+    if (setTagsDialog) {
+      setTagsDialog.addEventListener("click", function (e) {
+        if (e.target === setTagsDialog) closeSetTagsDialog();
+      });
+    }
+
+    if (setTagsToolbar && setTagsDialog) {
+      setTagsToolbar.addEventListener("click", function () {
+        var ids = getSelectedIds();
+        if (ids.length < 1) return;
+        var n = ids.length;
+        if (setTagsLead) {
+          setTagsLead.textContent =
+            "Add selected tags to " + n + " firewall" + (n === 1 ? "" : "s") + ". Existing tags are kept.";
+        }
+        if (batchTagRoot) gcTagEditorSetTags(batchTagRoot, []);
+        if (setTagsApply) setTagsApply.disabled = false;
+        setTagsDialog.showModal();
+      });
+    }
+
+    if (setTagsApply) {
+      setTagsApply.addEventListener("click", function () {
+        var ids = getSelectedIds();
+        if (ids.length < 1) {
+          closeSetTagsDialog();
+          return;
+        }
+        var tags = batchTagRoot ? gcTagEditorGetTags(batchTagRoot) : [];
+        if (!tags.length) {
+          alert("Add at least one tag.");
+          return;
+        }
+        setTagsApply.disabled = true;
+        fetch(GC_SET_TAGS_BATCH_URL, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ ids: ids, tags: tags }),
+        })
+          .then(function (r) {
+            if (r.ok) {
+              location.reload();
+              return;
+            }
+            setTagsApply.disabled = false;
+            return r
+              .json()
+              .then(function (j) {
+                var d = j && j.detail ? j.detail : "Could not set tags.";
+                alert(typeof d === "string" ? d : JSON.stringify(d));
+              })
+              .catch(function () {
+                alert("Could not set tags.");
+              });
+          })
+          .catch(function () {
+            setTagsApply.disabled = false;
+            alert("Could not set tags.");
+          });
+      });
+    }
+
+    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
+      window.gcRegisterConfigCacheTableRefresher(refreshInventoryTableAfterCacheSync);
+    }
+
+    (function () {
+      var tablist = document.getElementById("gc-fw-inv-main-tablist");
+      if (!tablist) return;
+      var tabs = tablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-fw-inv-tab]");
+      var panels = {
+        firewalls: document.getElementById("gc-fw-inv-panel-firewalls"),
+        configurations: document.getElementById("gc-fw-inv-panel-configurations"),
+      };
+      var subFw = document.getElementById("gc-fw-inv-subtitle-firewalls");
+      var subCfg = document.getElementById("gc-fw-inv-subtitle-configurations");
+      function applyUrlForTab(id) {
+        try {
+          var u = new URL(window.location.href);
+          if (id === "configurations") u.searchParams.set("tab", "configurations");
+          else u.searchParams.delete("tab");
+          window.history.replaceState({}, "", u.pathname + u.search + u.hash);
+        } catch (e) {}
+      }
+      function setTab(id) {
+        var k = id === "configurations" ? "configurations" : "firewalls";
+        tabs.forEach(function (t) {
+          var tid = t.getAttribute("data-gc-fw-inv-tab");
+          var on = tid === k;
+          t.classList.toggle("is-active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        Object.keys(panels).forEach(function (key) {
+          var p = panels[key];
+          if (!p) return;
+          var show = key === k;
+          p.classList.toggle("is-active", show);
+          p.hidden = !show;
+        });
+        if (subFw) subFw.hidden = k !== "firewalls";
+        if (subCfg) subCfg.hidden = k !== "configurations";
+        applyUrlForTab(k);
+        document.title = k === "configurations" ? "Configurations · Firewalls · Ground Control" : "Firewalls · Ground Control";
+        var pt = document.querySelector(".page-header__title");
+        if (pt) pt.textContent = k === "configurations" ? "Configurations" : "Firewalls";
+        var cur = document.querySelector(".breadcrumbs__item--current");
+        if (cur) cur.textContent = k === "configurations" ? "Configurations" : "Inventory";
+      }
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          var id = tab.getAttribute("data-gc-fw-inv-tab");
+          if (!id) return;
+          setTab(id);
+        });
+      });
+    })();
+  })();
+</script>
+<script src="/static/gc-configuration-members-multiselect.js?v={{ _gc_ver }}"></script>
+{% include "partials/configuration_inventory_scripts.html" %}
+{% endblock %}

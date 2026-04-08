@@ -1,0 +1,213 @@
+{# VLAN add/edit flyout — layout aligned with mocks/vlan edit.png and vlan add.png; behaviors mirror gc-net-if-flyout. #}
+<div id="gc-net-vlan-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-vlan-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-vlan-flyout-title" class="gc-if-flyout__title">Edit VLAN</h2>
+    </header>
+    <form id="gc-vlan-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="gc-if-flyout__section-label">General settings</p>
+          <div id="gc-vlan-flyout-fw-slot" class="gc-if-flyout__fw-slot" hidden aria-hidden="true"></div>
+          <div id="gc-vlan-flyout-target-fw-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-add-firewall">Firewall <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-vlan-flyout-add-firewall" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div id="gc-vlan-flyout-target-cfg-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-add-configuration">Configuration <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-vlan-flyout-add-configuration" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div class="gc-if-flyout__field" data-gc-combine-field-keys="Name,__name">
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-name">Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <input type="text" id="gc-vlan-flyout-name" class="gc-if-flyout__input" autocomplete="off" required />
+          </div>
+          <div id="gc-vlan-flyout-hardware-row-edit" class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Hardware</span>
+            <span id="gc-vlan-flyout-hardware-readonly" class="gc-if-flyout__readonly-val mono">—</span>
+          </div>
+          <div id="gc-vlan-flyout-hardware-row-add" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-hardware-input">Hardware <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <input type="text" id="gc-vlan-flyout-hardware-input" class="gc-if-flyout__input mono" autocomplete="off" />
+          </div>
+          <div id="gc-vlan-flyout-interface-row-edit" class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Interface</span>
+            <span id="gc-vlan-flyout-interface-readonly" class="gc-if-flyout__readonly-val mono">—</span>
+          </div>
+          <div id="gc-vlan-flyout-interface-row-add" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-interface-select">Interface <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-vlan-flyout-interface-select" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div id="gc-vlan-flyout-vlanid-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-vlan-id">VLAN ID <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <div class="gc-if-flyout__field-inline">
+              <input type="text" id="gc-vlan-flyout-vlan-id" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" inputmode="numeric" autocomplete="off" />
+              <span class="gc-if-flyout__range-hint">(1–4094)</span>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field" data-gc-combine-field-keys="__zone">
+            <label class="gc-if-flyout__label" for="gc-vlan-flyout-zone">Zone</label>
+            <select id="gc-vlan-flyout-zone" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+
+          <div id="gc-vlan-flyout-post-zone" class="gc-if-flyout__post-zone">
+            <hr class="gc-if-flyout__rule" />
+
+            <div class="gc-if-flyout__check-head">
+              <label class="gc-if-flyout__check-label">
+                <input type="checkbox" id="gc-vlan-flyout-ipv4-enabled" checked />
+                <span>IPv4 configuration</span>
+              </label>
+            </div>
+            <div id="gc-vlan-flyout-ipv4-body" class="gc-if-flyout__subsection">
+              <fieldset class="gc-if-flyout__fieldset">
+                <legend class="gc-if-flyout__legend">IP assignment</legend>
+                <div class="gc-if-flyout__radios">
+                  <label><input type="radio" name="gc-vlan-ipv4-mode" value="static" /> Static</label>
+                  <label><input type="radio" name="gc-vlan-ipv4-mode" value="pppoe" /> PPPoE (DSL)</label>
+                  <label><input type="radio" name="gc-vlan-ipv4-mode" value="dhcp" checked /> DHCP</label>
+                </div>
+              </fieldset>
+              <div id="gc-vlan-flyout-ipv4-single-static" class="gc-if-flyout__field-row">
+                <div class="gc-if-flyout__field gc-if-flyout__field--half" data-gc-combine-field-keys="IPAddress,IPv4Address">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv4-ip">IPv4 <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                  <input type="text" id="gc-vlan-flyout-ipv4-ip" class="gc-if-flyout__input mono" autocomplete="off" title="Dotted quad or CIDR, e.g. 192.168.1.1/24 (parsed on leave)" />
+                </div>
+                <div class="gc-if-flyout__field gc-if-flyout__field--half" data-gc-combine-field-keys="Netmask,IPv4Netmask">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv4-netmask">Netmask</label>
+                  <input type="text" id="gc-vlan-flyout-ipv4-netmask" class="gc-if-flyout__input mono" autocomplete="off" title="/24, plain prefix (0–32), or dotted mask — normalized on leave" />
+                </div>
+              </div>
+              <div id="gc-vlan-flyout-ipv4-combined-wrap" class="gc-if-flyout__combined-static" hidden aria-hidden="true">
+                <p class="gc-if-flyout__subhead">Static IPv4 per scope (combined view)</p>
+                <div class="gc-if-cmb-toolbar">
+                  <input
+                    type="search"
+                    class="gc-if-flyout__input gc-if-cmb-filter"
+                    placeholder="Filter by scope, hardware, addresses…"
+                    autocomplete="off"
+                    aria-label="Filter per-scope IPv4 rows"
+                  />
+                </div>
+                <div class="gc-if-flyout__table-scroll">
+                  <table class="data-table data-table--dense gc-if-flyout__combine-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Hardware</th>
+                        <th scope="col">Address</th>
+                        <th scope="col">Netmask / prefix</th>
+                        <th scope="col" class="gc-if-cmb-gw-col">Gateway name</th>
+                        <th scope="col" class="gc-if-cmb-gw-col">Gateway IP</th>
+                        <th scope="col">Pool</th>
+                        <th scope="col" class="th-narrow" title="IPAM pool alignment"> </th>
+                      </tr>
+                    </thead>
+                    <tbody id="gc-vlan-flyout-ipv4-combined-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="gc-vlan-flyout-ipv4-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+                <p class="gc-if-flyout__subhead">Gateway detail</p>
+                <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayName,IPv4GatewayName,DefaultGatewayName">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv4-gw-name">Gateway name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                  <input type="text" id="gc-vlan-flyout-ipv4-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+                </div>
+                <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayIP,Gateway,DefaultGateway,IPv4Gateway">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv4-gw-ip">Gateway IP</label>
+                  <input type="text" id="gc-vlan-flyout-ipv4-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+                </div>
+              </div>
+            </div>
+
+            <hr class="gc-if-flyout__rule" />
+
+            <div class="gc-if-flyout__check-head">
+              <label class="gc-if-flyout__check-label">
+                <input type="checkbox" id="gc-vlan-flyout-ipv6-enabled" checked />
+                <span>IPv6 configuration</span>
+              </label>
+            </div>
+            <div id="gc-vlan-flyout-ipv6-body" class="gc-if-flyout__subsection">
+              <fieldset class="gc-if-flyout__fieldset">
+                <legend class="gc-if-flyout__legend">IP assignment</legend>
+                <div class="gc-if-flyout__radios">
+                  <label><input type="radio" name="gc-vlan-ipv6-mode" value="static" checked /> Static</label>
+                  <label><input type="radio" name="gc-vlan-ipv6-mode" value="dhcp" /> DHCP</label>
+                  <label>
+                    <input type="radio" name="gc-vlan-ipv6-mode" value="delegated" /> Delegated
+                    <span class="gc-if-flyout__info" title="Prefix delegated from upstream">i</span>
+                  </label>
+                </div>
+              </fieldset>
+              <div id="gc-vlan-flyout-ipv6-single-static" class="gc-if-flyout__field-row">
+                <div class="gc-if-flyout__field gc-if-flyout__field--grow" data-gc-combine-field-keys="IPv6Address,IPv6_Address">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv6-ip">IPv6 / prefix <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                  <input type="text" id="gc-vlan-flyout-ipv6-ip" class="gc-if-flyout__input mono" autocomplete="off" title="Address only or full CIDR, e.g. 2001:db8::1/64 (parsed on leave)" />
+                </div>
+                <div class="gc-if-flyout__field gc-if-flyout__field--narrow" data-gc-combine-field-keys="Prefix,IPv6PrefixLength,IPv6Prefix,PrefixLength">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv6-prefix">&nbsp;</label>
+                  <input type="text" id="gc-vlan-flyout-ipv6-prefix" class="gc-if-flyout__input mono" autocomplete="off" />
+                </div>
+              </div>
+              <div id="gc-vlan-flyout-ipv6-combined-wrap" class="gc-if-flyout__combined-static" hidden aria-hidden="true">
+                <p class="gc-if-flyout__subhead">Static IPv6 per scope (combined view)</p>
+                <div class="gc-if-cmb-toolbar">
+                  <input
+                    type="search"
+                    class="gc-if-flyout__input gc-if-cmb-filter"
+                    placeholder="Filter by scope, hardware, addresses…"
+                    autocomplete="off"
+                    aria-label="Filter per-scope IPv6 rows"
+                  />
+                </div>
+                <div class="gc-if-flyout__table-scroll">
+                  <table class="data-table data-table--dense gc-if-flyout__combine-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Hardware</th>
+                        <th scope="col">Address</th>
+                        <th scope="col">Prefix</th>
+                        <th scope="col" class="gc-if-cmb-gw-col">Gateway name</th>
+                        <th scope="col" class="gc-if-cmb-gw-col">Gateway address</th>
+                        <th scope="col">Pool</th>
+                        <th scope="col" class="th-narrow" title="IPAM pool alignment"> </th>
+                      </tr>
+                    </thead>
+                    <tbody id="gc-vlan-flyout-ipv6-combined-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="gc-vlan-flyout-ipv6-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+                <p class="gc-if-flyout__subhead">Gateway detail</p>
+                <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayNameIpv6,IPv6GatewayName,IPv6_GatewayName">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv6-gw-name">Gateway name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                  <input type="text" id="gc-vlan-flyout-ipv6-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+                </div>
+                <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayIPv6,IPv6Gateway,IPv6_Gateway,IPv6DefaultGateway">
+                  <label class="gc-if-flyout__label" for="gc-vlan-flyout-ipv6-gw-ip">Gateway IP <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                  <input type="text" id="gc-vlan-flyout-ipv6-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-vlan-flyout-save" disabled>Save</button>
+        <button type="button" class="link-btn" id="gc-vlan-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

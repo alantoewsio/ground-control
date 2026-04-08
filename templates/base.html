@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/static/favicon.ico" sizes="any" />
+    <title>{% block title %}Ground Control{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/auth-ui.css" />
+  </head>
+  <body class="{% block body_class %}{% endblock %}">
+    {% set hide_app_chrome = hide_app_chrome if hide_app_chrome is defined else false %}
+    {% set about = app_about if app_about is defined else {
+      'app_name': 'Ground Control',
+      'project_name': '',
+      'description': '',
+      'app_version': '0.3.0',
+      'license': 'See the project repository for licensing information.',
+    } %}
+    {% if auth_client_state is defined %}
+      {% set ac = auth_client_state %}
+    {% else %}
+      {% set ac = {
+        'authenticated': false,
+        'needs_admin_password_setup': false,
+        'user': none,
+        'default_admin_username': none,
+        'session_idle_timeout_minutes': 60,
+      } %}
+    {% endif %}
+    {% set gc_u = ac.user if ac.authenticated else none %}
+    <script>
+      window.GC_INITIAL_AUTH = {{ ac | tojson }};
+    </script>
+    <div
+      id="auth-overlay"
+      class="auth-overlay{% if not ac.authenticated %} auth-overlay--bootstrapping{% endif %}"
+      {% if ac.authenticated %}hidden{% endif %}
+      aria-hidden="{{ 'true' if ac.authenticated else 'false' }}"
+    >
+      <div class="auth-overlay__stage">
+        <div class="auth-overlay__split">
+          <div class="auth-overlay__left">
+            <div class="auth-overlay__card" role="dialog" aria-modal="true" aria-label="Authentication">
+            <h1 id="auth-overlay-title" class="auth-overlay__card-title" hidden></h1>
+            <p id="auth-overlay-subtitle" class="auth-overlay__card-sub muted" hidden></p>
+            <div
+              id="auth-loading-block"
+              class="auth-overlay__block auth-overlay__loading-block"
+              {% if ac.authenticated %}hidden{% endif %}
+            >
+              <p class="auth-overlay__lead muted auth-overlay__loading-text">Checking sign-in status…</p>
+            </div>
+            <div id="auth-setup-block" class="auth-overlay__block" hidden>
+              <p id="auth-setup-lead" class="auth-overlay__lead muted">
+                <!-- Filled by auth-app.js with admin username -->
+              </p>
+              <form id="auth-setup-form" class="auth-overlay__form" autocomplete="off">
+                <label class="settings-form__field">
+                  <span class="settings-form__label">New password</span>
+                  <input
+                    type="password"
+                    id="auth-setup-password"
+                    class="settings-form__input auth-overlay__input"
+                    required
+                    minlength="10"
+                    maxlength="256"
+                    autocomplete="new-password"
+                  />
+                </label>
+                <label class="settings-form__field">
+                  <span class="settings-form__label">Confirm password</span>
+                  <input
+                    type="password"
+                    id="auth-setup-password-confirm"
+                    class="settings-form__input auth-overlay__input"
+                    required
+                    minlength="10"
+                    maxlength="256"
+                    autocomplete="new-password"
+                  />
+                </label>
+                <p id="auth-setup-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+                <button type="submit" class="btn btn--primary auth-overlay__submit">Save and continue</button>
+              </form>
+            </div>
+            <div id="auth-login-block" class="auth-overlay__block" hidden>
+              <form id="auth-login-form" class="auth-overlay__form" autocomplete="on">
+                <label class="settings-form__field">
+                  <span class="settings-form__label">Username</span>
+                  <span class="auth-overlay__input-wrap">
+                    <input
+                      type="text"
+                      id="auth-login-username"
+                      class="settings-form__input auth-overlay__input"
+                      required
+                      maxlength="200"
+                      name="username"
+                      autocomplete="username"
+                    />
+                    <span class="auth-overlay__input-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path
+                          fill="currentColor"
+                          d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                </label>
+                <label class="settings-form__field">
+                  <span class="settings-form__label">Password</span>
+                  <span class="auth-overlay__input-wrap">
+                    <input
+                      type="password"
+                      id="auth-login-password"
+                      class="settings-form__input auth-overlay__input"
+                      required
+                      maxlength="512"
+                      name="password"
+                      autocomplete="current-password"
+                    />
+                    <span class="auth-overlay__input-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path
+                          fill="currentColor"
+                          d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                </label>
+                <p id="auth-login-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+                <button type="submit" class="btn btn--primary auth-overlay__submit">Login</button>
+              </form>
+            </div>
+            </div>
+          </div>
+          <div class="auth-overlay__visual" aria-hidden="true">
+            <img src="/static/Design.png" alt="" class="auth-overlay__visual-image" />
+          </div>
+        </div>
+      </div>
+      <footer class="auth-overlay__footer">
+        <p class="auth-overlay__copyright">© 2026 Sophos Ltd.</p>
+      </footer>
+    </div>
+
+    <div
+      class="app-shell"
+      id="app-shell"
+      {% if skip_global_fw_table_filter %}data-gc-skip-fw-table-filter="1"{% endif %}
+    >
+      <script>
+        try {
+          if (localStorage.getItem("ground-control-sidebar-collapsed") === "1") {
+            document.getElementById("app-shell").classList.add("app-shell--nav-collapsed");
+          }
+        } catch (e) {}
+      </script>
+      {% if not hide_app_chrome %}
+      <header class="top-bar" role="banner">
+        <div class="top-bar__inner">
+          <div class="top-bar__left">
+            <a href="/" class="top-bar__brand" aria-label="Home">
+              <span class="top-bar__wordmark" aria-hidden="true">Ground Control</span>
+            </a>
+            {% set top_nav_active = top_nav_active if top_nav_active is defined else "" %}
+            <nav class="top-bar__primary-nav" aria-label="Primary">
+              <a
+                href="/"
+                class="top-bar__nav-link{% if top_nav_active == 'dashboard' %} is-active{% endif %}"
+              >Dashboard</a>
+              <a
+                href="/firewalls"
+                class="top-bar__nav-link{% if top_nav_active == 'firewalls' %} is-active{% endif %}"
+              >Firewalls</a>
+              <a
+                href="/address-management"
+                class="top-bar__nav-link{% if top_nav_active == 'address_management' %} is-active{% endif %}"
+              >Address Management</a>
+            </nav>
+          </div>
+          <div class="top-bar__tools">
+            {% if ac.authenticated %}
+            <a
+              class="top-bar-connected-mini top-bar-connected-mini--loading"
+              id="gc-topbar-connected-mini"
+              href="/#gc-dashboard-connected-panel"
+              title="Open Dashboard 24h reachability chart"
+              aria-label="Open Dashboard 24h reachability chart"
+              aria-busy="true"
+            >
+              <span class="top-bar-connected-mini__label">24h</span>
+              <span class="top-bar-connected-mini__chart-wrap">
+                <canvas
+                  id="gc-topbar-connected-mini-canvas"
+                  class="top-bar-connected-mini__canvas"
+                  width="88"
+                  height="24"
+                  aria-label="Reachable and disconnected monitored firewalls over the past 24 hours"
+                ></canvas>
+                <span class="top-bar-connected-mini__skel top-bar-connected-mini__skel--chart" aria-hidden="true"></span>
+              </span>
+              <span class="top-bar-connected-mini__value-wrap">
+                <span class="top-bar-connected-mini__value" id="gc-topbar-connected-mini-value">—</span>
+                <span class="top-bar-connected-mini__skel top-bar-connected-mini__skel--value" aria-hidden="true"></span>
+              </span>
+            </a>
+            {% endif %}
+            {% if ac.authenticated and network_fw_selection_user_id %}
+            <div class="gc-multiselect gc-multiselect--top-bar gc-net-fw-multiselect" id="gc-net-fw-multiselect">
+              <span class="gc-multiselect__label" id="gc-net-fw-multiselect-label">Firewalls</span>
+              <div class="gc-multiselect__control">
+                <div
+                  class="gc-hs-ip-host-flyout__fw-ms"
+                  data-gc-fw-ms="1"
+                  data-fw-picker-mode="add"
+                  data-fw-initial-selected="[]"
+                  data-fw-assigned-ids="[]"
+                >
+                  <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+                    <button
+                      type="button"
+                      class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                      id="gc-net-fw-trigger"
+                      aria-haspopup="listbox"
+                      aria-expanded="false"
+                      aria-labelledby="gc-net-fw-multiselect-label gc-net-fw-trigger"
+                    >
+                      <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text" id="gc-net-fw-trigger-text">Loading…</span>
+                      <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                    </button>
+                    <div
+                      class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown gc-net-fw-dropdown--split"
+                      id="gc-net-fw-dropdown"
+                      hidden
+                    >
+                      <div class="gc-net-fw-dropdown__body">
+                        <div
+                          class="gc-net-fw-dropdown__selected"
+                          id="gc-net-fw-selected-panel"
+                          aria-label="Selected firewalls and configurations"
+                        ></div>
+                        <div class="gc-net-fw-dropdown__picker">
+                          <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                            <input
+                              type="search"
+                              class="gc-if-flyout__input gc-hs-ip-host-flyout__fw-search"
+                              id="gc-net-fw-search"
+                              placeholder="Search tags, firewalls, or configurations"
+                              autocomplete="off"
+                            />
+                          </div>
+                          <div
+                            class="gc-hs-ip-host-flyout__fw-ms-options"
+                            id="gc-net-fw-options"
+                            role="listbox"
+                            aria-multiselectable="true"
+                          ></div>
+                          <p class="gc-hs-ip-host-flyout__fw-empty muted" id="gc-net-fw-empty" hidden>No firewalls registered.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            {% block top_bar_tools_leading %}{% endblock %}
+            <button
+              type="button"
+              class="icon-btn"
+              id="btn-settings"
+              title="Settings"
+              aria-label="Settings"
+              aria-haspopup="dialog"
+              aria-controls="settings-modal"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                />
+              </svg>
+            </button>
+            <div class="user-menu user-menu--trailing">
+              <button
+                type="button"
+                class="icon-btn user-menu__trigger"
+                id="btn-user-menu"
+                title="Account"
+                aria-label="Account menu"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="user-menu-dropdown"
+                {% if not ac.authenticated %}hidden{% endif %}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                  />
+                </svg>
+              </button>
+              <div
+                id="user-menu-dropdown"
+                class="user-menu__dropdown user-menu__dropdown--rich"
+                hidden
+                role="menu"
+                aria-labelledby="btn-user-menu"
+              >
+                <div class="user-menu__header">
+                  <div class="user-menu__avatar" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="28" height="28">
+                      <path
+                        fill="currentColor"
+                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="user-menu__identity">
+                    <div class="user-menu__display-name" id="user-menu-display-name">
+                      {% if gc_u -%}
+                        {{- ((gc_u.full_name or '') | trim) or (gc_u.username | e) -}}
+                      {%- endif %}
+                    </div>
+                    <div class="user-menu__role" id="user-menu-role-line">
+                      {% if gc_u -%}
+                        {%- if gc_u.role == 'admin' -%}Administrator{%- elif gc_u.role == 'user' -%}User{%- else -%}{{ gc_u.role | e }}{%- endif -%}
+                      {%- endif %}
+                    </div>
+                  </div>
+                </div>
+                <div class="user-menu__rule" role="separator"></div>
+                <div class="user-menu__section">
+                  <button
+                    type="button"
+                    class="user-menu__session-link"
+                    role="menuitem"
+                    id="user-menu-active-admins"
+                  >
+                    <span class="user-menu__session-label">Admins logged in</span>
+                    <span class="user-menu__session-count" id="user-menu-active-admin-count">—</span>
+                  </button>
+                </div>
+                <div class="user-menu__footer">
+                  <button type="button" class="user-menu__signout" role="menuitem" id="user-menu-logout">
+                    <span class="user-menu__signout-label">Sign out</span>
+                    <svg class="user-menu__signout-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      {% endif %}
+
+      <div class="app-body">
+        {% set show_firewalls_sidebar = show_firewalls_sidebar if show_firewalls_sidebar is defined else false %}
+        {% set show_configurations_sidebar = show_configurations_sidebar if show_configurations_sidebar is defined else false %}
+        {% set show_address_management_sidebar = show_address_management_sidebar if show_address_management_sidebar is defined else false %}
+        {% set show_app_sidebar = show_firewalls_sidebar or show_configurations_sidebar or show_address_management_sidebar %}
+        <aside
+          class="app-sidebar{% if not show_app_sidebar %} app-sidebar--hidden{% endif %}"
+          aria-label="{% if show_firewalls_sidebar %}Firewalls navigation{% elif show_configurations_sidebar %}Configuration navigation{% elif show_address_management_sidebar %}Address Management navigation{% else %}Main navigation{% endif %}"
+        >
+          {% block app_sidebar %}{% endblock %}
+        </aside>
+
+        <div class="app-content">
+          <div
+            id="gc-global-banner"
+            class="gc-global-banner gc-global-banner--hidden"
+            role="status"
+            aria-live="polite"
+            hidden
+          >
+            <div class="gc-global-banner__inner">
+              <div class="gc-global-banner__top">
+                <span class="gc-global-banner__icon" aria-hidden="true"></span>
+                <span class="gc-global-banner__text"></span>
+                <button
+                  type="button"
+                  class="gc-global-banner__close"
+                  hidden
+                  aria-label="Dismiss"
+                  title="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+              <div class="gc-global-banner__bar" hidden>
+                <div class="gc-global-banner__bar-track" aria-hidden="true">
+                  <div class="gc-global-banner__bar-fill"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <script src="/static/gc-global-banner.js"></script>
+          <div class="app-main">
+            {% if not hide_app_chrome %}
+            <header class="page-header">
+              <div class="page-header__top">
+                <h1 class="page-header__title">{% block page_title %}Ground Control{% endblock %}</h1>
+                {% block page_header_middle %}{% endblock %}
+                {% block page_header_actions %}{% endblock %}
+              </div>
+              {% block breadcrumbs %}{% endblock %}
+              {% block page_subtitle %}{% endblock %}
+            </header>
+            {% endif %}
+            {% block content %}{% endblock %}
+          </div>
+          {% block app_content_dock %}
+          {% if ac.authenticated %}
+          <div
+            class="gc-task-queue-bottom-tab"
+            id="gc-task-queue-bottom-tab"
+            hidden
+            aria-hidden="true"
+          >
+            <button
+              type="button"
+              class="gc-task-queue-bottom-tab__main"
+              id="gc-task-queue-dock-open"
+              aria-haspopup="dialog"
+              aria-controls="gc-task-queue-dock"
+              aria-expanded="false"
+            >
+              <span class="gc-task-queue-bottom-tab__label" data-gc-task-queue-tab-label></span>
+            </button>
+            <button
+              type="button"
+              class="icon-btn gc-task-queue-bottom-tab__approve-all gc-task-queue-dock-approve-all"
+              title="Approve and send all"
+              aria-label="Approve and send all queued tasks"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19.01l1.41-1.41L1.83 12 .41 13.41z"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            id="gc-task-queue-dock"
+            class="gc-task-queue-dock"
+            hidden
+            aria-hidden="true"
+          >
+            <div class="gc-task-queue-dock__backdrop" tabindex="-1" aria-hidden="true"></div>
+            <div
+              class="gc-task-queue-dock__panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="gc-task-queue-dock-title"
+            >
+              <div
+                class="gc-task-queue-dock__resize"
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Resize task queue panel"
+                title="Drag to resize"
+              ></div>
+              <div class="gc-task-queue-dock__head">
+                <p id="gc-task-queue-dock-title" class="gc-task-queue-dock__tab-label" data-gc-task-queue-tab-label></p>
+                <div class="gc-task-queue-dock__head-middle">
+                  <button
+                    type="button"
+                    class="filters__toggle gc-task-queue-dock__filters-toggle"
+                    id="gc-task-queue-dock-filters-toggle"
+                    aria-expanded="false"
+                    aria-label="Filters"
+                    title="Filters"
+                  >
+                    <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                    </svg>
+                    <span class="filters__title-label">Filters</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn task-queue-toolbar-btn task-queue-toolbar-btn--approve gc-task-queue-dock-approve-all"
+                    title="Approve and send all"
+                    aria-label="Approve and send all queued tasks"
+                  >
+                    Approve All
+                  </button>
+                  <button
+                    type="button"
+                    class="btn task-queue-toolbar-btn task-queue-toolbar-btn--approve"
+                    id="gc-task-queue-dock-approve-selected"
+                    disabled
+                  >
+                    Approve Selected
+                  </button>
+                  <button
+                    type="button"
+                    class="btn task-queue-toolbar-btn task-queue-toolbar-btn--reject"
+                    id="gc-task-queue-dock-reject-selected"
+                    disabled
+                  >
+                    Reject Selected
+                  </button>
+                  <div class="toolbar__search-cluster task-queue-toolbar__search-cluster">
+                    <div class="search-field">
+                      <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                        />
+                      </svg>
+                      <input
+                        type="search"
+                        id="gc-task-queue-dock-search"
+                        class="search-field__input"
+                        placeholder="Search"
+                        autocomplete="off"
+                        aria-label="Search task queue"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div class="gc-task-queue-dock__head-end">
+                  <a
+                    href="/firewalls/history#outgoing"
+                    class="link-btn task-queue-past-changes-link gc-task-queue-dock__past-changes"
+                    target="_top"
+                    rel="noopener noreferrer"
+                  >View past changes</a>
+                  <div class="gc-task-queue-dock__head-actions">
+                    <button
+                      type="button"
+                      class="icon-btn gc-task-queue-dock__full-height-btn"
+                      aria-label="Expand task queue panel to full height"
+                      aria-pressed="false"
+                      title="Expand to full height"
+                    >
+                      <svg
+                        class="gc-task-queue-dock__fh-icon"
+                        data-gc-tq-expand
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fill="currentColor"
+                          d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
+                        />
+                      </svg>
+                      <svg
+                        class="gc-task-queue-dock__fh-icon"
+                        data-gc-tq-collapse
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        aria-hidden="true"
+                        hidden
+                      >
+                        <path
+                          fill="currentColor"
+                          d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
+                        />
+                      </svg>
+                    </button>
+                    <button type="button" class="icon-btn gc-task-queue-dock__close" aria-label="Close task queue" title="Close">
+                      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <iframe
+                id="gc-task-queue-dock-iframe"
+                class="gc-task-queue-dock__iframe"
+                title="Task queue"
+                src="about:blank"
+              ></iframe>
+            </div>
+          </div>
+          {% endif %}
+          {% endblock %}
+        </div>
+      </div>
+    </div>
+
+    <div id="settings-modal" class="settings-modal" hidden aria-hidden="true">
+      <div class="settings-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+      <div class="settings-modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+        <div class="settings-modal__layout">
+          <aside class="settings-modal__sidebar" aria-label="Settings sections">
+            <div class="settings-modal__sidebar-head">
+              <h2 id="settings-modal-title" class="settings-modal__title">Settings</h2>
+              <div class="settings-modal__search search-field">
+                <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                  />
+                </svg>
+                <input
+                  type="search"
+                  id="settings-nav-filter"
+                  class="search-field__input"
+                  placeholder="Search settings"
+                  autocomplete="off"
+                  aria-label="Search settings labels and sections"
+                />
+              </div>
+            </div>
+            <div class="settings-sidebar-stack">
+              <nav class="settings-nav" id="settings-nav">
+                <button type="button" class="settings-nav__item is-active" data-settings-section="users" aria-current="page">
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
+                    />
+                  </svg>
+                  <span>Users</span>
+                </button>
+                <button type="button" class="settings-nav__item" id="settings-nav-security" data-settings-section="security">
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
+                    />
+                  </svg>
+                  <span>Security</span>
+                </button>
+                <button type="button" class="settings-nav__item" id="settings-nav-test" data-settings-section="test">
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-7-2a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-3-6h6V8H9v3z"
+                    />
+                  </svg>
+                  <span>Test Firewalls</span>
+                </button>
+              </nav>
+              <div class="settings-modal__sidebar-footer">
+                <button
+                  type="button"
+                  class="settings-nav__item settings-nav__item--footer"
+                  id="settings-nav-about"
+                  data-settings-section="about"
+                >
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                    />
+                  </svg>
+                  <span>About</span>
+                </button>
+              </div>
+            </div>
+          </aside>
+          <div class="settings-modal__main" id="settings-modal-main">
+            <div class="settings-modal__main-toolbar">
+              <div class="settings-modal__toolbar-end">
+                <button
+                  type="button"
+                  class="settings-modal__close icon-btn"
+                  id="settings-modal-close"
+                  aria-label="Close settings"
+                  title="Close"
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="settings-modal__main-scroll">
+              <section id="settings-panel-users" class="settings-panel is-active" data-settings-panel="users">
+                <h3 class="settings-panel__heading">Users</h3>
+                <p class="settings-panel__lead muted">
+                  Local accounts for this application. Passwords are stored with strong hashing.
+                </p>
+                <div class="settings-panel__actions" id="settings-users-actions" hidden>
+                  <button type="button" class="btn btn--primary" id="btn-add-user">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    </svg>
+                    Add user
+                  </button>
+                </div>
+                <aside
+                  class="filters filters--collapsed settings-users-facet-aside"
+                  aria-label="User table filters"
+                  id="settings-users-filters-aside"
+                >
+                  <div class="filters__head">
+                    <button
+                      type="button"
+                      class="filters__toggle"
+                      id="settings-users-filters-toggle"
+                      aria-expanded="false"
+                      aria-controls="settings-users-filters-drawer"
+                      aria-label="Filters"
+                      title="Filters"
+                    >
+                      <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                      </svg>
+                      <span class="filters__title-label">Filters</span>
+                    </button>
+                    <div class="filters__head-actions" id="settings-users-facet-head-actions" hidden>
+                      <span class="filters__facet-count" id="settings-users-facet-count" aria-live="polite"></span>
+                      <button type="button" class="filters__facet-reset link-btn" id="settings-users-facet-reset" hidden>
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    id="settings-users-filters-drawer"
+                    class="filters__drawer settings-users-filters-drawer"
+                    hidden
+                  ></div>
+                </aside>
+                <div class="settings-cred-table-wrap table-wrap" id="settings-users-wrap">
+                  <div class="table-scroll">
+                    <table
+                      class="data-table data-table--dense settings-cred-table settings-user-table"
+                      id="settings-users-table"
+                    >
+                      <colgroup>
+                        <col class="settings-user-col-name" />
+                        <col class="settings-user-col-fullname" />
+                        <col class="settings-user-col-email" />
+                        <col class="settings-user-col-mobile" />
+                        <col class="settings-user-col-role" />
+                        <col class="settings-user-col-updated" />
+                        <col class="settings-cred-col-actions" />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col" data-gc-col="username">Username</th>
+                          <th scope="col" data-gc-col="full_name">Full name</th>
+                          <th scope="col" data-gc-col="email">Email</th>
+                          <th scope="col" data-gc-col="mobile">Mobile</th>
+                          <th scope="col" data-gc-col="role">Role</th>
+                          <th scope="col" data-gc-col="updated_at" data-gc-sort="date">Updated</th>
+                          <th scope="col" class="settings-cred-actions-col">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="settings-users-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+              <section id="settings-panel-security" class="settings-panel" data-settings-panel="security" hidden>
+                <h3 class="settings-panel__heading">Security</h3>
+                <p class="settings-panel__lead muted">
+                  Control how the application listens on the network, which clients may connect, and how HTTPS is
+                  provisioned.
+                </p>
+                <form id="settings-security-form" class="settings-form settings-form--security" autocomplete="off">
+                  <div class="settings-security__section">
+                    <h4 class="settings-security__subhead">Server binding</h4>
+                    <label class="settings-form__field settings-form__field--inline">
+                      <input type="checkbox" name="http_enabled" id="settings-security-http-enabled" checked />
+                      <span class="settings-form__label settings-form__label--inline">Enable HTTP</span>
+                    </label>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">HTTP port</span>
+                      <input
+                        type="number"
+                        name="http_port"
+                        id="settings-security-http-port"
+                        class="settings-form__input"
+                        min="1"
+                        max="65535"
+                        value="{{ http_listen_port() }}"
+                      />
+                    </label>
+                    <span class="settings-security__hint muted">
+                      Applies after restart. Environment:
+                      <code class="settings-about__code">GROUND_CONTROL_HTTP_PORT</code>,
+                      <code class="settings-about__code">GROUND_CONTROL_PORT</code>, or
+                      <code class="settings-about__code">PORT</code>.
+                    </span>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">Listening interface</span>
+                      <select name="listen_interface" id="settings-security-listen-interface" class="settings-form__input">
+                        <option value="0.0.0.0">All interfaces (0.0.0.0)</option>
+                        <option value="::">All interfaces IPv6 (::)</option>
+                        <option value="127.0.0.1" selected>Loopback IPv4 (127.0.0.1)</option>
+                        <option value="::1">Loopback IPv6 (::1)</option>
+                      </select>
+                    </label>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">Allowed network ranges</span>
+                      <textarea
+                        name="allowed_ranges"
+                        id="settings-security-allowed-ranges"
+                        class="settings-form__input settings-form__textarea"
+                        rows="4"
+                        placeholder="One CIDR per line, e.g.&#10;10.0.0.0/8&#10;192.168.1.0/24&#10;Leave empty to allow all (not recommended on untrusted networks)."
+                        spellcheck="false"
+                      ></textarea>
+                      <span class="settings-security__hint muted">IPv4 or IPv6 CIDR notation. Empty means no extra restriction beyond the interface.</span>
+                    </label>
+                  </div>
+                  <div class="settings-security__section">
+                    <h4 class="settings-security__subhead">HTTPS</h4>
+                    <div id="settings-security-cert-summary-box" class="settings-security__cert-summary-box">
+                      <span class="settings-form__label">Current TLS certificate</span>
+                      <p class="settings-security__cert-summary-text muted" id="settings-security-cert-summary">
+                        Loading…
+                      </p>
+                      <button
+                        type="button"
+                        class="btn btn--secondary"
+                        id="settings-security-download-public-cert"
+                        disabled
+                      >
+                        Download public certificate (PEM)
+                      </button>
+                      <p class="settings-security__hint muted" id="settings-security-download-cert-hint" hidden>
+                        For a self-signed certificate, import this file as a trusted root (CA) in your operating system or
+                        browser so HTTPS connections are accepted without warnings.
+                      </p>
+                    </div>
+                    <label class="settings-form__field settings-form__field--inline">
+                      <input type="checkbox" name="https_enabled" id="settings-security-https-enabled" checked />
+                      <span class="settings-form__label settings-form__label--inline">Enable HTTPS</span>
+                    </label>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">HTTPS port</span>
+                      <input
+                        type="number"
+                        name="https_port"
+                        id="settings-security-https-port"
+                        class="settings-form__input"
+                        min="1"
+                        max="65535"
+                        value="{{ https_listen_port() }}"
+                      />
+                    </label>
+                    <span class="settings-security__hint muted">
+                      Applies after restart. Optional env:
+                      <code class="settings-about__code">GROUND_CONTROL_HTTPS_PORT</code>.
+                    </span>
+                    <label class="settings-form__field settings-form__field--inline">
+                      <input type="checkbox" name="redirect_http" id="settings-security-redirect-http" checked />
+                      <span class="settings-form__label settings-form__label--inline">Redirect HTTP to HTTPS</span>
+                    </label>
+                    <div id="settings-security-tls-block" class="settings-security__tls-block" hidden>
+                      <label class="settings-form__field">
+                        <span class="settings-form__label">TLS hostname</span>
+                        <input
+                          type="text"
+                          name="tls_hostname"
+                          id="settings-security-tls-hostname"
+                          class="settings-form__input"
+                          value="localhost"
+                          placeholder="e.g. localhost or groundcontrol.example.com"
+                          spellcheck="false"
+                        />
+                      </label>
+                      <p class="settings-security__hint muted">Certificate source</p>
+                      <div class="settings-security__cert-methods" role="radiogroup" aria-label="Certificate source">
+                        <label class="settings-security__radio-line">
+                          <input type="radio" name="cert_method" value="self_signed" checked />
+                          <span>Self-signed (generate on this server)</span>
+                        </label>
+                        <label class="settings-security__radio-line">
+                          <input type="radio" name="cert_method" value="letsencrypt_http" />
+                          <span>Let’s Encrypt (HTTP-01 validation)</span>
+                        </label>
+                        <label class="settings-security__radio-line">
+                          <input type="radio" name="cert_method" value="letsencrypt_dns" />
+                          <span>Let’s Encrypt (DNS validation)</span>
+                        </label>
+                      </div>
+                      <div id="settings-security-cert-self" class="settings-security__cert-panel">
+                        <p class="settings-security__hint muted">
+                          Creates a local certificate for the hostname above. Browsers will show a warning until the
+                          certificate is trusted or replaced.
+                        </p>
+                        <button type="button" class="btn btn--secondary" id="settings-security-gen-self-signed">
+                          Generate certificate
+                        </button>
+                      </div>
+                      <div id="settings-security-cert-lehttp" class="settings-security__cert-panel" hidden>
+                        <p class="settings-security__hint muted">
+                          Requests a certificate from Let’s Encrypt using HTTP-01. Port 80 must reach this host, or a
+                          reverse proxy must complete the challenge.
+                        </p>
+                        <button type="button" class="btn btn--secondary" id="settings-security-fetch-le-http">
+                          Fetch Let’s Encrypt certificate
+                        </button>
+                      </div>
+                      <div id="settings-security-cert-ledns" class="settings-security__cert-panel" hidden>
+                        <p class="settings-security__hint muted">
+                          Use when HTTP-01 is not possible. You will add a DNS TXT record at your provider, then confirm
+                          issuance here.
+                        </p>
+                        <ol class="settings-security__dns-steps">
+                          <li>
+                            <span class="settings-security__step-label">DNS provider API</span>
+                            <label class="settings-form__field">
+                              <span class="settings-form__label">Provider / credentials <span class="muted">(optional)</span></span>
+                              <input
+                                type="password"
+                                name="dns_api_token"
+                                id="settings-security-dns-api-token"
+                                class="settings-form__input"
+                                placeholder="API token or secret (stored securely when saved)"
+                                autocomplete="new-password"
+                              />
+                            </label>
+                          </li>
+                          <li>
+                            <span class="settings-security__step-label">Request challenge</span>
+                            <button type="button" class="btn btn--secondary" id="settings-security-dns-request">
+                              Start DNS challenge
+                            </button>
+                            <div id="settings-security-dns-txt-hint" class="settings-security__dns-record" hidden>
+                              <p class="settings-security__hint muted">Add this TXT record at your DNS host:</p>
+                              <pre class="settings-security__pre" id="settings-security-dns-txt-placeholder" aria-live="polite"></pre>
+                            </div>
+                          </li>
+                          <li>
+                            <span class="settings-security__step-label">Verify and issue</span>
+                            <button type="button" class="btn btn--secondary" id="settings-security-dns-verify">
+                              Verify DNS and issue certificate
+                            </button>
+                          </li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </section>
+              <section id="settings-panel-about" class="settings-panel" data-settings-panel="about" hidden>
+                <h3 class="settings-panel__heading">About</h3>
+                <dl class="settings-about">
+                  <div class="settings-about__row">
+                    <dt class="settings-about__term">Application</dt>
+                    <dd class="settings-about__def">{{ about.app_name }}</dd>
+                  </div>
+                  {% if about.project_name %}
+                  <div class="settings-about__row">
+                    <dt class="settings-about__term">Project</dt>
+                    <dd class="settings-about__def"><code class="settings-about__code">{{ about.project_name }}</code></dd>
+                  </div>
+                  {% endif %}
+                  {% if about.description %}
+                  <div class="settings-about__row settings-about__row--description">
+                    <dt class="settings-about__term">Description</dt>
+                    <dd class="settings-about__def settings-about__def--description">{{ about.description }}</dd>
+                  </div>
+                  {% endif %}
+                  <div class="settings-about__row">
+                    <dt class="settings-about__term">Version</dt>
+                    <dd class="settings-about__def">{{ about.app_version }}</dd>
+                  </div>
+                  <div class="settings-about__row">
+                    <dt class="settings-about__term">License</dt>
+                    <dd class="settings-about__def">{{ about.license }}</dd>
+                  </div>
+                </dl>
+              </section>
+              <section id="settings-panel-test" class="settings-panel" data-settings-panel="test" hidden>
+                <h3 class="settings-panel__heading">Test Firewalls</h3>
+                <p class="settings-panel__lead muted">
+                  Generate synthetic firewalls for load and workflow testing. They simulate probe behavior and do not use
+                  real device connections when queue tasks are approved.
+                </p>
+                <form id="settings-test-firewalls-form" class="settings-form" autocomplete="off">
+                  <label class="settings-form__field">
+                    <span class="settings-form__label">Current test firewalls</span>
+                    <input
+                      type="text"
+                      id="settings-test-firewalls-current"
+                      class="settings-form__input"
+                      value="0"
+                      readonly
+                    />
+                  </label>
+                  <label class="settings-form__field">
+                    <span class="settings-form__label">Add at a time</span>
+                    <input
+                      type="number"
+                      id="settings-test-firewalls-count"
+                      class="settings-form__input"
+                      min="1"
+                      max="1000"
+                      step="1"
+                      value="10"
+                    />
+                  </label>
+                  <label class="settings-form__field">
+                    <span class="settings-form__label">Test LAN pool</span>
+                    <input
+                      type="text"
+                      id="settings-test-firewalls-lan-pool"
+                      class="settings-form__input"
+                      value="172.16.0.0/12"
+                      placeholder="172.16.0.0/12"
+                      spellcheck="false"
+                      autocapitalize="off"
+                      autocomplete="off"
+                      aria-describedby="settings-test-firewalls-lan-pool-desc"
+                    />
+                    <p id="settings-test-firewalls-lan-pool-desc" class="settings-test-fw-source__hint muted">
+                      IPv4 CIDR for an IPAM pool in the Testing VRF (created if missing). Each new test firewall gets the next
+                      available /24 assignment and a synthetic LAN interface in that subnet.
+                    </p>
+                  </label>
+                  <div class="settings-form__field settings-test-fw-source">
+                    <span class="settings-form__label" id="settings-test-fw-source-label">Copy cached config from</span>
+                    <p class="settings-test-fw-source__hint muted">
+                      Optional. Each new test firewall receives a full copy of locally cached Inventory entities from the
+                      firewall you select (same as importing into a configuration).
+                    </p>
+                    <input type="hidden" id="settings-test-fw-source-id" value="" />
+                    <div class="settings-test-fw-source__combo" id="settings-test-fw-source-combo">
+                      <button
+                        type="button"
+                        class="settings-test-fw-source__trigger"
+                        id="settings-test-fw-source-trigger"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-controls="settings-test-fw-source-dropdown"
+                      >
+                        <span class="settings-test-fw-source__trigger-text" id="settings-test-fw-source-trigger-text">None (empty cache)</span>
+                        <span class="settings-test-fw-source__chev" aria-hidden="true">▾</span>
+                      </button>
+                      <div
+                        id="settings-test-fw-source-dropdown"
+                        class="settings-test-fw-source__dropdown"
+                        hidden
+                        role="presentation"
+                      >
+                        <div class="search-field settings-test-fw-source__search">
+                          <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                            />
+                          </svg>
+                          <input
+                            type="search"
+                            id="settings-test-fw-source-search"
+                            class="search-field__input"
+                            placeholder="Search firewalls by name or tag"
+                            autocomplete="off"
+                            aria-label="Search firewalls to copy cached config from"
+                            aria-controls="settings-test-fw-source-list"
+                          />
+                        </div>
+                        <div
+                          id="settings-test-fw-source-list"
+                          class="settings-test-fw-source__list"
+                          role="listbox"
+                          aria-labelledby="settings-test-fw-source-label"
+                        ></div>
+                        <p id="settings-test-fw-source-empty" class="settings-test-fw-source__empty muted" hidden>
+                          No firewalls match.
+                        </p>
+                        <button
+                          type="button"
+                          class="btn btn--secondary settings-test-fw-source__clear"
+                          id="settings-test-fw-source-clear"
+                        >
+                          Clear selection
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <p id="settings-test-firewalls-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+                  <div class="settings-form__actions">
+                    <button type="button" class="btn btn--primary" id="settings-test-firewalls-add">
+                      Add 10 test firewalls
+                    </button>
+                    <button type="button" class="btn btn--secondary" id="settings-test-firewalls-cleanup">
+                      Clean up test firewalls
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+            <footer
+              id="settings-modal-security-footer"
+              class="settings-modal__security-footer"
+              hidden
+              aria-label="Security settings actions"
+            >
+              <p class="settings-modal__security-footer-status" id="settings-security-status" aria-live="polite"></p>
+              <button type="submit" form="settings-security-form" class="btn btn--primary" id="settings-security-apply">
+                Apply
+              </button>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="user-form-dialog" class="settings-subdialog" hidden aria-hidden="true">
+      <div class="settings-subdialog__backdrop" aria-hidden="true"></div>
+      <div class="settings-subdialog__panel" role="dialog" aria-modal="true" aria-labelledby="user-form-title">
+        <div class="settings-subdialog__header">
+          <h3 id="user-form-title" class="settings-subdialog__title">Add user</h3>
+          <button type="button" class="settings-subdialog__close icon-btn" id="user-form-close" aria-label="Close" title="Close">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+              />
+            </svg>
+          </button>
+        </div>
+        <form id="user-form" class="settings-form">
+          <label class="settings-form__field">
+            <span class="settings-form__label">Username</span>
+            <input
+              type="text"
+              name="username"
+              id="user-form-username"
+              class="settings-form__input"
+              required
+              maxlength="200"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Full name <span class="muted">(optional)</span></span>
+            <input
+              type="text"
+              name="full_name"
+              id="user-form-full-name"
+              class="settings-form__input"
+              maxlength="200"
+              autocomplete="off"
+            />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Email <span class="muted">(optional)</span></span>
+            <input type="text" name="email" id="user-form-email" class="settings-form__input" maxlength="320" autocomplete="off" />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Mobile number <span class="muted">(optional)</span></span>
+            <input type="text" name="mobile" id="user-form-mobile" class="settings-form__input" maxlength="80" autocomplete="off" />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Role</span>
+            <select id="user-form-role" class="settings-form__input" name="role" required>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Password</span>
+            <input
+              type="password"
+              name="password"
+              id="user-form-password"
+              class="settings-form__input"
+              required
+              minlength="10"
+              maxlength="256"
+              autocomplete="new-password"
+            />
+          </label>
+          <p id="user-form-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+          <div class="settings-form__actions">
+            <button type="submit" class="btn btn--primary" id="user-form-submit">Create user</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="user-edit-profile-dialog" class="settings-subdialog" hidden aria-hidden="true">
+      <div class="settings-subdialog__backdrop" aria-hidden="true"></div>
+      <div class="settings-subdialog__panel" role="dialog" aria-modal="true" aria-labelledby="user-edit-profile-title">
+        <div class="settings-subdialog__header">
+          <h3 id="user-edit-profile-title" class="settings-subdialog__title">Edit user profile</h3>
+          <button
+            type="button"
+            class="settings-subdialog__close icon-btn"
+            id="user-edit-profile-close"
+            aria-label="Close"
+            title="Close"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+              />
+            </svg>
+          </button>
+        </div>
+        <form id="user-edit-profile-form" class="settings-form">
+          <input type="hidden" id="user-edit-profile-id" name="user_id" value="" />
+          <label class="settings-form__field">
+            <span class="settings-form__label">Full name <span class="muted">(optional)</span></span>
+            <input type="text" id="user-edit-profile-full-name" class="settings-form__input" maxlength="200" autocomplete="off" />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Email <span class="muted">(optional)</span></span>
+            <input type="text" id="user-edit-profile-email" class="settings-form__input" maxlength="320" autocomplete="off" />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Mobile number <span class="muted">(optional)</span></span>
+            <input type="text" id="user-edit-profile-mobile" class="settings-form__input" maxlength="80" autocomplete="off" />
+          </label>
+          <p id="user-edit-profile-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+          <div class="settings-form__actions">
+            <button type="submit" class="btn btn--primary" id="user-edit-profile-submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="active-admins-dialog" class="settings-subdialog" hidden aria-hidden="true">
+      <div class="settings-subdialog__backdrop" aria-hidden="true"></div>
+      <div class="settings-subdialog__panel active-admins-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="active-admins-title">
+        <div class="settings-subdialog__header">
+          <h3 id="active-admins-title" class="settings-subdialog__title">Logged-in administrators</h3>
+          <button type="button" class="settings-subdialog__close icon-btn" id="active-admins-close" aria-label="Close" title="Close">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="active-admins-dialog__body">
+          <p id="active-admins-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+          <div class="table-scroll active-admins-dialog__table-wrap">
+            <table class="data-table data-table--dense active-admins-dialog__table">
+              <thead>
+                <tr>
+                  <th scope="col">Admin</th>
+                  <th scope="col">IP</th>
+                  <th scope="col">Logged in</th>
+                  <th scope="col">Last activity</th>
+                  <th scope="col">Idle</th>
+                </tr>
+              </thead>
+              <tbody id="active-admins-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if ac.authenticated %}
+    {% include "partials/config_viewer_modal.html" %}
+    {% endif %}
+
+    <div
+      id="gc-nav-error-modal"
+      class="gc-nav-error-modal"
+      hidden
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="gc-nav-error-modal-title"
+    >
+      <div class="gc-nav-error-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+      <div class="gc-nav-error-modal__panel">
+        <div class="gc-nav-error-modal__header">
+          <h2 id="gc-nav-error-modal-title" class="gc-nav-error-modal__title">Something went wrong</h2>
+          <button
+            type="button"
+            class="gc-nav-error-modal__close icon-btn"
+            id="gc-nav-error-modal-close"
+            aria-label="Close"
+            title="Close"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+              />
+            </svg>
+          </button>
+        </div>
+        <p id="gc-nav-error-modal-status" class="gc-nav-error-modal__status muted" hidden></p>
+        <div id="gc-nav-error-modal-body" class="gc-nav-error-modal__body"></div>
+        <div class="gc-nav-error-modal__footer">
+          <button type="button" class="btn btn--primary" id="gc-nav-error-modal-dismiss">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var shell = document.getElementById("app-shell");
+        var btn = document.getElementById("app-sidebar-toggle");
+        if (!shell || !btn) return;
+        var key = "ground-control-sidebar-collapsed";
+        function sync() {
+          var collapsed = shell.classList.contains("app-shell--nav-collapsed");
+          btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          btn.setAttribute(
+            "title",
+            collapsed ? "Expand navigation" : "Collapse navigation"
+          );
+          btn.setAttribute(
+            "aria-label",
+            collapsed ? "Expand navigation" : "Collapse navigation"
+          );
+        }
+        btn.addEventListener("click", function () {
+          shell.classList.toggle("app-shell--nav-collapsed");
+          sync();
+          try {
+            localStorage.setItem(key, shell.classList.contains("app-shell--nav-collapsed") ? "1" : "0");
+          } catch (e) {}
+        });
+        sync();
+      })();
+    </script>
+    <script src="/static/gc-table-facets.js"></script>
+    <script src="/static/gc-table-sort.js"></script>
+    <script src="/static/gc-table-lazy.js"></script>
+    <script src="/static/gc-table-virtual.js"></script>
+    <script src="/static/gc-table-cells.js"></script>
+    {% if ac.authenticated %}
+    <script>
+      window.gcNavFirewallsJson = {{ nav_firewalls_add_json | default([]) | tojson }};
+      window.gcNavConfigurationsJson = {{ nav_configurations_add_json | default([]) | tojson }};
+    </script>
+    {% endif %}
+    {% if ac.authenticated and network_fw_selection_user_id and not hide_app_chrome %}
+    <script>
+      window.GC_TOP_BAR_FIREWALLS = {
+        userId: {{ network_fw_selection_user_id | tojson }},
+        storageKey: "ground-control-network-fw-filter-v2",
+        navRefreshUrl: {{ request.url_for("api_firewalls_nav_multiselect") | string | tojson }},
+        navConfigurationsUrl: {{ request.url_for("api_configurations_nav_multiselect") | string | tojson }},
+        inventoryUrl: {{ request.url_for("firewalls_inventory_page") | string | tojson }},
+      };
+    </script>
+    <script src="/static/gc-top-bar-firewalls.js"></script>
+    {% endif %}
+    {% if ac.authenticated %}
+    <script src="/static/config-viewer.js?v={{ about.app_version }}"></script>
+    {% endif %}
+    <script src="/static/gc-config-cache-refresh.js"></script>
+    {% if ac.authenticated and not hide_app_chrome %}
+    <script>
+      window.GC_TOPBAR_CONNECTED_MINI = {
+        apiDashboardUrl: {{ request.url_for("api_dashboard") | string | tojson }},
+        userId: {{ network_fw_selection_user_id | default(none) | tojson }},
+        firewallStorageKeyPrefix: "ground-control-network-fw-filter-v2",
+      };
+    </script>
+    <script src="/static/gc-topbar-connected-mini.js"></script>
+    {% endif %}
+    <script src="/static/gc-nav-error.js" defer></script>
+    {% block scripts %}{% endblock %}
+    <script src="/static/task-queue-dock.js" defer></script>
+    <script src="/static/task-queue-badge.js" defer></script>
+    <script src="/static/auth-app.js" defer></script>
+  </body>
+</html>

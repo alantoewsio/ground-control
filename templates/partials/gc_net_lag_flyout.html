@@ -1,0 +1,251 @@
+{# LAG add/edit — mirrors bridge pair + interface flyouts; SFOS LAG XML per xml-api-docs/Configure/Network/LAG.md #}
+<div id="gc-net-lag-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-bridge-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-lag-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-lag-flyout-title" class="gc-if-flyout__title">Edit LAG</h2>
+    </header>
+    <form id="gc-lag-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="gc-if-flyout__section-label">General settings</p>
+          <div id="gc-lag-flyout-target-fw-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-add-firewall">Firewall <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-lag-flyout-add-firewall" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div id="gc-lag-flyout-target-cfg-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-add-configuration">Configuration <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-lag-flyout-add-configuration" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-name">Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <input type="text" id="gc-lag-flyout-name" class="gc-if-flyout__input" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field" id="gc-lag-flyout-hw-edit-field">
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-hardware">Hardware <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <input type="text" id="gc-lag-flyout-hardware" class="gc-if-flyout__input mono" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly" id="gc-lag-flyout-hw-ro-field" hidden>
+            <span class="gc-if-flyout__label">Hardware</span>
+            <span id="gc-lag-flyout-hardware-ro" class="gc-if-flyout__readonly-val mono">—</span>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-zone">Network zone</label>
+            <select id="gc-lag-flyout-zone" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+
+          <fieldset class="gc-if-flyout__fieldset">
+            <legend class="gc-if-flyout__legend">Aggregation mode</legend>
+            <div class="gc-if-flyout__radios">
+              <label><input type="radio" name="gc-lag-mode" value="active_backup" checked /> Active–backup</label>
+              <label><input type="radio" name="gc-lag-mode" value="lacp" /> 802.3ad (LACP)</label>
+            </div>
+          </fieldset>
+
+          <div class="gc-if-flyout__field" id="gc-lag-flyout-xmit-wrap" hidden>
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-xmit">Transmit hash policy <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-lag-flyout-xmit" class="gc-if-flyout__input gc-if-flyout__select">
+              <option value="Layer2">Layer 2</option>
+              <option value="Layer2+3">Layer 2+3</option>
+              <option value="Layer3+4">Layer 3+4</option>
+            </select>
+          </div>
+
+          <div class="gc-if-flyout__field" id="gc-lag-flyout-primary-wrap">
+            <label class="gc-if-flyout__label" for="gc-lag-flyout-primary">Primary interface</label>
+            <select id="gc-lag-flyout-primary" class="gc-if-flyout__input gc-if-flyout__select"></select>
+            <p class="gc-if-flyout__range-hint">Used in active–backup mode (optional).</p>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+          <p class="gc-if-flyout__section-label gc-bridge-flyout__members-head">Member interfaces</p>
+          <p class="gc-if-flyout__range-hint">2–4 physical interfaces (no VLANs).</p>
+          <div class="gc-bridge-flyout__members-table-wrap">
+            <table class="gc-bridge-flyout__members-table" aria-label="LAG member interfaces">
+              <thead>
+                <tr>
+                  <th scope="col">Interface</th>
+                  <th scope="col" class="gc-bridge-flyout__members-actions-col"></th>
+                </tr>
+              </thead>
+              <tbody id="gc-lag-flyout-members-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+            <label class="gc-if-flyout__toggle-label">
+              <input type="checkbox" id="gc-lag-flyout-if-status" checked />
+              <span>Interface on</span>
+            </label>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+
+          <div class="gc-if-flyout__check-head">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-lag-flyout-ipv4-enabled" checked />
+              <span>IPv4 configuration</span>
+            </label>
+          </div>
+          <div id="gc-lag-flyout-ipv4-body" class="gc-if-flyout__subsection">
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">IP assignment</legend>
+              <div class="gc-if-flyout__radios">
+                <label><input type="radio" name="gc-lag-ipv4-mode" value="static" /> Static</label>
+                <label><input type="radio" name="gc-lag-ipv4-mode" value="dhcp" checked /> DHCP</label>
+              </div>
+            </fieldset>
+            <div class="gc-if-flyout__field-row">
+              <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv4-ip">IPv4</label>
+                <input type="text" id="gc-lag-flyout-ipv4-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv4-netmask">Netmask</label>
+                <input type="text" id="gc-lag-flyout-ipv4-netmask" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+            <div id="gc-lag-flyout-ipv4-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+              <p class="gc-if-flyout__subhead">Gateway detail</p>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv4-gw-name">Gateway name</label>
+                <input type="text" id="gc-lag-flyout-ipv4-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv4-gw-ip">Gateway IP</label>
+                <input type="text" id="gc-lag-flyout-ipv4-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+
+          <div class="gc-if-flyout__check-head">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-lag-flyout-ipv6-enabled" checked />
+              <span>IPv6 configuration</span>
+            </label>
+          </div>
+          <div id="gc-lag-flyout-ipv6-body" class="gc-if-flyout__subsection">
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">IP assignment</legend>
+              <div class="gc-if-flyout__radios">
+                <label><input type="radio" name="gc-lag-ipv6-mode" value="static" checked /> Static</label>
+                <label><input type="radio" name="gc-lag-ipv6-mode" value="dhcp" /> DHCP</label>
+                <label><input type="radio" name="gc-lag-ipv6-mode" value="delegated" /> Delegated</label>
+              </div>
+            </fieldset>
+            <div class="gc-if-flyout__field-row">
+              <div class="gc-if-flyout__field gc-if-flyout__field--grow">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv6-ip">IPv6 / prefix</label>
+                <input type="text" id="gc-lag-flyout-ipv6-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--narrow">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv6-prefix">&nbsp;</label>
+                <input type="text" id="gc-lag-flyout-ipv6-prefix" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+            <div id="gc-lag-flyout-ipv6-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+              <p class="gc-if-flyout__subhead">Gateway detail</p>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv6-gw-name">Gateway name</label>
+                <input type="text" id="gc-lag-flyout-ipv6-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="gc-lag-flyout-ipv6-gw-ip">Gateway IP</label>
+                <input type="text" id="gc-lag-flyout-ipv6-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+
+          <button
+            type="button"
+            class="gc-if-flyout__adv-toggle"
+            id="gc-lag-flyout-adv-toggle"
+            aria-expanded="false"
+          >
+            <span class="gc-if-flyout__adv-toggle-text">Advanced settings</span>
+            <span class="gc-if-flyout__adv-toggle-ic" aria-hidden="true">▼</span>
+          </button>
+          <div id="gc-lag-flyout-adv-body" class="gc-if-flyout__adv-block" hidden>
+            <p class="gc-if-flyout__mini-head">Port settings</p>
+            <div class="gc-if-flyout__field gc-if-flyout__field--inline-hint">
+              <label class="gc-if-flyout__label" for="gc-lag-flyout-link-mode">Link mode</label>
+              <select id="gc-lag-flyout-link-mode" class="gc-if-flyout__input gc-if-flyout__select">
+                <option value="Auto Negotiate">Auto Negotiate</option>
+                <option value="10MbpsFD">10 Mbps full duplex</option>
+                <option value="100MbpsFD">100 Mbps full duplex</option>
+                <option value="1000MbpsFD">1000 Mbps full duplex</option>
+                <option value="10000MbpsFD">10000 Mbps full duplex</option>
+              </select>
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+              <label class="gc-if-flyout__toggle-label">
+                <input type="checkbox" id="gc-lag-flyout-auto-neg" checked />
+                <span>Auto-negotiation for media type</span>
+              </label>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-lag-flyout-fec">Forward Error Correction (FEC)</label>
+              <select id="gc-lag-flyout-fec" class="gc-if-flyout__input gc-if-flyout__select">
+                <option value="Off">Off</option>
+                <option value="Automatic">Automatic</option>
+                <option value="BaseR-encoding">BaseR encoding</option>
+                <option value="RS-FEC-encoding">RS-FEC encoding</option>
+              </select>
+            </div>
+            <p class="gc-if-flyout__mini-head">Interface settings</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-lag-flyout-mtu">MTU</label>
+              <div class="gc-if-flyout__field-inline">
+                <input type="text" id="gc-lag-flyout-mtu" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                <span class="gc-if-flyout__range-hint">(576–9000)</span>
+              </div>
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--mss">
+              <label class="gc-if-flyout__mss-row">
+                <input type="checkbox" id="gc-lag-flyout-mss-cb" />
+                <span class="gc-if-flyout__label-inline">Override MSS</span>
+              </label>
+              <div class="gc-if-flyout__field-inline">
+                <input type="text" id="gc-lag-flyout-mss" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                <span class="gc-if-flyout__range-hint">(536–8960)</span>
+              </div>
+            </div>
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">MAC Address selection</legend>
+              <label class="gc-if-flyout__radio-block">
+                <input type="radio" name="gc-lag-mac-mode" value="default" checked />
+                <span>Use default MAC address</span>
+                <input type="text" id="gc-lag-flyout-mac-default" class="gc-if-flyout__input mono gc-if-flyout__input--mac" readonly />
+              </label>
+              <label class="gc-if-flyout__radio-block">
+                <input type="radio" name="gc-lag-mac-mode" value="override" />
+                <span>Override default MAC address</span>
+                <input type="text" id="gc-lag-flyout-mac-override" class="gc-if-flyout__input mono gc-if-flyout__input--mac" autocomplete="off" />
+              </label>
+            </fieldset>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-lag-flyout-save" disabled>Save</button>
+        <button type="button" class="link-btn" id="gc-lag-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,212 @@
+<div id="gc-cfg-edit-flyout" class="gc-if-flyout gc-fw-inv-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-cfg-edit-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-cfg-edit-flyout-title" class="gc-if-flyout__title">Edit configuration</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-cfg-edit-flyout-close" aria-label="Close" title="Close">
+        ×
+      </button>
+    </header>
+    <form method="post" action="{{ url_configuration_update }}" class="gc-if-flyout__panel-form" id="edit-cfg-form" novalidate>
+      <input type="hidden" name="configuration_id" id="edit-cfg-id" value="" />
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="edit-cfg-name">Name <span class="muted">(optional)</span></label>
+            <input type="text" id="edit-cfg-name" name="name" class="gc-if-flyout__input" autocomplete="off" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="edit-cfg-description">Description <span class="muted">(optional)</span></label>
+            <textarea id="edit-cfg-description" name="description" class="gc-if-flyout__input" rows="3"></textarea>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label" id="gc-cfg-member-edit-field-label">Assigned firewalls <span class="muted">(optional)</span></span>
+            <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.875rem">
+              Choose tags and/or individual firewalls. Tags include every firewall with that tag.
+            </p>
+            <div
+              class="gc-multiselect gc-cfg-member-ms gc-cfg-member-ms--in-sheet"
+              data-gc-cfg-member-root="1"
+              data-gc-cfg-member-scope="edit"
+            >
+              <div class="gc-multiselect__control">
+                <div
+                  class="gc-hs-ip-host-flyout__fw-ms"
+                  data-gc-fw-ms="1"
+                  data-fw-picker-mode="add"
+                  data-fw-initial-selected="[]"
+                  data-fw-assigned-ids="[]"
+                >
+                  <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+                    <button
+                      type="button"
+                      class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                      id="gc-cfg-member-edit-trigger"
+                      aria-haspopup="listbox"
+                      aria-expanded="false"
+                      aria-labelledby="gc-cfg-member-edit-field-label gc-cfg-member-edit-trigger"
+                    >
+                      <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text" id="gc-cfg-member-edit-trigger-text">Loading…</span>
+                      <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                    </button>
+                    <div
+                      class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown gc-net-fw-dropdown--split"
+                      id="gc-cfg-member-edit-dropdown"
+                      hidden
+                    >
+                      <div class="gc-net-fw-dropdown__body">
+                        <div
+                          class="gc-net-fw-dropdown__selected"
+                          id="gc-cfg-member-edit-selected-panel"
+                          aria-label="Assigned firewalls preview"
+                        ></div>
+                        <div class="gc-net-fw-dropdown__picker">
+                          <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                            <input
+                              type="search"
+                              class="gc-if-flyout__input gc-hs-ip-host-flyout__fw-search"
+                              id="gc-cfg-member-edit-search"
+                              placeholder="Search tags or firewalls"
+                              autocomplete="off"
+                            />
+                          </div>
+                          <div
+                            class="gc-hs-ip-host-flyout__fw-ms-options"
+                            id="gc-cfg-member-edit-options"
+                            role="listbox"
+                            aria-multiselectable="true"
+                          ></div>
+                          <p class="gc-hs-ip-host-flyout__fw-empty muted" id="gc-cfg-member-edit-empty" hidden>No firewalls registered.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" name="member_firewall_ids_json" value='{"tags":[],"firewall_ids":[]}' data-gc-cfg-member-hidden autocomplete="off" />
+              <p class="gc-cfg-member-ms__count muted" data-gc-cfg-member-count aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="gc-cfg-edit-tabs" id="gc-cfg-edit-tabs">
+            <div class="gc-tabs" role="tablist" aria-label="Configuration details">
+              <button
+                type="button"
+                class="gc-tabs__tab is-active"
+                role="tab"
+                aria-selected="true"
+                id="gc-cfg-edit-tab-members"
+                data-gc-cfg-edit-tab="members"
+              >
+                Members
+              </button>
+              <button
+                type="button"
+                class="gc-tabs__tab"
+                role="tab"
+                aria-selected="false"
+                id="gc-cfg-edit-tab-configuration"
+                data-gc-cfg-edit-tab="configuration"
+              >
+                Configuration
+              </button>
+            </div>
+            <div class="gc-tab-panels">
+              <div
+                class="gc-tab-panel is-active"
+                role="tabpanel"
+                aria-labelledby="gc-cfg-edit-tab-members"
+                id="gc-cfg-edit-panel-members"
+              >
+                <div class="table-scroll">
+                  <table class="data-table data-table--dense">
+                    <thead>
+                      <tr>
+                        <th scope="col">Firewall</th>
+                        <th scope="col">State</th>
+                        <th scope="col">Missing</th>
+                        <th scope="col">Different</th>
+                      </tr>
+                    </thead>
+                    <tbody id="gc-cfg-edit-members-tbody">
+                      <tr>
+                        <td colspan="4" class="muted">Loading member firewalls…</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div
+                class="gc-tab-panel"
+                role="tabpanel"
+                aria-labelledby="gc-cfg-edit-tab-configuration"
+                id="gc-cfg-edit-panel-configuration"
+                hidden
+              >
+                <p id="gc-cfg-edit-config-meta" class="muted"></p>
+                <div id="gc-cfg-edit-config-status" class="gc-config-viewer-modal__status" hidden></div>
+                <div id="gc-cfg-edit-config-tree" class="gc-cv-tree gc-cfg-edit-config-tree"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary">Save changes</button>
+        <button type="button" class="link-btn" id="cancel-edit-cfg">Cancel</button>
+      </footer>
+    </form>
+  </div>
+  <div
+    id="gc-cfg-edit-member-drift-flyout"
+    class="gc-if-flyout__panel gc-cfg-secondary-flyout"
+    role="dialog"
+    aria-modal="false"
+    aria-labelledby="gc-cfg-edit-member-drift-title"
+    hidden
+  >
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-cfg-edit-member-drift-title" class="gc-if-flyout__title">Member drift details</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-cfg-edit-member-drift-close" aria-label="Close" title="Close">
+        ×
+      </button>
+    </header>
+    <div class="gc-if-flyout__scroll">
+      <div class="gc-if-flyout__form-body">
+        <p id="gc-cfg-edit-member-drift-meta" class="muted"></p>
+        <div id="gc-cfg-edit-member-drift-status" class="gc-config-viewer-modal__status" hidden></div>
+        <div id="gc-cfg-edit-member-drift-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="gc-cfg-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="gc-cfg-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-cfg-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="gc-cfg-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="gc-cfg-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="gc-cfg-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="gc-cfg-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>

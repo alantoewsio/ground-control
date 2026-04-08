@@ -1,0 +1,125 @@
+{# Network · Zones add/edit — see mocks/zone add.png; ApplianceAccess checkboxes match Sophos Zone API. #}
+<div id="gc-net-zone-flyout" class="gc-if-flyout gc-zone-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-zone-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-zone-flyout-title" class="gc-if-flyout__title">Add zone</h2>
+    </header>
+    <form id="gc-zone-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div id="gc-zone-flyout-fw-slot"></div>
+          <div id="gc-zone-flyout-scope-wrap" class="gc-zone-flyout__scope-table-wrap" hidden>
+            <span class="gc-if-flyout__label">Per firewall</span>
+            <div class="table-scroll gc-zone-flyout__scope-scroll">
+              <table class="data-table data-table--dense gc-zone-flyout__scope-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Scope</th>
+                    <th scope="col">Zone</th>
+                    <th scope="col">Hardware</th>
+                    <th scope="col">Gateway name</th>
+                    <th scope="col">Gateway IP</th>
+                  </tr>
+                </thead>
+                <tbody id="gc-zone-flyout-scope-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div
+            class="gc-if-flyout__field gc-combine-flyout-conflict-scope gc-zone-flyout__layout-conflict"
+            data-gc-combine-field-keys="__flyout.NetworkZone"
+            id="gc-zone-flyout-conflict-network-zone"
+            hidden
+          >
+            <span class="gc-if-flyout__label">Network zone differs across scopes</span>
+            <p class="muted gc-zone-flyout__layout-conflict-hint">Compare to see each scope’s zone binding.</p>
+          </div>
+          <div
+            class="gc-if-flyout__field gc-combine-flyout-conflict-scope gc-zone-flyout__layout-conflict"
+            data-gc-combine-field-keys="__flyout.Hardware"
+            id="gc-zone-flyout-conflict-hardware"
+            hidden
+          >
+            <span class="gc-if-flyout__label">Hardware differs across scopes</span>
+          </div>
+          <div
+            class="gc-if-flyout__field gc-combine-flyout-conflict-scope gc-zone-flyout__layout-conflict"
+            data-gc-combine-field-keys="__flyout.GatewayName"
+            id="gc-zone-flyout-conflict-gateway-name"
+            hidden
+          >
+            <span class="gc-if-flyout__label">Gateway name differs across scopes</span>
+          </div>
+          <div
+            class="gc-if-flyout__field gc-combine-flyout-conflict-scope gc-zone-flyout__layout-conflict"
+            data-gc-combine-field-keys="__flyout.GatewayIP"
+            id="gc-zone-flyout-conflict-gateway-ip"
+            hidden
+          >
+            <span class="gc-if-flyout__label">Gateway IP differs across scopes</span>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-zone-flyout-name"
+              >Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label
+            >
+            <input
+              type="text"
+              id="gc-zone-flyout-name"
+              class="gc-if-flyout__input"
+              autocomplete="off"
+              required
+              placeholder="Enter Name"
+            />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-zone-flyout-description">Description</label>
+            <textarea
+              id="gc-zone-flyout-description"
+              class="gc-if-flyout__input gc-zone-flyout__textarea"
+              rows="3"
+              autocomplete="off"
+              placeholder="Enter description"
+            ></textarea>
+          </div>
+          <div class="gc-if-flyout__field gc-combine-flyout-conflict-scope" data-gc-combine-field-keys="Type">
+            <span class="gc-if-flyout__label"
+              >Type <span class="gc-if-flyout__req" aria-hidden="true">*</span></span
+            >
+            <div class="gc-if-flyout__radios">
+              <label><input type="radio" name="gc-zone-flyout-type" value="LAN" checked /> LAN</label>
+              <label><input type="radio" name="gc-zone-flyout-type" value="DMZ" /> DMZ</label>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Members</span>
+            <span id="gc-zone-flyout-members" class="gc-if-flyout__readonly-val">None</span>
+          </div>
+          <hr class="gc-if-flyout__rule" />
+          <div class="gc-zone-flyout__device-access">
+            <div class="gc-zone-flyout__access-grid">
+              <span class="gc-if-flyout__label gc-zone-flyout__access-side-label">Device access</span>
+              <div id="gc-zone-flyout-access-groups" class="gc-zone-flyout__access-groups"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-zone-flyout-save" disabled>Save</button>
+        <button type="button" class="link-btn" id="gc-zone-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

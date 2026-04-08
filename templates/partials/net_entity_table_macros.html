@@ -1,0 +1,275 @@
+{# Shared by Firewalls · Network and Firewalls · Hosts & Services. Do not extend other templates — Jinja macro imports execute the whole file. #}
+{% macro net_filters_aside(prefix, aside_hidden) %}
+      <aside
+        class="filters filters--collapsed"
+        aria-label="Filters"
+        id="{{ prefix }}-filters-aside"
+        {% if aside_hidden %}hidden{% endif %}
+      >
+        <div id="{{ prefix }}-filters-drawer" class="filters__drawer" hidden></div>
+      </aside>
+{% endmacro %}
+
+{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true) %}
+        <div class="table-wrap gc-net-if-table-wrap">
+          <div class="firewalls-page__head">
+            <h2>{{ title }}</h2>
+          </div>
+          <div class="toolbar">
+            <div class="toolbar__sheet">
+              <div class="toolbar__line toolbar__line--main">
+                <div class="toolbar__filters">
+                  <div class="filters__head">
+                    <button
+                      type="button"
+                      class="filters__toggle"
+                      id="{{ prefix }}-filters-toggle"
+                      aria-expanded="false"
+                      aria-controls="{{ prefix }}-filters-drawer"
+                      aria-label="Filters"
+                      title="Filters"
+                    >
+                      <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                      </svg>
+                      <span class="filters__title-label">Filters</span>
+                    </button>
+                    {% if show_entity_quick_filters %}
+                    <div class="filters__head-trail">
+                      <div class="filters__head-actions" id="{{ prefix }}-facet-head-actions" hidden>
+                        <span class="filters__facet-count" id="{{ prefix }}-facet-count" aria-live="polite"></span>
+                        <button type="button" class="filters__facet-reset link-btn" id="{{ prefix }}-facet-reset" hidden>
+                          Reset
+                        </button>
+                      </div>
+                      <nav class="gc-net-entity-quick-type" id="{{ prefix }}-quick-entity-nav" aria-label="Quick filter by type">
+                        <button type="button" class="gc-net-entity-quick-type__btn" data-gc-entity-quick="interface" aria-pressed="false">
+                          Interfaces
+                        </button>
+                        <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                        <button type="button" class="gc-net-entity-quick-type__btn" data-gc-entity-quick="bridge_pair" aria-pressed="false">
+                          Bridge Pairs
+                        </button>
+                        <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                        <button type="button" class="gc-net-entity-quick-type__btn" data-gc-entity-quick="lag" aria-pressed="false">
+                          LAG
+                        </button>
+                        <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                        <button type="button" class="gc-net-entity-quick-type__btn" data-gc-entity-quick="vlan" aria-pressed="false">
+                          VLANs
+                        </button>
+                        <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                        <button type="button" class="gc-net-entity-quick-type__btn" data-gc-entity-quick="alias" aria-pressed="false">
+                          Aliases
+                        </button>
+                      </nav>
+                    </div>
+                    {% else %}
+                    <div class="filters__head-actions" id="{{ prefix }}-facet-head-actions" hidden>
+                      <span class="filters__facet-count" id="{{ prefix }}-facet-count" aria-live="polite"></span>
+                      <button type="button" class="filters__facet-reset link-btn" id="{{ prefix }}-facet-reset" hidden>
+                        Reset
+                      </button>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="toolbar__fw-toolbar-end">
+                  {% if show_combine %}
+                  {% set _combine_hint = combine_title if combine_title is not none and combine_title else "Combined view merges rows that share the same zone name. When access settings differ, the switch turns yellow — click to compare firewalls, or Shift+click to show separate rows." %}
+                  <div class="gc-net-zone-toolbar-combine" id="{{ prefix }}-toolbar-combine">
+                    <label
+                      class="gc-toolbar-combine"
+                      id="{{ prefix }}-combine-wrap"
+                      title="{{ _combine_hint | e }}"
+                    >
+                      <span class="gc-toolbar-combine__text">Combined View</span>
+                      <input
+                        type="checkbox"
+                        id="{{ prefix }}-combine"
+                        class="gc-toolbar-combine__input"
+                        checked
+                        autocomplete="off"
+                      />
+                      <span class="gc-toolbar-combine__track" aria-hidden="true"
+                        ><span class="gc-toolbar-combine__thumb"></span
+                      ></span>
+                    </label>
+                  </div>
+                  {% endif %}
+                  {% if show_combine and show_combine_sync_selected %}
+                  <div class="gc-toolbar-combine-sync" id="{{ prefix }}-combine-sync-wrap">
+                    <button
+                      type="button"
+                      class="btn btn--secondary gc-toolbar-combine-sync__btn"
+                      id="{{ prefix }}-combine-sync-selected"
+                      disabled
+                      title="Queue create tasks on each selected firewall or configuration where the chosen rows are not in the cache yet. Rows that already exist on every selected scope and show a field-conflict (!) icon are skipped."
+                    >
+                      Sync selected
+                    </button>
+                  </div>
+                  {% endif %}
+                  {% if primary_btn_id and primary_btn_label %}
+                  <button type="button" class="btn primary gc-net-entity-toolbar-primary" id="{{ primary_btn_id }}">
+                    {{ primary_btn_label }}
+                  </button>
+                  {% endif %}
+                  {% if secondary_btn_id and secondary_btn_label %}
+                  <button type="button" class="btn btn--secondary gc-net-entity-toolbar-secondary" id="{{ secondary_btn_id }}" disabled>
+                    {{ secondary_btn_label }}
+                  </button>
+                  {% endif %}
+                  <div class="toolbar__search-cluster">
+                    {% if pre_search_btn_a_id and pre_search_btn_a_label %}
+                    <button
+                      type="button"
+                      class="btn btn--secondary gc-toolbar-pre-search-btn"
+                      id="{{ pre_search_btn_a_id }}"
+                      disabled
+                    >
+                      {{ pre_search_btn_a_label }}
+                    </button>
+                    {% endif %}
+                    {% if pre_search_btn_b_id and pre_search_btn_b_label %}
+                    <button
+                      type="button"
+                      class="btn btn--secondary gc-toolbar-pre-search-btn"
+                      id="{{ pre_search_btn_b_id }}"
+                      disabled
+                    >
+                      {{ pre_search_btn_b_label }}
+                    </button>
+                    {% endif %}
+                    {% if show_add_dropdown %}
+                    <div class="gc-toolbar-add-dropdown" id="{{ prefix }}-add-dropdown-wrap">
+                      <button
+                        type="button"
+                        class="btn primary gc-toolbar-add-dropdown__trigger"
+                        id="{{ prefix }}-add-dropdown-trigger"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls="{{ prefix }}-add-dropdown-menu"
+                      >
+                        Add Interface
+                        <span class="gc-toolbar-add-dropdown__chev" aria-hidden="true">▾</span>
+                      </button>
+                      <div
+                        id="{{ prefix }}-add-dropdown-menu"
+                        class="gc-toolbar-add-dropdown__menu"
+                        role="menu"
+                        hidden
+                        aria-labelledby="{{ prefix }}-add-dropdown-trigger"
+                      >
+                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="bridge">
+                          Bridge
+                        </button>
+                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="lag">
+                          LAG
+                        </button>
+                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="vlan">
+                          VLAN
+                        </button>
+                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="alias">
+                          Alias
+                        </button>
+                      </div>
+                    </div>
+                    {% endif %}
+                    {% if toolbar_page_sync %}
+                    <button
+                      type="button"
+                      class="btn-icon gc-table-page-sync-btn"
+                      id="{{ prefix }}-page-sync"
+                      title="Sync cached objects for visible rows (selected firewalls only)"
+                      aria-label="Sync configuration cache for visible rows on this page"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                        />
+                      </svg>
+                    </button>
+                    {% endif %}
+                    <div class="search-field">
+                      <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                        />
+                      </svg>
+                      <input
+                        type="search"
+                        id="{{ prefix }}-search"
+                        class="search-field__input"
+                        placeholder="Search"
+                        autocomplete="off"
+                        aria-label="{{ search_aria }}"
+                      />
+                    </div>
+                    <span
+                      id="{{ prefix }}-cols-trigger"
+                      class="toolbar__cols-icon"
+                      role="button"
+                      tabindex="0"
+                      aria-expanded="false"
+                      aria-haspopup="true"
+                      aria-controls="{{ prefix }}-cols-panel"
+                      title="Columns"
+                      aria-label="Choose table columns"
+                    >
+                      <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                        />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-scroll">
+            <table class="data-table data-table--dense" id="{{ prefix }}-table">
+              <thead id="{{ prefix }}-thead">
+                <tr>
+                  <th scope="col" data-gc-col="_placeholder">—</th>
+                </tr>
+              </thead>
+              <tbody id="{{ prefix }}-tbody">
+                <tr id="{{ prefix }}-placeholder">
+                  <td class="muted" data-gc-net-entity-msg>Select one or more firewalls in the top bar.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <footer class="table-footer">
+            <span class="table-footer__count" id="{{ prefix }}-count" aria-live="polite"></span>
+          </footer>
+        </div>
+{% endmacro %}
+
+{% macro net_cols_modal(prefix) %}
+<div id="{{ prefix }}-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="{{ prefix }}-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="{{ prefix }}-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="{{ prefix }}-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="{{ prefix }}-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="{{ prefix }}-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="{{ prefix }}-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>
+{% endmacro %}

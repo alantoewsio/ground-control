@@ -1,0 +1,299 @@
+{# Users + groups flyouts (Configure · Authentication). Uses gc-if-flyout styles. #}
+<div id="gc-au-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    style="width: min(640px, 100vw - 32px)"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-au-flyout-title"
+  >
+    <div class="gc-if-flyout__resize" aria-hidden="true"></div>
+    <form id="gc-au-form" class="gc-if-flyout__panel-form" novalidate>
+      <header class="gc-if-flyout__header">
+        <h2 id="gc-au-flyout-title" class="gc-if-flyout__title">User</h2>
+        <button type="button" class="gc-wfp-flyout__close" id="gc-au-flyout-close" aria-label="Close" title="Close">
+          <span aria-hidden="true">×</span>
+        </button>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div id="gc-au-fw-field" class="gc-if-flyout__field gc-hs-ip-host-flyout__fw-field">
+            <span class="gc-if-flyout__label">Firewalls</span>
+            <div
+              class="gc-hs-ip-host-flyout__fw-ms"
+              data-gc-fw-ms="1"
+              data-fw-picker-mode="add"
+              data-fw-initial-selected="[]"
+              data-fw-assigned-ids="[]"
+            >
+              <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+                <button
+                  type="button"
+                  class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text">Select firewalls…</span>
+                  <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown" hidden>
+                  <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                    <input type="search" class="gc-hs-ip-host-flyout__fw-search" placeholder="Search" autocomplete="off" />
+                  </div>
+                  <div class="gc-hs-ip-host-flyout__fw-ms-options" role="listbox" aria-multiselectable="true"></div>
+                  <p class="gc-hs-ip-host-flyout__fw-empty muted" hidden>No firewalls available.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="gc-if-flyout__section-label">General</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-username">Username</label>
+            <input type="text" id="gc-au-username" class="gc-if-flyout__input" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-name">Name</label>
+            <input type="text" id="gc-au-name" class="gc-if-flyout__input" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-desc">Description</label>
+            <textarea id="gc-au-desc" class="gc-if-flyout__input" rows="2" placeholder="Description"></textarea>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">User type</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-au-usertype" value="User" checked /> User</label>
+              <label><input type="radio" name="gc-au-usertype" value="Administrator" /> Administrator</label>
+            </div>
+          </div>
+          <div id="gc-au-profile-field" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-au-profile">Profile</label>
+            <select id="gc-au-profile" class="gc-if-flyout__input gc-if-flyout__select" disabled>
+              <option value="">Select firewall(s) first…</option>
+            </select>
+            <p class="muted" style="margin-top: 6px; font-size: 0.8125rem">
+              Administration profiles from the configuration cache for the selected firewall(s).
+            </p>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-password">Password</label>
+            <input type="password" id="gc-au-password" class="gc-if-flyout__input" autocomplete="new-password" placeholder="Leave blank to keep (edit) or required (add)" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-email">Email</label>
+            <input type="email" id="gc-au-email" class="gc-if-flyout__input" autocomplete="off" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-group">Group</label>
+            <select id="gc-au-group" class="gc-if-flyout__input gc-if-flyout__select" disabled>
+              <option value="">Select firewall(s) first…</option>
+            </select>
+            <p class="muted" style="margin-top: 6px; font-size: 0.8125rem">
+              User groups from the configuration cache for the selected firewall(s). Leave unset for none.
+            </p>
+          </div>
+          <p class="gc-if-flyout__section-label">Policies</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-surfing">Surfing quota</label>
+            <input type="text" id="gc-au-surfing" class="gc-if-flyout__input" autocomplete="off" placeholder="Unlimited Internet Access" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-accesstime">Access time</label>
+            <input type="text" id="gc-au-accesstime" class="gc-if-flyout__input" autocomplete="off" placeholder="Allowed all the time" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-datatransfer">Network traffic</label>
+            <input type="text" id="gc-au-datatransfer" class="gc-if-flyout__input" autocomplete="off" placeholder="None" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-qos">Traffic shaping</label>
+            <input type="text" id="gc-au-qos" class="gc-if-flyout__input" autocomplete="off" placeholder="None" />
+          </div>
+          <p class="gc-if-flyout__section-label">VPN</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-sslvpn">User SSL VPN policy</label>
+            <input type="text" id="gc-au-sslvpn" class="gc-if-flyout__input" autocomplete="off" placeholder="No policy applied" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-clientless">User clientless SSL VPN policy</label>
+            <input type="text" id="gc-au-clientless" class="gc-if-flyout__input" autocomplete="off" placeholder="No policy applied" />
+          </div>
+          <p class="gc-if-flyout__section-label">Other settings</p>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">Quarantine digest</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-au-quarantine" value="Enable" /> Enable</label>
+              <label><input type="radio" name="gc-au-quarantine" value="Disable" checked /> Disable</label>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">MAC binding</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-au-macbind" value="Enable" /> Enable</label>
+              <label><input type="radio" name="gc-au-macbind" value="Disable" checked /> Disable</label>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-maclist">MAC address list</label>
+            <textarea id="gc-au-maclist" class="gc-if-flyout__input" rows="2" placeholder="One per line or comma-separated"></textarea>
+          </div>
+          <p class="gc-if-flyout__section-label">Administrator advanced</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-au-applsched">Schedule for device access</label>
+            <input type="text" id="gc-au-applsched" class="gc-if-flyout__input" autocomplete="off" placeholder="All the time" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">Login restriction for device access</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-au-admlogin" value="AnyNode" checked /> Any node</label>
+              <label><input type="radio" name="gc-au-admlogin" value="SelectedNodes" /> Selected nodes</label>
+              <label><input type="radio" name="gc-au-admlogin" value="NodeRange" /> Node range</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-wfp-flyout__footer">
+        <button type="button" class="btn btn--secondary" id="gc-au-cancel">Cancel</button>
+        <button type="submit" class="btn primary" id="gc-au-save">Save</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div id="gc-ag-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    style="width: min(560px, 100vw - 32px)"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ag-flyout-title"
+  >
+    <div class="gc-if-flyout__resize" aria-hidden="true"></div>
+    <form id="gc-ag-form" class="gc-if-flyout__panel-form" novalidate>
+      <header class="gc-if-flyout__header">
+        <h2 id="gc-ag-flyout-title" class="gc-if-flyout__title">Group</h2>
+        <button type="button" class="gc-wfp-flyout__close" id="gc-ag-flyout-close" aria-label="Close" title="Close">
+          <span aria-hidden="true">×</span>
+        </button>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div id="gc-ag-fw-field" class="gc-if-flyout__field gc-hs-ip-host-flyout__fw-field">
+            <span class="gc-if-flyout__label">Firewalls</span>
+            <div
+              class="gc-hs-ip-host-flyout__fw-ms"
+              data-gc-fw-ms="1"
+              data-fw-picker-mode="add"
+              data-fw-initial-selected="[]"
+              data-fw-assigned-ids="[]"
+            >
+              <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+                <button
+                  type="button"
+                  class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text">Select firewalls…</span>
+                  <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown" hidden>
+                  <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                    <input type="search" class="gc-hs-ip-host-flyout__fw-search" placeholder="Search" autocomplete="off" />
+                  </div>
+                  <div class="gc-hs-ip-host-flyout__fw-ms-options" role="listbox" aria-multiselectable="true"></div>
+                  <p class="gc-hs-ip-host-flyout__fw-empty muted" hidden>No firewalls available.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="gc-if-flyout__section-label">General</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-name">Group name</label>
+            <input type="text" id="gc-ag-name" class="gc-if-flyout__input" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-desc">Description</label>
+            <textarea id="gc-ag-desc" class="gc-if-flyout__input" rows="2" placeholder="Description"></textarea>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-grouptype">Group type</label>
+            <select id="gc-ag-grouptype" class="gc-if-flyout__input gc-if-flyout__select">
+              <option value="Normal">Normal</option>
+              <option value="Clientless">Clientless</option>
+            </select>
+          </div>
+          <p class="gc-if-flyout__section-label">Policies</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-surfing">Surfing quota</label>
+            <input type="text" id="gc-ag-surfing" class="gc-if-flyout__input" autocomplete="off" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-access">Access time</label>
+            <input type="text" id="gc-ag-access" class="gc-if-flyout__input" autocomplete="off" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-datatransfer">Network traffic</label>
+            <input type="text" id="gc-ag-datatransfer" class="gc-if-flyout__input" autocomplete="off" placeholder="None" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-qos">Traffic shaping</label>
+            <input type="text" id="gc-ag-qos" class="gc-if-flyout__input" autocomplete="off" placeholder="None" />
+          </div>
+          <p class="gc-if-flyout__section-label">VPN</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-sslvpn">SSL VPN policy</label>
+            <input type="text" id="gc-ag-sslvpn" class="gc-if-flyout__input" autocomplete="off" placeholder="No policy applied" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ag-clientless">Clientless SSL VPN policy</label>
+            <input type="text" id="gc-ag-clientless" class="gc-if-flyout__input" autocomplete="off" placeholder="No policy applied" />
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">L2TP</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-ag-l2tp" value="Enable" /> Enable</label>
+              <label><input type="radio" name="gc-ag-l2tp" value="Disable" checked /> Disable</label>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">PPTP</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-ag-pptp" value="Enable" /> Enable</label>
+              <label><input type="radio" name="gc-ag-pptp" value="Disable" checked /> Disable</label>
+            </div>
+          </div>
+          <p class="gc-if-flyout__section-label">Other settings</p>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">Quarantine digest</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-ag-quarantine" value="Enable" checked /> Enable</label>
+              <label><input type="radio" name="gc-ag-quarantine" value="Disable" /> Disable</label>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">MAC binding</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-ag-macbind" value="Enable" /> Enable</label>
+              <label><input type="radio" name="gc-ag-macbind" value="Disable" checked /> Disable</label>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field">
+            <span class="gc-if-flyout__label">Sign-in restriction</span>
+            <div class="gc-if-flyout__radio-row">
+              <label><input type="radio" name="gc-ag-loginrestriction" value="AnyNode" checked /> Any node</label>
+              <label><input type="radio" name="gc-ag-loginrestriction" value="SelectedNodes" /> Selected nodes</label>
+              <label><input type="radio" name="gc-ag-loginrestriction" value="NodeRange" /> Node range</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-wfp-flyout__footer">
+        <button type="button" class="btn btn--secondary" id="gc-ag-cancel">Cancel</button>
+        <button type="submit" class="btn primary" id="gc-ag-save">Save</button>
+      </footer>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,140 @@
+<div id="gc-ips-sig-flyout" class="gc-if-flyout gc-ips-sig-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-ips-sig-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ips-sig-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <form id="gc-ips-sig-form" class="gc-if-flyout__panel-form gc-ips-sig-flyout__form" novalidate>
+      <header class="gc-if-flyout__header">
+        <h2 id="gc-ips-sig-flyout-title" class="gc-if-flyout__title">Custom signature</h2>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div id="gc-ips-sig-fw-field" class="gc-if-flyout__field gc-hs-ip-host-flyout__fw-field">
+            <span class="gc-if-flyout__label">Firewalls</span>
+            <p id="gc-ips-sig-fw-ms-hint" class="muted gc-hs-ip-host-flyout__fw-hint"></p>
+            <div id="gc-ips-sig-fw-slot"></div>
+          </div>
+          <template id="gc-ips-sig-fw-ms-template">
+            <div
+              class="gc-hs-ip-host-flyout__fw-ms"
+              data-gc-fw-ms="1"
+              data-fw-picker-mode="add"
+              data-fw-initial-selected="[]"
+              data-fw-assigned-ids="[]"
+            >
+              <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+                <button
+                  type="button"
+                  class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text">Loading…</span>
+                  <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown" hidden>
+                  <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                    <input
+                      type="search"
+                      class="gc-if-flyout__input gc-hs-ip-host-flyout__fw-search"
+                      placeholder="Search firewalls"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="gc-hs-ip-host-flyout__fw-ms-options" role="listbox" aria-multiselectable="true"></div>
+                  <p class="gc-hs-ip-host-flyout__fw-empty muted" hidden>No firewalls available.</p>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ips-sig-name"
+              >Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label
+            >
+            <input
+              type="text"
+              id="gc-ips-sig-name"
+              class="gc-if-flyout__input"
+              maxlength="15"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <div class="gc-if-flyout__field" data-gc-combine-field-keys="__protocol">
+            <label class="gc-if-flyout__label" for="gc-ips-sig-protocol"
+              >Protocol <span class="gc-if-flyout__req" aria-hidden="true">*</span></label
+            >
+            <select id="gc-ips-sig-protocol" class="gc-if-flyout__input gc-if-flyout__select" required>
+              <option value="">Select here</option>
+            </select>
+          </div>
+          <div class="gc-if-flyout__field" data-gc-combine-field-keys="__custom_rule">
+            <label class="gc-if-flyout__label" for="gc-ips-sig-rule"
+              >Custom rule <span class="gc-if-flyout__req" aria-hidden="true">*</span></label
+            >
+            <div class="gc-ips-sig-rule-help-row">
+              <a
+                href="https://docs.sophos.com/nsg/sophos-firewall/latest/Help/en-us/webhelp/onlinehelp/AdministratorHelp/IntrusionPrevention/CustomIPSSignatures/index.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn-icon gc-ips-sig-rule-help"
+                aria-label="Sophos help: Custom IPS signatures (opens in new tab)"
+                title="Sophos help: Custom IPS signatures"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"
+                  />
+                </svg>
+              </a>
+            </div>
+            <div class="gc-snort-editor" id="gc-ips-sig-rule-editor">
+              <pre class="gc-snort-editor__highlights" aria-hidden="true"
+                ><code id="gc-ips-sig-rule-highlights" class="gc-snort-editor__code"></code
+              ></pre>
+              <textarea
+                id="gc-ips-sig-rule"
+                class="gc-snort-editor__textarea"
+                rows="8"
+                spellcheck="false"
+                autocomplete="off"
+                required
+              ></textarea>
+            </div>
+            <p class="muted gc-ips-sig-flyout__field-hint">
+              Snort-style options, e.g.
+              <span class="mono">srcport:443; content:"www.facebook.com";</span>
+            </p>
+          </div>
+          <div class="gc-if-flyout__field" data-gc-combine-field-keys="__severity">
+            <label class="gc-if-flyout__label" for="gc-ips-sig-severity"
+              >Severity <span class="gc-if-flyout__req" aria-hidden="true">*</span></label
+            >
+            <select id="gc-ips-sig-severity" class="gc-if-flyout__input gc-if-flyout__select" required>
+              <option value="">Select here</option>
+            </select>
+          </div>
+          <div class="gc-if-flyout__field" data-gc-combine-field-keys="__action">
+            <label class="gc-if-flyout__label" for="gc-ips-sig-action">Recommended action</label>
+            <select id="gc-ips-sig-action" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer gc-ips-sig-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-ips-sig-save">Queue save</button>
+        <button type="button" class="link-btn" id="gc-ips-sig-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

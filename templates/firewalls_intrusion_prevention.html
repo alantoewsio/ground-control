@@ -1,0 +1,1208 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "intrusion_prevention" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% block title %}Intrusion Prevention · Firewalls · Ground Control{% endblock %}
+{% block page_title %}Intrusion Prevention{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Intrusion Prevention</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page gc-ips-switch-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ net_filters_aside("gc-ips-cfg", false) }}
+        {{ net_filters_aside("gc-ips-pol", true) }}
+        {{ net_filters_aside("gc-ips-sig", true) }}
+        {{ net_filters_aside("gc-ips-tmac", true) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        <div class="gc-tabs" role="tablist" aria-label="Intrusion Prevention views" id="gc-ips-main-tablist">
+          <button
+            type="button"
+            class="gc-tabs__tab is-active"
+            role="tab"
+            aria-selected="true"
+            id="gc-tab-ips-configure"
+            data-gc-tab="configure"
+          >
+            Configure
+          </button>
+          <button
+            type="button"
+            class="gc-tabs__tab"
+            role="tab"
+            aria-selected="false"
+            id="gc-tab-ips-policy"
+            data-gc-tab="policy"
+          >
+            Policy
+          </button>
+          <button
+            type="button"
+            class="gc-tabs__tab"
+            role="tab"
+            aria-selected="false"
+            id="gc-tab-ips-signatures"
+            data-gc-tab="signatures"
+          >
+            Custom signatures
+          </button>
+          <button
+            type="button"
+            class="gc-tabs__tab"
+            role="tab"
+            aria-selected="false"
+            id="gc-tab-ips-trusted-mac"
+            data-gc-tab="trusted_mac"
+          >
+            Trusted MAC
+          </button>
+        </div>
+
+        <div class="gc-tab-panels">
+          <div
+            class="gc-tab-panel is-active"
+            role="tabpanel"
+            aria-labelledby="gc-tab-ips-configure"
+            id="gc-panel-ips-configure"
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-ips-cfg",
+                "IPS switch",
+                "Search firewalls",
+                pre_search_btn_a_id="gc-ips-cfg-enable-selected",
+                pre_search_btn_a_label="Enable selected",
+                pre_search_btn_b_id="gc-ips-cfg-disable-selected",
+                pre_search_btn_b_label="Disable selected",
+              )
+            }}
+          </div>
+          <div
+            class="gc-tab-panel"
+            role="tabpanel"
+            aria-labelledby="gc-tab-ips-policy"
+            id="gc-panel-ips-policy"
+            hidden
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-ips-pol",
+                "IPS policies",
+                "Search policies",
+                show_combine=true,
+                combine_title="Merged by policy name across selected firewalls. When description or policy content differs, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.",
+                primary_btn_id="gc-ips-pol-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-ips-pol-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div
+            class="gc-tab-panel"
+            role="tabpanel"
+            aria-labelledby="gc-tab-ips-signatures"
+            id="gc-panel-ips-signatures"
+            hidden
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-ips-sig",
+                "Custom signatures",
+                "Search custom signatures",
+                show_combine=true,
+                combine_title="Merged by signature name across selected firewalls. When protocol, severity, action, or rule text differs, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.",
+                primary_btn_id="gc-ips-sig-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-ips-sig-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div
+            class="gc-tab-panel"
+            role="tabpanel"
+            aria-labelledby="gc-tab-ips-trusted-mac"
+            id="gc-panel-ips-trusted-mac"
+            hidden
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-ips-tmac",
+                "Trusted MAC",
+                "Search trusted MAC entries",
+                show_combine=true,
+                combine_title="Merged by MAC address across selected firewalls. When IPv4/IPv6 association or addresses differ, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.",
+                primary_btn_id="gc-ips-tmac-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-ips-tmac-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="gc-ips-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
+  <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="gc-net-zone-combine-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ips-combine-modal-title"
+  >
+    <header class="gc-net-zone-combine-modal__header">
+      <h2 id="gc-ips-combine-modal-title" class="gc-net-zone-combine-modal__title">Compare by firewall</h2>
+      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-ips-combine-modal-close" aria-label="Close" title="Close">
+        <span aria-hidden="true">×</span>
+      </button>
+    </header>
+    <div id="gc-ips-combine-modal-body" class="gc-net-zone-combine-modal__body"></div>
+    <footer class="gc-net-zone-combine-modal__footer">
+      <button type="button" class="btn btn--secondary" id="gc-ips-combine-modal-done">Close</button>
+    </footer>
+  </div>
+</div>
+
+{{ net_cols_modal("gc-ips-cfg") }}
+{{ net_cols_modal("gc-ips-pol") }}
+{{ net_cols_modal("gc-ips-sig") }}
+{{ net_cols_modal("gc-ips-tmac") }}
+{% include "partials/gc_ips_policy_flyout.html" %}
+{% include "partials/gc_ips_custom_signature_flyout.html" %}
+{% include "partials/gc_ips_trusted_mac_flyout.html" %}
+{% include "partials/gc_ips_dos_spoof_flyouts.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.GC_IPS_SWITCH_ENQUEUE_BATCH_URL = {{ url_api_task_queue_enqueue_ips_switch_batch | tojson }};
+  window.GC_IPS_POLICY_DROPDOWNS = {{ ips_policy_dropdowns | tojson }};
+  window.GC_IPS_POLICY_CREATE_URL = {{ url_api_task_queue_enqueue_ips_policy_create | tojson }};
+  window.GC_IPS_POLICY_UPDATE_URL = {{ url_api_task_queue_enqueue_ips_policy_update | tojson }};
+  window.GC_IPS_CUSTOM_SIGNATURE_DROPDOWNS = {{ ips_custom_signature_dropdowns | tojson }};
+  window.GC_IPS_CUSTOM_SIGNATURE_CREATE_BATCH_URL = {{ url_api_task_queue_enqueue_ips_custom_signature_create_batch | tojson }};
+  window.GC_IPS_CUSTOM_SIGNATURE_UPDATE_URL = {{ url_api_task_queue_enqueue_ips_custom_signature_update | tojson }};
+  window.GC_IPS_TRUSTED_MAC_CREATE_BATCH_URL = {{ url_api_task_queue_enqueue_ips_trusted_mac_create_batch | tojson }};
+  window.GC_IPS_TRUSTED_MAC_UPDATE_URL = {{ url_api_task_queue_enqueue_ips_trusted_mac_update | tojson }};
+  window.GC_NETWORK_ZONES_URL = {{ url_api_network_zones | tojson }};
+  window.GC_IPS_DOS_SETTINGS_ENQUEUE_URL = {{ url_api_task_queue_enqueue_dos_settings_update | tojson }};
+  window.GC_IPS_SPOOF_PREVENTION_ENQUEUE_URL = {{ url_api_task_queue_enqueue_spoof_prevention_update | tojson }};
+</script>
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-snort-rule-highlight.js"></script>
+<script src="/static/gc-hosts-services-flyout.js"></script>
+<script src="/static/gc-ips-policy-flyout.js"></script>
+<script src="/static/gc-ips-custom-signature-flyout.js"></script>
+<script src="/static/gc-ips-trusted-mac-flyout.js"></script>
+<script src="/static/gc-ips-dos-spoof-flyouts.js"></script>
+<script>
+  (function () {
+    var URL_IPS_SWITCH = {{ url_api_ips_switch_table | tojson }};
+    var URL_IPS_POLICY = {{ url_api_ips_policy_table | tojson }};
+    var URL_IPS_CUSTOM_SIG = {{ url_api_ips_custom_signature_table | tojson }};
+    var URL_IPS_TRUSTED_MAC = {{ url_api_ips_trusted_mac_table | tojson }};
+    var ENQUEUE_IPS_SWITCH = window.GC_IPS_SWITCH_ENQUEUE_BATCH_URL || "";
+    var ENQUEUE_IPS_POLICY_DELETES = {{ url_api_task_queue_enqueue_ips_policy_deletes_batch | tojson }};
+    var ENQUEUE_IPS_CUSTOM_SIG_DELETES = {{ url_api_task_queue_enqueue_ips_custom_signature_deletes_batch | tojson }};
+    var ENQUEUE_IPS_TRUSTED_MAC_DELETES = {{ url_api_task_queue_enqueue_ips_trusted_mac_deletes_batch | tojson }};
+
+    var IPS_POL_COMBINE_LS = "ground-control-ips-pol-combine-v1";
+    var IPS_SIG_COMBINE_LS = "ground-control-ips-sig-combine-v1";
+    var IPS_TMAC_COMBINE_LS = "ground-control-ips-tmac-combine-v1";
+    var lastIpsPolPayload = null;
+    var lastIpsSigPayload = null;
+    var lastIpsTmacPayload = null;
+    var ipsCombineModal = document.getElementById("gc-ips-combine-modal");
+    var ipsCombineModalBody = document.getElementById("gc-ips-combine-modal-body");
+    var ipsCombineModalTitle = document.getElementById("gc-ips-combine-modal-title");
+    var ipsCombineModalClose = document.getElementById("gc-ips-combine-modal-close");
+    var ipsCombineModalDone = document.getElementById("gc-ips-combine-modal-done");
+    var ipsCombineModalBackdrop = ipsCombineModal
+      ? ipsCombineModal.querySelector(".gc-net-zone-combine-modal__backdrop")
+      : null;
+
+    var IPS_MAIN_TAB_LS = "ground-control-ips-main-tab";
+    var FILTER_IDS = [
+      "gc-ips-cfg-filters-aside",
+      "gc-ips-pol-filters-aside",
+      "gc-ips-sig-filters-aside",
+      "gc-ips-tmac-filters-aside",
+    ];
+
+    function readSavedIpsMainTab() {
+      try {
+        var raw = localStorage.getItem(IPS_MAIN_TAB_LS);
+        if (
+          raw === "configure" ||
+          raw === "policy" ||
+          raw === "signatures" ||
+          raw === "trusted_mac"
+        )
+          return raw;
+      } catch (e) {}
+      return "configure";
+    }
+
+    var activeMainTab = readSavedIpsMainTab();
+
+    function syncFilterAsidesVisibility() {
+      var showId = "gc-ips-cfg-filters-aside";
+      if (activeMainTab === "policy") showId = "gc-ips-pol-filters-aside";
+      if (activeMainTab === "signatures") showId = "gc-ips-sig-filters-aside";
+      if (activeMainTab === "trusted_mac") showId = "gc-ips-tmac-filters-aside";
+      FILTER_IDS.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.hidden = id !== showId;
+      });
+    }
+
+    var mainTablist = document.getElementById("gc-ips-main-tablist");
+    var mainTabs = mainTablist
+      ? mainTablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-tab]")
+      : document.querySelectorAll(
+          "#gc-tab-ips-configure, #gc-tab-ips-policy, #gc-tab-ips-signatures, #gc-tab-ips-trusted-mac",
+        );
+    var mainPanels = {
+      configure: document.getElementById("gc-panel-ips-configure"),
+      policy: document.getElementById("gc-panel-ips-policy"),
+      signatures: document.getElementById("gc-panel-ips-signatures"),
+      trusted_mac: document.getElementById("gc-panel-ips-trusted-mac"),
+    };
+
+    function applyMainTabPanels() {
+      Object.keys(mainPanels).forEach(function (key) {
+        var p = mainPanels[key];
+        if (!p) return;
+        var show = key === activeMainTab;
+        p.classList.toggle("is-active", show);
+        p.hidden = !show;
+      });
+    }
+
+    function syncMainTabButtons() {
+      mainTabs.forEach(function (t) {
+        var tid = t.getAttribute("data-gc-tab");
+        var on = tid === activeMainTab;
+        t.classList.toggle("is-active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    }
+
+    function updateIpsPolCombineChrome(data) {
+      var wrap = document.getElementById("gc-ips-pol-combine-wrap");
+      var inp = document.getElementById("gc-ips-pol-combine");
+      if (!wrap || !inp) return;
+      var conflicts = !!(data && data.ips_policy_combine_conflicts);
+      var flat = !!(data && data.ips_policy_combined === false);
+      wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
+    }
+
+    function updateIpsSigCombineChrome(data) {
+      var wrap = document.getElementById("gc-ips-sig-combine-wrap");
+      var inp = document.getElementById("gc-ips-sig-combine");
+      if (!wrap || !inp) return;
+      var conflicts = !!(data && data.ips_custom_sig_combine_conflicts);
+      var flat = !!(data && data.ips_custom_sig_combined === false);
+      wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
+    }
+
+    function updateIpsTmacCombineChrome(data) {
+      var wrap = document.getElementById("gc-ips-tmac-combine-wrap");
+      var inp = document.getElementById("gc-ips-tmac-combine");
+      if (!wrap || !inp) return;
+      var conflicts = !!(data && data.ips_trusted_mac_combine_conflicts);
+      var flat = !!(data && data.ips_trusted_mac_combined === false);
+      wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
+    }
+
+    function escIpsComb(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function scopePillForCombineModal(fw) {
+      if (typeof window.gcFirewallScopePillHtml === "function") {
+        return window.gcFirewallScopePillHtml(fw);
+      }
+      return escIpsComb(fw);
+    }
+
+    function modalScalarIps(val) {
+      return '<span class="gc-net-zone-modal__scalar">' + escIpsComb(val) + "</span>";
+    }
+
+    function buildIpsCombineModalHtml(data, kind) {
+      var labels = (data && data.column_labels) || {};
+      var rows = (data && data.rows) || [];
+      var ck =
+        kind === "pol"
+          ? "ips_policy_combine_conflict"
+          : kind === "tmac"
+            ? "ips_trusted_mac_combine_conflict"
+            : "ips_custom_sig_combine_conflict";
+      var pk =
+        kind === "pol"
+          ? "ips_policy_combine_per_field"
+          : kind === "tmac"
+            ? "ips_trusted_mac_combine_per_field"
+            : "ips_custom_sig_combine_per_field";
+      var conflictRows = rows.filter(function (r) {
+        if (!r) return false;
+        var pf = r[pk];
+        return r[ck] && pf;
+      });
+      if (!conflictRows.length) {
+        return '<p class="muted">No differing field values for this selection.</p>';
+      }
+      return conflictRows
+        .map(function (row) {
+          var hname = (row.cells && row.cells.__name) || "";
+          var pf = row[pk] || {};
+          var colKeys = Object.keys(pf).sort();
+          var parts =
+            '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
+            escIpsComb(hname) +
+            "</h3>";
+          colKeys.forEach(function (colKey) {
+            var lbl = labels[colKey] || colKey;
+            parts +=
+              '<h4 class="gc-net-zone-modal__col">' + escIpsComb(lbl).replace(/\n/g, "<br />") + "</h4>";
+            parts += '<ul class="gc-net-zone-modal__fw-list">';
+            var per = pf[colKey];
+            Object.keys(per)
+              .sort()
+              .forEach(function (fw) {
+                parts +=
+                  '<li class="gc-net-zone-modal__fw-row">' +
+                  scopePillForCombineModal(fw) +
+                  '<span class="gc-net-zone-modal__fw-val">' +
+                  modalScalarIps(per[fw]) +
+                  "</span></li>";
+              });
+            parts += "</ul>";
+          });
+          parts += "</section>";
+          return parts;
+        })
+        .join("");
+    }
+
+    function closeIpsCombineModal() {
+      if (!ipsCombineModal) return;
+      ipsCombineModal.hidden = true;
+      ipsCombineModal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    function openIpsCombineModal(kind) {
+      var data =
+        kind === "pol" ? lastIpsPolPayload : kind === "tmac" ? lastIpsTmacPayload : lastIpsSigPayload;
+      if (!data || !ipsCombineModalBody || !ipsCombineModal) return;
+      if (ipsCombineModalTitle) {
+        ipsCombineModalTitle.textContent =
+          kind === "pol"
+            ? "IPS policy by firewall"
+            : kind === "tmac"
+              ? "Trusted MAC by firewall"
+              : "Custom signature by firewall";
+      }
+      ipsCombineModalBody.innerHTML = buildIpsCombineModalHtml(data, kind);
+      ipsCombineModal.hidden = false;
+      ipsCombineModal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      if (ipsCombineModalClose) ipsCombineModalClose.focus();
+    }
+
+    function onIpsCombineModalKeydown(e) {
+      if (!ipsCombineModal || ipsCombineModal.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeIpsCombineModal();
+      }
+    }
+
+    document.addEventListener("keydown", onIpsCombineModalKeydown);
+    if (ipsCombineModalClose) ipsCombineModalClose.addEventListener("click", closeIpsCombineModal);
+    if (ipsCombineModalDone) ipsCombineModalDone.addEventListener("click", closeIpsCombineModal);
+    if (ipsCombineModalBackdrop) ipsCombineModalBackdrop.addEventListener("click", closeIpsCombineModal);
+
+    try {
+      var polCbxInit = document.getElementById("gc-ips-pol-combine");
+      if (polCbxInit) {
+        var vp = localStorage.getItem(IPS_POL_COMBINE_LS);
+        if (vp === "0") polCbxInit.checked = false;
+        else if (vp === "1") polCbxInit.checked = true;
+      }
+      var sigCbxInit = document.getElementById("gc-ips-sig-combine");
+      if (sigCbxInit) {
+        var vs = localStorage.getItem(IPS_SIG_COMBINE_LS);
+        if (vs === "0") sigCbxInit.checked = false;
+        else if (vs === "1") sigCbxInit.checked = true;
+      }
+      var tmacCbxInit = document.getElementById("gc-ips-tmac-combine");
+      if (tmacCbxInit) {
+        var vt = localStorage.getItem(IPS_TMAC_COMBINE_LS);
+        if (vt === "0") tmacCbxInit.checked = false;
+        else if (vt === "1") tmacCbxInit.checked = true;
+      }
+    } catch (eLs) {}
+
+    function refreshIpsSwitchTable() {
+      if (tableIps && tableIps.refresh) tableIps.refresh();
+    }
+
+    function refreshIpsPolicyTable() {
+      if (tablePol && tablePol.refresh) tablePol.refresh();
+    }
+
+    function refreshIpsCustomSignatureTable() {
+      if (tableSig && tableSig.refresh) tableSig.refresh();
+    }
+
+    function refreshIpsTrustedMacTable() {
+      if (tableTmac && tableTmac.refresh) tableTmac.refresh();
+    }
+
+    function refreshIpsTablesForSelection() {
+      refreshIpsSwitchTable();
+      refreshIpsPolicyTable();
+      refreshIpsCustomSignatureTable();
+      refreshIpsTrustedMacTable();
+    }
+
+    window.gcIpsPolicyTableRefresh = refreshIpsPolicyTable;
+    window.gcIpsCustomSignatureTableRefresh = refreshIpsCustomSignatureTable;
+    window.gcIpsTrustedMacTableRefresh = refreshIpsTrustedMacTable;
+
+    document.addEventListener("gc-firewall-selection-changed", function () {
+      refreshIpsTablesForSelection();
+    });
+
+    function ipsConfigureFirewallIdsFromSyncDetail(ids, detail) {
+      var d = detail || {};
+      if (d.post_sync == null) return ids || [];
+      var list = Array.isArray(d.post_sync) ? d.post_sync : [d.post_sync];
+      var want = { ips_switch: true, spoof_prevention: true, dos_settings: true };
+      function entryHasWantedEntity(p) {
+        if (!p || typeof p !== "object") return false;
+        var arrs = [];
+        if (Array.isArray(p.synced_entity_ids)) arrs.push(p.synced_entity_ids);
+        if (Array.isArray(p.entities)) arrs.push(p.entities);
+        for (var a = 0; a < arrs.length; a++) {
+          var arr = arrs[a];
+          for (var b = 0; b < arr.length; b++) {
+            if (want[String(arr[b] || "").trim()]) return true;
+          }
+        }
+        return false;
+      }
+      var out = [];
+      for (var i = 0; i < list.length; i++) {
+        var p = list[i];
+        if (!p || p.ok !== true || p.firewall_id == null) continue;
+        if (!entryHasWantedEntity(p)) continue;
+        var n = parseInt(String(p.firewall_id), 10);
+        if (!isNaN(n) && n > 0 && out.indexOf(n) === -1) out.push(n);
+      }
+      return out;
+    }
+
+    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
+      window.gcRegisterConfigCacheTableRefresher(function (ids, detail) {
+        if (!ids || !ids.length) return;
+        var sel =
+          typeof window.gcGetSelectedFirewallIds === "function"
+            ? window.gcGetSelectedFirewallIds()
+            : [];
+        if (!sel || !sel.length) return;
+        var set = {};
+        sel.forEach(function (id) {
+          set[Number(id)] = true;
+        });
+        var hit = ids.some(function (id) {
+          return set[Number(id)];
+        });
+        if (hit) {
+          refreshIpsPolicyTable();
+          refreshIpsCustomSignatureTable();
+          refreshIpsTrustedMacTable();
+        }
+        var cfgIds = ipsConfigureFirewallIdsFromSyncDetail(ids, detail);
+        var hitCfg = cfgIds.some(function (id) {
+          return set[Number(id)];
+        });
+        if (hitCfg) {
+          refreshIpsSwitchTable();
+          if (typeof syncIpsBulkToolbar === "function") syncIpsBulkToolbar();
+        }
+      });
+    }
+
+    mainTabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var id = tab.getAttribute("data-gc-tab");
+        activeMainTab = id;
+        syncMainTabButtons();
+        applyMainTabPanels();
+        syncFilterAsidesVisibility();
+        try {
+          localStorage.setItem(IPS_MAIN_TAB_LS, id);
+        } catch (e) {}
+        if (id === "policy") refreshIpsPolicyTable();
+        if (id === "signatures") refreshIpsCustomSignatureTable();
+        if (id === "trusted_mac") refreshIpsTrustedMacTable();
+      });
+    });
+
+    function bannerResult(ok, msg) {
+      if (typeof window.gcGlobalBannerShowResult === "function") {
+        window.gcGlobalBannerShowResult(ok, msg);
+      } else {
+        alert(msg);
+      }
+    }
+
+    function dispatchTaskQueueUpdated() {
+      try {
+        document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+      } catch (e0) {}
+    }
+
+    var enableBulkBtn = document.getElementById("gc-ips-cfg-enable-selected");
+    var disableBulkBtn = document.getElementById("gc-ips-cfg-disable-selected");
+    var ipsTableEl = document.getElementById("gc-ips-cfg-table");
+
+    function syncIpsBulkToolbar() {
+      var tbody = document.getElementById("gc-ips-cfg-tbody");
+      if (!enableBulkBtn || !disableBulkBtn || !tbody) return;
+      var nEn = 0;
+      var nDis = 0;
+      tbody.querySelectorAll("tr.gc-ips-cfg-data-row input.gc-hs-row-select:checked").forEach(function (cb) {
+        var tr = cb.closest("tr");
+        if (!tr || tr.hidden || !tr._gcNetRow) return;
+        var r = tr._gcNetRow;
+        if (!r.ips_known) return;
+        if (r.ips_enabled) nDis++;
+        else nEn++;
+      });
+      enableBulkBtn.disabled = nEn < 1;
+      disableBulkBtn.disabled = nDis < 1;
+    }
+
+    function enqueueIpsSwitchItems(items) {
+      if (!ENQUEUE_IPS_SWITCH) {
+        return Promise.reject(new Error("Enqueue URL is not configured."));
+      }
+      return fetch(ENQUEUE_IPS_SWITCH, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({ items: items }),
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, j: j };
+        });
+      });
+    }
+
+    if (ipsTableEl) {
+      ipsTableEl.addEventListener("click", function (ev) {
+        var cfgBtn = ev.target.closest("button.gc-table-action-configure-btn");
+        if (cfgBtn && ipsTableEl.contains(cfgBtn)) {
+          var trCfg = cfgBtn.closest("tr");
+          if (trCfg && trCfg._gcNetRow) {
+            var ac = cfgBtn.getAttribute("data-gc-action-col");
+            if (ac === "__dos_configure" && window.gcIpsDosFlyoutOpenFromTr) {
+              window.gcIpsDosFlyoutOpenFromTr(trCfg);
+            } else if (ac === "__spoof_configure" && window.gcIpsSpoofFlyoutOpenFromTr) {
+              window.gcIpsSpoofFlyoutOpenFromTr(trCfg);
+            }
+          }
+          return;
+        }
+        var spoofTblTgl = ev.target.closest("button.gc-ips-spoof-table-toggle");
+        if (spoofTblTgl && ipsTableEl.contains(spoofTblTgl)) {
+          var tdSp = spoofTblTgl.closest("td");
+          if (tdSp && tdSp.getAttribute("data-gc-col") === "__spoof_configure") {
+            var trSp = spoofTblTgl.closest("tr");
+            if (trSp && trSp._gcNetRow && typeof window.gcIpsSpoofFlyoutOpenFromTr === "function") {
+              window.gcIpsSpoofFlyoutOpenFromTr(trSp, { toggleEnableCheckbox: true });
+            }
+          }
+          return;
+        }
+        var btn = ev.target.closest("button.gc-table-toggle");
+        if (!btn || !ipsTableEl.contains(btn)) return;
+        var td = btn.closest("td");
+        if (!td || td.getAttribute("data-gc-col") !== "__ips_status") return;
+        var tr = btn.closest("tr");
+        if (!tr || !tr._gcNetRow) return;
+        var row = tr._gcNetRow;
+        if (!row.ips_known || row.config_entry_id == null) return;
+        var currentlyOn = !!row.ips_enabled;
+        var nextOn = !currentlyOn;
+        var verb = nextOn ? "enable" : "disable";
+        var fwLabel = (row.cells && row.cells.__name) || "this firewall";
+        if (
+          !window.confirm(
+            "Add a task to the queue to " +
+              verb +
+              " IPS on " +
+              fwLabel +
+              "? The firewall is updated when the task is sent from the queue.",
+          )
+        ) {
+          return;
+        }
+        btn.disabled = true;
+        enqueueIpsSwitchItems([
+          {
+            config_entry_id: row.config_entry_id,
+            status: nextOn ? "Enable" : "Disable",
+          },
+        ])
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.error)) || "Request failed.";
+              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            var n = (x.j && x.j.count) || 0;
+            if (n < 1) {
+              bannerResult(
+                true,
+                "Nothing queued — the cached IPS state already matches the requested setting.",
+              );
+            } else {
+              bannerResult(true, "Added 1 task to the queue.");
+              dispatchTaskQueueUpdated();
+            }
+          })
+          .catch(function () {
+            btn.disabled = false;
+            bannerResult(false, "Network error.");
+          });
+      });
+    }
+
+    function runBulkIpsSwitch(enableTargets) {
+      var tbody = document.getElementById("gc-ips-cfg-tbody");
+      if (!tbody) return;
+      var items = [];
+      tbody.querySelectorAll("tr.gc-ips-cfg-data-row input.gc-hs-row-select:checked").forEach(function (cb) {
+        var tr = cb.closest("tr");
+        if (!tr || tr.hidden || !tr._gcNetRow) return;
+        var r = tr._gcNetRow;
+        if (!r.ips_known || r.config_entry_id == null) return;
+        if (enableTargets && !r.ips_enabled) {
+          items.push({ config_entry_id: r.config_entry_id, status: "Enable" });
+        }
+        if (!enableTargets && r.ips_enabled) {
+          items.push({ config_entry_id: r.config_entry_id, status: "Disable" });
+        }
+      });
+      if (!items.length) return;
+      var verb = enableTargets ? "enable" : "disable";
+      if (
+        !window.confirm(
+          "Add " +
+            items.length +
+            " task" +
+            (items.length === 1 ? "" : "s") +
+            " to the queue to " +
+            verb +
+            " IPS on the selected firewalls? Firewalls are updated when tasks are sent from the queue.",
+        )
+      ) {
+        return;
+      }
+      var btn = enableTargets ? enableBulkBtn : disableBulkBtn;
+      if (btn) btn.disabled = true;
+      enqueueIpsSwitchItems(items)
+        .then(function (x) {
+          if (btn) btn.disabled = false;
+          if (!x.ok) {
+            var em = (x.j && (x.j.detail || x.j.error)) || "Request failed.";
+            bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+            return;
+          }
+          var n = (x.j && x.j.count) || 0;
+          if (n < 1) {
+            bannerResult(
+              true,
+              "Nothing queued — selected firewalls already match the requested IPS state in the cache.",
+            );
+          } else {
+            bannerResult(
+              true,
+              n === 1 ? "Added 1 task to the queue." : "Added " + n + " tasks to the queue.",
+            );
+            dispatchTaskQueueUpdated();
+          }
+          syncIpsBulkToolbar();
+        })
+        .catch(function () {
+          if (btn) btn.disabled = false;
+          bannerResult(false, "Network error.");
+        });
+    }
+
+    if (enableBulkBtn) {
+      enableBulkBtn.addEventListener("click", function () {
+        runBulkIpsSwitch(true);
+      });
+    }
+    if (disableBulkBtn) {
+      disableBulkBtn.addEventListener("click", function () {
+        runBulkIpsSwitch(false);
+      });
+    }
+
+    var tableIps = gcCreateNetworkEntityTable({
+      prefix: "gc-ips-cfg",
+      apiUrl: URL_IPS_SWITCH,
+      pageSyncFallbackEntities: ["ips_switch"],
+      lsKey: "ground-control-ips-cfg-columns-v4",
+      dataRowClass: "gc-ips-cfg-data-row",
+      colPickerAttr: "data-gc-ips-cfg-col",
+      pageSyncExtraEntities: ["dos_settings", "spoof_prevention"],
+      bulkRowSelect: true,
+      rowPayloadOnly: true,
+      interactiveBoolColIds: ["__ips_status"],
+      actionButtonColIds: ["__dos_configure", "__spoof_configure"],
+      actionButtonPrimary: true,
+      actionButtonPreToggleByCol: {
+        __spoof_configure: {
+          rowKey: "spoof_prevention_enabled",
+          toggleTitle: "Toggle spoof prevention for this firewall",
+        },
+      },
+      interactiveBoolTitle: "Click to toggle status",
+      bulkSelectDisableRow: function (row) {
+        return !row.ips_known;
+      },
+      bulkSelectDisableHint:
+        "IPS status is unknown until you sync IPS configuration (IPS switch, DoS, spoof prevention) from Inventory for this firewall.",
+      onBulkSelectionChange: syncIpsBulkToolbar,
+      labels: {
+        countSingular: "firewall",
+        countPlural: "firewalls",
+        emptyCache:
+          "No firewalls selected, or none match the current filter. Select firewalls in the top bar and sync IPS configuration (IPS switch, DoS, spoof prevention) from Inventory to see status.",
+        emptyFilter: "No rows match the current search or filters.",
+        loadError: "Could not load IPS configuration.",
+      },
+    });
+
+    var tablePol = gcCreateNetworkEntityTable({
+      prefix: "gc-ips-pol",
+      apiUrl: URL_IPS_POLICY,
+      pageSyncFallbackEntities: ["ips_policy"],
+      lsKey: "ground-control-ips-pol-columns-v3",
+      dataRowClass: "gc-ips-pol-data-row",
+      colPickerAttr: "data-gc-ips-pol-col",
+      bulkRowSelect: true,
+      bulkSelectCheckedByDefault: true,
+      rowClickable: true,
+      rowAriaEntitySingular: "IPS policy",
+      combineQuery: { param: "combine" },
+      combineSyncSelected: {
+        strategy: "ips_policy_create",
+        createUrl: window.GC_IPS_POLICY_CREATE_URL,
+      },
+      onRowClick: function (tr) {
+        if (window.gcIpsPolicyFlyoutOpenFromTr) window.gcIpsPolicyFlyoutOpenFromTr(tr);
+      },
+      labels: {
+        countSingular: "policy",
+        countPlural: "policies",
+        emptyCache:
+          "No IPS policies in the cache for the selected firewalls. Sync IPS policies from Inventory.",
+        emptyFilter: "No rows match the current search or filters.",
+        loadError: "Could not load IPS policies.",
+      },
+      afterRenderFromApi: function (data) {
+        lastIpsPolPayload = data;
+        updateIpsPolCombineChrome(data);
+      },
+    });
+
+    var tableSig = gcCreateNetworkEntityTable({
+      prefix: "gc-ips-sig",
+      apiUrl: URL_IPS_CUSTOM_SIG,
+      pageSyncFallbackEntities: ["ips_custom_signature"],
+      lsKey: "ground-control-ips-sig-columns-v2",
+      dataRowClass: "gc-ips-sig-data-row",
+      colPickerAttr: "data-gc-ips-sig-col",
+      bulkRowSelect: true,
+      rowClickable: true,
+      rowAriaEntitySingular: "custom IPS signature",
+      combineQuery: { param: "combine" },
+      combineSyncSelected: {
+        strategy: "ips_custom_sig_batch",
+        createBatchUrl: window.GC_IPS_CUSTOM_SIGNATURE_CREATE_BATCH_URL,
+      },
+      onRowClick: function (tr) {
+        if (window.gcIpsCustomSignatureFlyoutOpenFromTr) window.gcIpsCustomSignatureFlyoutOpenFromTr(tr);
+      },
+      labels: {
+        countSingular: "signature",
+        countPlural: "signatures",
+        emptyCache:
+          "No custom signatures in the cache for the selected firewalls. Sync IPS custom signatures from Inventory.",
+        emptyFilter: "No rows match the current search or filters.",
+        loadError: "Could not load custom signatures.",
+      },
+      afterRenderFromApi: function (data) {
+        lastIpsSigPayload = data;
+        updateIpsSigCombineChrome(data);
+      },
+    });
+
+    var tableTmac = gcCreateNetworkEntityTable({
+      prefix: "gc-ips-tmac",
+      apiUrl: URL_IPS_TRUSTED_MAC,
+      pageSyncFallbackEntities: ["trusted_mac"],
+      lsKey: "ground-control-ips-tmac-columns-v2",
+      dataRowClass: "gc-ips-tmac-data-row",
+      colPickerAttr: "data-gc-ips-tmac-col",
+      bulkRowSelect: true,
+      rowClickable: true,
+      rowAriaEntitySingular: "trusted MAC entry",
+      combineQuery: { param: "combine" },
+      combineSyncSelected: {
+        strategy: "ips_trusted_mac_batch",
+        createBatchUrl: window.GC_IPS_TRUSTED_MAC_CREATE_BATCH_URL,
+      },
+      onRowClick: function (tr) {
+        if (window.gcIpsTrustedMacFlyoutOpenFromTr) window.gcIpsTrustedMacFlyoutOpenFromTr(tr);
+      },
+      labels: {
+        countSingular: "entry",
+        countPlural: "entries",
+        emptyCache:
+          "No trusted MAC entries in the cache for the selected firewalls. Sync trusted MAC from Inventory.",
+        emptyFilter: "No rows match the current search or filters.",
+        loadError: "Could not load trusted MAC list.",
+      },
+      afterRenderFromApi: function (data) {
+        lastIpsTmacPayload = data;
+        updateIpsTmacCombineChrome(data);
+      },
+    });
+
+    (function bindIpsCombineToggles() {
+      var polCombineInp = document.getElementById("gc-ips-pol-combine");
+      if (polCombineInp) {
+        polCombineInp.addEventListener("change", function () {
+          try {
+            localStorage.setItem(IPS_POL_COMBINE_LS, polCombineInp.checked ? "1" : "0");
+          } catch (e) {}
+          if (tablePol && tablePol.refresh) tablePol.refresh();
+        });
+        polCombineInp.addEventListener("pointerdown", function (e) {
+          var d = lastIpsPolPayload;
+          var conflicts = !!(d && d.ips_policy_combine_conflicts);
+          if (!d || !conflicts || !polCombineInp.checked) return;
+          if (e.shiftKey) return;
+          var pt = e.pointerType;
+          if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
+          if (pt === "mouse" && e.button !== 0) return;
+          e.preventDefault();
+          openIpsCombineModal("pol");
+        });
+      }
+      var sigCombineInp = document.getElementById("gc-ips-sig-combine");
+      if (sigCombineInp) {
+        sigCombineInp.addEventListener("change", function () {
+          try {
+            localStorage.setItem(IPS_SIG_COMBINE_LS, sigCombineInp.checked ? "1" : "0");
+          } catch (e) {}
+          if (tableSig && tableSig.refresh) tableSig.refresh();
+        });
+        sigCombineInp.addEventListener("pointerdown", function (e) {
+          var d = lastIpsSigPayload;
+          var conflicts = !!(d && d.ips_custom_sig_combine_conflicts);
+          if (!d || !conflicts || !sigCombineInp.checked) return;
+          if (e.shiftKey) return;
+          var pt = e.pointerType;
+          if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
+          if (pt === "mouse" && e.button !== 0) return;
+          e.preventDefault();
+          openIpsCombineModal("sig");
+        });
+      }
+      var tmacCombineInp = document.getElementById("gc-ips-tmac-combine");
+      if (tmacCombineInp) {
+        tmacCombineInp.addEventListener("change", function () {
+          try {
+            localStorage.setItem(IPS_TMAC_COMBINE_LS, tmacCombineInp.checked ? "1" : "0");
+          } catch (e) {}
+          if (tableTmac && tableTmac.refresh) tableTmac.refresh();
+        });
+        tmacCombineInp.addEventListener("pointerdown", function (e) {
+          var d = lastIpsTmacPayload;
+          var conflicts = !!(d && d.ips_trusted_mac_combine_conflicts);
+          if (!d || !conflicts || !tmacCombineInp.checked) return;
+          if (e.shiftKey) return;
+          var pt = e.pointerType;
+          if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
+          if (pt === "mouse" && e.button !== 0) return;
+          e.preventDefault();
+          openIpsCombineModal("tmac");
+        });
+      }
+    })();
+
+    (function bindIpsPolicyDeleteSelected() {
+      var btn = document.getElementById("gc-ips-pol-delete-selected");
+      if (!btn || !tablePol) return;
+      btn.addEventListener("click", function () {
+        if (typeof tablePol.getDeleteConfigEntryIdsFromSelection !== "function") return;
+        var ids = tablePol.getDeleteConfigEntryIdsFromSelection();
+        if (!ids.length) {
+          bannerResult(false, "Select one or more policies to delete.");
+          return;
+        }
+        if (
+          !window.confirm(
+            "Queue deletion of " +
+              ids.length +
+              " IPS polic" +
+              (ids.length === 1 ? "y" : "ies") +
+              " on the firewall(s)? Policies are removed when the tasks are sent from the queue.",
+          )
+        ) {
+          return;
+        }
+        if (!ENQUEUE_IPS_POLICY_DELETES) {
+          bannerResult(false, "Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(ENQUEUE_IPS_POLICY_DELETES, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            var n = (x.j && x.j.count) || 0;
+            bannerResult(
+              true,
+              n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
+            );
+            dispatchTaskQueueUpdated();
+            if (tablePol.refresh) tablePol.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            bannerResult(false, "Network error.");
+          });
+      });
+    })();
+
+    (function bindIpsTrustedMacDeleteSelected() {
+      var btn = document.getElementById("gc-ips-tmac-delete-selected");
+      if (!btn || !tableTmac) return;
+      btn.addEventListener("click", function () {
+        if (typeof tableTmac.getDeleteConfigEntryIdsFromSelection !== "function") return;
+        var ids = tableTmac.getDeleteConfigEntryIdsFromSelection();
+        if (!ids.length) {
+          bannerResult(false, "Select one or more trusted MAC entries to delete.");
+          return;
+        }
+        if (
+          !window.confirm(
+            "Queue deletion of " +
+              ids.length +
+              " trusted MAC entr" +
+              (ids.length === 1 ? "y" : "ies") +
+              " on the firewall(s)? Entries are removed when the tasks are sent from the queue.",
+          )
+        ) {
+          return;
+        }
+        if (!ENQUEUE_IPS_TRUSTED_MAC_DELETES) {
+          bannerResult(false, "Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(ENQUEUE_IPS_TRUSTED_MAC_DELETES, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            var n = (x.j && x.j.count) || 0;
+            bannerResult(
+              true,
+              n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
+            );
+            dispatchTaskQueueUpdated();
+            if (tableTmac.refresh) tableTmac.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            bannerResult(false, "Network error.");
+          });
+      });
+    })();
+
+    (function bindIpsCustomSignatureDeleteSelected() {
+      var btn = document.getElementById("gc-ips-sig-delete-selected");
+      if (!btn || !tableSig) return;
+      btn.addEventListener("click", function () {
+        if (typeof tableSig.getDeleteConfigEntryIdsFromSelection !== "function") return;
+        var ids = tableSig.getDeleteConfigEntryIdsFromSelection();
+        if (!ids.length) {
+          bannerResult(false, "Select one or more custom signatures to delete.");
+          return;
+        }
+        if (
+          !window.confirm(
+            "Queue deletion of " +
+              ids.length +
+              " custom IPS signature" +
+              (ids.length === 1 ? "" : "s") +
+              " on the firewall(s)? Objects are removed when the tasks are sent from the queue.",
+          )
+        ) {
+          return;
+        }
+        if (!ENQUEUE_IPS_CUSTOM_SIG_DELETES) {
+          bannerResult(false, "Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(ENQUEUE_IPS_CUSTOM_SIG_DELETES, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            var n = (x.j && x.j.count) || 0;
+            bannerResult(
+              true,
+              n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
+            );
+            dispatchTaskQueueUpdated();
+            if (tableSig.refresh) tableSig.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            bannerResult(false, "Network error.");
+          });
+      });
+    })();
+
+    var addPolBtn = document.getElementById("gc-ips-pol-add");
+    if (addPolBtn) {
+      addPolBtn.addEventListener("click", function () {
+        if (window.gcIpsPolicyFlyoutOpenCreate) window.gcIpsPolicyFlyoutOpenCreate();
+      });
+    }
+
+    var addSigBtn = document.getElementById("gc-ips-sig-add");
+    if (addSigBtn) {
+      addSigBtn.addEventListener("click", function () {
+        if (window.gcIpsCustomSignatureFlyoutOpenCreate) window.gcIpsCustomSignatureFlyoutOpenCreate();
+      });
+    }
+
+    var addTmacBtn = document.getElementById("gc-ips-tmac-add");
+    if (addTmacBtn) {
+      addTmacBtn.addEventListener("click", function () {
+        if (window.gcIpsTrustedMacFlyoutOpenCreate) window.gcIpsTrustedMacFlyoutOpenCreate();
+      });
+    }
+
+    if (tableIps && tableIps.refresh) tableIps.refresh();
+    if (tablePol && tablePol.refresh) tablePol.refresh();
+    if (tableSig && tableSig.refresh) tableSig.refresh();
+    if (tableTmac && tableTmac.refresh) tableTmac.refresh();
+
+    syncMainTabButtons();
+    applyMainTabPanels();
+    syncFilterAsidesVisibility();
+    if (activeMainTab === "policy") refreshIpsPolicyTable();
+    if (activeMainTab === "signatures") refreshIpsCustomSignatureTable();
+    if (activeMainTab === "trusted_mac") refreshIpsTrustedMacTable();
+
+    if (window.gcIpsPolicyFlyoutInit) window.gcIpsPolicyFlyoutInit();
+    if (window.gcIpsCustomSignatureFlyoutInit) window.gcIpsCustomSignatureFlyoutInit();
+    if (window.gcIpsTrustedMacFlyoutInit) window.gcIpsTrustedMacFlyoutInit();
+    if (window.gcIpsDosSpoofFlyoutsInit) window.gcIpsDosSpoofFlyoutsInit();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,210 @@
+{# DoS + Spoof protection flyouts for IPS · Configure (per-firewall row). UI aligned with mocks/DoS Settings.png and mocks/Spoof Protection settings.png #}
+<div id="gc-ips-dos-flyout" class="gc-if-flyout gc-ips-dos-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-ips-dos-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ips-dos-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <form id="gc-ips-dos-form" class="gc-if-flyout__panel-form" novalidate>
+      <header class="gc-if-flyout__header">
+        <h2 id="gc-ips-dos-flyout-title" class="gc-if-flyout__title">DoS settings</h2>
+        <p id="gc-ips-dos-flyout-fw" class="gc-ips-cfg-flyout__fw muted"></p>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div class="gc-ips-dos-tables-stack">
+            <div class="gc-ips-dos-table-block">
+              <p class="gc-if-flyout__section-label">Source</p>
+              <div class="gc-ips-dos-table-wrap">
+                <table class="gc-ips-dos-table" aria-label="DoS source limits">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="gc-ips-dos-table__attack">Attack type</th>
+                      <th scope="col" class="gc-ips-dos-table__num">Packet rate<br /><span class="gc-ips-dos-table__sub">(Packet/min)</span></th>
+                      <th scope="col" class="gc-ips-dos-table__num">Burst rate<br /><span class="gc-ips-dos-table__sub">(Packet/sec)</span></th>
+                      <th scope="col">Apply</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">SYN flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-syn-src-pkt" min="0" value="12000" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-syn-src-burst" min="0" value="100" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-syn-src-apply" aria-label="Apply SYN flood source protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">UDP flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-udp-src-pkt" min="0" value="" placeholder="—" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-udp-src-burst" min="0" value="" placeholder="—" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-udp-src-apply" aria-label="Apply UDP flood source protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">TCP flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-tcp-src-pkt" min="0" value="" placeholder="—" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-tcp-src-burst" min="0" value="" placeholder="—" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-tcp-src-apply" aria-label="Apply TCP flood source protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">ICMP/ICMPv6 flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-icmp-src-pkt" min="0" value="" placeholder="—" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-icmp-src-burst" min="0" value="" placeholder="—" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-icmp-src-apply" aria-label="Apply ICMP flood source protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Dropped source routed packets</th>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-srcrt-apply" checked aria-label="Apply dropped source routed packets" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Disable ICMP/ICMPv6 redirect packet</th>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-redirect-apply" checked aria-label="Disable ICMP redirect (source)" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">ARP hardening</th>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-arp-apply" checked aria-label="ARP hardening" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="gc-ips-dos-table-block">
+              <p class="gc-if-flyout__section-label">Destination</p>
+              <div class="gc-ips-dos-table-wrap">
+                <table class="gc-ips-dos-table" aria-label="DoS destination limits">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="gc-ips-dos-table__attack">Attack type</th>
+                      <th scope="col" class="gc-ips-dos-table__num">Packet rate<br /><span class="gc-ips-dos-table__sub">(Packet/min)</span></th>
+                      <th scope="col" class="gc-ips-dos-table__num">Burst rate<br /><span class="gc-ips-dos-table__sub">(Packet/sec)</span></th>
+                      <th scope="col">Apply</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">SYN flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-syn-dst-pkt" min="0" value="18000" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-syn-dst-burst" min="0" value="120" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-syn-dst-apply" aria-label="Apply SYN flood destination protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">UDP flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-udp-dst-pkt" min="0" value="" placeholder="—" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-udp-dst-burst" min="0" value="" placeholder="—" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-udp-dst-apply" aria-label="Apply UDP flood destination protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">TCP flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-tcp-dst-pkt" min="0" value="" placeholder="—" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-tcp-dst-burst" min="0" value="" placeholder="—" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-tcp-dst-apply" aria-label="Apply TCP flood destination protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">ICMP/ICMPv6 flood</th>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-icmp-dst-pkt" min="0" value="" placeholder="—" /></td>
+                      <td><input type="number" class="gc-if-flyout__input gc-ips-dos-table__inp" id="gc-ips-dos-icmp-dst-burst" min="0" value="" placeholder="—" /></td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-icmp-dst-apply" aria-label="Apply ICMP flood destination protection" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Dropped source routed packets</th>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-srcrt-dst-apply" aria-label="Apply destination side for source routed packets" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Disable ICMP/ICMPv6 redirect packet</th>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-redirect-dst-apply" checked aria-label="Disable ICMP redirect (destination)" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">ARP hardening</th>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="muted gc-ips-dos-table__na">—</td>
+                      <td class="gc-ips-dos-table__chk"><input type="checkbox" id="gc-ips-dos-arp-dst-apply" aria-label="ARP hardening destination" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-ips-dos-apply">Apply</button>
+        <button type="button" class="link-btn" id="gc-ips-dos-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div id="gc-ips-spoof-flyout" class="gc-if-flyout gc-ips-spoof-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-ips-spoof-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ips-spoof-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <form id="gc-ips-spoof-form" class="gc-if-flyout__panel-form" novalidate>
+      <header class="gc-if-flyout__header">
+        <h2 id="gc-ips-spoof-flyout-title" class="gc-if-flyout__title">Spoof protection general settings</h2>
+        <p id="gc-ips-spoof-flyout-fw" class="gc-ips-cfg-flyout__fw muted"></p>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-ips-spoof-enable" />
+              <span>Enable spoof prevention</span>
+            </label>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__check-label gc-ips-spoof-flyout__restrict-label" id="gc-ips-spoof-restrict-mac-label">
+              <input type="checkbox" id="gc-ips-spoof-restrict-mac" disabled />
+              <span>Restrict unknown IP on trusted MAC</span>
+            </label>
+          </div>
+          <p class="gc-ips-spoof-warn" id="gc-ips-spoof-mac-hint">
+            You need to add at least one MAC entry in the &quot;Trusted MAC&quot; list to enable MAC filtering.
+          </p>
+          <table class="gc-ips-spoof-zones-table">
+            <thead>
+              <tr>
+                <th scope="col">Zone</th>
+                <th scope="col">IP spoofing</th>
+                <th scope="col">MAC filter</th>
+                <th scope="col">IP–MAC pair filter</th>
+              </tr>
+            </thead>
+            <tbody id="gc-ips-spoof-zones-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-ips-spoof-apply">Apply</button>
+        <button type="button" class="link-btn" id="gc-ips-spoof-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

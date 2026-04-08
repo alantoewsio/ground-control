@@ -1,0 +1,1391 @@
+<script>
+  (function () {
+    var GC_DELETE_BATCH_URL = {{ url_configuration_delete_batch | tojson }};
+    var GC_APPLY_TO_FIREWALLS_BATCH_URL = {{ url_api_configurations_apply_to_firewalls_batch | tojson }};
+    var GC_APPLY_CFG_TO_MEMBERS_URL_TEMPLATE = {{ url_api_configuration_apply_to_member_firewalls_template | tojson }};
+    var GC_CONFIG_STATUS_SUMMARY_URL = {{ url_api_configurations_status_summary | tojson }};
+    var COLS = [
+      { id: "name", label: "Name" },
+      { id: "description", label: "Description" },
+      { id: "clone_source", label: "Cloned from" },
+      { id: "members", label: "Members" },
+      { id: "items", label: "Items" },
+      { id: "status", label: "Status" },
+    ];
+    var LS_KEY = "ground-control-cfg-columns-v1";
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function escapeAttr(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;");
+    }
+
+    function tagKey(s) {
+      return String(s || "").trim().toLowerCase();
+    }
+
+    function parseMemberJsonString(raw) {
+      var tags = [];
+      var ids = [];
+      try {
+        var data = JSON.parse(raw || "{}");
+        if (Array.isArray(data)) {
+          data.forEach(function (x) {
+            var n = parseInt(String(x), 10);
+            if (!isNaN(n) && n > 0) ids.push(n);
+          });
+        } else if (data && typeof data === "object") {
+          var t = data.tags;
+          if (Array.isArray(t)) {
+            t.forEach(function (x) {
+              var s = String(x || "").trim();
+              if (s) tags.push(s);
+            });
+          }
+          var f = data.firewall_ids != null ? data.firewall_ids : data.firewallIds;
+          if (Array.isArray(f)) {
+            f.forEach(function (x) {
+              var n2 = parseInt(String(x), 10);
+              if (!isNaN(n2) && n2 > 0) ids.push(n2);
+            });
+          }
+        }
+      } catch (e) {
+        return { tags: [], firewall_ids: [] };
+      }
+      ids = ids.filter(function (n, i, a) { return a.indexOf(n) === i; });
+      return { tags: tags, firewall_ids: ids };
+    }
+
+    function computeEffectiveIds(fws, selectedFwIds, selectedTags) {
+      var set = {};
+      var tagWant = {};
+      (selectedTags || []).forEach(function (t) {
+        var k = tagKey(t);
+        if (k) tagWant[k] = true;
+      });
+      (selectedFwIds || []).forEach(function (id) {
+        var n = parseInt(String(id), 10);
+        if (!isNaN(n) && n > 0) set[String(n)] = true;
+      });
+      (fws || []).forEach(function (fw) {
+        if (!fw || fw.id == null) return;
+        var tags = Array.isArray(fw.tags) ? fw.tags : [];
+        for (var i = 0; i < tags.length; i++) {
+          if (tagWant[tagKey(tags[i])]) {
+            var n = parseInt(String(fw.id), 10);
+            if (!isNaN(n) && n > 0) set[String(n)] = true;
+            break;
+          }
+        }
+      });
+      return Object.keys(set).map(function (k) { return parseInt(k, 10); }).filter(function (n) { return !isNaN(n); });
+    }
+
+    function loadColVis() {
+      var d = {};
+      COLS.forEach(function (c) {
+        d[c.id] = true;
+      });
+      try {
+        var raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+          var o = JSON.parse(raw);
+          if (o && typeof o === "object") {
+            COLS.forEach(function (c) {
+              if (Object.prototype.hasOwnProperty.call(o, c.id)) d[c.id] = !!o[c.id];
+            });
+          }
+        }
+      } catch (e) {}
+      var visible = 0;
+      COLS.forEach(function (c) {
+        if (d[c.id]) visible++;
+      });
+      if (visible < 1 && COLS.length) d[COLS[0].id] = true;
+      return d;
+    }
+
+    function persistColVis(vis) {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(vis));
+      } catch (e) {}
+    }
+
+    function applyColVis(vis) {
+      var table = document.getElementById("gc-cfg-table");
+      if (!table) return;
+      COLS.forEach(function (c) {
+        var on = !!vis[c.id];
+        table.querySelectorAll('[data-gc-col="' + c.id + '"]').forEach(function (el) {
+          el.classList.toggle("gc-col-hidden", !on);
+        });
+      });
+    }
+
+    function syncFilterEmptyColspan() {
+      var table = document.getElementById("gc-cfg-table");
+      var cell = document.querySelector("#gc-cfg-filter-empty td");
+      var ph = document.querySelector(".gc-cfg-placeholder-row td");
+      if (!table) return;
+      var n = table.querySelectorAll("thead th").length;
+      if (cell) cell.setAttribute("colspan", String(n));
+      if (ph) ph.setAttribute("colspan", String(n));
+    }
+
+    var colVis = loadColVis();
+    applyColVis(colVis);
+    syncFilterEmptyColspan();
+
+    var filtersDrawerEl = document.getElementById("gc-cfg-filters-drawer");
+
+    function configurationRowFacetMap(tr) {
+      return {
+        name: (tr.getAttribute("data-cfg-name") || "").trim(),
+        description: (tr.getAttribute("data-cfg-description") || "").trim(),
+        clone_source: (tr.getAttribute("data-cfg-clone-source-search") || "").trim(),
+        members: (tr.getAttribute("data-cfg-members-search") || "").trim(),
+        items: (tr.getAttribute("data-cfg-items-search") || "").trim(),
+        status: (tr.getAttribute("data-cfg-status-search") || "").trim(),
+      };
+    }
+
+    function rebuildConfigurationFacets(done) {
+      if (!filtersDrawerEl || !window.gcTableFacets) {
+        if (typeof done === "function") done();
+        return;
+      }
+      var rowEls = Array.prototype.slice.call(document.querySelectorAll("#gc-cfg-tbody tr.gc-cfg-data-row"));
+      var maps = rowEls.map(configurationRowFacetMap);
+      function finish() {
+        window.gcTableFacets.rebuild(filtersDrawerEl, COLS, maps, "gc-cfg");
+        if (typeof done === "function") done();
+      }
+      var lazy = window.gcTableLazy;
+      if (!lazy || typeof lazy.forEachChunked !== "function" || rowEls.length <= lazy.DEFAULT_THRESHOLD) {
+        rowEls.forEach(function (tr, i) {
+          window.gcTableFacets.setRowFacets(tr, maps[i]);
+        });
+        finish();
+        return;
+      }
+      lazy.forEachChunked(
+        rowEls,
+        lazy.DEFAULT_CHUNK,
+        function (tr, i) {
+          window.gcTableFacets.setRowFacets(tr, maps[i]);
+        },
+        finish,
+      );
+    }
+
+    function updateFacetChrome() {
+      var n = filtersDrawerEl && window.gcTableFacets ? window.gcTableFacets.appliedCount(filtersDrawerEl) : 0;
+      var head = document.getElementById("gc-cfg-facet-head-actions");
+      var countEl = document.getElementById("gc-cfg-facet-count");
+      var resetBtn = document.getElementById("gc-cfg-facet-reset");
+      if (!head || !countEl || !resetBtn) return;
+      if (n > 0) {
+        head.hidden = false;
+        countEl.innerHTML = '<span class="filters__facet-count-num">' + n + "</span> applied";
+        resetBtn.hidden = false;
+      } else {
+        head.hidden = true;
+        countEl.textContent = "";
+        resetBtn.hidden = true;
+      }
+    }
+
+    function rowMatchesFacets(tr) {
+      if (!tr.classList.contains("gc-cfg-data-row")) return true;
+      if (!filtersDrawerEl || !window.gcTableFacets) return true;
+      return window.gcTableFacets.rowMatches(tr, filtersDrawerEl);
+    }
+
+    function rowMatchesSearch(tr, q) {
+      if (!q) return true;
+      if (!tr.classList.contains("gc-cfg-data-row")) return true;
+      var s = tr.getAttribute("data-search") || "";
+      return s.indexOf(q) !== -1;
+    }
+
+    function visibleDataRows() {
+      return Array.prototype.filter.call(document.querySelectorAll("#gc-cfg-tbody tr.gc-cfg-data-row"), function (tr) {
+        return !tr.hidden;
+      });
+    }
+
+    function getSelectedIds() {
+      var ids = [];
+      document.querySelectorAll(".gc-cfg-row-select:checked").forEach(function (cb) {
+        var id = parseInt(cb.value, 10);
+        if (!isNaN(id)) ids.push(id);
+      });
+      return ids;
+    }
+
+    function updateSelectionChrome() {
+      var n = getSelectedIds().length;
+      var delBtn = document.getElementById("gc-cfg-delete-selected");
+      var applyBtn = document.getElementById("gc-cfg-apply-selected-firewalls");
+      if (delBtn) delBtn.disabled = n < 1;
+      if (applyBtn) applyBtn.disabled = n < 1;
+      var all = document.getElementById("gc-cfg-select-all");
+      if (!all) return;
+      var vis = visibleDataRows();
+      var visChecked = vis.filter(function (tr) {
+        return tr.querySelector(".gc-cfg-row-select") && tr.querySelector(".gc-cfg-row-select").checked;
+      }).length;
+      if (vis.length === 0) {
+        all.checked = false;
+        all.indeterminate = false;
+      } else if (visChecked === 0) {
+        all.checked = false;
+        all.indeterminate = false;
+      } else if (visChecked === vis.length) {
+        all.checked = true;
+        all.indeterminate = false;
+      } else {
+        all.checked = false;
+        all.indeterminate = true;
+      }
+    }
+
+    function applyRowFilter() {
+      var q = (document.getElementById("gc-cfg-search") && document.getElementById("gc-cfg-search").value || "")
+        .trim()
+        .toLowerCase();
+      var rows = document.querySelectorAll("#gc-cfg-tbody tr.gc-cfg-data-row");
+      var place = document.querySelector("#gc-cfg-tbody tr.gc-cfg-placeholder-row");
+      var emptyFilter = document.getElementById("gc-cfg-filter-empty");
+      var visible = 0;
+      var totalData = rows.length;
+      rows.forEach(function (tr) {
+        var ok = rowMatchesFacets(tr) && rowMatchesSearch(tr, q);
+        tr.hidden = !ok;
+        if (ok) visible++;
+      });
+      if (place) place.hidden = totalData > 0;
+      if (emptyFilter) {
+        emptyFilter.hidden = !(totalData > 0 && visible === 0);
+        syncFilterEmptyColspan();
+      }
+      var countEl = document.getElementById("gc-cfg-count");
+      if (countEl) {
+        if (totalData === 0) {
+          countEl.textContent = "";
+        } else if (visible === totalData) {
+          countEl.textContent = visible === 1 ? "1 configuration" : visible + " configurations";
+        } else {
+          countEl.textContent = "Showing " + visible + " of " + totalData + " configurations";
+        }
+      }
+      updateSelectionChrome();
+    }
+
+    function configRowEls() {
+      return Array.prototype.slice.call(document.querySelectorAll("#gc-cfg-tbody tr.gc-cfg-data-row"));
+    }
+
+    function setRowStatusCell(tr, text, searchText) {
+      if (!tr) return;
+      var td = tr.querySelector('[data-cfg-status-cell="1"]');
+      if (td) td.textContent = text || "—";
+      tr.setAttribute("data-cfg-status-search", String(searchText || "").toLowerCase());
+    }
+
+    function statusCellSummary(assigned, outOfSync) {
+      var a = parseInt(assigned, 10);
+      var o = parseInt(outOfSync, 10);
+      if (isNaN(a) || a < 0) a = 0;
+      if (isNaN(o) || o < 0) o = 0;
+      if (o > a) o = a;
+      return {
+        text:
+          a +
+          " assigned, " +
+          o +
+          " out-of-sync",
+        search:
+          a +
+          " assigned " +
+          o +
+          " out-of-sync",
+      };
+    }
+
+    function refreshConfigurationStatusSummary() {
+      if (!GC_CONFIG_STATUS_SUMMARY_URL) return;
+      var rows = configRowEls();
+      if (!rows.length) return;
+      var ids = [];
+      rows.forEach(function (tr) {
+        var n = parseInt(tr.getAttribute("data-cfg-id") || "", 10);
+        if (!isNaN(n) && n > 0) ids.push(n);
+      });
+      ids = ids.filter(function (n, i, a) { return a.indexOf(n) === i; });
+      if (!ids.length) return;
+      var url = GC_CONFIG_STATUS_SUMMARY_URL + "?configuration_ids=" + encodeURIComponent(ids.join(","));
+      fetch(url, {
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, body: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok) return;
+          var byId = (res.body && res.body.by_configuration_id) || {};
+          rows.forEach(function (tr) {
+            var n = parseInt(tr.getAttribute("data-cfg-id") || "", 10);
+            if (isNaN(n) || n <= 0) return;
+            var row = byId[String(n)] || byId[n];
+            if (!row || typeof row !== "object") {
+              setRowStatusCell(tr, "—", "");
+              return;
+            }
+            var s = statusCellSummary(row.assigned_firewalls, row.out_of_sync_firewalls);
+            setRowStatusCell(tr, s.text, s.search);
+          });
+          rebuildConfigurationFacets(function () {
+            applyRowFilter();
+            updateFacetChrome();
+          });
+        })
+        .catch(function () {
+          // Keep whatever values are currently rendered when status refresh fails.
+        });
+    }
+
+    function setFiltersAsideCollapsed(collapsed) {
+      var aside = document.getElementById("gc-cfg-filters-aside");
+      var drawer = document.getElementById("gc-cfg-filters-drawer");
+      var btn = document.getElementById("gc-cfg-filters-toggle");
+      if (!aside || !drawer || !btn) return;
+      aside.classList.toggle("filters--collapsed", collapsed);
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      if (collapsed) drawer.setAttribute("hidden", "");
+      else drawer.removeAttribute("hidden");
+    }
+
+    document.getElementById("gc-cfg-filters-toggle") &&
+      document.getElementById("gc-cfg-filters-toggle").addEventListener("click", function () {
+        var aside = document.getElementById("gc-cfg-filters-aside");
+        var collapsed = aside && aside.classList.contains("filters--collapsed");
+        setFiltersAsideCollapsed(!collapsed);
+      });
+
+    document.getElementById("gc-cfg-facet-reset") &&
+      document.getElementById("gc-cfg-facet-reset").addEventListener("click", function () {
+        if (filtersDrawerEl && window.gcTableFacets) window.gcTableFacets.reset(filtersDrawerEl, "gc-cfg");
+        updateFacetChrome();
+        applyRowFilter();
+      });
+
+    var filtersAsideEl = document.getElementById("gc-cfg-filters-aside");
+    if (filtersAsideEl && window.gcTableFacets) {
+      window.gcTableFacets.bindAside(
+        filtersAsideEl,
+        function () {
+          updateFacetChrome();
+          applyRowFilter();
+        },
+        "gc-cfg",
+      );
+    }
+
+    var searchIn = document.getElementById("gc-cfg-search");
+    if (searchIn) {
+      if (window.gcTableFacets && window.gcTableFacets.bindToolbarSearch) {
+        window.gcTableFacets.bindToolbarSearch(searchIn, "gc-cfg", applyRowFilter);
+      } else {
+        searchIn.addEventListener("input", applyRowFilter);
+      }
+    }
+
+    document.getElementById("gc-cfg-select-all") &&
+      document.getElementById("gc-cfg-select-all").addEventListener("change", function () {
+        var on = document.getElementById("gc-cfg-select-all").checked;
+        visibleDataRows().forEach(function (tr) {
+          var cb = tr.querySelector(".gc-cfg-row-select");
+          if (cb) cb.checked = on;
+        });
+        updateSelectionChrome();
+      });
+
+    document.getElementById("gc-cfg-tbody") &&
+      document.getElementById("gc-cfg-tbody").addEventListener("change", function (e) {
+        if (e.target.classList && e.target.classList.contains("gc-cfg-row-select")) updateSelectionChrome();
+      });
+
+    rebuildConfigurationFacets(function () {
+      applyRowFilter();
+      updateFacetChrome();
+    });
+
+    function filterColMenuList() {
+      var q = (document.getElementById("gc-cfg-cols-filter") && document.getElementById("gc-cfg-cols-filter").value || "")
+        .trim()
+        .toLowerCase();
+      var list = document.getElementById("gc-cfg-cols-list");
+      if (!list) return;
+      list.querySelectorAll("li[data-col-label]").forEach(function (li) {
+        var lab = (li.dataset.colLabel || "").toLowerCase();
+        li.hidden = q !== "" && lab.indexOf(q) === -1;
+      });
+    }
+
+    function buildColMenuList() {
+      var list = document.getElementById("gc-cfg-cols-list");
+      if (!list) return;
+      list.innerHTML = COLS.map(function (c) {
+        return (
+          '<li class="toolbar__cols-item" data-col-id="' +
+          escapeHtml(c.id) +
+          '" data-col-label="' +
+          escapeHtml(c.label.toLowerCase()) +
+          '">' +
+          '<label class="toolbar__cols-label">' +
+          '<input type="checkbox" data-gc-cfg-col="' +
+          escapeHtml(c.id) +
+          '" ' +
+          (colVis[c.id] ? "checked" : "") +
+          " />" +
+          "<span>" +
+          escapeHtml(c.label) +
+          "</span>" +
+          "</label>" +
+          "</li>"
+        );
+      }).join("");
+      filterColMenuList();
+    }
+
+    function positionCfgColsDropdown() {
+      var btn = document.getElementById("gc-cfg-cols-trigger");
+      var panel = document.getElementById("gc-cfg-cols-panel");
+      var modal = document.getElementById("gc-cfg-cols-modal");
+      if (!btn || !panel || !modal || modal.hidden) return;
+      panel.style.maxHeight = "";
+      var r = btn.getBoundingClientRect();
+      var gap = 6;
+      var margin = 8;
+      var pw = panel.offsetWidth || Math.min(380, window.innerWidth - 2 * margin);
+      var left = r.left;
+      if (left + pw > window.innerWidth - margin) left = window.innerWidth - margin - pw;
+      left = Math.max(margin, left);
+      var topBelow = r.bottom + gap;
+      panel.style.left = left + "px";
+      panel.style.top = topBelow + "px";
+      var after = panel.getBoundingClientRect();
+      if (after.bottom > window.innerHeight - margin) {
+        var aboveTop = r.top - gap - after.height;
+        if (aboveTop >= margin) panel.style.top = aboveTop + "px";
+        else {
+          panel.style.top = margin + "px";
+          panel.style.maxHeight = Math.max(120, window.innerHeight - 2 * margin) + "px";
+        }
+      }
+    }
+
+    function setColPanelOpen(open) {
+      var modal = document.getElementById("gc-cfg-cols-modal");
+      var btn = document.getElementById("gc-cfg-cols-trigger");
+      var panel = document.getElementById("gc-cfg-cols-panel");
+      if (!modal || !btn) return;
+      modal.hidden = !open;
+      modal.setAttribute("aria-hidden", open ? "false" : "true");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (!open && panel) {
+        panel.style.top = "";
+        panel.style.left = "";
+        panel.style.maxHeight = "";
+      }
+      if (open) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(positionCfgColsDropdown);
+        });
+      }
+    }
+
+    buildColMenuList();
+    var colsTrigger = document.getElementById("gc-cfg-cols-trigger");
+    var colsModal = document.getElementById("gc-cfg-cols-modal");
+    var colsPanel = document.getElementById("gc-cfg-cols-panel");
+    var colsFilter = document.getElementById("gc-cfg-cols-filter");
+    var colsList = document.getElementById("gc-cfg-cols-list");
+    var colsClose = document.getElementById("gc-cfg-cols-close");
+
+    function openColsFromTrigger() {
+      var willOpen = colsModal.hidden;
+      setColPanelOpen(willOpen);
+      if (willOpen) {
+        buildColMenuList();
+        colsFilter && colsFilter.focus();
+      }
+    }
+
+    if (colsTrigger) {
+      colsTrigger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openColsFromTrigger();
+      });
+      colsTrigger.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openColsFromTrigger();
+        }
+      });
+    }
+    colsFilter &&
+      colsFilter.addEventListener("input", function () {
+        filterColMenuList();
+      });
+    colsClose &&
+      colsClose.addEventListener("click", function () {
+        setColPanelOpen(false);
+        colsTrigger && colsTrigger.focus();
+      });
+    colsModal &&
+      colsModal.querySelector(".fw-cols-modal__backdrop") &&
+      colsModal.querySelector(".fw-cols-modal__backdrop").addEventListener("click", function () {
+        setColPanelOpen(false);
+        colsTrigger && colsTrigger.focus();
+      });
+    colsList &&
+      colsList.addEventListener("change", function (e) {
+        var t = e.target;
+        var cb = t instanceof Element ? t.closest("input[data-gc-cfg-col]") : null;
+        if (!cb) return;
+        var id = cb.getAttribute("data-gc-cfg-col");
+        if (!id || !Object.prototype.hasOwnProperty.call(colVis, id)) return;
+        colVis[id] = cb.checked;
+        var n = 0;
+        COLS.forEach(function (c) {
+          if (colVis[c.id]) n++;
+        });
+        if (n < 1) {
+          cb.checked = true;
+          colVis[id] = true;
+          return;
+        }
+        persistColVis(colVis);
+        applyColVis(colVis);
+        syncFilterEmptyColspan();
+        applyRowFilter();
+      });
+    document.addEventListener("mousedown", function (e) {
+      if (!colsModal || colsModal.hidden) return;
+      var t = e.target;
+      if (!(t instanceof Node)) return;
+      if ((colsTrigger && colsTrigger.contains(t)) || (colsPanel && colsPanel.contains(t))) return;
+      setColPanelOpen(false);
+    });
+
+    var editFlyout = document.getElementById("gc-cfg-edit-flyout");
+    var editForm = document.getElementById("edit-cfg-form");
+    var cancelEdit = document.getElementById("cancel-edit-cfg");
+    var flyoutClose = document.getElementById("gc-cfg-edit-flyout-close");
+    var flyoutBackdrop = editFlyout && editFlyout.querySelector(".gc-if-flyout__backdrop");
+    var flyoutPanel = editFlyout && editFlyout.querySelector(".gc-if-flyout__panel");
+    var cfgEditTabsRoot = document.getElementById("gc-cfg-edit-tabs");
+    var cfgEditTabBtns = cfgEditTabsRoot
+      ? cfgEditTabsRoot.querySelectorAll("[data-gc-cfg-edit-tab]")
+      : [];
+    var cfgEditPanels = {
+      members: document.getElementById("gc-cfg-edit-panel-members"),
+      configuration: document.getElementById("gc-cfg-edit-panel-configuration"),
+    };
+    var cfgEditMembersTbody = document.getElementById("gc-cfg-edit-members-tbody");
+    var cfgEditConfigMeta = document.getElementById("gc-cfg-edit-config-meta");
+    var cfgEditConfigStatus = document.getElementById("gc-cfg-edit-config-status");
+    var cfgEditConfigTree = document.getElementById("gc-cfg-edit-config-tree");
+    var cfgEditConfigTreeReqToken = 0;
+    var cfgEditMemberDriftFlyout = document.getElementById("gc-cfg-edit-member-drift-flyout");
+    var cfgEditMemberDriftClose = document.getElementById("gc-cfg-edit-member-drift-close");
+    var cfgEditMemberDriftMeta = document.getElementById("gc-cfg-edit-member-drift-meta");
+    var cfgEditMemberDriftStatus = document.getElementById("gc-cfg-edit-member-drift-status");
+    var cfgEditMemberDriftBody = document.getElementById("gc-cfg-edit-member-drift-body");
+    var cfgEditMemberSummaryReqToken = 0;
+    var cfgEditMemberDetailReqToken = 0;
+
+    function positionMemberDriftFlyout() {
+      if (!cfgEditMemberDriftFlyout || !flyoutPanel || cfgEditMemberDriftFlyout.hidden) return;
+      var primaryRect = flyoutPanel.getBoundingClientRect();
+      var secWidth = cfgEditMemberDriftFlyout.offsetWidth || 420;
+      var margin = 8;
+      var left = primaryRect.left - secWidth - 10;
+      if (left < margin) left = margin;
+      cfgEditMemberDriftFlyout.style.left = left + "px";
+      cfgEditMemberDriftFlyout.style.top = primaryRect.top + "px";
+      cfgEditMemberDriftFlyout.style.height = primaryRect.height + "px";
+    }
+
+    function setCfgEditTab(tabId) {
+      cfgEditTabBtns.forEach(function (btn) {
+        var on = btn.getAttribute("data-gc-cfg-edit-tab") === tabId;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      Object.keys(cfgEditPanels).forEach(function (key) {
+        var p = cfgEditPanels[key];
+        if (!p) return;
+        var show = key === tabId;
+        p.classList.toggle("is-active", show);
+        p.hidden = !show;
+      });
+      if (tabId !== "members") {
+        closeMemberDriftFlyout();
+      }
+    }
+
+    function closeMemberDriftFlyout() {
+      if (!cfgEditMemberDriftFlyout) return;
+      cfgEditMemberDetailReqToken++;
+      cfgEditMemberDriftFlyout.hidden = true;
+      cfgEditMemberDriftFlyout.style.left = "";
+      cfgEditMemberDriftFlyout.style.top = "";
+      cfgEditMemberDriftFlyout.style.height = "";
+      if (cfgEditMemberDriftStatus) {
+        cfgEditMemberDriftStatus.hidden = true;
+        cfgEditMemberDriftStatus.textContent = "";
+      }
+      if (cfgEditMemberDriftBody) cfgEditMemberDriftBody.innerHTML = "";
+      if (cfgEditMemberDriftMeta) cfgEditMemberDriftMeta.textContent = "";
+    }
+
+    function rowStatePillHtml(inSync) {
+      var on = !!inSync;
+      return (
+        '<span class="gc-zone-pill gc-cfg-member-state-pill">' +
+        '<span class="gc-firewall-pill-status ' +
+        (on ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline") +
+        '" aria-hidden="true">' +
+        (on ? "✓" : "×") +
+        "</span>" +
+        (on ? "In sync" : "Out of sync") +
+        "</span>"
+      );
+    }
+
+    function loadMemberDriftSummary(cfgId) {
+      if (!cfgEditMembersTbody) return;
+      var token = ++cfgEditMemberSummaryReqToken;
+      cfgEditMembersTbody.innerHTML = '<tr><td colspan="4" class="muted">Loading member firewalls…</td></tr>';
+      fetch("/api/configurations/" + encodeURIComponent(String(cfgId)) + "/member-firewall-drift-summary", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+        })
+        .then(function (res) {
+          if (token !== cfgEditMemberSummaryReqToken) return;
+          if (!res.ok) {
+            var err = (res.body && (res.body.detail || res.body.message)) || "Could not load member drift.";
+            if (typeof err !== "string") err = JSON.stringify(err);
+            cfgEditMembersTbody.innerHTML = '<tr><td colspan="4" class="muted">' + escapeHtml(err) + "</td></tr>";
+            return;
+          }
+          var rows = Array.isArray(res.body && res.body.firewalls) ? res.body.firewalls : [];
+          if (!rows.length) {
+            cfgEditMembersTbody.innerHTML = '<tr><td colspan="4" class="muted">No member firewalls in scope.</td></tr>';
+            return;
+          }
+          cfgEditMembersTbody.innerHTML = rows
+            .map(function (fw) {
+              var fid = parseInt(fw.firewall_id, 10) || 0;
+              var label = String(fw.label || ("#" + fid));
+              var online = !!fw.online;
+              var stateSync = String(fw.state || "") === "in_sync";
+              var missing = parseInt(fw.missing_count, 10) || 0;
+              var diff = parseInt(fw.different_count, 10) || 0;
+              return (
+                '<tr class="gc-cfg-member-drift-row gc-fw-row--clickable" data-firewall-id="' +
+                fid +
+                '" data-firewall-label="' +
+                escapeAttr(label) +
+                '">' +
+                '<td><span class="gc-zone-pill gc-firewall-pill">' +
+                '<span class="gc-firewall-pill-status ' +
+                (online ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline") +
+                '" aria-hidden="true">' +
+                (online ? "✓" : "×") +
+                "</span>" +
+                '<span class="mono">' +
+                escapeHtml(label) +
+                "</span></span></td>" +
+                "<td>" +
+                rowStatePillHtml(stateSync) +
+                "</td>" +
+                '<td class="mono">' +
+                missing +
+                "</td>" +
+                '<td class="mono">' +
+                diff +
+                "</td>" +
+                "</tr>"
+              );
+            })
+            .join("");
+        })
+        .catch(function () {
+          if (token !== cfgEditMemberSummaryReqToken) return;
+          cfgEditMembersTbody.innerHTML = '<tr><td colspan="4" class="muted">Request failed.</td></tr>';
+        });
+    }
+
+    function loadMemberDriftDetail(cfgId, firewallId, firewallLabel) {
+      if (!cfgEditMemberDriftFlyout || !cfgEditMemberDriftBody || !cfgEditMemberDriftMeta || !cfgEditMemberDriftStatus) return;
+      var token = ++cfgEditMemberDetailReqToken;
+      cfgEditMemberDriftFlyout.hidden = false;
+      positionMemberDriftFlyout();
+      cfgEditMemberDriftMeta.textContent = "Loading " + (firewallLabel || ("#" + firewallId)) + "…";
+      cfgEditMemberDriftStatus.hidden = true;
+      cfgEditMemberDriftStatus.textContent = "";
+      cfgEditMemberDriftBody.innerHTML = '<p class="muted">Loading…</p>';
+      fetch(
+        "/api/configurations/" +
+          encodeURIComponent(String(cfgId)) +
+          "/member-firewalls/" +
+          encodeURIComponent(String(firewallId)) +
+          "/drift-items",
+        { credentials: "same-origin", headers: { Accept: "application/json" } },
+      )
+        .then(function (r) {
+          return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+        })
+        .then(function (res) {
+          if (token !== cfgEditMemberDetailReqToken) return;
+          if (!res.ok) {
+            var err = (res.body && (res.body.detail || res.body.message)) || "Could not load drift details.";
+            if (typeof err !== "string") err = JSON.stringify(err);
+            cfgEditMemberDriftBody.innerHTML = "";
+            cfgEditMemberDriftStatus.hidden = false;
+            cfgEditMemberDriftStatus.textContent = err;
+            return;
+          }
+          var b = res.body || {};
+          var fLabel = String(b.firewall_label || firewallLabel || ("#" + firewallId));
+          var missing = Array.isArray(b.missing) ? b.missing : [];
+          var different = Array.isArray(b.different) ? b.different : [];
+          cfgEditMemberDriftMeta.textContent =
+            fLabel +
+            " · " +
+            (parseInt(b.missing_count, 10) || 0) +
+            " missing · " +
+            (parseInt(b.different_count, 10) || 0) +
+            " different";
+          var sectionHtml = function (title, items) {
+            if (!items.length) {
+              return (
+                '<section class="gc-net-zone-modal__zone">' +
+                '<h3 class="gc-net-zone-modal__zn">' +
+                escapeHtml(title) +
+                '</h3><p class="muted">None.</p></section>'
+              );
+            }
+            return (
+              '<section class="gc-net-zone-modal__zone">' +
+              '<h3 class="gc-net-zone-modal__zn">' +
+              escapeHtml(title) +
+              '</h3><ul class="gc-cv-items">' +
+              items
+                .map(function (it) {
+                  var et = String((it && it.entity_type) || "");
+                  var nm = String((it && it.external_name) || "");
+                  return (
+                    '<li class="gc-cv-item-row"><span class="mono">' +
+                    escapeHtml(et) +
+                    "</span> · " +
+                    escapeHtml(nm) +
+                    "</li>"
+                  );
+                })
+                .join("") +
+              "</ul></section>"
+            );
+          };
+          cfgEditMemberDriftBody.innerHTML =
+            sectionHtml("Missing on firewall", missing) +
+            sectionHtml("Different from configuration", different);
+        })
+        .catch(function () {
+          if (token !== cfgEditMemberDetailReqToken) return;
+          cfgEditMemberDriftBody.innerHTML = "";
+          cfgEditMemberDriftStatus.hidden = false;
+          cfgEditMemberDriftStatus.textContent = "Request failed.";
+        });
+    }
+
+    function renderCfgTreeNestedHtml(data) {
+      function countHtml(n) {
+        return '<span class="gc-cv-count">' + (n || 0) + "</span>";
+      }
+      function renderItems(items) {
+        if (!items || !items.length) return '<p class="muted gc-cv-empty">No objects in this category.</p>';
+        return (
+          '<ul class="gc-cv-items">' +
+          items
+            .map(function (it) {
+              var nm = it && it.name != null ? String(it.name) : "(unnamed)";
+              return '<li class="gc-cv-item-row"><span class="gc-cv-item-link">' + escapeHtml(nm) + "</span></li>";
+            })
+            .join("") +
+          "</ul>"
+        );
+      }
+      function renderTabs(tabs) {
+        return (tabs || [])
+          .map(function (t) {
+            return (
+              '<details class="gc-cv-tab">' +
+              '<summary class="gc-cv-summary-row"><span class="gc-cv-summary-main">' +
+              escapeHtml(t.label || t.id || "") +
+              " " +
+              countHtml(t.count || 0) +
+              "</span></summary>" +
+              '<div class="gc-cv-tab-body">' +
+              renderItems(t.items) +
+              "</div></details>"
+            );
+          })
+          .join("");
+      }
+      function renderGroups(groups) {
+        return (groups || [])
+          .map(function (g) {
+            return (
+              '<details class="gc-cv-group">' +
+              '<summary class="gc-cv-summary-row"><span class="gc-cv-summary-main">' +
+              escapeHtml(g.label || g.id || "") +
+              " " +
+              countHtml(g.count || 0) +
+              "</span></summary>" +
+              '<div class="gc-cv-group-body">' +
+              renderTabs(g.tabs) +
+              "</div></details>"
+            );
+          })
+          .join("");
+      }
+      var html = (data.sections || [])
+        .map(function (sec) {
+          return (
+            '<details class="gc-cv-section">' +
+            '<summary class="gc-cv-summary-row"><span class="gc-cv-summary-main">' +
+            escapeHtml(sec.label || sec.id || "") +
+            " " +
+            countHtml(sec.count || 0) +
+            "</span></summary>" +
+            '<div class="gc-cv-section-body">' +
+            renderGroups(sec.groups) +
+            "</div></details>"
+          );
+        })
+        .join("");
+      if (data.unmapped && Array.isArray(data.unmapped.tabs) && data.unmapped.tabs.length) {
+        html +=
+          '<details class="gc-cv-section gc-cv-section--other">' +
+          '<summary class="gc-cv-summary-row"><span class="gc-cv-summary-main">' +
+          escapeHtml(data.unmapped.label || "Other") +
+          " " +
+          countHtml(data.unmapped.count || 0) +
+          "</span></summary>" +
+          '<div class="gc-cv-section-body">' +
+          renderTabs(data.unmapped.tabs) +
+          "</div></details>";
+      }
+      return html || '<p class="muted">No cached objects.</p>';
+    }
+
+    function loadNestedConfigurationTree(cfgId) {
+      if (!cfgEditConfigTree || !cfgEditConfigMeta || !cfgEditConfigStatus) return;
+      var token = ++cfgEditConfigTreeReqToken;
+      cfgEditConfigTree.innerHTML = '<p class="muted">Loading…</p>';
+      cfgEditConfigMeta.textContent = "";
+      cfgEditConfigStatus.hidden = true;
+      cfgEditConfigStatus.textContent = "";
+      fetch("/api/configurations/" + encodeURIComponent(String(cfgId)) + "/config-viewer-tree", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) { return { ok: r.ok, body: j, status: r.status }; });
+        })
+        .then(function (res) {
+          if (token !== cfgEditConfigTreeReqToken) return;
+          if (!res.ok) {
+            var d = res.body && res.body.detail;
+            var msg = typeof d === "string" ? d : JSON.stringify(d || res.body || "");
+            cfgEditConfigTree.innerHTML = "";
+            cfgEditConfigStatus.hidden = false;
+            cfgEditConfigStatus.textContent = msg || "Could not load configuration cache.";
+            return;
+          }
+          var data = res.body || {};
+          var n = data.total_count != null ? data.total_count : 0;
+          cfgEditConfigMeta.textContent = n === 1 ? "1 cached object." : n + " cached objects.";
+          cfgEditConfigTree.innerHTML = renderCfgTreeNestedHtml(data);
+        })
+        .catch(function () {
+          if (token !== cfgEditConfigTreeReqToken) return;
+          cfgEditConfigTree.innerHTML = "";
+          cfgEditConfigStatus.hidden = false;
+          cfgEditConfigStatus.textContent = "Request failed.";
+        });
+    }
+
+    function closeEditFlyout() {
+      if (!editFlyout) return;
+      cfgEditConfigTreeReqToken++;
+      cfgEditMemberSummaryReqToken++;
+      closeMemberDriftFlyout();
+      editFlyout.hidden = true;
+      editFlyout.setAttribute("aria-hidden", "true");
+    }
+
+    function openEditFlyout(tr) {
+      if (!editFlyout || !editForm) return;
+      var id = tr.getAttribute("data-cfg-id");
+      if (!id) return;
+      var idField = document.getElementById("edit-cfg-id");
+      if (idField) idField.value = id;
+      document.getElementById("edit-cfg-name").value = tr.getAttribute("data-cfg-name") || "";
+      document.getElementById("edit-cfg-description").value = tr.getAttribute("data-cfg-description") || "";
+      var editMsRoot = editForm && editForm.querySelector("[data-gc-cfg-member-root]");
+      var editApi = editMsRoot && window.gcCfgMemberMsGetApi && window.gcCfgMemberMsGetApi(editMsRoot);
+      if (editApi && typeof editApi.loadFromMemberJson === "function") {
+        editApi.loadFromMemberJson(tr.getAttribute("data-cfg-members-json"));
+      }
+      closeMemberDriftFlyout();
+      loadMemberDriftSummary(id);
+      setCfgEditTab("members");
+      loadNestedConfigurationTree(id);
+      editFlyout.hidden = false;
+      editFlyout.setAttribute("aria-hidden", "false");
+      if (flyoutPanel) {
+        try {
+          flyoutPanel.focus();
+        } catch (e2) {}
+      }
+    }
+
+    function applyConfigurationRowToMembers(tr, btn) {
+      var cfgId = parseInt(tr.getAttribute("data-cfg-id") || "", 10);
+      if (isNaN(cfgId) || cfgId <= 0) {
+        alert("Missing configuration id.");
+        return;
+      }
+      if (!GC_APPLY_CFG_TO_MEMBERS_URL_TEMPLATE) {
+        alert("Apply URL is not configured.");
+        return;
+      }
+      var cfgName = (tr.getAttribute("data-cfg-name") || "").trim();
+      var cfgLabel = cfgName || "Configuration #" + cfgId;
+      if (!window.confirm("Queue create/update tasks to apply " + cfgLabel + " to all of its member firewalls?")) {
+        return;
+      }
+      var url = GC_APPLY_CFG_TO_MEMBERS_URL_TEMPLATE.replace("__CONFIG_ID__", encodeURIComponent(String(cfgId)));
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("btn-icon--busy");
+      }
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, body: j };
+          });
+        })
+        .then(function (res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("btn-icon--busy");
+          }
+          if (!res.ok) {
+            var err = (res.body && (res.body.detail || res.body.message)) || "Could not queue apply tasks.";
+            if (typeof err !== "string") err = JSON.stringify(err);
+            if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(false, err);
+            } else {
+              alert(err);
+            }
+            return;
+          }
+          var body = res.body || {};
+          var queued = parseInt(body.queued_count || 0, 10) || 0;
+          var unchanged = parseInt(body.unchanged_count || 0, 10) || 0;
+          var skipped = Array.isArray(body.skipped) ? body.skipped.length : 0;
+          var members = Array.isArray(body.member_firewall_ids) ? body.member_firewall_ids.length : 0;
+          var txt = "Queued " + queued + " task(s) for " + members + " member firewall" + (members === 1 ? "" : "s") + ".";
+          if (unchanged > 0) txt += " " + unchanged + " already matched.";
+          if (skipped > 0) txt += " " + skipped + " skipped.";
+          if (typeof window.gcGlobalBannerShowResult === "function") {
+            window.gcGlobalBannerShowResult(queued > 0, txt);
+          } else {
+            alert(txt);
+          }
+          try {
+            document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+          } catch (e3) {}
+        })
+        .catch(function () {
+          if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("btn-icon--busy");
+          }
+          if (typeof window.gcGlobalBannerShowResult === "function") {
+            window.gcGlobalBannerShowResult(false, "Network error while queueing apply tasks.");
+          } else {
+            alert("Network error while queueing apply tasks.");
+          }
+        });
+    }
+
+    function bindCfgFlyoutResize(root) {
+      var panel = root.querySelector(".gc-if-flyout__panel");
+      var handle = root.querySelector(".gc-if-flyout__resize");
+      if (!panel || !handle || handle.dataset.gcCfgResizeBound === "1") return;
+      handle.dataset.gcCfgResizeBound = "1";
+      handle.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var startX = e.clientX;
+        var startW = panel.getBoundingClientRect().width;
+        var maxW = Math.min(720, window.innerWidth - 24);
+        function onMove(e2) {
+          var w = startW + (startX - e2.clientX);
+          w = Math.max(280, Math.min(maxW, w));
+          panel.style.width = w + "px";
+          positionMemberDriftFlyout();
+        }
+        function onUp() {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        }
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+    if (editFlyout) bindCfgFlyoutResize(editFlyout);
+    cfgEditTabBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tid = btn.getAttribute("data-gc-cfg-edit-tab");
+        if (!tid) return;
+        setCfgEditTab(tid);
+      });
+    });
+    if (cfgEditMembersTbody) {
+      cfgEditMembersTbody.addEventListener("click", function (e) {
+        var t = e.target;
+        var tr = t && t.closest && t.closest(".gc-cfg-member-drift-row");
+        if (!tr) return;
+        var cfgIdField = document.getElementById("edit-cfg-id");
+        var cfgId = cfgIdField ? parseInt(cfgIdField.value || "", 10) : NaN;
+        var fwId = parseInt(tr.getAttribute("data-firewall-id") || "", 10);
+        if (isNaN(cfgId) || cfgId <= 0 || isNaN(fwId) || fwId <= 0) return;
+        loadMemberDriftDetail(cfgId, fwId, tr.getAttribute("data-firewall-label") || "");
+      });
+    }
+    if (cfgEditMemberDriftClose) {
+      cfgEditMemberDriftClose.addEventListener("click", function () {
+        closeMemberDriftFlyout();
+      });
+    }
+
+    if (cancelEdit) cancelEdit.addEventListener("click", closeEditFlyout);
+    if (flyoutClose) flyoutClose.addEventListener("click", closeEditFlyout);
+    if (flyoutBackdrop) flyoutBackdrop.addEventListener("click", closeEditFlyout);
+
+    var cfgTbody = document.getElementById("gc-cfg-tbody");
+    if (cfgTbody) {
+      cfgTbody.addEventListener("click", function (e) {
+        var t = e.target;
+        var applyBtn = t && t.closest && t.closest(".gc-cfg-apply-members");
+        if (applyBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          var applyTr = applyBtn.closest && applyBtn.closest("tr.gc-cfg-data-row");
+          if (applyTr) applyConfigurationRowToMembers(applyTr, applyBtn);
+          return;
+        }
+        if (t && t.closest && t.closest("[data-select-stop]")) return;
+        var tr = t && t.closest && t.closest("tr.gc-cfg-data-row");
+        if (!tr) return;
+        if (t.closest && t.closest(".gc-cfg-row-select")) return;
+        if (t.closest && t.closest("td.actions")) {
+          openEditFlyout(tr);
+          return;
+        }
+        openEditFlyout(tr);
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && colsModal && !colsModal.hidden) {
+        setColPanelOpen(false);
+        colsTrigger && colsTrigger.focus();
+      }
+      if (e.key === "Escape" && editFlyout && !editFlyout.hidden) {
+        closeEditFlyout();
+      }
+    });
+    function repositionColsIfOpen() {
+      if (colsModal && !colsModal.hidden) positionCfgColsDropdown();
+    }
+    window.addEventListener("resize", repositionColsIfOpen);
+    window.addEventListener("scroll", repositionColsIfOpen, true);
+    window.addEventListener("resize", positionMemberDriftFlyout);
+    window.addEventListener("scroll", positionMemberDriftFlyout, true);
+
+    var addModal = document.getElementById("add-cfg-modal");
+    var addForm = document.getElementById("add-cfg-form");
+    var openBtn = document.getElementById("open-add-cfg");
+    var cancelBtn = document.getElementById("cancel-add-cfg");
+    if (openBtn && addModal) {
+      openBtn.addEventListener("click", function () {
+        if (addForm) addForm.reset();
+        var addMsRoot = addForm && addForm.querySelector("[data-gc-cfg-member-root]");
+        var addApi = addMsRoot && window.gcCfgMemberMsGetApi && window.gcCfgMemberMsGetApi(addMsRoot);
+        if (addApi && typeof addApi.resetAfterFormResetEmpty === "function") {
+          addApi.resetAfterFormResetEmpty();
+        }
+        addModal.showModal();
+      });
+    }
+    if (cancelBtn && addModal) {
+      cancelBtn.addEventListener("click", function () {
+        addModal.close();
+      });
+    }
+    if (addModal) {
+      addModal.addEventListener("click", function (e) {
+        if (e.target === addModal) addModal.close();
+      });
+    }
+
+    if (editForm) {
+      editForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var idField = document.getElementById("edit-cfg-id");
+        if (!idField || !String(idField.value || "").trim()) {
+          alert("Missing configuration id. Close and open the panel again.");
+          return;
+        }
+        var fd = new FormData(editForm);
+        var submitBtn = editForm.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        fetch(editForm.getAttribute("action") || {{ url_configuration_update | tojson }}, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+        })
+          .then(function (r) {
+            return r.text().then(function (text) {
+              return { ok: r.ok, status: r.status, text: text };
+            });
+          })
+          .then(function (res) {
+            if (submitBtn) submitBtn.disabled = false;
+            if (res.ok) {
+              try {
+                var j = JSON.parse(res.text);
+                if (j && j.ok) {
+                  closeEditFlyout();
+                  try {
+                    document.dispatchEvent(new CustomEvent("gc-nav-configurations-refresh-requested"));
+                  } catch (e3) {}
+                  window.location.reload();
+                  return;
+                }
+              } catch (e4) {}
+            }
+            alert("Save failed.");
+          })
+          .catch(function () {
+            if (submitBtn) submitBtn.disabled = false;
+            alert("Save failed.");
+          });
+      });
+    }
+
+    var delDialog = document.getElementById("gc-cfg-delete-dialog");
+    var delLead = document.getElementById("gc-cfg-delete-dialog-lead");
+    var delConfirm = document.getElementById("gc-cfg-delete-dialog-confirm");
+    var delCancel = document.getElementById("gc-cfg-delete-dialog-cancel");
+    var delToolbar = document.getElementById("gc-cfg-delete-selected");
+
+    function closeDelDialog() {
+      if (delDialog) delDialog.close();
+    }
+
+    if (delCancel && delDialog) {
+      delCancel.addEventListener("click", closeDelDialog);
+    }
+    if (delDialog) {
+      delDialog.addEventListener("click", function (e) {
+        if (e.target === delDialog) closeDelDialog();
+      });
+    }
+
+    if (delToolbar && delDialog && delLead && delConfirm) {
+      delToolbar.addEventListener("click", function () {
+        var ids = getSelectedIds();
+        if (ids.length < 1) return;
+        delConfirm.disabled = false;
+        var n = ids.length;
+        delLead.textContent =
+          "Are you sure you want to delete " + n + " configuration" + (n === 1 ? "" : "s") + "? This cannot be undone.";
+        delConfirm.textContent = "Delete " + n + " configuration" + (n === 1 ? "" : "s");
+        delDialog.showModal();
+      });
+    }
+
+    if (delConfirm) {
+      delConfirm.addEventListener("click", function () {
+        var ids = getSelectedIds();
+        if (ids.length < 1) {
+          closeDelDialog();
+          return;
+        }
+        delConfirm.disabled = true;
+        fetch(GC_DELETE_BATCH_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: ids }),
+        })
+          .then(function (r) {
+            if (r.ok) {
+              try {
+                document.dispatchEvent(new CustomEvent("gc-nav-configurations-refresh-requested"));
+              } catch (e5) {}
+              location.reload();
+            } else {
+              delConfirm.disabled = false;
+              alert("Delete failed");
+            }
+          })
+          .catch(function () {
+            delConfirm.disabled = false;
+            alert("Delete failed");
+          });
+      });
+    }
+
+    (function bindApplySelectedToFirewalls() {
+      var btn = document.getElementById("gc-cfg-apply-selected-firewalls");
+      if (!btn) return;
+      btn.addEventListener("click", function () {
+        var cfgIds = getSelectedIds();
+        if (cfgIds.length < 1) {
+          alert("Select one or more configurations.");
+          return;
+        }
+        var fwIds =
+          typeof window.gcGetSelectedFirewallIds === "function" ? window.gcGetSelectedFirewallIds() : [];
+        if (!Array.isArray(fwIds) || fwIds.length < 1) {
+          alert("Select one or more firewalls in the top bar first.");
+          return;
+        }
+        var cN = cfgIds.length;
+        var fN = fwIds.length;
+        var msg =
+          "Queue create/update tasks to apply " +
+          cN +
+          " configuration" +
+          (cN === 1 ? "" : "s") +
+          " across " +
+          fN +
+          " selected firewall" +
+          (fN === 1 ? "" : "s") +
+          "?";
+        if (!window.confirm(msg)) return;
+        btn.disabled = true;
+        fetch(GC_APPLY_TO_FIREWALLS_BATCH_URL, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({
+            configuration_ids: cfgIds,
+            firewall_ids: fwIds,
+          }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, body: j };
+            });
+          })
+          .then(function (res) {
+            btn.disabled = false;
+            if (!res.ok) {
+              var err = (res.body && (res.body.detail || res.body.message)) || "Could not queue apply tasks.";
+              if (typeof err !== "string") err = JSON.stringify(err);
+              if (typeof window.gcGlobalBannerShowResult === "function") {
+                window.gcGlobalBannerShowResult(false, err);
+              } else {
+                alert(err);
+              }
+              return;
+            }
+            var body = res.body || {};
+            var queued = parseInt(body.queued_count || 0, 10) || 0;
+            var unchanged = parseInt(body.unchanged_count || 0, 10) || 0;
+            var skipped = Array.isArray(body.skipped) ? body.skipped.length : 0;
+            var text = "Queued " + queued + " task(s).";
+            if (unchanged > 0) text += " " + unchanged + " already matched.";
+            if (skipped > 0) text += " " + skipped + " skipped.";
+            if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(queued > 0, text);
+            } else {
+              alert(text);
+            }
+            try {
+              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            } catch (e6) {}
+          })
+          .catch(function () {
+            btn.disabled = false;
+            if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(false, "Network error while queueing apply tasks.");
+            } else {
+              alert("Network error while queueing apply tasks.");
+            }
+          });
+      });
+    })();
+
+    refreshConfigurationStatusSummary();
+    setInterval(refreshConfigurationStatusSummary, 60 * 1000);
+    document.addEventListener("gc-configuration-entries-updated", function () {
+      refreshConfigurationStatusSummary();
+    });
+    document.addEventListener("gc-nav-configurations-refresh-requested", function () {
+      refreshConfigurationStatusSummary();
+    });
+  })();
+</script>

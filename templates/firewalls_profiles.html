@@ -1,0 +1,409 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "profiles" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% block title %}Profiles · Firewalls · Ground Control{% endblock %}
+{% block page_title %}Profiles{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Profiles</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Schedules, access time, quotas, IPsec profiles, and device access from the cache. Enable the matching object types in
+  <strong>Inventory</strong> sync, then refresh from the toolbar.
+</p>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column" id="gc-prof-filters-stack">
+        {{ net_filters_aside("gc-prof-sched", false) }}
+        {{ net_filters_aside("gc-prof-at", true) }}
+        {{ net_filters_aside("gc-prof-sq", true) }}
+        {{ net_filters_aside("gc-prof-dt", true) }}
+        {{ net_filters_aside("gc-prof-vpn", true) }}
+        {{ net_filters_aside("gc-prof-ap", true) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        <div class="gc-tabs" role="tablist" aria-label="Profiles views" id="gc-prof-main-tablist">
+          <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true" id="gc-tab-prof-sched" data-gc-prof-tab="sched">
+            Schedule
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-prof-at" data-gc-prof-tab="at">
+            Access time
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-prof-sq" data-gc-prof-tab="sq">
+            Surfing quota
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-prof-dt" data-gc-prof-tab="dt">
+            Network traffic quota
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-prof-vpn" data-gc-prof-tab="vpn">
+            IPsec profiles
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-prof-device" data-gc-prof-tab="device">
+            Device Access
+          </button>
+        </div>
+        <div class="gc-tab-panels">
+          <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-tab-prof-sched" id="gc-panel-prof-sched">
+            {{
+              net_entity_table_wrap(
+                "gc-prof-sched",
+                "Schedules",
+                "Search schedules",
+                show_combine=true,
+                combine_title="Combined view merges rows with the same schedule name across firewalls. Yellow switch: values differ — click to compare, Shift+click to list each firewall.",
+                primary_btn_id="gc-prof-sched-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-prof-sched-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-prof-at" id="gc-panel-prof-at" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-prof-at",
+                "Access time",
+                "Search access time policies",
+                show_combine=true,
+                combine_title="Combined view merges rows with the same policy name across firewalls. Yellow switch: values differ — click to compare, Shift+click to list each firewall.",
+                primary_btn_id="gc-prof-at-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-prof-at-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-prof-sq" id="gc-panel-prof-sq" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-prof-sq",
+                "Surfing quota",
+                "Search surfing quota policies",
+                show_combine=true,
+                combine_title="Combined view merges rows with the same policy name across firewalls. Yellow switch: values differ — click to compare, Shift+click to list each firewall.",
+                primary_btn_id="gc-prof-sq-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-prof-sq-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-prof-dt" id="gc-panel-prof-dt" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-prof-dt",
+                "Network traffic quota",
+                "Search data transfer policies",
+                show_combine=true,
+                combine_title="Combined view merges rows with the same policy name across firewalls. Yellow switch: values differ — click to compare, Shift+click to list each firewall.",
+                primary_btn_id="gc-prof-dt-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-prof-dt-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-prof-vpn" id="gc-panel-prof-vpn" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-prof-vpn",
+                "IPsec profiles",
+                "Search VPN profiles",
+                show_combine=true,
+                combine_title="Combined view merges rows with the same profile name across firewalls. Yellow switch: values differ — click to compare, Shift+click to list each firewall.",
+                primary_btn_id="gc-prof-vpn-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-prof-vpn-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-prof-device" id="gc-panel-prof-device" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-prof-ap",
+                "Administration profiles",
+                "Search profiles",
+                show_combine=true,
+                combine_title="Combined view merges rows with the same profile name across firewalls. Yellow switch: permission matrices differ — click to compare, Shift+click to list each firewall.",
+                primary_btn_id="gc-prof-ap-add",
+                primary_btn_label="Add",
+                secondary_btn_id="gc-prof-ap-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+        </div>
+        <script>
+          (function () {
+            var PANEL_IDS = {
+              sched: "gc-panel-prof-sched",
+              at: "gc-panel-prof-at",
+              sq: "gc-panel-prof-sq",
+              dt: "gc-panel-prof-dt",
+              vpn: "gc-panel-prof-vpn",
+              device: "gc-panel-prof-device",
+            };
+            var FILTER_PREFIX = {
+              sched: "gc-prof-sched",
+              at: "gc-prof-at",
+              sq: "gc-prof-sq",
+              dt: "gc-prof-dt",
+              vpn: "gc-prof-vpn",
+              device: "gc-prof-ap",
+            };
+            var activeTab = "sched";
+
+            function syncProfFilterAsides() {
+              var key = activeTab === "device" ? "device" : activeTab;
+              Object.keys(FILTER_PREFIX).forEach(function (k) {
+                var el = document.getElementById(FILTER_PREFIX[k] + "-filters-aside");
+                if (el) el.hidden = k !== key;
+              });
+            }
+
+            function applyProfTabs() {
+              Object.keys(PANEL_IDS).forEach(function (k) {
+                var p = document.getElementById(PANEL_IDS[k]);
+                if (!p) return;
+                var on = k === activeTab;
+                p.classList.toggle("is-active", on);
+                if (on) p.removeAttribute("hidden");
+                else p.setAttribute("hidden", "");
+              });
+              var root = document.getElementById("gc-prof-main-tablist");
+              if (root) {
+                var ch = root.children;
+                for (var i = 0; i < ch.length; i++) {
+                  var el = ch[i];
+                  if (!el || !el.getAttribute) continue;
+                  var tid = el.getAttribute("data-gc-prof-tab");
+                  if (!tid) continue;
+                  var on = tid === activeTab;
+                  el.classList.toggle("is-active", on);
+                  el.setAttribute("aria-selected", on ? "true" : "false");
+                }
+              }
+              syncProfFilterAsides();
+            }
+
+            function onProfTabPointer(e) {
+              if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+              var root = document.getElementById("gc-prof-main-tablist");
+              if (!root) return;
+              var btn = e.target && e.target.closest && e.target.closest("[data-gc-prof-tab]");
+              if (!btn || !root.contains(btn)) return;
+              var tid = btn.getAttribute("data-gc-prof-tab");
+              if (!tid || !Object.prototype.hasOwnProperty.call(FILTER_PREFIX, tid)) return;
+              if (e.type === "keydown") e.preventDefault();
+              activeTab = tid;
+              applyProfTabs();
+            }
+
+            document.addEventListener("click", onProfTabPointer, true);
+            document.addEventListener("keydown", onProfTabPointer, true);
+            applyProfTabs();
+          })();
+        </script>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div
+  id="gc-prof-combine-modal"
+  class="gc-net-zone-combine-modal"
+  hidden
+  aria-hidden="true"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="gc-prof-combine-modal-title"
+>
+  <div class="gc-net-zone-combine-modal__backdrop" id="gc-prof-combine-modal-backdrop"></div>
+  <div class="gc-net-zone-combine-modal__dialog">
+    <header class="gc-net-zone-combine-modal__head">
+      <h2 id="gc-prof-combine-modal-title" class="gc-net-zone-combine-modal__title">Compare by firewall</h2>
+      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-prof-combine-modal-close" aria-label="Close">
+        ×
+      </button>
+    </header>
+    <div class="gc-net-zone-combine-modal__body" id="gc-prof-combine-modal-body"></div>
+    <footer class="gc-net-zone-combine-modal__foot">
+      <button type="button" class="btn primary" id="gc-prof-combine-modal-done">Done</button>
+    </footer>
+  </div>
+</div>
+
+{{ net_cols_modal("gc-prof-sched") }}
+{{ net_cols_modal("gc-prof-at") }}
+{{ net_cols_modal("gc-prof-sq") }}
+{{ net_cols_modal("gc-prof-dt") }}
+{{ net_cols_modal("gc-prof-vpn") }}
+{{ net_cols_modal("gc-prof-ap") }}
+{% include "partials/gc_admin_profile_flyout.html" %}
+{% include "partials/gc_profiles_entity_flyout.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-hosts-services-flyout.js"></script>
+<script src="/static/gc-admin-profile-flyout.js"></script>
+<script src="/static/gc-profiles-entity-flyout.js"></script>
+<script src="/static/gc-auth-identity-pages.js"></script>
+<script src="/static/gc-profiles-entities.js"></script>
+<script>
+  var profDeviceTableHolder = { table: null };
+  window.gcInitProfilesPolicyEntitiesPage({
+    deviceTableHolder: profDeviceTableHolder,
+    urls: {
+      createBatch: {{ url_api_task_queue_enqueue_profile_entity_create_batch | tojson }},
+      updateBatch: {{ url_api_task_queue_enqueue_profile_entity_update_batch | tojson }},
+      deleteBatch: {{ url_api_task_queue_enqueue_profile_entity_deletes_batch | tojson }},
+    },
+    tables: [
+      {
+        key: "sched",
+        prefix: "gc-prof-sched",
+        apiUrl: {{ url_api_profile_schedule_table | tojson }},
+        entityType: "schedule",
+        syncEntity: "schedule",
+        metaCombined: "schedule_combined",
+        metaConflicts: "schedule_combine_conflicts",
+        conflictRow: "schedule_combine_conflict",
+        perField: "schedule_combine_per_field",
+        combineDetailCol: "__schedule_detail",
+        editTargets: "schedule_edit_targets",
+        lsCombine: "ground-control-prof-sched-combine-v1",
+        colLs: "ground-control-prof-sched-columns-v1",
+        valuePillColIds: ["__type"],
+        rowAriaEntitySingular: "schedule",
+        labels: {
+          countSingular: "schedule",
+          countPlural: "schedules",
+          emptyCache: "No schedules in the cache. Enable Schedules sync in Inventory, then sync.",
+          emptyFilter: "No rows match the current search or filters.",
+          loadError: "Could not load schedules.",
+        },
+      },
+      {
+        key: "at",
+        prefix: "gc-prof-at",
+        apiUrl: {{ url_api_profile_access_time_table | tojson }},
+        entityType: "access_time_policy",
+        syncEntity: "access_time_policy",
+        metaCombined: "accesstime_combined",
+        metaConflicts: "accesstime_combine_conflicts",
+        conflictRow: "accesstime_combine_conflict",
+        perField: "accesstime_combine_per_field",
+        combineDetailCol: "__at_detail",
+        editTargets: "accesstime_edit_targets",
+        lsCombine: "ground-control-prof-at-combine-v1",
+        colLs: "ground-control-prof-at-columns-v1",
+        valuePillColIds: ["__strategy"],
+        rowAriaEntitySingular: "access time policy",
+        combineFlyoutColumnLabels: {
+          "__name": "Name",
+          "__description": "Description",
+          "__strategy": "Strategy",
+          "__schedule": "Schedule",
+        },
+        labels: {
+          countSingular: "policy",
+          countPlural: "policies",
+          emptyCache: "No access time policies in the cache. Enable Access time policies sync in Inventory, then sync.",
+          emptyFilter: "No rows match the current search or filters.",
+          loadError: "Could not load access time policies.",
+        },
+      },
+      {
+        key: "sq",
+        prefix: "gc-prof-sq",
+        apiUrl: {{ url_api_profile_surfing_quota_table | tojson }},
+        entityType: "surfing_quota_policy",
+        syncEntity: "surfing_quota_policy",
+        metaCombined: "surfingquota_combined",
+        metaConflicts: "surfingquota_combine_conflicts",
+        conflictRow: "surfingquota_combine_conflict",
+        perField: "surfingquota_combine_per_field",
+        combineDetailCol: "__sq_detail",
+        editTargets: "surfingquota_edit_targets",
+        lsCombine: "ground-control-prof-sq-combine-v1",
+        colLs: "ground-control-prof-sq-columns-v1",
+        rowAriaEntitySingular: "surfing quota policy",
+        labels: {
+          countSingular: "policy",
+          countPlural: "policies",
+          emptyCache: "No surfing quota policies in the cache. Enable Surfing quota policies sync in Inventory, then sync.",
+          emptyFilter: "No rows match the current search or filters.",
+          loadError: "Could not load surfing quota policies.",
+        },
+      },
+      {
+        key: "dt",
+        prefix: "gc-prof-dt",
+        apiUrl: {{ url_api_profile_data_transfer_table | tojson }},
+        entityType: "data_transfer_policy",
+        syncEntity: "data_transfer_policy",
+        metaCombined: "datatransfer_combined",
+        metaConflicts: "datatransfer_combine_conflicts",
+        conflictRow: "datatransfer_combine_conflict",
+        perField: "datatransfer_combine_per_field",
+        combineDetailCol: "__dt_detail",
+        editTargets: "datatransfer_edit_targets",
+        lsCombine: "ground-control-prof-dt-combine-v1",
+        colLs: "ground-control-prof-dt-columns-v1",
+        rowAriaEntitySingular: "network traffic quota policy",
+        labels: {
+          countSingular: "policy",
+          countPlural: "policies",
+          emptyCache: "No data transfer policies in the cache. Enable Data transfer policies sync in Inventory, then sync.",
+          emptyFilter: "No rows match the current search or filters.",
+          loadError: "Could not load data transfer policies.",
+        },
+      },
+      {
+        key: "vpn",
+        prefix: "gc-prof-vpn",
+        apiUrl: {{ url_api_profile_vpn_profile_table | tojson }},
+        entityType: "vpn_profile",
+        syncEntity: "vpn_profile",
+        metaCombined: "vpnprofile_combined",
+        metaConflicts: "vpnprofile_combine_conflicts",
+        conflictRow: "vpnprofile_combine_conflict",
+        perField: "vpnprofile_combine_per_field",
+        combineDetailCol: "__vpn_detail",
+        editTargets: "vpnprofile_edit_targets",
+        lsCombine: "ground-control-prof-vpn-combine-v1",
+        colLs: "ground-control-prof-vpn-columns-v1",
+        rowAriaEntitySingular: "IPsec profile",
+        labels: {
+          countSingular: "profile",
+          countPlural: "profiles",
+          emptyCache: "No VPN profiles in the cache. Enable VPN profiles sync in Inventory, then sync.",
+          emptyFilter: "No rows match the current search or filters.",
+          loadError: "Could not load VPN profiles.",
+        },
+      },
+    ],
+  });
+  var gcProfDeviceTableBundle = window.gcInitProfilesDeviceAccessPage({
+    urlTable: {{ url_api_admin_profile_table | tojson }},
+    urlCreate: {{ url_api_task_queue_enqueue_admin_profile_create | tojson }},
+    urlUpdate: {{ url_api_task_queue_enqueue_admin_profile_update | tojson }},
+    urlDeletes: {{ url_api_task_queue_enqueue_admin_profile_deletes_batch | tojson }},
+    suppressFirewallRefreshListener: true,
+  });
+  profDeviceTableHolder.table = gcProfDeviceTableBundle && gcProfDeviceTableBundle.table;
+</script>
+{% endblock %}

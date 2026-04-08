@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/static/favicon.ico" sizes="any" />
+    <title>Task Queue · Ground Control</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="gc-task-queue-embed-body">
+    {% include "task_queue_inner.html" %}
+    <script>
+      window.GC_TASK_QUEUE = {
+        listUrl: {{ url_api_task_queue_list | tojson }},
+        deleteUrl: {{ url_api_task_queue_delete | tojson }},
+        sendAllUrl: {{ url_api_task_queue_send_all | tojson }},
+        sendSelectedUrl: {{ url_api_task_queue_send_selected | tojson }},
+      };
+    </script>
+    <script src="/static/gc-table-facets.js"></script>
+    <script src="/static/gc-table-sort.js"></script>
+    <script src="/static/gc-table-lazy.js"></script>
+    <script src="/static/task-queue.js" defer></script>
+  </body>
+</html>

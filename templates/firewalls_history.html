@@ -1,0 +1,894 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "history" %}
+{% block title %}History · Firewalls · Ground Control{% endblock %}
+{% block page_title %}History{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">History</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Incoming changes from firewall syncs, task queue history (items sent to firewalls or removed from the queue), sync run logs, and access logs.
+</p>
+{% endblock %}
+{% block content %}
+<main class="layout single">
+  <section class="firewalls-page firewalls-history-page">
+    <div class="gc-tabs" role="tablist" aria-label="History views" id="gc-fw-hist-tablist">
+      <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true" id="gc-fw-hist-tab-incoming" data-gc-tab="incoming">
+        Cache Updates
+      </button>
+      <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-fw-hist-tab-outgoing" data-gc-tab="outgoing">
+        Task queue history
+      </button>
+      <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-fw-hist-tab-sync" data-gc-tab="sync">
+        Sync logs
+      </button>
+      <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-fw-hist-tab-access" data-gc-tab="access">
+        Access logs
+      </button>
+    </div>
+    <div class="gc-tab-panels">
+      <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-fw-hist-tab-incoming" id="gc-fw-hist-panel-incoming">
+        <div class="split">
+          <aside class="filters filters--collapsed" aria-label="Filters" id="gc-hist-chg-filters-aside">
+            <div id="gc-hist-chg-filters-drawer" class="filters__drawer" hidden></div>
+          </aside>
+          <div class="content-pane">
+            <div class="table-wrap gc-net-if-table-wrap">
+              <div class="firewalls-page__head">
+                <h2>Cache updates</h2>
+              </div>
+              <div class="toolbar">
+                <div class="toolbar__sheet">
+                  <div class="toolbar__line toolbar__line--main">
+                    <div class="toolbar__filters">
+                      <div class="filters__head">
+                        <button
+                          type="button"
+                          class="filters__toggle"
+                          id="gc-hist-chg-filters-toggle"
+                          aria-expanded="false"
+                          aria-controls="gc-hist-chg-filters-drawer"
+                          aria-label="Filters"
+                          title="Filters"
+                        >
+                          <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                          </svg>
+                          <span class="filters__title-label">Filters</span>
+                        </button>
+                        <div class="filters__head-actions" id="gc-hist-chg-facet-head-actions" hidden>
+                          <span class="filters__facet-count" id="gc-hist-chg-facet-count" aria-live="polite"></span>
+                          <button type="button" class="filters__facet-reset link-btn" id="gc-hist-chg-facet-reset" hidden>
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="toolbar__fw-toolbar-end">
+                      <div class="toolbar__search-cluster">
+                        <div class="search-field">
+                          <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                            />
+                          </svg>
+                          <input
+                            type="search"
+                            id="gc-hist-chg-search"
+                            class="search-field__input"
+                            placeholder="Search"
+                            autocomplete="off"
+                            aria-label="Search incoming changes"
+                          />
+                        </div>
+                        <span
+                          id="gc-hist-chg-cols-trigger"
+                          class="toolbar__cols-icon"
+                          role="button"
+                          tabindex="0"
+                          aria-expanded="false"
+                          aria-haspopup="true"
+                          aria-controls="gc-hist-chg-cols-panel"
+                          title="Columns"
+                          aria-label="Choose table columns"
+                        >
+                          <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table data-table--dense" id="gc-hist-chg-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-gc-col="id" data-gc-sort="number">ID</th>
+                      <th scope="col" data-gc-col="sync_run_id">Sync run</th>
+                      <th scope="col" data-gc-col="firewall_label">Firewall</th>
+                      <th scope="col" data-gc-col="entity_type">Type</th>
+                      <th scope="col" data-gc-col="external_name">Name</th>
+                      <th scope="col" data-gc-col="action">Action</th>
+                      <th scope="col" data-gc-col="old_payload" class="gc-col-hidden">Old payload</th>
+                      <th scope="col" data-gc-col="new_payload" class="gc-col-hidden">New payload</th>
+                      <th scope="col" data-gc-col="created_at" data-gc-sort="date">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in changelog_rows %}
+                    <tr
+                      class="gc-hist-chg-row"
+                      data-firewall-id="{{ row.firewall_id }}"
+                      data-changelog-id="{{ row.id }}"
+                      data-search="{{ row.search_blob | e }}"
+                      title="Click row to compare old vs new payload"
+                    >
+                      <td class="mono" data-gc-col="id" data-sort-value="{{ row.id }}">{{ row.id }}</td>
+                      <td class="mono muted" data-gc-col="sync_run_id">{{ row.sync_run_id }}</td>
+                      <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
+                        <span class="gc-zone-pill gc-firewall-pill">
+                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
+                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
+                          </span>
+                          <span class="mono">{{ row.firewall_label }}</span>
+                        </span>
+                      </td>
+                      <td data-gc-col="entity_type">{{ row.entity_type }}</td>
+                      <td class="mono" data-gc-col="external_name">{{ row.external_name }}</td>
+                      <td data-gc-col="action">
+                        {% set _action = (row.action or '') | lower %}
+                        <span class="gc-hist-chg-action gc-hist-chg-action--{% if _action in ['added', 'add'] %}added{% elif _action in ['deleted', 'delete'] %}deleted{% else %}changed{% endif %}">
+                          {{ row.action }}
+                        </span>
+                      </td>
+                      <td
+                        class="mono muted gc-col-hidden payload-preview-cell"
+                        data-gc-col="old_payload"
+                        {% if row.old_payload_title %}title="{{ row.old_payload_title | e }}"{% endif %}
+                      >{{ row.old_payload_preview | e }}</td>
+                      <td
+                        class="mono muted gc-col-hidden payload-preview-cell"
+                        data-gc-col="new_payload"
+                        {% if row.new_payload_title %}title="{{ row.new_payload_title | e }}"{% endif %}
+                      >{{ row.new_payload_preview | e }}</td>
+                      <td class="mono muted" data-gc-col="created_at" data-sort-value="{{ row.created_at | e }}">{{ row.created_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr class="gc-hist-chg-placeholder">
+                      <td colspan="9" class="muted">No changelog entries yet. Run a config sync from Inventory.</td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="gc-hist-chg-filter-empty" class="gc-hist-chg-filter-empty" hidden>
+                      <td colspan="9" class="muted">No rows match your search or filters.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <footer class="table-footer">
+                <span class="table-footer__count" id="gc-hist-chg-count" aria-live="polite"></span>
+              </footer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-fw-hist-tab-outgoing" id="gc-fw-hist-panel-outgoing" hidden>
+        <div class="split">
+          <aside class="filters filters--collapsed" aria-label="Filters" id="gc-hist-out-filters-aside" hidden>
+            <div id="gc-hist-out-filters-drawer" class="filters__drawer" hidden></div>
+          </aside>
+          <div class="content-pane">
+            <div class="table-wrap gc-net-if-table-wrap">
+              <div class="firewalls-page__head">
+                <h2>Task queue history</h2>
+              </div>
+              <div class="toolbar">
+                <div class="toolbar__sheet">
+                  <div class="toolbar__line toolbar__line--main">
+                    <div class="toolbar__filters">
+                      <div class="filters__head">
+                        <button
+                          type="button"
+                          class="filters__toggle"
+                          id="gc-hist-out-filters-toggle"
+                          aria-expanded="false"
+                          aria-controls="gc-hist-out-filters-drawer"
+                          aria-label="Filters"
+                          title="Filters"
+                        >
+                          <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                          </svg>
+                          <span class="filters__title-label">Filters</span>
+                        </button>
+                        <div class="filters__head-actions" id="gc-hist-out-facet-head-actions" hidden>
+                          <span class="filters__facet-count" id="gc-hist-out-facet-count" aria-live="polite"></span>
+                          <button type="button" class="filters__facet-reset link-btn" id="gc-hist-out-facet-reset" hidden>
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="toolbar__fw-toolbar-end">
+                      <div class="toolbar__search-cluster">
+                        <div class="search-field">
+                          <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                            />
+                          </svg>
+                          <input
+                            type="search"
+                            id="gc-hist-out-search"
+                            class="search-field__input"
+                            placeholder="Search"
+                            autocomplete="off"
+                            aria-label="Search task queue history"
+                          />
+                        </div>
+                        <span
+                          id="gc-hist-out-cols-trigger"
+                          class="toolbar__cols-icon"
+                          role="button"
+                          tabindex="0"
+                          aria-expanded="false"
+                          aria-haspopup="true"
+                          aria-controls="gc-hist-out-cols-panel"
+                          title="Columns"
+                          aria-label="Choose table columns"
+                        >
+                          <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table data-table--dense" id="gc-hist-out-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-gc-col="id" data-gc-sort="number">ID</th>
+                      <th scope="col" data-gc-col="source_task_id" data-gc-sort="number" class="gc-col-hidden">Queue ID</th>
+                      <th scope="col" data-gc-col="firewall_label">Firewall</th>
+                      <th scope="col" data-gc-col="entity_type">Type</th>
+                      <th scope="col" data-gc-col="external_name">Name</th>
+                      <th scope="col" data-gc-col="outcome_label">Status</th>
+                      <th scope="col" data-gc-col="created_by_username">Queued by</th>
+                      <th scope="col" data-gc-col="completed_by_username">Completed by</th>
+                      <th scope="col" data-gc-col="created_at" data-gc-sort="date">Queued</th>
+                      <th scope="col" data-gc-col="completed_at" data-gc-sort="date">Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in outgoing_rows %}
+                    <tr
+                      class="gc-hist-out-row"
+                      data-firewall-id="{{ row.firewall_id }}"
+                      data-completed-id="{{ row.id }}"
+                      data-outcome="{{ row.outcome or 'sent' }}"
+                      data-search="{{ row.search_blob | e }}"
+                      title="Click to view proposed change vs local cache"
+                    >
+                      <td class="mono" data-gc-col="id" data-sort-value="{{ row.id }}">{{ row.id }}</td>
+                      <td class="mono muted gc-col-hidden" data-gc-col="source_task_id" data-sort-value="{{ row.source_task_id or 0 }}">{{ row.source_task_id or "—" }}</td>
+                      <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
+                        {% if row.firewall_id %}
+                        <span class="gc-zone-pill gc-firewall-pill">
+                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
+                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
+                          </span>
+                          <span class="mono">{{ row.firewall_label }}</span>
+                        </span>
+                        {% else %}
+                        <span class="muted">{{ row.firewall_label }}</span>
+                        {% endif %}
+                      </td>
+                      <td data-gc-col="entity_type">{{ row.entity_type }}</td>
+                      <td class="mono" data-gc-col="external_name">{{ row.external_name }}</td>
+                      <td data-gc-col="outcome_label">
+                        {% if row.outcome == 'removed_from_queue' %}
+                        <span class="gc-hist-out-status gc-hist-out-status--removed" data-gc-hist-out-status="removed">{{ row.outcome_label }}</span>
+                        {% else %}
+                        <span class="gc-hist-out-status gc-hist-out-status--sent" data-gc-hist-out-status="sent">{{ row.outcome_label }}</span>
+                        {% endif %}
+                      </td>
+                      <td data-gc-col="created_by_username">{{ row.created_by_username or "—" }}</td>
+                      <td data-gc-col="completed_by_username">{{ row.completed_by_username or "—" }}</td>
+                      <td class="mono muted" data-gc-col="created_at" data-sort-value="{{ row.created_at | e }}">{{ row.created_at }}</td>
+                      <td class="mono muted" data-gc-col="completed_at" data-sort-value="{{ row.completed_at | e }}">{{ row.completed_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr class="gc-hist-out-placeholder">
+                      <td colspan="10" class="muted">No task queue history yet. Send or remove items from the Task Queue to record them here.</td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="gc-hist-out-filter-empty" class="gc-hist-out-filter-empty" hidden>
+                      <td colspan="10" class="muted">No rows match your search or filters.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <footer class="table-footer">
+                <span class="table-footer__count" id="gc-hist-out-count" aria-live="polite"></span>
+              </footer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-fw-hist-tab-sync" id="gc-fw-hist-panel-sync" hidden>
+        <div class="split">
+          <aside class="filters filters--collapsed" aria-label="Filters" id="gc-hist-sync-filters-aside" hidden>
+            <div id="gc-hist-sync-filters-drawer" class="filters__drawer" hidden></div>
+          </aside>
+          <div class="content-pane">
+            <div class="table-wrap gc-net-if-table-wrap">
+              <div class="firewalls-page__head">
+                <h2>Sync runs</h2>
+              </div>
+              <div class="toolbar">
+                <div class="toolbar__sheet">
+                  <div class="toolbar__line toolbar__line--main">
+                    <div class="toolbar__filters">
+                      <div class="filters__head">
+                        <button
+                          type="button"
+                          class="filters__toggle"
+                          id="gc-hist-sync-filters-toggle"
+                          aria-expanded="false"
+                          aria-controls="gc-hist-sync-filters-drawer"
+                          aria-label="Filters"
+                          title="Filters"
+                        >
+                          <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                          </svg>
+                          <span class="filters__title-label">Filters</span>
+                        </button>
+                        <div class="filters__head-actions" id="gc-hist-sync-facet-head-actions" hidden>
+                          <span class="filters__facet-count" id="gc-hist-sync-facet-count" aria-live="polite"></span>
+                          <button type="button" class="filters__facet-reset link-btn" id="gc-hist-sync-facet-reset" hidden>
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="toolbar__fw-toolbar-end">
+                      <div class="toolbar__search-cluster">
+                        <div class="search-field">
+                          <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                            />
+                          </svg>
+                          <input
+                            type="search"
+                            id="gc-hist-sync-search"
+                            class="search-field__input"
+                            placeholder="Search"
+                            autocomplete="off"
+                            aria-label="Search sync logs"
+                          />
+                        </div>
+                        <span
+                          id="gc-hist-sync-cols-trigger"
+                          class="toolbar__cols-icon"
+                          role="button"
+                          tabindex="0"
+                          aria-expanded="false"
+                          aria-haspopup="true"
+                          aria-controls="gc-hist-sync-cols-panel"
+                          title="Columns"
+                          aria-label="Choose table columns"
+                        >
+                          <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table data-table--dense" id="gc-hist-sync-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-gc-col="id">Run ID</th>
+                      <th scope="col" data-gc-col="firewall_label">Firewall</th>
+                      <th scope="col" data-gc-col="started_at" data-gc-sort="date">Started</th>
+                      <th scope="col" data-gc-col="finished_at" data-gc-sort="date">Finished</th>
+                      <th scope="col" data-gc-col="status">Status</th>
+                      <th scope="col" data-gc-col="error_message">Error</th>
+                      <th scope="col" data-gc-col="added_count" data-gc-sort="number">Added</th>
+                      <th scope="col" data-gc-col="changed_count" data-gc-sort="number">Changed</th>
+                      <th scope="col" data-gc-col="deleted_count" data-gc-sort="number">Deleted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in sync_rows %}
+                    <tr
+                      class="gc-hist-sync-row"
+                      data-sync-run-id="{{ row.id }}"
+                      data-firewall-id="{{ row.firewall_id }}"
+                      data-search="{{ row.search_blob | e }}"
+                      title="Click row for sync details"
+                    >
+                      <td class="mono muted" data-gc-col="id">{{ row.id }}</td>
+                      <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
+                        <span class="gc-zone-pill gc-firewall-pill">
+                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
+                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
+                          </span>
+                          <span class="mono">{{ row.firewall_label }}</span>
+                        </span>
+                      </td>
+                      <td class="mono muted" data-gc-col="started_at" data-sort-value="{{ row.started_at | e }}">{{ row.started_at }}</td>
+                      <td class="mono muted" data-gc-col="finished_at" data-sort-value="{{ row.finished_at | e }}">{{ row.finished_at or "—" }}</td>
+                      <td data-gc-col="status">{{ row.status }}</td>
+                      <td class="muted" data-gc-col="error_message">{{ row.error_message or "—" }}</td>
+                      <td class="mono" data-gc-col="added_count" data-sort-value="{{ row.added_count }}">{{ row.added_count }}</td>
+                      <td class="mono" data-gc-col="changed_count" data-sort-value="{{ row.changed_count }}">{{ row.changed_count }}</td>
+                      <td class="mono" data-gc-col="deleted_count" data-sort-value="{{ row.deleted_count }}">{{ row.deleted_count }}</td>
+                    </tr>
+                    {% else %}
+                    <tr class="gc-hist-sync-placeholder">
+                      <td colspan="9" class="muted">No sync runs yet. Run a config sync from Inventory.</td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="gc-hist-sync-filter-empty" class="gc-hist-sync-filter-empty" hidden>
+                      <td colspan="9" class="muted">No rows match your search or filters.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <footer class="table-footer">
+                <span class="table-footer__count" id="gc-hist-sync-count" aria-live="polite"></span>
+              </footer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-fw-hist-tab-access" id="gc-fw-hist-panel-access" hidden>
+        <div class="split">
+          <aside class="filters filters--collapsed" aria-label="Filters" id="gc-hist-access-filters-aside" hidden>
+            <div id="gc-hist-access-filters-drawer" class="filters__drawer" hidden></div>
+          </aside>
+          <div class="content-pane">
+            <div class="table-wrap gc-net-if-table-wrap">
+              <div class="firewalls-page__head">
+                <h2>Access logs</h2>
+              </div>
+              <div class="toolbar">
+                <div class="toolbar__sheet">
+                  <div class="toolbar__line toolbar__line--main">
+                    <div class="toolbar__filters">
+                      <div class="filters__head">
+                        <button
+                          type="button"
+                          class="filters__toggle"
+                          id="gc-hist-access-filters-toggle"
+                          aria-expanded="false"
+                          aria-controls="gc-hist-access-filters-drawer"
+                          aria-label="Filters"
+                          title="Filters"
+                        >
+                          <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                          </svg>
+                          <span class="filters__title-label">Filters</span>
+                        </button>
+                        <div class="filters__head-actions" id="gc-hist-access-facet-head-actions" hidden>
+                          <span class="filters__facet-count" id="gc-hist-access-facet-count" aria-live="polite"></span>
+                          <button type="button" class="filters__facet-reset link-btn" id="gc-hist-access-facet-reset" hidden>
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="toolbar__fw-toolbar-end">
+                      <div class="toolbar__search-cluster">
+                        <div class="search-field">
+                          <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                            />
+                          </svg>
+                          <input
+                            type="search"
+                            id="gc-hist-access-search"
+                            class="search-field__input"
+                            placeholder="Search"
+                            autocomplete="off"
+                            aria-label="Search access logs"
+                          />
+                        </div>
+                        <span
+                          id="gc-hist-access-cols-trigger"
+                          class="toolbar__cols-icon"
+                          role="button"
+                          tabindex="0"
+                          aria-expanded="false"
+                          aria-haspopup="true"
+                          aria-controls="gc-hist-access-cols-panel"
+                          title="Columns"
+                          aria-label="Choose table columns"
+                        >
+                          <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table data-table--dense" id="gc-hist-access-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-gc-col="id" data-gc-sort="number">ID</th>
+                      <th scope="col" data-gc-col="session_id" class="gc-col-hidden">Session ID</th>
+                      <th scope="col" data-gc-col="firewall_label">Firewall</th>
+                      <th scope="col" data-gc-col="access_type">Access type</th>
+                      <th scope="col" data-gc-col="event_label">Event</th>
+                      <th scope="col" data-gc-col="connected_label">Connected</th>
+                      <th scope="col" data-gc-col="initiated_by_username">Initiated by</th>
+                      <th scope="col" data-gc-col="client_ip">Client IP</th>
+                      <th scope="col" data-gc-col="details" class="gc-col-hidden">Details</th>
+                      <th scope="col" data-gc-col="created_at" data-gc-sort="date">When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in access_rows %}
+                    <tr
+                      class="gc-hist-access-row"
+                      data-firewall-id="{{ row.firewall_id }}"
+                      data-search="{{ row.search_blob | e }}"
+                    >
+                      <td class="mono" data-gc-col="id" data-sort-value="{{ row.id }}">{{ row.id }}</td>
+                      <td class="mono muted gc-col-hidden" data-gc-col="session_id">{{ row.session_id }}</td>
+                      <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
+                        {% if row.firewall_id %}
+                        <span class="gc-zone-pill gc-firewall-pill">
+                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
+                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
+                          </span>
+                          <span class="mono">{{ row.firewall_label }}</span>
+                        </span>
+                        {% else %}
+                        <span class="muted">{{ row.firewall_label }}</span>
+                        {% endif %}
+                      </td>
+                      <td data-gc-col="access_type">
+                        <span class="gc-hist-access-type gc-hist-access-type--{{ row.access_type_key or 'other' }}">{{ row.access_type }}</span>
+                      </td>
+                      <td data-gc-col="event_label">{{ row.event_label }}</td>
+                      <td data-gc-col="connected_label">{{ row.connected_label }}</td>
+                      <td data-gc-col="initiated_by_username">{{ row.initiated_by_username or "—" }}</td>
+                      <td class="mono muted" data-gc-col="client_ip">{{ row.client_ip or "—" }}</td>
+                      <td class="muted gc-col-hidden" data-gc-col="details">{{ row.details or "—" }}</td>
+                      <td class="mono muted" data-gc-col="created_at" data-sort-value="{{ row.created_at | e }}">{{ row.created_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr class="gc-hist-access-placeholder">
+                      <td colspan="10" class="muted">No access logs yet. Open an SSH or WebAdmin session to start logging.</td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="gc-hist-access-filter-empty" class="gc-hist-access-filter-empty" hidden>
+                      <td colspan="10" class="muted">No rows match your search or filters.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <footer class="table-footer">
+                <span class="table-footer__count" id="gc-hist-access-count" aria-live="polite"></span>
+              </footer>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="gc-hist-chg-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="gc-hist-chg-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-hist-chg-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="gc-hist-chg-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="gc-hist-chg-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="gc-hist-chg-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="gc-hist-chg-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>
+
+<div id="gc-hist-out-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="gc-hist-out-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-hist-out-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="gc-hist-out-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="gc-hist-out-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="gc-hist-out-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="gc-hist-out-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>
+
+<div id="gc-hist-sync-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="gc-hist-sync-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-hist-sync-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="gc-hist-sync-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="gc-hist-sync-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="gc-hist-sync-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="gc-hist-sync-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>
+
+<div id="gc-hist-access-cols-modal" class="fw-cols-modal" hidden aria-hidden="true">
+  <div class="fw-cols-modal__backdrop" aria-hidden="true"></div>
+  <div id="gc-hist-access-cols-panel" class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-hist-access-cols-modal-title">
+    <div class="fw-cols-modal__header">
+      <h2 id="gc-hist-access-cols-modal-title" class="fw-cols-modal__title">Table columns</h2>
+      <button type="button" class="fw-cols-modal__close" id="gc-hist-access-cols-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <input
+      type="search"
+      id="gc-hist-access-cols-filter"
+      class="fw-cols-modal__filter"
+      placeholder="Search columns"
+      autocomplete="off"
+      aria-label="Search columns"
+    />
+    <ul id="gc-hist-access-cols-list" class="fw-cols-modal__list"></ul>
+  </div>
+</div>
+
+<div id="gc-hist-chg-compare-modal" class="task-queue-compare-modal" hidden aria-hidden="true">
+  <div class="task-queue-compare-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    id="gc-hist-chg-compare-panel"
+    class="task-queue-compare-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-hist-chg-compare-title"
+  >
+    <div class="task-queue-compare-modal__header">
+      <h2 id="gc-hist-chg-compare-title" class="task-queue-compare-modal__title">Config change</h2>
+      <button type="button" class="task-queue-compare-modal__close" id="gc-hist-chg-compare-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <p id="gc-hist-chg-compare-meta" class="task-queue-compare-modal__meta muted"></p>
+    <p id="gc-hist-chg-compare-missing" class="task-queue-compare-modal__missing muted" hidden></p>
+    <div class="task-queue-compare-scroll">
+      <table class="task-queue-diff-table" role="grid" aria-label="Previous versus new payload">
+        <thead>
+          <tr>
+            <th scope="col" class="task-queue-diff-table__th">Previous</th>
+            <th scope="col" class="task-queue-diff-table__th">New</th>
+          </tr>
+        </thead>
+        <tbody id="gc-hist-chg-diff-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="gc-hist-out-compare-modal" class="task-queue-compare-modal" hidden aria-hidden="true">
+  <div class="task-queue-compare-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    id="gc-hist-out-compare-panel"
+    class="task-queue-compare-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-hist-out-compare-title"
+  >
+    <div class="task-queue-compare-modal__header">
+      <h2 id="gc-hist-out-compare-title" class="task-queue-compare-modal__title">Task queue entry</h2>
+      <button type="button" class="task-queue-compare-modal__close" id="gc-hist-out-compare-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <p id="gc-hist-out-compare-meta" class="task-queue-compare-modal__meta muted"></p>
+    <p id="gc-hist-out-compare-missing" class="task-queue-compare-modal__missing muted" hidden></p>
+    <p id="gc-hist-out-compare-outcome-banner" class="task-queue-compare-modal__outcome-banner" hidden></p>
+    <div class="task-queue-compare-scroll">
+      <table class="task-queue-diff-table" role="grid" aria-label="Local cache versus proposed change">
+        <thead>
+          <tr>
+            <th scope="col" class="task-queue-diff-table__th" id="gc-hist-out-diff-th-left">Stored (local cache)</th>
+            <th scope="col" class="task-queue-diff-table__th" id="gc-hist-out-diff-th-right">Proposed change</th>
+          </tr>
+        </thead>
+        <tbody id="gc-hist-out-diff-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="gc-hist-sync-detail-modal" class="task-queue-compare-modal" hidden aria-hidden="true">
+  <div class="task-queue-compare-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    id="gc-hist-sync-detail-panel"
+    class="task-queue-compare-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-hist-sync-detail-title"
+  >
+    <div class="task-queue-compare-modal__header">
+      <h2 id="gc-hist-sync-detail-title" class="task-queue-compare-modal__title">Sync run details</h2>
+      <button type="button" class="task-queue-compare-modal__close" id="gc-hist-sync-detail-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <p id="gc-hist-sync-detail-meta" class="task-queue-compare-modal__meta muted"></p>
+    <div class="task-queue-compare-scroll">
+      <div id="gc-hist-sync-detail-body" class="gc-sync-run-detail-body"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% set _changelog_cmp = request.url_for('api_firewall_changelog_compare', entry_id=888888888) | string %}
+{% set _out_cmp = request.url_for('api_task_queue_completed_compare', completed_id=888888888) | string %}
+{% set _sync_run_d = request.url_for('api_firewall_sync_run_details', sync_run_id='00000000-0000-0000-0000-000000000000') | string %}
+<script>
+  window.GC_FIREWALLS_HISTORY = {
+    changelogCompareUrlTpl: {{ _changelog_cmp.replace('888888888', '__ID__') | tojson }},
+    completedCompareUrlTpl: {{ _out_cmp.replace('888888888', '__ID__') | tojson }},
+    syncRunDetailsUrlTpl: {{ _sync_run_d.replace('00000000-0000-0000-0000-000000000000', '__RUN_ID__') | tojson }},
+    outgoingListUrl: {{ request.url_for('api_task_queue_completed_list') | string | tojson }},
+    outgoingPageSize: {{ outgoing_page_size | tojson }},
+    outgoingHasMore: {{ outgoing_has_more | tojson }},
+    outgoingInitialCount: {{ outgoing_rows | length }},
+    tabLsKey: "ground-control-firewalls-history-tab",
+    filterAsideIds: [
+      { id: "gc-hist-chg-filters-aside", tab: "incoming" },
+      { id: "gc-hist-out-filters-aside", tab: "outgoing" },
+      { id: "gc-hist-sync-filters-aside", tab: "sync" },
+      { id: "gc-hist-access-filters-aside", tab: "access" },
+    ],
+    tables: [
+      {
+        prefix: "gc-hist-chg",
+        facetStorageKey: "gc-hist-chg",
+        lsKeyCols: "ground-control-fw-hist-chg-cols-v1",
+        colCheckboxAttr: "data-gc-hist-chg-col",
+        tableId: "gc-hist-chg-table",
+        rowClass: "gc-hist-chg-row",
+        placeholderRowClass: "gc-hist-chg-placeholder",
+        filterEmptyRowId: "gc-hist-chg-filter-empty",
+        countElId: "gc-hist-chg-count",
+        cols: [
+          { id: "id", label: "ID" },
+          { id: "sync_run_id", label: "Sync run" },
+          { id: "firewall_label", label: "Firewall" },
+          { id: "entity_type", label: "Type" },
+          { id: "external_name", label: "Name" },
+          { id: "action", label: "Action" },
+          { id: "old_payload", label: "Old payload", defaultHidden: true },
+          { id: "new_payload", label: "New payload", defaultHidden: true },
+          { id: "created_at", label: "Created" },
+        ],
+      },
+      {
+        prefix: "gc-hist-sync",
+        facetStorageKey: "gc-hist-sync",
+        lsKeyCols: "ground-control-fw-hist-sync-cols-v1",
+        colCheckboxAttr: "data-gc-hist-sync-col",
+        tableId: "gc-hist-sync-table",
+        rowClass: "gc-hist-sync-row",
+        placeholderRowClass: "gc-hist-sync-placeholder",
+        filterEmptyRowId: "gc-hist-sync-filter-empty",
+        countElId: "gc-hist-sync-count",
+        cols: [
+          { id: "id", label: "Run ID" },
+          { id: "firewall_label", label: "Firewall" },
+          { id: "started_at", label: "Started" },
+          { id: "finished_at", label: "Finished" },
+          { id: "status", label: "Status" },
+          { id: "error_message", label: "Error" },
+          { id: "added_count", label: "Added" },
+          { id: "changed_count", label: "Changed" },
+          { id: "deleted_count", label: "Deleted" },
+        ],
+      },
+      {
+        prefix: "gc-hist-out",
+        facetStorageKey: "gc-hist-out",
+        lsKeyCols: "ground-control-fw-hist-out-cols-v2",
+        colCheckboxAttr: "data-gc-hist-out-col",
+        tableId: "gc-hist-out-table",
+        rowClass: "gc-hist-out-row",
+        placeholderRowClass: "gc-hist-out-placeholder",
+        filterEmptyRowId: "gc-hist-out-filter-empty",
+        countElId: "gc-hist-out-count",
+        cols: [
+          { id: "id", label: "ID" },
+          { id: "source_task_id", label: "Queue ID", defaultHidden: true },
+          { id: "firewall_label", label: "Firewall" },
+          { id: "entity_type", label: "Type" },
+          { id: "external_name", label: "Name" },
+          { id: "outcome_label", label: "Status" },
+          { id: "created_by_username", label: "Queued by" },
+          { id: "completed_by_username", label: "Completed by" },
+          { id: "created_at", label: "Queued" },
+          { id: "completed_at", label: "Completed" },
+        ],
+      },
+      {
+        prefix: "gc-hist-access",
+        facetStorageKey: "gc-hist-access",
+        lsKeyCols: "ground-control-fw-hist-access-cols-v1",
+        colCheckboxAttr: "data-gc-hist-access-col",
+        tableId: "gc-hist-access-table",
+        rowClass: "gc-hist-access-row",
+        placeholderRowClass: "gc-hist-access-placeholder",
+        filterEmptyRowId: "gc-hist-access-filter-empty",
+        countElId: "gc-hist-access-count",
+        cols: [
+          { id: "id", label: "ID" },
+          { id: "session_id", label: "Session ID", defaultHidden: true },
+          { id: "firewall_label", label: "Firewall" },
+          { id: "access_type", label: "Access type" },
+          { id: "event_label", label: "Event" },
+          { id: "connected_label", label: "Connected" },
+          { id: "initiated_by_username", label: "Initiated by" },
+          { id: "client_ip", label: "Client IP" },
+          { id: "details", label: "Details", defaultHidden: true },
+          { id: "created_at", label: "When" },
+        ],
+      },
+    ],
+  };
+</script>
+<script src="/static/firewalls-history.js" defer></script>
+{% endblock %}

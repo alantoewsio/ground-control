@@ -1,0 +1,225 @@
+{# Bridge pair add/edit flyout #}
+<div id="gc-net-bridge-pair-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-bridge-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-bridge-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-bridge-flyout-title" class="gc-if-flyout__title">Edit bridge pair</h2>
+    </header>
+    <form id="gc-bridge-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="gc-if-flyout__section-label">General settings</p>
+          <div id="gc-bridge-flyout-target-fw-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-bridge-flyout-add-firewall">Firewall <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-bridge-flyout-add-firewall" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div id="gc-bridge-flyout-target-cfg-row" class="gc-if-flyout__field" hidden>
+            <label class="gc-if-flyout__label" for="gc-bridge-flyout-add-configuration">Configuration <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <select id="gc-bridge-flyout-add-configuration" class="gc-if-flyout__input gc-if-flyout__select"></select>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-bridge-flyout-name">Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <input type="text" id="gc-bridge-flyout-name" class="gc-if-flyout__input" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-bridge-flyout-hardware">Hardware <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+            <input type="text" id="gc-bridge-flyout-hardware" class="gc-if-flyout__input mono" autocomplete="off" required />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-bridge-flyout-description">Description</label>
+            <textarea id="gc-bridge-flyout-description" class="gc-if-flyout__input gc-bridge-flyout__textarea" rows="2" placeholder="Enter description"></textarea>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+            <label class="gc-if-flyout__toggle-label">
+              <input type="checkbox" id="gc-bridge-flyout-routing" />
+              <span>Enable routing on this bridge pair</span>
+            </label>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+          <p class="gc-if-flyout__section-label gc-bridge-flyout__members-title gc-bridge-flyout__members-head">Member interfaces</p>
+          <div class="gc-bridge-flyout__members-table-wrap">
+            <table class="gc-bridge-flyout__members-table" aria-label="Member interfaces">
+              <thead>
+                <tr>
+                  <th scope="col">Interface</th>
+                  <th scope="col">Zone</th>
+                  <th scope="col" class="gc-bridge-flyout__members-actions-col"></th>
+                </tr>
+              </thead>
+              <tbody id="gc-bridge-flyout-members-tbody"></tbody>
+            </table>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+          <div class="gc-if-flyout__check-head">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-bridge-flyout-ipv4-enabled" />
+              <span>IPv4 configuration</span>
+            </label>
+          </div>
+          <div id="gc-bridge-flyout-ipv4-body" class="gc-if-flyout__subsection">
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">IP assignment</legend>
+              <div class="gc-if-flyout__radios">
+                <label><input type="radio" name="gc-bridge-ipv4-mode" value="static" checked /> Static</label>
+                <label><input type="radio" name="gc-bridge-ipv4-mode" value="dhcp" /> DHCP</label>
+              </div>
+            </fieldset>
+            <div class="gc-if-flyout__field-row">
+              <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                <label class="gc-if-flyout__label" for="gc-bridge-flyout-ipv4-ip">IPv4</label>
+                <input type="text" id="gc-bridge-flyout-ipv4-ip" class="gc-if-flyout__input mono" autocomplete="off" title="Dotted quad or CIDR, e.g. 192.168.1.1/24 (parsed on leave)" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--half">
+                <label class="gc-if-flyout__label" for="gc-bridge-flyout-ipv4-netmask">Netmask</label>
+                <input type="text" id="gc-bridge-flyout-ipv4-netmask" class="gc-if-flyout__input mono" autocomplete="off" title="/24, plain prefix (0–32), or dotted mask — normalized on leave" />
+              </div>
+            </div>
+          </div>
+
+          <div class="gc-if-flyout__check-head">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-bridge-flyout-ipv6-enabled" />
+              <span>IPv6 configuration</span>
+            </label>
+          </div>
+          <div id="gc-bridge-flyout-ipv6-body" class="gc-if-flyout__subsection" hidden>
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">IP assignment</legend>
+              <div class="gc-if-flyout__radios">
+                <label><input type="radio" name="gc-bridge-ipv6-mode" value="static" checked /> Static</label>
+                <label><input type="radio" name="gc-bridge-ipv6-mode" value="dhcp" /> DHCP</label>
+                <label>
+                  <input type="radio" name="gc-bridge-ipv6-mode" value="delegated" /> Delegated
+                  <span
+                    class="gc-if-flyout__info"
+                    title="Delegated IP assignment automatically assigns IPv6 addresses to internal interfaces. Select it when the firewall uses DHCP prefix delegation to get an IPv6 prefix from your ISP's router, which delegates the prefix to your network."
+                    >i</span>
+                </label>
+              </div>
+            </fieldset>
+            <div class="gc-if-flyout__field-row">
+              <div class="gc-if-flyout__field gc-if-flyout__field--grow">
+                <label class="gc-if-flyout__label" for="gc-bridge-flyout-ipv6-ip">IPv6 / prefix <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                <input type="text" id="gc-bridge-flyout-ipv6-ip" class="gc-if-flyout__input mono" autocomplete="off" title="Address only or full CIDR, e.g. 2001:db8::1/64 (parsed on leave)" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--narrow">
+                <label class="gc-if-flyout__label" for="gc-bridge-flyout-ipv6-prefix">&nbsp;</label>
+                <input type="text" id="gc-bridge-flyout-ipv6-prefix" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+            <div id="gc-bridge-flyout-ipv6-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+              <p class="gc-if-flyout__subhead">Gateway detail</p>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="gc-bridge-flyout-ipv6-gw-name">Gateway name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                <input type="text" id="gc-bridge-flyout-ipv6-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="gc-bridge-flyout-ipv6-gw-ip">Gateway IP <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                <input type="text" id="gc-bridge-flyout-ipv6-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+          <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+            <label class="gc-if-flyout__toggle-label">
+              <input type="checkbox" id="gc-bridge-flyout-filter-vlan" />
+              <span>Filter VLANs</span>
+            </label>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-bridge-flyout-vlan-ids">Permitted VLAN ID or ID range</label>
+            <input type="text" id="gc-bridge-flyout-vlan-ids" class="gc-if-flyout__input mono" autocomplete="off" placeholder="e.g. 20–35 or 100" />
+            <p class="gc-if-flyout__range-hint">For VLAN ID, enter a number or range (example: 20–35).</p>
+          </div>
+
+          <button
+            type="button"
+            class="gc-if-flyout__adv-toggle"
+            id="gc-bridge-flyout-adv-toggle"
+            aria-expanded="false"
+          >
+            <span class="gc-if-flyout__adv-toggle-text">Advanced settings</span>
+            <span class="gc-if-flyout__adv-toggle-ic" aria-hidden="true">▼</span>
+          </button>
+          <div id="gc-bridge-flyout-adv-body" class="gc-if-flyout__adv-block" hidden>
+            <div class="gc-bridge-flyout__adv-cols">
+              <div class="gc-bridge-flyout__adv-col">
+                <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+                  <label class="gc-if-flyout__toggle-label">
+                    <input type="checkbox" id="gc-bridge-flyout-arp" checked />
+                    <span>Permit ARP broadcast</span>
+                  </label>
+                </div>
+                <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+                  <label class="gc-if-flyout__toggle-label">
+                    <input type="checkbox" id="gc-bridge-flyout-stp" />
+                    <span>Turn on Spanning Tree Protocol (STP)</span>
+                  </label>
+                </div>
+                <div class="gc-if-flyout__field">
+                  <label class="gc-if-flyout__label" for="gc-bridge-flyout-stp-max">STP max age (seconds)</label>
+                  <input type="text" id="gc-bridge-flyout-stp-max" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                  <span class="gc-if-flyout__range-hint">(6–40)</span>
+                </div>
+                <div class="gc-if-flyout__field">
+                  <label class="gc-if-flyout__label" for="gc-bridge-flyout-mac-aging">MAC aging (seconds)</label>
+                  <input type="text" id="gc-bridge-flyout-mac-aging" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                  <span class="gc-if-flyout__range-hint">(0–65535)</span>
+                </div>
+              </div>
+              <div class="gc-bridge-flyout__adv-col">
+                <div class="gc-if-flyout__field">
+                  <label class="gc-if-flyout__label" for="gc-bridge-flyout-mtu">MTU</label>
+                  <input type="text" id="gc-bridge-flyout-mtu" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                  <span class="gc-if-flyout__range-hint">(576–9000)</span>
+                </div>
+                <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+                  <label class="gc-if-flyout__toggle-label">
+                    <input type="checkbox" id="gc-bridge-flyout-mss-cb" />
+                    <span>Override MSS</span>
+                  </label>
+                </div>
+                <div class="gc-if-flyout__field">
+                  <label class="gc-if-flyout__label" for="gc-bridge-flyout-mss">MSS</label>
+                  <input type="text" id="gc-bridge-flyout-mss" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                  <span class="gc-if-flyout__range-hint">(536–8960)</span>
+                </div>
+              </div>
+              <div class="gc-bridge-flyout__adv-col">
+                <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+                  <label class="gc-if-flyout__toggle-label">
+                    <input type="checkbox" id="gc-bridge-flyout-filter-eth" />
+                    <span>Filter Ethernet frames</span>
+                  </label>
+                </div>
+                <div class="gc-if-flyout__field">
+                  <label class="gc-if-flyout__label" for="gc-bridge-flyout-eth-types">Forwarded Ethernet frame types</label>
+                  <input type="text" id="gc-bridge-flyout-eth-types" class="gc-if-flyout__input mono" autocomplete="off" placeholder="Comma-separated" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-bridge-flyout-save" disabled>Save</button>
+        <button type="button" class="link-btn" id="gc-bridge-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>

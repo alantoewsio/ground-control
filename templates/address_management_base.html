@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set show_address_management_sidebar = true %}
+{% set top_nav_active = top_nav_active | default("address_management") %}
+{% block app_sidebar %}
+<div class="app-sidebar__inner">
+  <button
+    type="button"
+    class="app-sidebar__toggle"
+    id="app-sidebar-toggle"
+    aria-expanded="true"
+    title="Collapse navigation"
+    aria-label="Collapse navigation"
+  >
+    <span class="app-sidebar__toggle-icon" aria-hidden="true">
+      <svg
+        class="app-sidebar__collapse-svg"
+        viewBox="0 0 28 22"
+        width="25"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          class="app-sidebar__collapse-bars"
+          fill="currentColor"
+          d="M1.25 4.25h14.5v2.35H1.25zm0 5.575h10.25v2.35H1.25zm0 5.575h16.25v2.35H1.25z"
+        />
+        <g class="app-sidebar__collapse-arrow-wrap">
+          <path fill="currentColor" d="M16.35 11L25 3.35v15.3L16.35 11z" />
+        </g>
+      </svg>
+    </span>
+  </button>
+  <p class="app-sidebar__title" id="app-nav-heading-address-mgmt">Address Management</p>
+  <div class="app-sidebar__nav-scroll">
+    <nav class="app-nav" aria-labelledby="app-nav-heading-address-mgmt" aria-orientation="vertical">
+      <p class="app-nav__section">Address plan</p>
+      <a
+        href="/address-management/pools"
+        class="app-nav__item{% if ipam_subnav_active == 'pools' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M4 8h4v4H4V8zm6-4h4v4h-4V4zm0 6h4v4h-4v-4zm6-6h4v4h-4V4zm0 6h4v4h-4v-4zM4 14h4v4H4v-4zm6 0h4v4h-4v-4z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Pools</span>
+      </a>
+      <a
+        href="/address-management/assignments"
+        class="app-nav__item{% if ipam_subnav_active == 'assignments' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1.41c0-2 4-3.1 6-3.1s6 1.1 6 3.1V18z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Assignments</span>
+      </a>
+      <a
+        href="/address-management/hosts"
+        class="app-nav__item{% if ipam_subnav_active == 'hosts' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Hosts</span>
+      </a>
+      <p class="app-nav__section">Registry</p>
+      <a
+        href="/address-management/vrfs"
+        class="app-nav__item{% if ipam_subnav_active == 'vrfs' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">VRFs</span>
+      </a>
+    </nav>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+{% block address_management_body %}{% endblock %}
+{% endblock %}

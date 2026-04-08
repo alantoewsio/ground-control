@@ -1,0 +1,19 @@
+services:
+  ground-control:
+    build: .
+    image: ground-control:local
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    environment:
+      GROUND_CONTROL_BIND_ADDRESS: "0.0.0.0"
+      PORT: "8000"
+      GROUND_CONTROL_HTTPS_PORT: "8443"
+      GROUND_CONTROL_DATABASE_URL: sqlite:////data/ground_control.db
+      GROUND_CONTROL_MONITOR_DATABASE_URL: sqlite:////data/ground_control_monitor.db
+      GROUND_CONTROL_SECRETS_DATABASE_URL: sqlite:////data/ground_control_secrets.db
+    volumes:
+      - ground_control_data:/data
+
+volumes:
+  ground_control_data:

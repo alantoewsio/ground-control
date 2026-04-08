@@ -1,0 +1,741 @@
+{% extends "address_management_base.html" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_cols_modal %}
+{% if ipam_page == "pools" %}
+  {% set ipam_heading = "Pools" %}
+  {% set ipam_add_label = "Add pool" %}
+{% elif ipam_page == "assignments" %}
+  {% set ipam_heading = "Assignments" %}
+  {% set ipam_add_label = "Add assignment" %}
+{% elif ipam_page == "hosts" %}
+  {% set ipam_heading = "Hosts" %}
+  {% set ipam_add_label = "Add host" %}
+{% else %}
+  {% set ipam_heading = "VRFs" %}
+  {% set ipam_add_label = "Add VRF" %}
+{% endif %}
+{% block title %}Address Management · Ground Control{% endblock %}
+{% block page_title %}Address Management{% endblock %}
+{% block page_header_middle %}{% endblock %}
+{% block page_header_actions %}{% endblock %}
+{% block address_management_body %}
+<main
+  class="layout single gc-ipam-page"
+  id="gc-ipam-root"
+  data-api-prefixes="{{ url_api_ipam_prefixes }}"
+  data-api-create="{{ url_api_ipam_prefixes_create }}"
+  data-api-accept-discovered="{{ url_api_ipam_accept_discovered }}"
+  data-api-accept-discovered-batch="{{ url_api_ipam_accept_discovered_batch }}"
+  data-api-next-assignment="{{ url_api_ipam_next_assignment_cidr }}"
+  data-api-vrfs="{{ url_api_ipam_vrfs }}"
+  data-api-vrfs-create="{{ url_api_ipam_vrfs_create }}"
+  data-gc-ipam-page="{{ ipam_page }}"
+  {% if ipam_page == "pools" %}data-gc-ipam-locked-type="pool"{% elif ipam_page == "assignments" %}data-gc-ipam-locked-type="assignment"{% elif ipam_page == "hosts" %}data-gc-ipam-locked-type="host"{% endif %}
+>
+  <p id="gc-ipam-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+
+  <section class="gc-ipam-stats" aria-label="Summary">
+    <article class="gc-ipam-stat panel">
+      <h2 class="gc-ipam-stat__label">Prefixes</h2>
+      <p class="gc-ipam-stat__value" id="gc-ipam-stat-total">—</p>
+    </article>
+    <article class="gc-ipam-stat panel">
+      <h2 class="gc-ipam-stat__label">IPv4</h2>
+      <p class="gc-ipam-stat__value" id="gc-ipam-stat-v4">—</p>
+    </article>
+    <article class="gc-ipam-stat panel">
+      <h2 class="gc-ipam-stat__label">IPv6</h2>
+      <p class="gc-ipam-stat__value" id="gc-ipam-stat-v6">—</p>
+    </article>
+    <article class="gc-ipam-stat panel">
+      <h2 class="gc-ipam-stat__label">Pools</h2>
+      <p class="gc-ipam-stat__value" id="gc-ipam-stat-pools">—</p>
+    </article>
+    <article class="gc-ipam-stat panel">
+      <h2 class="gc-ipam-stat__label">Discovered</h2>
+      <p class="gc-ipam-stat__value" id="gc-ipam-stat-discovered">—</p>
+    </article>
+    <article class="gc-ipam-stat panel">
+      <h2 class="gc-ipam-stat__label">Conflicts</h2>
+      <p class="gc-ipam-stat__value" id="gc-ipam-stat-conflicts">—</p>
+    </article>
+  </section>
+
+  <section class="panel grow gc-ipam-workspace">
+    {% if ipam_page != "vrfs" %}
+    <div class="gc-ipam-main-pane split">
+        {{ net_filters_aside("gc-ipam", false) }}
+        <div class="content-pane gc-ipam-content-pane">
+          <div class="table-wrap gc-net-if-table-wrap">
+            <div class="firewalls-page__head">
+              <h2>{{ ipam_heading }}</h2>
+            </div>
+            <div class="toolbar">
+              <div class="toolbar__sheet">
+                <div class="toolbar__line toolbar__line--main">
+                  <div class="toolbar__filters">
+                    <div class="filters__head">
+                      <button
+                        type="button"
+                        class="filters__toggle"
+                        id="gc-ipam-filters-toggle"
+                        aria-expanded="false"
+                        aria-controls="gc-ipam-filters-drawer"
+                        aria-label="Filters"
+                        title="Filters"
+                      >
+                        <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                          <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                        </svg>
+                        <span class="filters__title-label">Filters</span>
+                      </button>
+                      <div class="filters__head-trail">
+                        <div class="filters__head-actions" id="gc-ipam-facet-head-actions" hidden>
+                          <span class="filters__facet-count" id="gc-ipam-facet-count" aria-live="polite"></span>
+                          <button type="button" class="filters__facet-reset link-btn" id="gc-ipam-facet-reset" hidden>
+                            Reset
+                          </button>
+                        </div>
+                        <nav
+                          class="gc-net-entity-quick-type gc-ipam-quick-filters"
+                          id="gc-ipam-quick-nav"
+                          aria-label="Quick filters for discovery and conflicts"
+                        >
+                          <button
+                            type="button"
+                            class="gc-net-entity-quick-type__btn"
+                            data-gc-ipam-quick="all"
+                            aria-pressed="true"
+                          >
+                            All
+                          </button>
+                          <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                          <button
+                            type="button"
+                            class="gc-net-entity-quick-type__btn"
+                            data-gc-ipam-quick="manual"
+                            aria-pressed="false"
+                          >
+                            Manual only
+                          </button>
+                          <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                          <button
+                            type="button"
+                            class="gc-net-entity-quick-type__btn"
+                            data-gc-ipam-quick="discovered"
+                            aria-pressed="false"
+                          >
+                            Discovered only
+                          </button>
+                          <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                          <button
+                            type="button"
+                            class="gc-net-entity-quick-type__btn"
+                            id="gc-ipam-quick-conflicts"
+                            aria-pressed="false"
+                          >
+                            Conflicts only
+                          </button>
+                        </nav>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="toolbar__fw-toolbar-end">
+                    <div class="toolbar__bulk-actions">
+                      {% if ipam_page == "assignments" %}
+                      <button type="button" class="btn" id="gc-ipam-accept-all" title="Accept discovered prefixes that are already in a pool and have no VRF conflicts">
+                        Accept all (pooled, no conflict)
+                      </button>
+                      {% endif %}
+                      <button type="button" class="btn primary" id="gc-ipam-add-open">{{ ipam_add_label }}</button>
+                    </div>
+                    <div class="toolbar__search-cluster">
+                      <div class="search-field">
+                        <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                          />
+                        </svg>
+                        <input
+                          type="search"
+                          id="gc-ipam-search"
+                          class="search-field__input"
+                          placeholder="Search"
+                          autocomplete="off"
+                          aria-label="Search IPAM prefixes"
+                        />
+                      </div>
+                      <span
+                        id="gc-ipam-cols-trigger"
+                        class="toolbar__cols-icon"
+                        role="button"
+                        tabindex="0"
+                        aria-expanded="false"
+                        aria-haspopup="true"
+                        aria-controls="gc-ipam-cols-panel"
+                        title="Columns"
+                        aria-label="Choose table columns"
+                      >
+                        <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                          />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-scroll">
+              <table class="data-table data-table--dense gc-ipam-table" id="gc-ipam-table" aria-label="IP prefixes">
+                <thead>
+                  <tr>
+                    <th scope="col" data-gc-col="name">Name</th>
+                    <th scope="col" data-gc-col="cidr">Prefix</th>
+                    <th scope="col" data-gc-col="family" data-gc-sort="number">Family</th>
+                    <th scope="col" data-gc-col="type">Type</th>
+                    <th scope="col" data-gc-col="assigned">Assigned to</th>
+                    <th scope="col" data-gc-col="vrf">VRF</th>
+                    <th scope="col" data-gc-col="size">Size</th>
+                    <th scope="col" data-gc-col="description">Description</th>
+                    <th scope="col" data-gc-col="origin" class="gc-ipam-col-source" data-gc-no-sort>Source</th>
+                  </tr>
+                </thead>
+                <tbody id="gc-ipam-tbody"></tbody>
+              </table>
+            </div>
+
+            <footer class="table-footer">
+              <span class="table-footer__count" id="gc-ipam-count" aria-live="polite"></span>
+            </footer>
+          </div>
+        </div>
+      </div>
+    {% else %}
+    <div class="gc-ipam-main-pane">
+      <div class="content-pane gc-ipam-content-pane" style="flex: 1">
+        <div class="table-wrap gc-net-if-table-wrap">
+          <div class="firewalls-page__head">
+            <h2>{{ ipam_heading }}</h2>
+          </div>
+          <div class="toolbar">
+            <div class="toolbar__sheet">
+              <div class="toolbar__line toolbar__line--main">
+                <div class="toolbar__fw-toolbar-end" style="width: 100%; justify-content: flex-end">
+                  <button type="button" class="btn primary" id="gc-ipam-vrf-add-open">{{ ipam_add_label }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table data-table--dense" id="gc-ipam-vrf-table" aria-label="Defined VRFs">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Description</th>
+                  <th scope="col">Prefixes</th>
+                </tr>
+              </thead>
+              <tbody id="gc-ipam-vrf-tbody"></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span class="table-footer__count" id="gc-ipam-vrf-count" aria-live="polite"></span>
+          </footer>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+</main>
+
+{% if ipam_page != "vrfs" %}
+{{ net_cols_modal("gc-ipam") }}
+{% endif %}
+
+<div id="gc-ipam-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true" tabindex="-1"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ipam-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-ipam-flyout-title" class="gc-if-flyout__title">Add prefix</h2>
+    </header>
+    <form id="gc-ipam-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <input type="hidden" id="gc-ipam-flyout-id" name="id" value="" />
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="gc-if-flyout__section-label">Prefix</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-name">
+              Name <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-flyout-name"
+              name="name"
+              class="gc-if-flyout__input"
+              maxlength="255"
+              required
+              autocomplete="off"
+              placeholder="e.g. User VLAN west"
+            />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-vrf">
+              VRF <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <select
+              id="gc-ipam-flyout-vrf"
+              name="vrf"
+              class="gc-if-flyout__input gc-if-flyout__select"
+              required
+              aria-label="VRF"
+            ></select>
+            <p class="gc-if-flyout__hint muted">
+              Manage named VRFs from <strong>Address Management → VRFs</strong> in the sidebar. If only one VRF exists, it is selected automatically when adding a prefix.
+            </p>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly" id="gc-ipam-flyout-type-wrap">
+            <span class="gc-if-flyout__label" id="gc-ipam-flyout-type-label">Type</span>
+            <p class="gc-if-flyout__readonly-val" id="gc-ipam-flyout-type-display">—</p>
+            <input type="hidden" id="gc-ipam-flyout-type" name="prefix_type" value="" />
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-pool-unmanaged-wrap" hidden>
+            <span class="gc-if-flyout__label" id="gc-ipam-flyout-pool-unmanaged-label">Pool tracking</span>
+            <div class="gc-ipam-pool-unmanaged-row">
+              <button
+                type="button"
+                class="gc-table-toggle"
+                id="gc-ipam-flyout-pool-unmanaged-switch"
+                role="switch"
+                aria-checked="false"
+                aria-labelledby="gc-ipam-flyout-pool-unmanaged-label"
+              >
+                <span class="gc-table-toggle__track" aria-hidden="true"
+                  ><span class="gc-table-toggle__thumb"></span
+                ></span>
+              </button>
+              <span>Unmanaged</span>
+            </div>
+            <p class="gc-if-flyout__hint muted">
+              Unmanaged pools are hidden from assignment and host parent pickers and excluded from discovery and same-VRF conflict checks.
+            </p>
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-parent-pool-wrap" hidden>
+            <div id="gc-ipam-flyout-parent-pool-select-block">
+              <label class="gc-if-flyout__label" for="gc-ipam-flyout-parent-pool">
+                Parent pool <span class="gc-if-flyout__req" id="gc-ipam-flyout-parent-pool-req" aria-hidden="true" hidden>*</span>
+              </label>
+              <select id="gc-ipam-flyout-parent-pool" class="gc-if-flyout__input gc-if-flyout__select" aria-label="Parent pool">
+                <option value="">— Select pool —</option>
+              </select>
+            </div>
+            <div id="gc-ipam-flyout-parent-pool-readonly-block" hidden>
+              <span class="gc-if-flyout__label">Parent pool</span>
+              <p class="gc-if-flyout__readonly-val" id="gc-ipam-flyout-parent-pool-readonly">—</p>
+            </div>
+            <p class="gc-if-flyout__hint muted" id="gc-ipam-flyout-parent-pool-hint" hidden>
+              Optional: narrow the assignment list below. The chosen prefix must still fall inside the parent assignment.
+            </p>
+            <p class="gc-if-flyout__hint muted" id="gc-ipam-flyout-parent-pool-hint-pool" hidden>
+              Shown automatically: the tightest existing pool in this VRF that fully contains this prefix. Use a smaller prefix inside a larger pool to create a nested pool.
+            </p>
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-parent-assignment-wrap" hidden>
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-parent-assignment">
+              Parent assignment <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <select id="gc-ipam-flyout-parent-assignment" class="gc-if-flyout__input gc-if-flyout__select" aria-label="Parent assignment">
+              <option value="">— Select assignment —</option>
+            </select>
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-assignment-size-wrap" hidden>
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-assignment-pl">
+              Prefix length <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <select
+              id="gc-ipam-flyout-assignment-pl"
+              class="gc-if-flyout__input gc-if-flyout__select"
+              aria-label="Assignment prefix length"
+            ></select>
+            <p class="gc-if-flyout__hint muted">
+              Chooses the next unused block of this size inside the parent pool (IPv4). Use refresh if the plan changed.
+            </p>
+            <div class="gc-if-flyout__field gc-if-flyout__field--inline" style="margin-top: 8px">
+              <button type="button" class="link-btn" id="gc-ipam-flyout-cidr-refresh">
+                Refresh allocation
+              </button>
+            </div>
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-cidr-wrap">
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-cidr" id="gc-ipam-flyout-cidr-label">
+              Prefix (CIDR) <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-flyout-cidr"
+              name="cidr"
+              class="gc-if-flyout__input mono"
+              maxlength="128"
+              required
+              autocomplete="off"
+              placeholder="10.2.0.0/16"
+            />
+          </div>
+          <div id="gc-ipam-flyout-assigned-wrap" class="gc-ipam-flyout-assigned" hidden aria-hidden="true">
+            <p class="gc-if-flyout__section-label">Assignment</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-ipam-flyout-assigned-fw">Assigned to firewall</label>
+              <select
+                id="gc-ipam-flyout-assigned-fw"
+                class="gc-if-flyout__input gc-if-flyout__select"
+                aria-label="Assigned to firewall"
+              >
+                <option value="">— None —</option>
+              </select>
+              <p class="gc-if-flyout__hint muted" id="gc-ipam-flyout-assigned-fw-locked-hint" hidden>
+                Assigned to firewall is set from the discovered network (read-only).
+              </p>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-ipam-flyout-assigned-custom">Or custom label</label>
+              <input
+                type="text"
+                id="gc-ipam-flyout-assigned-custom"
+                class="gc-if-flyout__input"
+                maxlength="255"
+                placeholder="Team, site, ticket ID…"
+                autocomplete="off"
+              />
+            </div>
+            <p class="gc-if-flyout__hint muted">
+              For assignments only: pick a firewall from inventory, or type your own value. If both are set, the firewall is saved.
+            </p>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-description">Description</label>
+            <input
+              type="text"
+              id="gc-ipam-flyout-description"
+              name="description"
+              class="gc-if-flyout__input"
+              maxlength="500"
+              autocomplete="off"
+            />
+          </div>
+          <p id="gc-ipam-flyout-status" class="settings-form__status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </form>
+    <footer class="gc-if-flyout__footer gc-ipam-flyout__footer">
+      <div class="gc-ipam-flyout__footer-main">
+        <button type="submit" class="btn primary" id="gc-ipam-flyout-save" form="gc-ipam-flyout-form">
+          Save
+        </button>
+        <button type="button" class="link-btn" id="gc-ipam-flyout-cancel">Cancel</button>
+      </div>
+      <button
+        type="button"
+        class="btn danger gc-ipam-flyout-delete"
+        id="gc-ipam-flyout-delete"
+        hidden
+      >
+        Delete
+      </button>
+    </footer>
+  </div>
+</div>
+
+<div id="gc-ipam-disc-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true" tabindex="-1"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ipam-disc-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-ipam-disc-flyout-title" class="gc-if-flyout__title">Discovered assignment</h2>
+    </header>
+    <div class="gc-if-flyout__panel-form">
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="gc-if-flyout__section-label">From firewall sync</p>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Prefix</span>
+            <code class="gc-if-flyout__readonly-val" id="gc-ipam-disc-flyout-cidr"></code>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Firewall</span>
+            <span class="gc-if-flyout__readonly-val" id="gc-ipam-disc-flyout-fw"></span>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Sources</span>
+            <span class="gc-if-flyout__readonly-val" id="gc-ipam-disc-flyout-sources"></span>
+          </div>
+          <p class="gc-if-flyout__section-label">Save as assignment</p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-disc-flyout-name">
+              Name <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-disc-flyout-name"
+              class="gc-if-flyout__input"
+              maxlength="255"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <div class="gc-ipam-flyout-assigned">
+            <p class="gc-if-flyout__section-label">Assignment</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-ipam-disc-flyout-assigned-fw">Assigned to firewall</label>
+              <select
+                id="gc-ipam-disc-flyout-assigned-fw"
+                class="gc-if-flyout__input gc-if-flyout__select"
+                aria-label="Assigned to firewall"
+              >
+                <option value="">— None —</option>
+              </select>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-ipam-disc-flyout-assigned-custom">Or custom label</label>
+              <input
+                type="text"
+                id="gc-ipam-disc-flyout-assigned-custom"
+                class="gc-if-flyout__input"
+                maxlength="255"
+                placeholder="Team, site, ticket ID…"
+                autocomplete="off"
+              />
+            </div>
+            <p class="gc-if-flyout__hint muted">
+              If both are set, the firewall is saved.
+            </p>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-disc-flyout-description">Description</label>
+            <input
+              type="text"
+              id="gc-ipam-disc-flyout-description"
+              class="gc-if-flyout__input"
+              maxlength="500"
+              autocomplete="off"
+            />
+          </div>
+          <p id="gc-ipam-disc-flyout-pool-line" class="gc-ipam-disc-pool-line muted" hidden></p>
+          <p id="gc-ipam-disc-flyout-status" class="settings-form__status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="button" class="btn primary" id="gc-ipam-disc-flyout-accept">Accept</button>
+        <button type="button" class="link-btn" id="gc-ipam-disc-flyout-cancel">Cancel</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div id="gc-ipam-pool-flyout" class="gc-if-flyout gc-ipam-subflyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true" tabindex="-1"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ipam-pool-flyout-title"
+    tabindex="-1"
+  >
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-ipam-pool-flyout-title" class="gc-if-flyout__title">Create encompassing pool</h2>
+    </header>
+    <form id="gc-ipam-pool-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="muted">
+            No pool in the address plan fully contains this prefix. Create one that covers the assignment CIDR,
+            then it will be saved together with the assignment.
+          </p>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-pool-flyout-cidr">
+              Pool prefix (CIDR) <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-pool-flyout-cidr"
+              name="pool_cidr"
+              class="gc-if-flyout__input mono"
+              maxlength="128"
+              required
+              autocomplete="off"
+              placeholder="172.20.0.0/16"
+            />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-pool-flyout-name">
+              Pool name <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-pool-flyout-name"
+              name="pool_name"
+              class="gc-if-flyout__input"
+              maxlength="255"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <p id="gc-ipam-pool-flyout-status" class="settings-form__status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-ipam-pool-flyout-submit">Create pool and accept</button>
+        <button type="button" class="link-btn" id="gc-ipam-pool-flyout-cancel">Back</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div
+  id="gc-ipam-nested-pool-flyout"
+  class="gc-if-flyout gc-ipam-subflyout gc-ipam-nested-pool-flyout"
+  hidden
+  aria-hidden="true"
+>
+  <div class="gc-if-flyout__backdrop" aria-hidden="true" tabindex="-1"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ipam-nested-pool-flyout-title"
+    tabindex="-1"
+  >
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-ipam-nested-pool-flyout-title" class="gc-if-flyout__title">New pool</h2>
+    </header>
+    <form id="gc-ipam-nested-pool-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p class="muted">
+            Pool type is fixed to <strong>pool</strong>. VRF matches the add-prefix form. The aggregate must be at least one
+            step broader than the prefix you are adding (e.g. assignment <code class="mono">/24</code> allows pool
+            <code class="mono">/23</code> or shorter).
+          </p>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">VRF</span>
+            <span class="gc-if-flyout__readonly-val" id="gc-ipam-nested-pool-vrf"></span>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Prefix from add form</span>
+            <code class="gc-if-flyout__readonly-val mono" id="gc-ipam-nested-pool-assignment-cidr"></code>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-nested-pool-pl">
+              Pool aggregate (CIDR length) <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <select id="gc-ipam-nested-pool-pl" class="gc-if-flyout__input gc-if-flyout__select" required aria-label="Pool prefix length"></select>
+          </div>
+          <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+            <span class="gc-if-flyout__label">Calculated pool CIDR</span>
+            <code class="gc-if-flyout__readonly-val mono" id="gc-ipam-nested-pool-result">—</code>
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-nested-pool-name">
+              Pool name <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-nested-pool-name"
+              class="gc-if-flyout__input"
+              maxlength="255"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <p id="gc-ipam-nested-pool-flyout-status" class="settings-form__status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-ipam-nested-pool-flyout-submit">Create pool</button>
+        <button type="button" class="link-btn" id="gc-ipam-nested-pool-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div id="gc-ipam-vrf-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true" tabindex="-1"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ipam-vrf-flyout-title"
+    tabindex="-1"
+  >
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-ipam-vrf-flyout-title" class="gc-if-flyout__title">Add VRF</h2>
+    </header>
+    <form id="gc-ipam-vrf-flyout-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-vrf-flyout-name">
+              Name <span class="gc-if-flyout__req" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="gc-ipam-vrf-flyout-name"
+              class="gc-if-flyout__input"
+              maxlength="128"
+              required
+              autocomplete="off"
+              placeholder="e.g. production, tenant-east"
+            />
+          </div>
+          <div class="gc-if-flyout__field">
+            <label class="gc-if-flyout__label" for="gc-ipam-vrf-flyout-description">Description</label>
+            <input
+              type="text"
+              id="gc-ipam-vrf-flyout-description"
+              class="gc-if-flyout__input"
+              maxlength="500"
+              autocomplete="off"
+            />
+          </div>
+          <p class="gc-if-flyout__hint muted">
+            This name appears in the VRF dropdown when adding pools, assignments, and hosts.
+          </p>
+          <p id="gc-ipam-vrf-flyout-status" class="settings-form__status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-ipam-vrf-flyout-save">Save</button>
+        <button type="button" class="link-btn" id="gc-ipam-vrf-flyout-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/gc-ipam.js" defer></script>
+{% endblock %}

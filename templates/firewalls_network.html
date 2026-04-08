@@ -1,0 +1,1164 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "network" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% block title %}Network · Firewalls · Ground Control{% endblock %}
+{% block page_title %}Network{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Network</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">Interfaces and zones across selected firewalls. VLANs appear on the Interfaces tab.</p>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ net_filters_aside("gc-net-if", false) }}
+        {{ net_filters_aside("gc-net-zone", true) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        <div class="gc-tabs" role="tablist" aria-label="Network views" id="gc-network-main-tablist">
+          <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true" id="gc-tab-interfaces" data-gc-tab="interfaces">
+            Interfaces
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-zones" data-gc-tab="zones">
+            Zones
+          </button>
+        </div>
+
+        <div class="gc-tab-panels">
+          <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-tab-interfaces" id="gc-panel-interfaces">
+            {{
+              net_entity_table_wrap(
+                "gc-net-if",
+                "Interfaces",
+                "Search interfaces",
+                show_combine=true,
+                combine_title="Combined view merges rows that share the same type and name across selected firewalls or configurations. When values differ by scope, the switch turns yellow — click to compare, or Shift+click to show one row per scope.",
+                show_combine_sync_selected=false,
+                show_add_dropdown=true,
+                show_entity_quick_filters=true,
+                secondary_btn_id="gc-net-if-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-zones" id="gc-panel-zones" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-net-zone",
+                "Zones",
+                "Search zones",
+                show_combine=true,
+                primary_btn_id="gc-net-zone-add",
+                primary_btn_label="Add zone",
+                combine_title="Combined view merges rows that share the same zone name. When device access differs by firewall, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.",
+                secondary_btn_id="gc-net-zone-delete-selected",
+                secondary_btn_label="Delete selected",
+              )
+            }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ net_cols_modal("gc-net-if") }}
+{{ net_cols_modal("gc-net-zone") }}
+
+<div id="gc-net-zone-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
+  <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="gc-net-zone-combine-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-net-zone-combine-modal-title"
+  >
+    <header class="gc-net-zone-combine-modal__header">
+      <h2 id="gc-net-zone-combine-modal-title" class="gc-net-zone-combine-modal__title">Access control by firewall</h2>
+      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-net-zone-combine-modal-close" aria-label="Close" title="Close">
+        ×
+      </button>
+    </header>
+    <div id="gc-net-zone-combine-modal-body" class="gc-net-zone-combine-modal__body"></div>
+    <footer class="gc-net-zone-combine-modal__footer">
+      <button type="button" class="btn btn--secondary" id="gc-net-zone-combine-modal-done">Close</button>
+    </footer>
+  </div>
+</div>
+
+<div id="gc-net-if-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
+  <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="gc-net-zone-combine-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-net-if-combine-modal-title"
+  >
+    <header class="gc-net-zone-combine-modal__header">
+      <h2 id="gc-net-if-combine-modal-title" class="gc-net-zone-combine-modal__title">Interfaces — values by scope</h2>
+      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-net-if-combine-modal-close" aria-label="Close" title="Close">
+        ×
+      </button>
+    </header>
+    <div id="gc-net-if-combine-modal-body" class="gc-net-zone-combine-modal__body"></div>
+    <footer class="gc-net-zone-combine-modal__footer">
+      <button type="button" class="btn btn--secondary" id="gc-net-if-combine-modal-done">Close</button>
+    </footer>
+  </div>
+</div>
+
+<div id="gc-net-if-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-if-edit-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-if-edit-title" class="gc-if-flyout__title">Edit interface</h2>
+    </header>
+    <form id="gc-if-edit-form" class="gc-if-flyout__panel-form" novalidate>
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+        <p class="gc-if-flyout__section-label">General settings</p>
+        <div id="gc-if-edit-fw-slot" class="gc-if-flyout__fw-slot"></div>
+        <div class="gc-if-flyout__field" data-gc-combine-field-keys="Name,__name">
+          <label class="gc-if-flyout__label" for="gc-if-edit-name">Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+          <input type="text" id="gc-if-edit-name" class="gc-if-flyout__input" autocomplete="off" required />
+        </div>
+        <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+          <span class="gc-if-flyout__label">Hardware</span>
+          <span id="gc-if-edit-hardware" class="gc-if-flyout__readonly-val mono">—</span>
+        </div>
+        <div class="gc-if-flyout__field" data-gc-combine-field-keys="__zone">
+          <label class="gc-if-flyout__label" for="gc-if-edit-zone">Network zone</label>
+          <select id="gc-if-edit-zone" class="gc-if-flyout__input gc-if-flyout__select"></select>
+        </div>
+
+        <div id="gc-if-edit-post-zone" class="gc-if-flyout__post-zone">
+          <hr class="gc-if-flyout__rule" />
+
+          <div class="gc-if-flyout__check-head">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-if-edit-ipv4-enabled" checked />
+              <span>IPv4 configuration</span>
+            </label>
+          </div>
+          <div id="gc-if-edit-ipv4-body" class="gc-if-flyout__subsection">
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">IP assignment</legend>
+              <div class="gc-if-flyout__radios">
+                <label><input type="radio" name="gc-if-ipv4-mode" value="static" /> Static</label>
+                <label><input type="radio" name="gc-if-ipv4-mode" value="pppoe" /> PPPoE (DSL)</label>
+                <label><input type="radio" name="gc-if-ipv4-mode" value="dhcp" checked /> DHCP</label>
+              </div>
+            </fieldset>
+            <div id="gc-if-edit-ipv4-single-static" class="gc-if-flyout__field-row">
+              <div class="gc-if-flyout__field gc-if-flyout__field--half" data-gc-combine-field-keys="IPAddress,IPv4Address">
+                <label class="gc-if-flyout__label" for="gc-if-edit-ipv4-ip">IPv4</label>
+                <input type="text" id="gc-if-edit-ipv4-ip" class="gc-if-flyout__input mono" autocomplete="off" title="Dotted quad or CIDR, e.g. 192.168.1.1/24 (parsed on leave)" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--half" data-gc-combine-field-keys="Netmask,IPv4Netmask">
+                <label class="gc-if-flyout__label" for="gc-if-edit-ipv4-netmask">Netmask</label>
+                <input type="text" id="gc-if-edit-ipv4-netmask" class="gc-if-flyout__input mono" autocomplete="off" title="Shown as /prefix; dotted or prefix accepted — normalized to /prefix on leave; API uses dotted mask" />
+              </div>
+            </div>
+            <div id="gc-if-edit-ipv4-combined-wrap" class="gc-if-flyout__combined-static" hidden aria-hidden="true">
+              <p class="gc-if-flyout__subhead">Static IPv4 per scope (combined view)</p>
+              <div class="gc-if-cmb-toolbar">
+                <input
+                  type="search"
+                  class="gc-if-flyout__input gc-if-cmb-filter"
+                  placeholder="Filter by scope, hardware, addresses…"
+                  autocomplete="off"
+                  aria-label="Filter per-scope IPv4 rows"
+                />
+              </div>
+              <div class="gc-if-flyout__table-scroll">
+                <table class="data-table data-table--dense gc-if-flyout__combine-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Hardware</th>
+                      <th scope="col">Address</th>
+                      <th scope="col">Netmask / prefix</th>
+                      <th scope="col" class="gc-if-cmb-gw-col">Gateway name</th>
+                      <th scope="col" class="gc-if-cmb-gw-col">Gateway IP</th>
+                      <th scope="col">Pool</th>
+                      <th scope="col" class="th-narrow" title="IPAM pool alignment"> </th>
+                    </tr>
+                  </thead>
+                  <tbody id="gc-if-edit-ipv4-combined-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="gc-if-edit-ipv4-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+            <p class="gc-if-flyout__subhead">Gateway detail</p>
+            <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayName,IPv4GatewayName,DefaultGatewayName">
+              <label class="gc-if-flyout__label" for="gc-if-edit-ipv4-gw-name">Gateway name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+              <input type="text" id="gc-if-edit-ipv4-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+            </div>
+            <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayIP,Gateway,DefaultGateway,IPv4Gateway">
+              <label class="gc-if-flyout__label" for="gc-if-edit-ipv4-gw-ip">Gateway IP</label>
+              <input type="text" id="gc-if-edit-ipv4-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+            </div>
+            </div>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+
+          <div class="gc-if-flyout__check-head">
+            <label class="gc-if-flyout__check-label">
+              <input type="checkbox" id="gc-if-edit-ipv6-enabled" checked />
+              <span>IPv6 configuration</span>
+            </label>
+          </div>
+          <div id="gc-if-edit-ipv6-body" class="gc-if-flyout__subsection">
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">IP assignment</legend>
+              <div class="gc-if-flyout__radios">
+                <label><input type="radio" name="gc-if-ipv6-mode" value="static" checked /> Static</label>
+                <label><input type="radio" name="gc-if-ipv6-mode" value="dhcp" /> DHCP</label>
+                <label>
+                  <input type="radio" name="gc-if-ipv6-mode" value="delegated" /> Delegated
+                  <span class="gc-if-flyout__info" title="Prefix delegated from upstream">i</span>
+                </label>
+              </div>
+            </fieldset>
+            <div id="gc-if-edit-ipv6-single-static" class="gc-if-flyout__field-row">
+              <div class="gc-if-flyout__field gc-if-flyout__field--grow" data-gc-combine-field-keys="IPv6Address,IPv6_Address">
+                <label class="gc-if-flyout__label" for="gc-if-edit-ipv6-ip">IPv6 / prefix <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                <input type="text" id="gc-if-edit-ipv6-ip" class="gc-if-flyout__input mono" autocomplete="off" title="Address only or full CIDR, e.g. 2001:db8::1/64 (parsed on leave)" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--narrow" data-gc-combine-field-keys="Prefix,IPv6PrefixLength,IPv6Prefix,PrefixLength">
+                <label class="gc-if-flyout__label" for="gc-if-edit-ipv6-prefix">&nbsp;</label>
+                <input type="text" id="gc-if-edit-ipv6-prefix" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+            <div id="gc-if-edit-ipv6-combined-wrap" class="gc-if-flyout__combined-static" hidden aria-hidden="true">
+              <p class="gc-if-flyout__subhead">Static IPv6 per scope (combined view)</p>
+              <div class="gc-if-cmb-toolbar">
+                <input
+                  type="search"
+                  class="gc-if-flyout__input gc-if-cmb-filter"
+                  placeholder="Filter by scope, hardware, addresses…"
+                  autocomplete="off"
+                  aria-label="Filter per-scope IPv6 rows"
+                />
+              </div>
+              <div class="gc-if-flyout__table-scroll">
+                <table class="data-table data-table--dense gc-if-flyout__combine-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Hardware</th>
+                      <th scope="col">Address</th>
+                      <th scope="col">Prefix</th>
+                      <th scope="col" class="gc-if-cmb-gw-col">Gateway name</th>
+                      <th scope="col" class="gc-if-cmb-gw-col">Gateway address</th>
+                      <th scope="col">Pool</th>
+                      <th scope="col" class="th-narrow" title="IPAM pool alignment"> </th>
+                    </tr>
+                  </thead>
+                  <tbody id="gc-if-edit-ipv6-combined-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="gc-if-edit-ipv6-gateway-wrap" class="gc-if-flyout__gateway-wrap" hidden aria-hidden="true">
+              <p class="gc-if-flyout__subhead">Gateway detail</p>
+              <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayNameIpv6,IPv6GatewayName,IPv6_GatewayName">
+                <label class="gc-if-flyout__label" for="gc-if-edit-ipv6-gw-name">Gateway name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                <input type="text" id="gc-if-edit-ipv6-gw-name" class="gc-if-flyout__input" autocomplete="off" />
+              </div>
+              <div class="gc-if-flyout__field" data-gc-combine-field-keys="GatewayIPv6,IPv6Gateway,IPv6_Gateway,IPv6DefaultGateway">
+                <label class="gc-if-flyout__label" for="gc-if-edit-ipv6-gw-ip">Gateway IP <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                <input type="text" id="gc-if-edit-ipv6-gw-ip" class="gc-if-flyout__input mono" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+
+          <hr class="gc-if-flyout__rule" />
+
+          <button
+            type="button"
+            class="gc-if-flyout__adv-toggle"
+            id="gc-if-edit-adv-toggle"
+            aria-expanded="false"
+          >
+            <span class="gc-if-flyout__adv-toggle-text">Advanced settings</span>
+            <span class="gc-if-flyout__adv-toggle-ic" aria-hidden="true">▼</span>
+          </button>
+          <div id="gc-if-edit-adv-body" class="gc-if-flyout__adv-block" hidden>
+            <p class="gc-if-flyout__mini-head">Port settings</p>
+            <div class="gc-if-flyout__field gc-if-flyout__field--inline-hint">
+              <label class="gc-if-flyout__label" for="gc-if-edit-link-mode">Link mode</label>
+              <div class="gc-if-flyout__field-inline">
+                <select id="gc-if-edit-link-mode" class="gc-if-flyout__input gc-if-flyout__select">
+                  <option value="Auto Negotiate">Auto Negotiate</option>
+                  <option value="10MbpsFD">10 Mbps full duplex</option>
+                  <option value="100MbpsFD">100 Mbps full duplex</option>
+                  <option value="1000MbpsFD">1000 Mbps full duplex</option>
+                  <option value="10000MbpsFD">10000 Mbps full duplex</option>
+                </select>
+                <span class="gc-if-flyout__info" title="Physical link speed and duplex">i</span>
+              </div>
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+              <label class="gc-if-flyout__toggle-label">
+                <input type="checkbox" id="gc-if-edit-auto-neg" checked />
+                <span>Auto-negotiation for media type</span>
+                <span class="gc-if-flyout__info" title="Negotiate speed and duplex with the peer">i</span>
+              </label>
+            </div>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-if-edit-fec">Forward Error Correction (FEC)</label>
+              <select id="gc-if-edit-fec" class="gc-if-flyout__input gc-if-flyout__select">
+                <option value="Off">Off</option>
+                <option value="Automatic">Automatic</option>
+                <option value="BaseR-encoding">BaseR encoding</option>
+                <option value="RS-FEC-encoding">RS-FEC encoding</option>
+              </select>
+            </div>
+
+            <p class="gc-if-flyout__mini-head">Interface settings</p>
+            <div class="gc-if-flyout__field">
+              <label class="gc-if-flyout__label" for="gc-if-edit-mtu">MTU</label>
+              <div class="gc-if-flyout__field-inline">
+                <input type="text" id="gc-if-edit-mtu" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                <span class="gc-if-flyout__range-hint">(1280–9000)</span>
+              </div>
+            </div>
+            <div class="gc-if-flyout__field gc-if-flyout__field--mss">
+              <label class="gc-if-flyout__mss-row">
+                <input type="checkbox" id="gc-if-edit-mss-cb" />
+                <span class="gc-if-flyout__label-inline">Override MSS</span>
+              </label>
+              <div class="gc-if-flyout__field-inline">
+                <input type="text" id="gc-if-edit-mss" class="gc-if-flyout__input mono gc-if-flyout__input--w-short" autocomplete="off" />
+                <span class="gc-if-flyout__range-hint">(536–8960)</span>
+              </div>
+            </div>
+            <fieldset class="gc-if-flyout__fieldset">
+              <legend class="gc-if-flyout__legend">MAC Address selection</legend>
+              <label class="gc-if-flyout__radio-block">
+                <input type="radio" name="gc-if-mac-mode" value="default" checked />
+                <span>Use default MAC address</span>
+                <input type="text" id="gc-if-edit-mac-default" class="gc-if-flyout__input mono gc-if-flyout__input--mac" readonly />
+              </label>
+              <label class="gc-if-flyout__radio-block">
+                <input type="radio" name="gc-if-mac-mode" value="override" />
+                <span>Override default MAC address</span>
+                <input type="text" id="gc-if-edit-mac-override" class="gc-if-flyout__input mono gc-if-flyout__input--mac" autocomplete="off" />
+              </label>
+            </fieldset>
+          </div>
+        </div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-if-edit-save" disabled>Save</button>
+        <button type="button" class="link-btn" id="gc-if-edit-cancel">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+{% include "partials/gc_net_vlan_flyout.html" %}
+{% include "partials/gc_net_bridge_pair_flyout.html" %}
+{% include "partials/gc_net_lag_flyout.html" %}
+{% include "partials/gc_net_alias_flyout.html" %}
+{% include "partials/gc_net_zone_flyout.html" %}
+{% endblock %}
+{% block scripts %}
+<script>
+  window.gcTaskQueueEnqueueUrl = {{ url_api_task_queue_enqueue_interface | tojson }};
+  window.gcNetIfEntityTarget = "firewall";
+  window.gcConfigurationApplyInterfaceUrl = {{ url_api_configurations_apply_interface | tojson }};
+  window.gcNetVlanEntityTarget = "firewall";
+  window.gcNetVlanIfPrefix = "gc-net-if";
+  window.gcNetVlanVlanPrefix = "gc-net-vlan";
+  window.gcNetVlanEnqueueUrl = {{ url_api_task_queue_enqueue_vlan | tojson }};
+  window.gcNetVlanApplyUpdateUrl = {{ url_api_configurations_apply_vlan | tojson }};
+  window.gcNetVlanApplyCreateUrl = {{ url_api_configurations_apply_vlan_create | tojson }};
+  window.gcNetBridgePairEnqueueUrl = {{ url_api_task_queue_enqueue_bridge_pair | tojson }};
+  window.gcNetBridgePairEnqueueCreateUrl = {{ url_api_task_queue_enqueue_bridge_pair_create | tojson }};
+  window.gcNetBridgePairApplyUrl = {{ url_api_configurations_apply_bridge_pair | tojson }};
+  window.gcNetBridgePairApplyCreateUrl = {{ url_api_configurations_apply_bridge_pair_create | tojson }};
+  window.gcNetLagEnqueueUrl = {{ url_api_task_queue_enqueue_lag | tojson }};
+  window.gcNetLagEnqueueCreateUrl = {{ url_api_task_queue_enqueue_lag_create | tojson }};
+  window.gcNetLagApplyUpdateUrl = {{ url_api_configurations_apply_lag | tojson }};
+  window.gcNetLagApplyCreateUrl = {{ url_api_configurations_apply_lag_create | tojson }};
+  window.gcNetAliasEntityTarget = "firewall";
+  window.gcNetAliasEnqueueUrl = {{ url_api_task_queue_enqueue_alias | tojson }};
+  window.gcNetAliasEnqueueCreateUrl = {{ url_api_task_queue_enqueue_alias_create | tojson }};
+  window.gcNetAliasApplyUrl = {{ url_api_configurations_apply_alias | tojson }};
+  window.gcNetAliasApplyCreateUrl = {{ url_api_configurations_apply_alias_create | tojson }};
+  window.gcNetZoneEnqueueUpdateBatchUrl = {{ url_api_task_queue_enqueue_zone_updates_batch | tojson }};
+  window.gcNetZoneEnqueueCreateBatchUrl = {{ url_api_task_queue_enqueue_zone_create_batch | tojson }};
+  window.gcNetZoneApplyUpdateBatchUrl = "";
+  window.gcNetZoneApplyCreateBatchUrl = {{ url_api_configurations_apply_zone_create_batch | tojson }};
+  window.gcIpamNextAssignmentCidrUrl = {{ url_api_ipam_next_assignment_cidr | tojson }};
+  window.gcIpamPrefixesUrl = {{ url_api_ipam_prefixes | tojson }};
+  window.gcIpamResolveInterfacePoolIpv4Url = {{ url_api_ipam_resolve_interface_pool_ipv4 | tojson }};
+  window.gcIpamInterfacePoolCommitUrl = {{ url_api_ipam_interface_pool_commit | tojson }};
+</script>
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-net-ipv4-helpers.js"></script>
+<script src="/static/gc-net-if-combined-static.js"></script>
+<script src="/static/gc-net-if-flyout.js"></script>
+<script src="/static/gc-net-vlan-flyout.js"></script>
+<script src="/static/gc-net-bridge-pair-flyout.js?v=3"></script>
+<script src="/static/gc-net-lag-flyout.js"></script>
+<script src="/static/gc-net-alias-flyout.js"></script>
+<script src="/static/gc-hs-flyout-entity-forms.js"></script>
+<script src="/static/gc-hosts-services-flyout.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-net-zone-flyout.js"></script>
+<script>
+  (function () {
+    var URLS = {
+      interfaces: {{ url_api_network_interfaces | tojson }},
+      zones: {{ url_api_network_zones | tojson }},
+    };
+
+    function refreshAllNetworkTables() {
+      if (tableIf) tableIf.refresh();
+      if (tableZone) tableZone.refresh();
+    }
+
+    document.addEventListener("gc-firewall-selection-changed", function () {
+      refreshAllNetworkTables();
+    });
+    document.addEventListener("gc-configuration-exclusive-view-changed", function () {
+      refreshAllNetworkTables();
+    });
+
+    function networkCacheSyncSelectionHits(ids) {
+      if (!ids || !ids.length) return false;
+      var sel =
+        typeof window.gcGetSelectedFirewallIds === "function"
+          ? window.gcGetSelectedFirewallIds()
+          : [];
+      if (!sel || !sel.length) return false;
+      var set = {};
+      sel.forEach(function (id) {
+        set[Number(id)] = true;
+      });
+      return ids.some(function (id) {
+        return set[id];
+      });
+    }
+
+    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
+      window.gcRegisterConfigCacheTableRefresher(function (ids) {
+        if (!networkCacheSyncSelectionHits(ids)) return;
+        refreshAllNetworkTables();
+      });
+    }
+
+    var FILTER_IDS = ["gc-net-if-filters-aside", "gc-net-zone-filters-aside"];
+
+    var NETWORK_MAIN_TAB_LS = "ground-control-network-main-tab";
+
+    function readSavedNetworkMainTab() {
+      try {
+        var raw = localStorage.getItem(NETWORK_MAIN_TAB_LS);
+        if (raw === "interfaces" || raw === "zones") return raw;
+        if (raw === "vlan") return "interfaces";
+      } catch (e) {}
+      return "interfaces";
+    }
+
+    var activeMainTab = readSavedNetworkMainTab();
+
+    function syncFilterAsidesVisibility() {
+      var showId;
+      if (activeMainTab === "interfaces") showId = "gc-net-if-filters-aside";
+      else if (activeMainTab === "zones") showId = "gc-net-zone-filters-aside";
+      else showId = "gc-net-if-filters-aside";
+      FILTER_IDS.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.hidden = id !== showId;
+      });
+    }
+
+    var mainTablist = document.getElementById("gc-network-main-tablist");
+    var mainTabs = mainTablist
+      ? mainTablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-tab]")
+      : document.querySelectorAll("#gc-tab-interfaces, #gc-tab-zones");
+    var mainPanels = {
+      interfaces: document.getElementById("gc-panel-interfaces"),
+      zones: document.getElementById("gc-panel-zones"),
+    };
+
+    function applyMainTabPanels() {
+      Object.keys(mainPanels).forEach(function (key) {
+        var p = mainPanels[key];
+        if (!p) return;
+        var show = key === activeMainTab;
+        p.classList.toggle("is-active", show);
+        p.hidden = !show;
+      });
+    }
+
+    function syncMainTabButtons() {
+      mainTabs.forEach(function (t) {
+        var tid = t.getAttribute("data-gc-tab");
+        var on = tid === activeMainTab;
+        t.classList.toggle("is-active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    }
+
+    mainTabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var id = tab.getAttribute("data-gc-tab");
+        activeMainTab = id;
+        syncMainTabButtons();
+        applyMainTabPanels();
+        syncFilterAsidesVisibility();
+        try {
+          localStorage.setItem(NETWORK_MAIN_TAB_LS, id);
+        } catch (e) {}
+        if (id === "zones" && tableZone && tableZone.compactZoneFirewallCells) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              tableZone.compactZoneFirewallCells();
+            });
+          });
+        }
+      });
+    });
+
+    var IF_COMBINE_LS = "ground-control-interfaces-combine";
+    var lastIfPayload = null;
+    var ifCombineWrap = document.getElementById("gc-net-if-combine-wrap");
+    var ifCombineInput = document.getElementById("gc-net-if-combine");
+    var ifCombineModal = document.getElementById("gc-net-if-combine-modal");
+    var ifCombineModalBody = document.getElementById("gc-net-if-combine-modal-body");
+    var ifCombineModalClose = document.getElementById("gc-net-if-combine-modal-close");
+    var ifCombineModalDone = document.getElementById("gc-net-if-combine-modal-done");
+    var ifCombineModalBackdrop = ifCombineModal
+      ? ifCombineModal.querySelector(".gc-net-zone-combine-modal__backdrop")
+      : null;
+
+    var ZONES_COMBINE_LS = "ground-control-zones-combine";
+    var lastZonesPayload = null;
+    var zoneCombineWrap = document.getElementById("gc-net-zone-combine-wrap");
+    var zoneCombineInput = document.getElementById("gc-net-zone-combine");
+    var zoneCombineModal = document.getElementById("gc-net-zone-combine-modal");
+    var zoneCombineModalBody = document.getElementById("gc-net-zone-combine-modal-body");
+    var zoneCombineModalClose = document.getElementById("gc-net-zone-combine-modal-close");
+    var zoneCombineModalDone = document.getElementById("gc-net-zone-combine-modal-done");
+    var zoneCombineModalBackdrop = zoneCombineModal
+      ? zoneCombineModal.querySelector(".gc-net-zone-combine-modal__backdrop")
+      : null;
+
+    function updateZoneCombineChrome(data) {
+      if (!zoneCombineWrap || !zoneCombineInput) return;
+      var conflicts = !!(data && data.zones_combine_conflicts);
+      var flat = !!(data && data.zones_combined === false);
+      zoneCombineWrap.classList.toggle(
+        "gc-toolbar-combine--warning",
+        conflicts && !flat && zoneCombineInput.checked
+      );
+    }
+
+    function escModal(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function boolTriModal(raw) {
+      var t = String(raw == null ? "" : raw)
+        .trim()
+        .toLowerCase();
+      if (t === "") return null;
+      if (
+        t === "1" ||
+        t === "true" ||
+        t === "yes" ||
+        t === "on" ||
+        t === "enabled" ||
+        t === "enable"
+      ) {
+        return true;
+      }
+      if (
+        t === "0" ||
+        t === "false" ||
+        t === "no" ||
+        t === "off" ||
+        t === "disabled" ||
+        t === "disable"
+      ) {
+        return false;
+      }
+      return null;
+    }
+
+    function modalToggleHtml(on) {
+      var state = on ? "on" : "off";
+      var lab = on ? "On" : "Off";
+      return (
+        '<span class="gc-table-toggle gc-table-toggle--static gc-table-toggle--' +
+        state +
+        '" role="img" aria-label="' +
+        lab +
+        '"><span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span></span>'
+      );
+    }
+
+    function modalValueCell(val) {
+      var tri = boolTriModal(val);
+      if (tri !== null) return modalToggleHtml(tri);
+      var s = String(val == null ? "" : val).trim();
+      if (s === "") return modalToggleHtml(false);
+      return '<span class="gc-net-zone-modal__scalar">' + escModal(s) + "</span>";
+    }
+
+    function zoneHueModal(name) {
+      var h = 0;
+      var s = String(name || "");
+      for (var i = 0; i < s.length; i++) {
+        h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      }
+      return h % 360;
+    }
+
+    function fwPillModal(name) {
+      var hue = zoneHueModal(name);
+      return (
+        '<span class="gc-zone-pill" style="--gc-zone-h:' + hue + '">' + escModal(name) + "</span>"
+      );
+    }
+
+    function updateIfCombineChrome(data) {
+      if (!ifCombineWrap || !ifCombineInput) return;
+      var conflicts = !!(data && data.interfaces_combine_conflicts);
+      var flat = !!(data && data.interfaces_combined === false);
+      ifCombineWrap.classList.toggle(
+        "gc-toolbar-combine--warning",
+        conflicts && !flat && ifCombineInput.checked,
+      );
+    }
+
+    function buildIfCombineModalHtml(data) {
+      var labels = (data && data.column_labels) || {};
+      var rows = (data && data.rows) || [];
+      var conflictRows = rows.filter(function (r) {
+        return r && r.if_combine_conflict && r.if_combine_per_field;
+      });
+      if (!conflictRows.length) {
+        return '<p class="muted">No differing column values for this selection.</p>';
+      }
+      return conflictRows
+        .map(function (row) {
+          var nm = (row.cells && row.cells["__name"]) || "";
+          var pf = row.if_combine_per_field || {};
+          var colKeys = Object.keys(pf).sort();
+          var parts =
+            '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
+            escModal(nm) +
+            "</h3>";
+          colKeys.forEach(function (colKey) {
+            var lbl = labels[colKey] || colKey;
+            parts +=
+              '<h4 class="gc-net-zone-modal__col">' + escModal(lbl).replace(/\n/g, "<br />") + "</h4>";
+            parts += '<ul class="gc-net-zone-modal__fw-list">';
+            var per = pf[colKey];
+            Object.keys(per)
+              .sort()
+              .forEach(function (fw) {
+                parts +=
+                  '<li class="gc-net-zone-modal__fw-row">' +
+                  fwPillModal(fw) +
+                  '<span class="gc-net-zone-modal__fw-val">' +
+                  modalValueCell(per[fw]) +
+                  "</span></li>";
+              });
+            parts += "</ul>";
+          });
+          parts += "</section>";
+          return parts;
+        })
+        .join("");
+    }
+
+    function closeIfCombineModal() {
+      if (!ifCombineModal) return;
+      ifCombineModal.hidden = true;
+      ifCombineModal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    function openIfCombineModal() {
+      var data = lastIfPayload;
+      if (!data || !ifCombineModalBody || !ifCombineModal) return;
+      ifCombineModalBody.innerHTML = buildIfCombineModalHtml(data);
+      ifCombineModal.hidden = false;
+      ifCombineModal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      if (ifCombineModalClose) ifCombineModalClose.focus();
+    }
+
+    function onIfCombineModalKeydown(e) {
+      if (!ifCombineModal || ifCombineModal.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeIfCombineModal();
+      }
+    }
+
+    (function initIfCombineFromStorage() {
+      if (!ifCombineInput) return;
+      try {
+        var v = localStorage.getItem(IF_COMBINE_LS);
+        if (v === "0") ifCombineInput.checked = false;
+        else if (v === "1") ifCombineInput.checked = true;
+      } catch (eIf) {}
+    })();
+
+    function buildZoneConflictModalHtml(data) {
+      var labels = (data && data.column_labels) || {};
+      var rows = (data && data.rows) || [];
+      var conflictRows = rows.filter(function (r) {
+        return r && r.access_conflict && r.access_per_firewall;
+      });
+      if (!conflictRows.length) {
+        return '<p class="muted">No differing access control values for this selection.</p>';
+      }
+      return conflictRows
+        .map(function (row) {
+          var zname = (row.cells && row.cells["__name"]) || "";
+          var ap = row.access_per_firewall || {};
+          var colKeys = Object.keys(ap).sort();
+          var parts =
+            '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
+            escModal(zname) +
+            "</h3>";
+          colKeys.forEach(function (colKey) {
+            var lbl = labels[colKey] || colKey;
+            parts +=
+              '<h4 class="gc-net-zone-modal__col">' + escModal(lbl).replace(/\n/g, "<br />") + "</h4>";
+            parts += '<ul class="gc-net-zone-modal__fw-list">';
+            var per = ap[colKey];
+            Object.keys(per)
+              .sort()
+              .forEach(function (fw) {
+                parts +=
+                  '<li class="gc-net-zone-modal__fw-row">' +
+                  fwPillModal(fw) +
+                  '<span class="gc-net-zone-modal__fw-val">' +
+                  modalValueCell(per[fw]) +
+                  "</span></li>";
+              });
+            parts += "</ul>";
+          });
+          parts += "</section>";
+          return parts;
+        })
+        .join("");
+    }
+
+    function closeZoneCombineModal() {
+      if (!zoneCombineModal) return;
+      zoneCombineModal.hidden = true;
+      zoneCombineModal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    function openZoneCombineModal() {
+      var data = lastZonesPayload;
+      if (!data || !zoneCombineModalBody || !zoneCombineModal) return;
+      zoneCombineModalBody.innerHTML = buildZoneConflictModalHtml(data);
+      zoneCombineModal.hidden = false;
+      zoneCombineModal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      if (zoneCombineModalClose) zoneCombineModalClose.focus();
+    }
+
+    function onZoneCombineModalKeydown(e) {
+      if (!zoneCombineModal || zoneCombineModal.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeZoneCombineModal();
+      }
+    }
+
+    (function initZonesCombineFromStorage() {
+      if (!zoneCombineInput) return;
+      try {
+        var v = localStorage.getItem(ZONES_COMBINE_LS);
+        if (v === "0") zoneCombineInput.checked = false;
+        else if (v === "1") zoneCombineInput.checked = true;
+      } catch (e) {}
+    })();
+
+    document.addEventListener("keydown", onZoneCombineModalKeydown);
+    document.addEventListener("keydown", onIfCombineModalKeydown);
+
+    function netEntityTypeKey(row) {
+      var et = row && row.entity_type;
+      return et != null ? String(et).trim().toLowerCase() : "";
+    }
+
+    function netIfRowCanBulkDelete(row) {
+      var et = netEntityTypeKey(row);
+      return et === "vlan" || et === "bridge_pair" || et === "lag" || et === "alias";
+    }
+
+    var tableIf = gcCreateNetworkEntityTable({
+      prefix: "gc-net-if",
+      apiUrl: URLS.interfaces,
+      emptySelectionMessage:
+        "Select one or more firewalls or configurations in the top bar.",
+      lsKey: "ground-control-net-if-columns-v3",
+      dataRowClass: "gc-net-if-data-row",
+      colPickerAttr: "data-gc-net-if-col",
+      pageSyncFallbackEntities: ["interface", "vlan", "bridge_pair", "lag", "alias"],
+      interfaceStatusColumnVisual: true,
+      hardwarePortPills: true,
+      zoneAsPill: true,
+      combineQuery: { inputId: "gc-net-if-combine", param: "combine" },
+      combineConflictRowKey: "if_combine_conflict",
+      rowClickable: true,
+      entityTypeQuickFilter: true,
+      interfaceZonePresenceFacet: true,
+      bulkRowSelect: true,
+      bulkSelectDisableRow: function (row) {
+        return !netIfRowCanBulkDelete(row);
+      },
+      bulkDeleteRowFilter: netIfRowCanBulkDelete,
+      onRowClick: function (tr) {
+        var row = tr && tr._gcNetRow;
+        var et = netEntityTypeKey(row);
+        if (et === "vlan") {
+          if (window.gcNetVlanFlyoutOpenFromTr) window.gcNetVlanFlyoutOpenFromTr(tr);
+        } else if (et === "bridge_pair") {
+          if (window.gcNetBridgePairFlyoutOpenFromTr) window.gcNetBridgePairFlyoutOpenFromTr(tr);
+        } else if (et === "lag") {
+          if (window.gcNetLagFlyoutOpenFromTr) window.gcNetLagFlyoutOpenFromTr(tr);
+        } else if (et === "alias") {
+          if (window.gcNetAliasFlyoutOpenFromTr) window.gcNetAliasFlyoutOpenFromTr(tr);
+        } else if (window.gcNetIfEditFlyoutOpenFromTr) {
+          window.gcNetIfEditFlyoutOpenFromTr(tr);
+        }
+      },
+      labels: {
+        countSingular: "row",
+        countPlural: "rows",
+        emptyCache:
+          "No interfaces, VLANs, bridge pairs, LAGs, or aliases in the cache for the selected firewalls. Run sync from Inventory (include bridge pairs, LAGs, and aliases if needed).",
+        emptyFilter: "No rows match the current search or filters.",
+        loadError: "Could not load network objects.",
+      },
+      afterRenderFromApi: function (data) {
+        lastIfPayload = data;
+        updateIfCombineChrome(data);
+      },
+    });
+
+    (function bindNetIfDeleteSelected() {
+      var btn = document.getElementById("gc-net-if-delete-selected");
+      if (!btn || !tableIf) return;
+      var batchUrl = {{ url_api_task_queue_enqueue_network_entity_deletes_batch | tojson }};
+      btn.addEventListener("click", function () {
+        if (typeof tableIf.getDeleteConfigEntryIdsFromSelection !== "function") return;
+        var ids = tableIf.getDeleteConfigEntryIdsFromSelection();
+        if (!ids.length) {
+          alert("Select one or more rows to delete.");
+          return;
+        }
+        var msg =
+          "Physical interface rows cannot be deleted from Ground Control (those checkboxes are disabled on purpose).\n\n" +
+          "You are about to queue deletion of the selected VLAN, bridge pair, LAG, and/or alias objects on the firewall. " +
+          "That can immediately affect connectivity, routing, DHCP, VPN tunnels, and any rules or references that still use those objects when the tasks are sent.\n\n" +
+          "Proceed and add remove operations to the task queue?";
+        if (!window.confirm(msg)) return;
+        if (!batchUrl) {
+          alert("Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(batchUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em =
+                (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+              alert(typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            try {
+              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            } catch (e1) {}
+            if (tableIf.refresh) tableIf.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            alert("Network error.");
+          });
+      });
+    })();
+
+    var tableZone = gcCreateNetworkEntityTable({
+      prefix: "gc-net-zone",
+      apiUrl: URLS.zones,
+      emptySelectionMessage:
+        "Select one or more firewalls or configurations in the top bar.",
+      lsKey: "ground-control-net-zone-columns-v4",
+      dataRowClass: "gc-net-zone-data-row",
+      colPickerAttr: "data-gc-net-zone-col",
+      pageSyncFallbackEntities: ["zone"],
+      nameAsZonePill: true,
+      combineQuery: { inputId: "gc-net-zone-combine", param: "combine" },
+      bulkRowSelect: true,
+      combineSyncSelected: {
+        strategy: "zone_create_batch",
+        zoneFirewallCreateBatchUrl: window.gcNetZoneEnqueueCreateBatchUrl,
+        zoneConfigurationCreateBatchUrl: window.gcNetZoneApplyCreateBatchUrl,
+        resolveScopeIds: function () {
+          var out = [];
+          var seen = {};
+          function add(x) {
+            var n = parseInt(String(x), 10);
+            if (isNaN(n) || n < 1 || seen[n]) return;
+            seen[n] = true;
+            out.push(n);
+          }
+          if (typeof window.gcGetSelectedFirewallIds === "function") {
+            (window.gcGetSelectedFirewallIds() || []).forEach(add);
+          }
+          if (typeof window.gcGetEffectiveConfigurationIds === "function") {
+            (window.gcGetEffectiveConfigurationIds() || []).forEach(add);
+          }
+          return out;
+        },
+      },
+      rowClickable: true,
+      onRowClick: function (tr) {
+        var row = tr && tr._gcNetRow;
+        if (row && row.entity_type === "zone" && window.gcNetZoneFlyoutOpenFromTr) {
+          window.gcNetZoneFlyoutOpenFromTr(tr);
+        }
+      },
+      afterRenderFromApi: function (data) {
+        lastZonesPayload = data;
+        updateZoneCombineChrome(data);
+      },
+      labels: {
+        countSingular: "zone",
+        countPlural: "zones",
+        emptyCache:
+          "No zones in the cache for the selected firewalls. Run sync from Inventory.",
+        emptyFilter: "No zones match the current search or filters.",
+        loadError: "Could not load zones.",
+      },
+    });
+
+    (function bindZoneAddBtn() {
+      var b = document.getElementById("gc-net-zone-add");
+      if (!b) return;
+      b.addEventListener("click", function () {
+        if (window.gcNetZoneFlyoutOpenAdd) window.gcNetZoneFlyoutOpenAdd();
+      });
+    })();
+
+    (function bindNetZoneDeleteSelected() {
+      var btn = document.getElementById("gc-net-zone-delete-selected");
+      if (!btn || !tableZone) return;
+      var batchUrl = {{ url_api_task_queue_enqueue_network_entity_deletes_batch | tojson }};
+      btn.addEventListener("click", function () {
+        if (typeof tableZone.getDeleteConfigEntryIdsFromSelection !== "function") return;
+        var ids = tableZone.getDeleteConfigEntryIdsFromSelection();
+        if (!ids.length) {
+          alert("Select one or more rows to delete.");
+          return;
+        }
+        var msg =
+          "You are about to queue deletion of the selected zone objects on each firewall. " +
+          "That can affect rules and references that use those zone names when the tasks are sent.\n\n" +
+          "Proceed and add remove operations to the task queue?";
+        if (!window.confirm(msg)) return;
+        if (!batchUrl) {
+          alert("Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(batchUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em =
+                (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+              alert(typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            try {
+              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            } catch (e1) {}
+            if (tableZone.refresh) tableZone.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            alert("Network error.");
+          });
+      });
+    })();
+
+    if (ifCombineInput) {
+      ifCombineInput.addEventListener("change", function () {
+        try {
+          localStorage.setItem(IF_COMBINE_LS, ifCombineInput.checked ? "1" : "0");
+        } catch (eIf2) {}
+        if (tableIf) tableIf.refresh();
+      });
+      ifCombineInput.addEventListener("pointerdown", function (e) {
+        var d = lastIfPayload;
+        if (!d || !d.interfaces_combine_conflicts || !ifCombineInput.checked) return;
+        if (e.shiftKey) return;
+        var pt = e.pointerType;
+        if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
+        if (pt === "mouse" && e.button !== 0) return;
+        e.preventDefault();
+        openIfCombineModal();
+      });
+    }
+    if (ifCombineModalClose) ifCombineModalClose.addEventListener("click", closeIfCombineModal);
+    if (ifCombineModalDone) ifCombineModalDone.addEventListener("click", closeIfCombineModal);
+    if (ifCombineModalBackdrop) ifCombineModalBackdrop.addEventListener("click", closeIfCombineModal);
+
+    if (zoneCombineInput) {
+      zoneCombineInput.addEventListener("change", function () {
+        try {
+          localStorage.setItem(ZONES_COMBINE_LS, zoneCombineInput.checked ? "1" : "0");
+        } catch (e) {}
+        if (tableZone) tableZone.refresh();
+      });
+      zoneCombineInput.addEventListener("pointerdown", function (e) {
+        var d = lastZonesPayload;
+        if (!d || !d.zones_combine_conflicts || !zoneCombineInput.checked) return;
+        if (e.shiftKey) return;
+        var pt = e.pointerType;
+        if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
+        if (pt === "mouse" && e.button !== 0) return;
+        e.preventDefault();
+        openZoneCombineModal();
+      });
+    }
+    if (zoneCombineModalClose) zoneCombineModalClose.addEventListener("click", closeZoneCombineModal);
+    if (zoneCombineModalDone) zoneCombineModalDone.addEventListener("click", closeZoneCombineModal);
+    if (zoneCombineModalBackdrop) zoneCombineModalBackdrop.addEventListener("click", closeZoneCombineModal);
+
+    window.gcNetIfRefresh = refreshAllNetworkTables;
+
+    syncMainTabButtons();
+    applyMainTabPanels();
+    syncFilterAsidesVisibility();
+    if (window.gcNetIfEditFlyoutInit) window.gcNetIfEditFlyoutInit();
+    if (window.gcNetVlanFlyoutInit) window.gcNetVlanFlyoutInit();
+    if (window.gcNetBridgePairFlyoutInit) window.gcNetBridgePairFlyoutInit();
+    if (window.gcNetLagFlyoutInit) window.gcNetLagFlyoutInit();
+    if (window.gcNetAliasFlyoutInit) window.gcNetAliasFlyoutInit();
+    if (window.gcNetZoneFlyoutInit) window.gcNetZoneFlyoutInit();
+
+    (function initInterfacesAddDropdown() {
+      var wrap = document.getElementById("gc-net-if-add-dropdown-wrap");
+      var trig = document.getElementById("gc-net-if-add-dropdown-trigger");
+      var menu = document.getElementById("gc-net-if-add-dropdown-menu");
+      if (!wrap || !trig || !menu) return;
+      function closeMenu() {
+        menu.hidden = true;
+        trig.setAttribute("aria-expanded", "false");
+      }
+      function openMenu() {
+        menu.hidden = false;
+        trig.setAttribute("aria-expanded", "true");
+      }
+      trig.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (menu.hidden) openMenu();
+        else closeMenu();
+      });
+      menu.querySelectorAll("[data-gc-add-kind]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var k = btn.getAttribute("data-gc-add-kind");
+          closeMenu();
+          if (k === "bridge") {
+            if (window.gcNetBridgePairFlyoutOpenAdd) window.gcNetBridgePairFlyoutOpenAdd();
+          } else if (k === "vlan") {
+            if (window.gcNetVlanFlyoutOpenAdd) window.gcNetVlanFlyoutOpenAdd();
+          } else if (k === "lag") {
+            if (window.gcNetLagFlyoutOpenAdd) window.gcNetLagFlyoutOpenAdd();
+          } else if (k === "alias") {
+            if (window.gcNetAliasFlyoutOpenAdd) window.gcNetAliasFlyoutOpenAdd();
+          }
+        });
+      });
+      document.addEventListener("click", function (e) {
+        if (!wrap.contains(e.target)) closeMenu();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") closeMenu();
+      });
+    })();
+
+    refreshAllNetworkTables();
+    if (activeMainTab === "zones" && tableZone && tableZone.compactZoneFirewallCells) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          tableZone.compactZoneFirewallCells();
+        });
+      });
+    }
+  })();
+</script>
+{% endblock %}

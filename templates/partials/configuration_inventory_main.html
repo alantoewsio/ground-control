@@ -1,0 +1,351 @@
+<dialog class="modal" id="add-cfg-modal" aria-labelledby="add-cfg-title">
+  <form method="post" action="{{ url_configuration_create }}" class="form modal-form" id="add-cfg-form">
+    <h3 id="add-cfg-title" class="modal-title">Add configuration</h3>
+    <label>
+      <span>Name <span class="muted">(optional)</span></span>
+      <input type="text" name="name" autocomplete="off" placeholder="e.g. Lab template" />
+    </label>
+    <label>
+      <span>Description <span class="muted">(optional)</span></span>
+      <textarea name="description" rows="3" placeholder="Notes"></textarea>
+    </label>
+    <div class="gc-if-flyout__field">
+      <span class="gc-if-flyout__label" id="gc-cfg-member-add-field-label">Assigned firewalls <span class="muted">(optional)</span></span>
+      <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.875rem">
+        Choose tags and/or individual firewalls. Tags include every firewall with that tag.
+      </p>
+      <div
+        class="gc-multiselect gc-cfg-member-ms gc-cfg-member-ms--in-sheet"
+        data-gc-cfg-member-root="1"
+        data-gc-cfg-member-scope="add"
+      >
+        <div class="gc-multiselect__control">
+          <div
+            class="gc-hs-ip-host-flyout__fw-ms"
+            data-gc-fw-ms="1"
+            data-fw-picker-mode="add"
+            data-fw-initial-selected="[]"
+            data-fw-assigned-ids="[]"
+          >
+            <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+              <button
+                type="button"
+                class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                id="gc-cfg-member-add-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-labelledby="gc-cfg-member-add-field-label gc-cfg-member-add-trigger"
+              >
+                <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text" id="gc-cfg-member-add-trigger-text">Loading…</span>
+                <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+              </button>
+              <div
+                class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown gc-net-fw-dropdown--split"
+                id="gc-cfg-member-add-dropdown"
+                hidden
+              >
+                <div class="gc-net-fw-dropdown__body">
+                  <div
+                    class="gc-net-fw-dropdown__selected"
+                    id="gc-cfg-member-add-selected-panel"
+                    aria-label="Assigned firewalls preview"
+                  ></div>
+                  <div class="gc-net-fw-dropdown__picker">
+                    <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                      <input
+                        type="search"
+                        class="gc-if-flyout__input gc-hs-ip-host-flyout__fw-search"
+                        id="gc-cfg-member-add-search"
+                        placeholder="Search tags or firewalls"
+                        autocomplete="off"
+                      />
+                    </div>
+                    <div
+                      class="gc-hs-ip-host-flyout__fw-ms-options"
+                      id="gc-cfg-member-add-options"
+                      role="listbox"
+                      aria-multiselectable="true"
+                    ></div>
+                    <p class="gc-hs-ip-host-flyout__fw-empty muted" id="gc-cfg-member-add-empty" hidden>No firewalls registered.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" name="member_firewall_ids_json" value='{"tags":[],"firewall_ids":[]}' data-gc-cfg-member-hidden autocomplete="off" />
+        <p class="gc-cfg-member-ms__count muted" data-gc-cfg-member-count aria-live="polite"></p>
+      </div>
+    </div>
+    <label>
+      <span>Import cached objects from firewall <span class="muted">(optional)</span></span>
+      <select name="import_firewall_id" class="gc-if-flyout__input" aria-label="Firewall to copy cached configuration from">
+        <option value="">— None —</option>
+        {% for fw in nav_firewalls %}
+        <option value="{{ fw.id }}">{% if fw.name %}{{ fw.name | e }} — {{ fw.host | e }}{% else %}{{ fw.host | e }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="muted" style="margin-top: -0.25rem; font-size: 0.875rem">
+      Copies all locally cached entities from Inventory for that firewall into this configuration. Choose none for an empty configuration.
+    </p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="cancel-add-cfg">Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal gc-delete-confirm-dialog" id="gc-cfg-delete-dialog" aria-labelledby="gc-cfg-delete-dialog-title">
+  <div class="form modal-form">
+    <h3 id="gc-cfg-delete-dialog-title" class="modal-title">Delete configurations</h3>
+    <p id="gc-cfg-delete-dialog-lead" class="muted"></p>
+    <div class="modal-actions gc-delete-confirm-dialog__actions">
+      <button type="button" class="btn" id="gc-cfg-delete-dialog-cancel">Cancel</button>
+      <button type="button" class="btn destructive" id="gc-cfg-delete-dialog-confirm"></button>
+    </div>
+  </div>
+</dialog>
+
+<div class="split">
+  <aside class="filters filters--collapsed" aria-label="Filters" id="gc-cfg-filters-aside">
+    <div id="gc-cfg-filters-drawer" class="filters__drawer" hidden></div>
+  </aside>
+
+  <div class="content-pane">
+    <div class="table-wrap">
+      <div class="firewalls-page__head">
+        <h2>Configurations</h2>
+      </div>
+      <div class="toolbar">
+        <div class="toolbar__sheet">
+          <div class="toolbar__line toolbar__line--main">
+            <div class="toolbar__filters">
+              <div class="filters__head">
+                <button
+                  type="button"
+                  class="filters__toggle"
+                  id="gc-cfg-filters-toggle"
+                  aria-expanded="false"
+                  aria-controls="gc-cfg-filters-drawer"
+                  aria-label="Filters"
+                  title="Filters"
+                >
+                  <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                  </svg>
+                  <span class="filters__title-label">Filters</span>
+                </button>
+                <div class="filters__head-actions" id="gc-cfg-facet-head-actions" hidden>
+                  <span class="filters__facet-count" id="gc-cfg-facet-count" aria-live="polite"></span>
+                  <button type="button" class="filters__facet-reset link-btn" id="gc-cfg-facet-reset" hidden>
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar__fw-toolbar-end">
+              <div class="toolbar__bulk-actions">
+                <button type="button" class="btn btn--secondary" id="gc-cfg-delete-selected" disabled>
+                  Delete
+                </button>
+                <button type="button" class="btn btn--secondary" id="gc-cfg-apply-selected-firewalls" disabled>
+                  Apply to selected firewalls
+                </button>
+                <button type="button" class="btn primary" id="open-add-cfg">Add configuration</button>
+              </div>
+              <div class="toolbar__search-cluster">
+                <div class="search-field">
+                  <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                    />
+                  </svg>
+                  <input
+                    type="search"
+                    id="gc-cfg-search"
+                    class="search-field__input"
+                    placeholder="Search"
+                    autocomplete="off"
+                    aria-label="Search configurations"
+                  />
+                </div>
+                <span
+                  id="gc-cfg-cols-trigger"
+                  class="toolbar__cols-icon"
+                  role="button"
+                  tabindex="0"
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-controls="gc-cfg-cols-panel"
+                  title="Columns"
+                  aria-label="Choose table columns"
+                >
+                  <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table class="data-table data-table--dense" id="gc-cfg-table">
+          <thead>
+            <tr>
+              <th class="th-check" scope="col">
+                <input type="checkbox" id="gc-cfg-select-all" title="Select all" aria-label="Select all visible configurations" />
+              </th>
+              <th scope="col" data-gc-col="name">Name</th>
+              <th scope="col" data-gc-col="description">Description</th>
+              <th scope="col" data-gc-col="clone_source">Cloned from</th>
+              <th scope="col" data-gc-col="members">Members</th>
+              <th scope="col" data-gc-col="items" class="gc-cfg-items-col">Items</th>
+              <th scope="col" data-gc-col="status">Status</th>
+              <th scope="col" class="actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="gc-cfg-tbody">
+            {% set fw_lbl = firewall_label_by_id | default({}) %}
+            {% set cache_counts = cfg_cache_entry_counts | default({}) %}
+            {% for c in configurations %}
+            {% set n_items = cache_counts.get(c.id, 0) %}
+            {% set mem_split = c.member_assignment_tags_and_firewall_ids() %}
+            {% set mem_tags = mem_split[0] %}
+            {% set mem_ind_ids = mem_split[1] %}
+            {% set mem_eff = c.effective_member_firewall_ids(firewalls) %}
+            {% set msearch = namespace(s='') %}
+            {% for t in mem_tags %}{% set msearch.s = msearch.s ~ ' ' ~ (t | lower) %}{% endfor %}
+            {% for mid in mem_ind_ids %}
+              {% set lbl = fw_lbl[mid] if mid in fw_lbl else ('#' ~ mid) %}
+              {% set msearch.s = msearch.s ~ ' ' ~ (lbl | lower) %}
+            {% endfor %}
+            {% for eid in mem_eff %}
+              {% set elbl = fw_lbl[eid] if eid in fw_lbl else ('#' ~ eid) %}
+              {% set msearch.s = msearch.s ~ ' ' ~ (elbl | lower) %}
+            {% endfor %}
+            {% set members_search = (msearch.s | trim) %}
+            {% set clone_fw = c.cloned_from_firewall %}
+            {% set clone_label = ((clone_fw.name or clone_fw.host) if clone_fw else '') | trim %}
+            {% set clone_search = clone_label | lower %}
+            <tr
+              class="gc-fw-data-row gc-fw-row--clickable gc-cfg-data-row"
+              data-cfg-id="{{ c.id }}"
+              data-cfg-members-json="{{ c.member_firewall_ids_json | e }}"
+              data-cfg-members-search="{{ members_search | e }}"
+              data-cfg-name="{{ (c.name or '') | e }}"
+              data-cfg-description="{{ (c.description or '') | e }}"
+              data-cfg-clone-source-search="{{ clone_search | e }}"
+              data-cfg-items-count="{{ n_items }}"
+              data-cfg-items-search="{{ (n_items | string) | e }}"
+              data-cfg-status-search=""
+              data-search="{{ (
+                (c.name or '') ~ ' ' ~ (c.description or '') ~ ' ' ~ members_search ~ ' ' ~ clone_search ~ ' ' ~ (n_items | string)
+              ) | lower | e }}"
+            >
+              <td class="td-check" data-select-stop="1">
+                <input type="checkbox" class="gc-cfg-row-select" value="{{ c.id }}" aria-label="Select configuration" />
+              </td>
+              <td data-gc-col="name">{{ c.name or "—" }}</td>
+              <td class="desc-cell" data-gc-col="description">{{ (c.description or "—") | truncate(80) }}</td>
+              <td data-gc-col="clone_source" class="desc-cell">{{ clone_label if clone_label else "—" }}</td>
+              <td data-gc-col="members" class="gc-cfg-inventory-members-cell">
+                {% if mem_tags or mem_ind_ids %}
+                <div class="gc-cfg-inventory-members-cell__groups">
+                  {% if mem_tags %}
+                  <div class="gc-cfg-inventory-members-cell__group">
+                    <span class="gc-cfg-inventory-members-cell__label muted">Tags</span>
+                    <div class="gc-fw-sync-pills">
+                      {% for t in mem_tags %}
+                      <span class="gc-user-tag-pill gc-user-tag-pill--configuration-tag" title="Member tag">{{ t | e }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endif %}
+                  {% if mem_ind_ids %}
+                  <div class="gc-cfg-inventory-members-cell__group">
+                    <span class="gc-cfg-inventory-members-cell__label muted">Firewalls</span>
+                    <div class="gc-fw-sync-pills">
+                      {% for mid in mem_ind_ids %}
+                      {% set mlbl = fw_lbl[mid] if mid in fw_lbl else ('#' ~ mid) %}
+                      <span class="gc-user-tag-pill" title="Firewall id {{ mid }}">{{ mlbl | e }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+                <p class="gc-cfg-inventory-members-cell__count muted">
+                  {{ mem_eff | length }} firewall{% if (mem_eff | length) != 1 %}s{% endif %} in scope
+                  {% if mem_eff | length == 0 and (mem_tags or mem_ind_ids) %}(no matching inventory){% endif %}
+                </p>
+                {% else %}
+                <span class="muted">—</span>
+                {% endif %}
+              </td>
+              <td data-gc-col="items" class="gc-cfg-items-cell mono" title="Cached objects in this configuration">
+                {{ n_items }}
+              </td>
+              <td data-gc-col="status" class="gc-cfg-status-cell muted" data-cfg-status-cell="1">Loading…</td>
+              <td class="actions">
+                <button
+                  type="button"
+                  class="btn-icon gc-config-viewer-open"
+                  title="View cached configuration"
+                  aria-label="View cached configuration summary"
+                  data-select-stop="1"
+                  data-gc-cv-kind="configuration"
+                  data-gc-cv-scope-id="{{ c.id }}"
+                  data-gc-cv-label="{{ (((c.name or '') | trim) or ('Configuration #' ~ c.id)) | e }}"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn-icon gc-cfg-apply-members"
+                  title="Apply this configuration to its member firewalls"
+                  aria-label="Apply this configuration to its member firewalls"
+                  data-select-stop="1"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path fill="currentColor" d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+                  </svg>
+                </button>
+                <button type="button" class="btn-icon" title="Edit" aria-label="Edit configuration">
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                    />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="gc-cfg-placeholder-row">
+              <td colspan="7" class="muted">No configurations yet. Click <strong>Add configuration</strong>.</td>
+            </tr>
+            {% endfor %}
+            <tr id="gc-cfg-filter-empty" class="gc-cfg-filter-empty" hidden>
+              <td colspan="7" class="muted">No configurations match the current filters or search.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="table-footer">
+        <span class="table-footer__count" id="gc-cfg-count" aria-live="polite"></span>
+      </footer>
+    </div>
+  </div>
+</div>

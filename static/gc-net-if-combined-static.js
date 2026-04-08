@@ -1,0 +1,668 @@
+/**
+ * Combined-view interface flyout: per-scope IPv4/IPv6 static tables with IPAM pool pickers.
+ * Depends on gc-net-if-flyout.js (els, currentNetRow, pick, netmaskToDisplay, syncDirty, ipv4ModeValue, ipv6ModeValue).
+ */
+(function () {
+  "use strict";
+
+  var ipamPoolsCache = null;
+
+  function prefixesUrl() {
+    return (
+      (typeof window !== "undefined" && window.gcIpamPrefixesUrl) || "/api/ipam/prefixes"
+    );
+  }
+
+  function nextCidrUrl() {
+    return (typeof window !== "undefined" && window.gcIpamNextAssignmentCidrUrl) || "";
+  }
+
+  function resolveInterfacePoolIpv4Url() {
+    return (
+      (typeof window !== "undefined" && window.gcIpamResolveInterfacePoolIpv4Url) || ""
+    );
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /** Data columns after scope banner row: hardware + address fields + pool + conflict. */
+  var CMB_STATIC_COL_COUNT = 7;
+
+  function countCombinedDataRows(tb) {
+    return tb ? tb.querySelectorAll("tr.gc-if-cmb-data-row").length : 0;
+  }
+
+  function gatherTrSearchText(tr) {
+    if (!tr) return "";
+    var parts = [tr.textContent || ""];
+    tr.querySelectorAll("input, select").forEach(function (n) {
+      if (!n) return;
+      if (n.tagName === "SELECT") {
+        var o = n.options[n.selectedIndex];
+        parts.push((o && o.text) || n.value || "");
+      } else {
+        parts.push(n.value || "");
+      }
+    });
+    return parts.join(" ").trim();
+  }
+
+  function applyCombinedStaticFilter(tbody, query) {
+    if (!tbody) return;
+    var q = String(query || "")
+      .trim()
+      .toLowerCase();
+    tbody.querySelectorAll("tr.gc-if-cmb-data-row").forEach(function (dr) {
+      var scope = dr.previousElementSibling;
+      var scopeOk =
+        scope &&
+        scope.classList &&
+        scope.classList.contains("gc-if-cmb-scope-row");
+      var ok =
+        !q ||
+        (scopeOk &&
+          (gatherTrSearchText(scope) + " " + gatherTrSearchText(dr)).toLowerCase().indexOf(q) !== -1);
+      if (scopeOk) scope.hidden = !ok;
+      dr.hidden = !ok;
+    });
+  }
+
+  function bindCombinedStaticFilter(wrap, tbody) {
+    if (!wrap || !tbody) return;
+    var inp = wrap.querySelector(".gc-if-cmb-filter");
+    if (!inp || inp.dataset.gcCmbFilterBound === "1") return;
+    inp.dataset.gcCmbFilterBound = "1";
+    function run() {
+      applyCombinedStaticFilter(tbody, inp.value);
+    }
+    inp.addEventListener("input", run);
+    inp.addEventListener("search", run);
+    if (tbody.dataset.gcCmbTbodyFilterDelegated !== "1") {
+      tbody.dataset.gcCmbTbodyFilterDelegated = "1";
+      tbody.addEventListener("input", function (ev) {
+        if (!ev.target || !ev.target.closest || !ev.target.closest("tr.gc-if-cmb-data-row")) return;
+        run();
+      });
+      tbody.addEventListener("change", function (ev) {
+        if (!ev.target || !ev.target.closest || !ev.target.closest("tr.gc-if-cmb-data-row")) return;
+        run();
+      });
+    }
+  }
+
+  function combinedRowActive(row) {
+    return !!(row && row.interfaces_row_combined && row.if_combine_sources && row.if_combine_sources.length);
+  }
+
+  /** @param {object} [opts] */
+  function resolveOpts(opts) {
+    opts = opts || {};
+    return {
+      ipv4ModeValue:
+        opts.ipv4ModeValue ||
+        (typeof window.gcNetIfIpv4ModeValue === "function" ? window.gcNetIfIpv4ModeValue : null),
+      ipv6ModeValue:
+        opts.ipv6ModeValue ||
+        (typeof window.gcNetIfIpv6ModeValue === "function" ? window.gcNetIfIpv6ModeValue : null),
+      pick:
+        opts.pick || (typeof window.gcNetIfPick === "function" ? window.gcNetIfPick : null),
+      netmaskToDisplay:
+        opts.netmaskToDisplay ||
+        (typeof window.gcNetIfNetmaskToDisplay === "function" ? window.gcNetIfNetmaskToDisplay : null),
+      syncDirty:
+        opts.syncDirty || (typeof window.gcNetIfSyncDirty === "function" ? window.gcNetIfSyncDirty : null),
+      isWanNetworkZone:
+        opts.isWanNetworkZone ||
+        (typeof window.gcNetIfIsWanNetworkZone === "function" ? window.gcNetIfIsWanNetworkZone : null),
+    };
+  }
+
+  function modeV4From(ro) {
+    var fn = ro && ro.ipv4ModeValue;
+    return fn ? fn() : "dhcp";
+  }
+
+  function modeV6From(ro) {
+    var fn = ro && ro.ipv6ModeValue;
+    return fn ? fn() : "static";
+  }
+
+  function pickFlat(keys, flat, ro) {
+    var fn = ro && ro.pick;
+    if (fn) return fn(flat, keys);
+    return "";
+  }
+
+  function nmDisp(nm, ro) {
+    var fn = ro && ro.netmaskToDisplay;
+    if (fn) return fn(nm);
+    return String(nm || "");
+  }
+
+  function dirty(ro) {
+    var fn = ro && ro.syncDirty;
+    if (fn) fn();
+    else if (typeof window.gcNetIfSyncDirty === "function") window.gcNetIfSyncDirty();
+  }
+
+  function syncCombinedGwCols(els, ro) {
+    var wanFn = ro && ro.isWanNetworkZone;
+    var show = wanFn ? !!wanFn() : false;
+    [els.ipv4CombinedWrap, els.ipv6CombinedWrap].forEach(function (wrap) {
+      if (!wrap) return;
+      wrap.querySelectorAll(".gc-if-cmb-gw-col, .gc-if-cmb-gw-cell").forEach(function (el) {
+        el.hidden = !show;
+        el.setAttribute("aria-hidden", show ? "false" : "true");
+      });
+    });
+  }
+
+  function loadIpamPools(cb) {
+    if (ipamPoolsCache) {
+      cb(ipamPoolsCache);
+      return;
+    }
+    fetch(prefixesUrl(), { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (j) {
+        var rows = (j && j.prefixes) || [];
+        ipamPoolsCache = rows.filter(function (p) {
+          return (
+            p &&
+            String(p.prefix_type || "").toLowerCase() === "pool" &&
+            !p.pool_unmanaged
+          );
+        });
+        cb(ipamPoolsCache);
+      })
+      .catch(function () {
+        ipamPoolsCache = [];
+        cb([]);
+      });
+  }
+
+  function poolOptionsHtml(selectedId) {
+    var pools = ipamPoolsCache || [];
+    var opts =
+      '<option value="">— Select pool —</option>' +
+      pools
+        .map(function (p) {
+          var id = String(p.id);
+          var lab = (p.name || p.cidr || "").trim() || id;
+          var sel = String(selectedId || "") === id ? ' selected=""' : "";
+          return '<option value="' + escapeHtml(id) + '"' + sel + ">" + escapeHtml(lab) + "</option>";
+        })
+        .join("");
+    return opts;
+  }
+
+  /** Parse /24 from dotted netmask or prefix (best effort). */
+  function guessIpv4PrefixLen(netmaskStr) {
+    var s = String(netmaskStr || "").trim();
+    if (!s) return 24;
+    var mSlash = s.match(/^\s*\/(\d{1,2})\s*$/);
+    if (mSlash) {
+      var pls = parseInt(mSlash[1], 10);
+      return pls >= 0 && pls <= 32 ? pls : 24;
+    }
+    if (/^\d{1,2}$/.test(s)) {
+      var n = parseInt(s, 10);
+      return n >= 0 && n <= 32 ? n : 24;
+    }
+    if (s.indexOf(".") !== -1) {
+      var parts = s.split(".");
+      if (parts.length === 4) {
+        var bits = 0;
+        for (var i = 0; i < 4; i++) {
+          var o = parseInt(parts[i], 10);
+          if (isNaN(o)) return 24;
+          bits += (o >>> 0).toString(2).replace(/0/g, "").length;
+        }
+        return bits;
+      }
+    }
+    return 24;
+  }
+
+  function applyNextCidrToV4Row(tr, cidrStr) {
+    var raw = String(cidrStr || "").trim();
+    var slash = raw.indexOf("/");
+    if (slash < 0) return;
+    var hostPart = raw.slice(0, slash).trim();
+    var pl = parseInt(raw.slice(slash + 1), 10);
+    if (isNaN(pl) || pl < 0 || pl > 32) return;
+    var parts = hostPart.split(".").map(function (x) {
+      return parseInt(x, 10);
+    });
+    if (parts.length !== 4 || parts.some(function (n) {
+      return isNaN(n) || n < 0 || n > 255;
+    }))
+      return;
+    var ipInt =
+      (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+    var mask = pl === 0 ? 0 : (~0 << (32 - pl)) >>> 0;
+    var netInt = (ipInt & mask) >>> 0;
+    var hostInt = (netInt + 1) >>> 0;
+    var o0 = (hostInt >>> 24) & 255;
+    var o1 = (hostInt >>> 16) & 255;
+    var o2 = (hostInt >>> 8) & 255;
+    var o3 = hostInt & 255;
+    var ipEl = tr.querySelector(".gc-if-cmb-v4-ip");
+    var nmEl = tr.querySelector(".gc-if-cmb-v4-nm");
+    if (ipEl) ipEl.value = o0 + "." + o1 + "." + o2 + "." + o3;
+    if (nmEl) nmEl.value = "/" + pl;
+  }
+
+  function applyNextCidrToV6Row(tr, cidrStr) {
+    var ipEl = tr.querySelector(".gc-if-cmb-v6-ip");
+    var pxEl = tr.querySelector(".gc-if-cmb-v6-px");
+    if (!ipEl || !pxEl) return;
+    ipEl.value = String(cidrStr || "").trim();
+    pxEl.value = "";
+    var slash = ipEl.value.lastIndexOf("/");
+    if (slash > 0) {
+      var rest = ipEl.value.slice(0, slash).trim();
+      var suf = ipEl.value.slice(slash + 1).trim();
+      ipEl.value = rest;
+      pxEl.value = suf;
+    }
+  }
+
+  function onPoolChangeV4(tr, poolId, ro) {
+    if (!poolId) return;
+    var pl = guessIpv4PrefixLen(
+      (tr.querySelector(".gc-if-cmb-v4-nm") && tr.querySelector(".gc-if-cmb-v4-nm").value) || "",
+    );
+    var resolveU = resolveInterfacePoolIpv4Url();
+    var fallback = nextCidrUrl();
+    var fwRaw = (tr.dataset && tr.dataset.gcFirewallId) || "";
+    var fwNum = parseInt(String(fwRaw), 10);
+    var fwQ = !isNaN(fwNum) && fwNum > 0 ? "&firewall_id=" + encodeURIComponent(String(fwNum)) : "";
+    var query =
+      "?parent_pool_id=" + encodeURIComponent(poolId) + "&prefix_len=" + encodeURIComponent(String(pl));
+    var primary = resolveU ? resolveU + query + fwQ : "";
+    var secondary = fallback ? fallback + query : "";
+    var u = primary || secondary;
+    if (!u) return;
+    fetch(u, { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, j: j };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok || !x.j || !x.j.cidr) {
+          if (primary && secondary && u === primary) {
+            return fetch(secondary, {
+              credentials: "same-origin",
+              headers: { Accept: "application/json" },
+            }).then(function (r2) {
+              return r2.json().then(function (j2) {
+                return { ok: r2.ok, j: j2 };
+              });
+            });
+          }
+          var msg = (x.j && x.j.detail) || "Could not allocate from pool.";
+          alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+          return null;
+        }
+        return x;
+      })
+      .then(function (x) {
+        if (!x) return;
+        if (!x.ok || !x.j || !x.j.cidr) {
+          var msg2 = (x.j && x.j.detail) || "Could not allocate from pool.";
+          alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
+          return;
+        }
+        applyNextCidrToV4Row(tr, x.j.cidr);
+        tr.dataset.gcPoolConflict = "0";
+        var ic = tr.querySelector(".gc-if-cmb-pool-conflict");
+        if (ic) {
+          ic.innerHTML = "";
+          ic.removeAttribute("title");
+        }
+        dirty(ro);
+      })
+      .catch(function () {
+        alert("Network error while requesting next CIDR.");
+      });
+  }
+
+  function onPoolChangeV6(tr, poolId, ro) {
+    var url = nextCidrUrl();
+    if (!url || !poolId) return;
+    var px = (tr.querySelector(".gc-if-cmb-v6-px") && tr.querySelector(".gc-if-cmb-v6-px").value) || "64";
+    var pl = parseInt(String(px).trim(), 10);
+    if (isNaN(pl) || pl < 1 || pl > 128) pl = 64;
+    var u = url + "?parent_pool_id=" + encodeURIComponent(poolId) + "&prefix_len=" + encodeURIComponent(String(pl));
+    fetch(u, { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, j: j };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok || !x.j || !x.j.cidr) {
+          var msg = (x.j && x.j.detail) || "Could not allocate from pool.";
+          alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+          return;
+        }
+        applyNextCidrToV6Row(tr, x.j.cidr);
+        tr.dataset.gcPoolConflict = "0";
+        var ic = tr.querySelector(".gc-if-cmb-pool-conflict");
+        if (ic) {
+          ic.innerHTML = "";
+          ic.removeAttribute("title");
+        }
+        dirty(ro);
+      })
+      .catch(function () {
+        alert("Network error while requesting next CIDR.");
+      });
+  }
+
+  function sourcesStableKey(srcs) {
+    if (!srcs || !srcs.length) return "";
+    return srcs
+      .map(function (s) {
+        return String((s && s.config_entry_id) != null ? s.config_entry_id : "");
+      })
+      .join(",");
+  }
+
+  function buildIpv4Combined(els, row, ro) {
+    var tb = els.ipv4CombinedTbody;
+    if (!tb) return;
+    var wrap = els.ipv4CombinedWrap;
+    if (wrap) {
+      var fi = wrap.querySelector(".gc-if-cmb-filter");
+      if (fi) fi.value = "";
+    }
+    tb.innerHTML = "";
+    var srcs = row.if_combine_sources || [];
+    loadIpamPools(function () {
+      srcs.forEach(function (src) {
+        var flat = src.flat || {};
+        var hw = pickFlat(["Hardware"], flat, ro);
+        var scopeTr = document.createElement("tr");
+        scopeTr.className = "gc-if-cmb-scope-row";
+        scopeTr.innerHTML =
+          '<td colspan="' +
+          CMB_STATIC_COL_COUNT +
+          '" class="gc-if-cmb-scope-cell">' +
+          escapeHtml(src.scope_label || "") +
+          "</td>";
+        var tr = document.createElement("tr");
+        tr.className = "gc-if-cmb-data-row";
+        tr.dataset.configEntryId = String(src.config_entry_id || "");
+        var ip = pickFlat(["IPAddress", "IPv4Address"], flat, ro);
+        var nmRaw = pickFlat(["Netmask", "IPv4Netmask"], flat, ro);
+        var nm =
+          typeof window.gcNetIpv4FlyoutBlur !== "undefined" &&
+          window.gcNetIpv4FlyoutBlur.netmaskToSlashDisplay
+            ? window.gcNetIpv4FlyoutBlur.netmaskToSlashDisplay(nmRaw)
+            : nmDisp(nmRaw, ro);
+        var gwn = pickFlat(
+          ["GatewayName", "IPv4GatewayName", "DefaultGatewayName"],
+          flat,
+          ro,
+        );
+        var gwi = pickFlat(
+          ["GatewayIP", "Gateway", "DefaultGateway", "IPv4Gateway"],
+          flat,
+          ro,
+        );
+        var ip4 = src.ipam_v4 || {};
+        var poolId = ip4.pool_id != null ? String(ip4.pool_id) : "";
+        var conflict = !!ip4.pool_conflict;
+        tr.dataset.gcPoolConflict = conflict ? "1" : "0";
+        tr.dataset.gcFirewallId =
+          src.firewall_id != null && String(src.firewall_id).trim() !== ""
+            ? String(src.firewall_id)
+            : "";
+        tr.innerHTML =
+          '<td><input type="text" class="gc-if-flyout__input mono gc-if-cmb-hw" readonly tabindex="-1" aria-readonly="true" title="Hardware (read-only)" value="' +
+          escapeHtml(hw) +
+          '" /></td>' +
+          '<td><input type="text" class="gc-if-flyout__input mono gc-if-cmb-v4-ip" autocomplete="off" value="' +
+          escapeHtml(ip) +
+          '" /></td>' +
+          '<td><input type="text" class="gc-if-flyout__input mono gc-if-cmb-v4-nm" autocomplete="off" value="' +
+          escapeHtml(nm) +
+          '" /></td>' +
+          '<td class="gc-if-cmb-gw-cell"><input type="text" class="gc-if-flyout__input gc-if-cmb-v4-gw-name" autocomplete="off" value="' +
+          escapeHtml(gwn) +
+          '" /></td>' +
+          '<td class="gc-if-cmb-gw-cell"><input type="text" class="gc-if-flyout__input mono gc-if-cmb-v4-gw-ip" autocomplete="off" value="' +
+          escapeHtml(gwi) +
+          '" /></td>' +
+          '<td><select class="gc-if-flyout__input gc-if-flyout__select gc-if-cmb-pool">' +
+          poolOptionsHtml(poolId) +
+          "</select></td>" +
+          '<td class="gc-if-cmb-pool-conflict-cell"><span class="gc-if-cmb-pool-conflict" title="' +
+          (conflict
+            ? "Address does not match IPAM pool assignment for this scope"
+            : "") +
+          '">' +
+          (conflict
+            ? '<span class="gc-if-ipam-cidr-icon gc-if-ipam-cidr-icon--conflict gc-if-cmb-inline-icon" role="img" aria-label="Pool mismatch">!</span>'
+            : "") +
+          "</span></td>";
+        var sel = tr.querySelector(".gc-if-cmb-pool");
+        if (sel) {
+          sel.addEventListener("change", function () {
+            onPoolChangeV4(tr, sel.value, ro);
+          });
+        }
+        var nmInp = tr.querySelector(".gc-if-cmb-v4-nm");
+        if (
+          nmInp &&
+          window.gcNetIpv4FlyoutBlur &&
+          window.gcNetIpv4FlyoutBlur.applyNetmaskNormalizeToSlash
+        ) {
+          nmInp.addEventListener("blur", function () {
+            window.gcNetIpv4FlyoutBlur.applyNetmaskNormalizeToSlash(
+              { ipv4Nm: nmInp },
+              function () {
+                dirty(ro);
+              },
+            );
+          });
+        }
+        tb.appendChild(scopeTr);
+        tb.appendChild(tr);
+      });
+      tb.dataset.gcIfCmbKey = sourcesStableKey(srcs);
+      syncCombinedGwCols(els, ro);
+      bindCombinedStaticFilter(wrap, tb);
+      applyCombinedStaticFilter(tb, "");
+    });
+  }
+
+  function buildIpv6Combined(els, row, ro) {
+    var tb = els.ipv6CombinedTbody;
+    if (!tb) return;
+    var wrap = els.ipv6CombinedWrap;
+    if (wrap) {
+      var fi6 = wrap.querySelector(".gc-if-cmb-filter");
+      if (fi6) fi6.value = "";
+    }
+    tb.innerHTML = "";
+    var srcs = row.if_combine_sources || [];
+    loadIpamPools(function () {
+      srcs.forEach(function (src) {
+        var flat = src.flat || {};
+        var hw = pickFlat(["Hardware"], flat, ro);
+        var scopeTr = document.createElement("tr");
+        scopeTr.className = "gc-if-cmb-scope-row";
+        scopeTr.innerHTML =
+          '<td colspan="' +
+          CMB_STATIC_COL_COUNT +
+          '" class="gc-if-cmb-scope-cell">' +
+          escapeHtml(src.scope_label || "") +
+          "</td>";
+        var tr = document.createElement("tr");
+        tr.className = "gc-if-cmb-data-row";
+        tr.dataset.configEntryId = String(src.config_entry_id || "");
+        var ip = pickFlat(["IPv6Address", "IPv6_Address"], flat, ro);
+        var px =
+          pickFlat(["Prefix", "IPv6PrefixLength", "IPv6Prefix", "PrefixLength"], flat, ro) || "64";
+        var gwn = pickFlat(
+          ["GatewayNameIpv6", "IPv6GatewayName", "IPv6_GatewayName"],
+          flat,
+          ro,
+        );
+        var gwi = pickFlat(
+          ["GatewayIPv6", "IPv6Gateway", "IPv6_Gateway", "IPv6DefaultGateway"],
+          flat,
+          ro,
+        );
+        var ip6 = src.ipam_v6 || {};
+        var poolId = ip6.pool_id != null ? String(ip6.pool_id) : "";
+        var conflict = !!ip6.pool_conflict;
+        tr.dataset.gcPoolConflict = conflict ? "1" : "0";
+        tr.innerHTML =
+          '<td><input type="text" class="gc-if-flyout__input mono gc-if-cmb-hw" readonly tabindex="-1" aria-readonly="true" title="Hardware (read-only)" value="' +
+          escapeHtml(hw) +
+          '" /></td>' +
+          '<td><input type="text" class="gc-if-flyout__input mono gc-if-cmb-v6-ip" autocomplete="off" value="' +
+          escapeHtml(ip) +
+          '" /></td>' +
+          '<td><input type="text" class="gc-if-flyout__input mono gc-if-cmb-v6-px" autocomplete="off" value="' +
+          escapeHtml(px) +
+          '" /></td>' +
+          '<td class="gc-if-cmb-gw-cell"><input type="text" class="gc-if-flyout__input gc-if-cmb-v6-gw-name" autocomplete="off" value="' +
+          escapeHtml(gwn) +
+          '" /></td>' +
+          '<td class="gc-if-cmb-gw-cell"><input type="text" class="gc-if-flyout__input mono gc-if-cmb-v6-gw-ip" autocomplete="off" value="' +
+          escapeHtml(gwi) +
+          '" /></td>' +
+          '<td><select class="gc-if-flyout__input gc-if-flyout__select gc-if-cmb-pool-v6">' +
+          poolOptionsHtml(poolId) +
+          "</select></td>" +
+          '<td class="gc-if-cmb-pool-conflict-cell"><span class="gc-if-cmb-pool-conflict" title="' +
+          (conflict
+            ? "Address does not match IPAM pool assignment for this scope"
+            : "") +
+          '">' +
+          (conflict
+            ? '<span class="gc-if-ipam-cidr-icon gc-if-ipam-cidr-icon--conflict gc-if-cmb-inline-icon" role="img" aria-label="Pool mismatch">!</span>'
+            : "") +
+          "</span></td>";
+        var sel = tr.querySelector(".gc-if-cmb-pool-v6");
+        if (sel) {
+          sel.addEventListener("change", function () {
+            onPoolChangeV6(tr, sel.value, ro);
+          });
+        }
+        tb.appendChild(scopeTr);
+        tb.appendChild(tr);
+      });
+      tb.dataset.gcIfCmbKey = sourcesStableKey(srcs);
+      syncCombinedGwCols(els, ro);
+      bindCombinedStaticFilter(wrap, tb);
+      applyCombinedStaticFilter(tb, "");
+    });
+  }
+
+  window.gcNetIfCombinedStaticSync = function (els, row, opts) {
+    if (!els || !row) return;
+    var force = !!(opts && opts.forceRebuild);
+    var ro = resolveOpts(opts);
+    var on = combinedRowActive(row);
+    var v4s =
+      on &&
+      els.ipv4Cb &&
+      els.ipv4Cb.checked &&
+      modeV4From(ro) === "static" &&
+      !!els.ipv4CombinedWrap &&
+      !!els.ipv4SingleStatic;
+    var v6s =
+      on &&
+      els.ipv6Cb &&
+      els.ipv6Cb.checked &&
+      modeV6From(ro) === "static" &&
+      !!els.ipv6CombinedWrap &&
+      !!els.ipv6SingleStatic;
+    if (els.ipv4SingleStatic) {
+      els.ipv4SingleStatic.hidden = v4s;
+      els.ipv4SingleStatic.setAttribute("aria-hidden", v4s ? "true" : "false");
+    }
+    if (els.ipv4CombinedWrap) {
+      els.ipv4CombinedWrap.hidden = !v4s;
+      els.ipv4CombinedWrap.setAttribute("aria-hidden", v4s ? "false" : "true");
+    }
+    if (els.ipv6SingleStatic) {
+      els.ipv6SingleStatic.hidden = v6s;
+      els.ipv6SingleStatic.setAttribute("aria-hidden", v6s ? "true" : "false");
+    }
+    if (els.ipv6CombinedWrap) {
+      els.ipv6CombinedWrap.hidden = !v6s;
+      els.ipv6CombinedWrap.setAttribute("aria-hidden", v6s ? "false" : "true");
+    }
+    var srcs = row.if_combine_sources || [];
+    var srcKey = sourcesStableKey(srcs);
+    if (v4s && srcs.length) {
+      var tb4 = els.ipv4CombinedTbody;
+      var needV4 =
+        force ||
+        !tb4 ||
+        tb4.dataset.gcIfCmbKey !== srcKey ||
+        countCombinedDataRows(tb4) !== srcs.length;
+      if (needV4) buildIpv4Combined(els, row, ro);
+      else syncCombinedGwCols(els, ro);
+    } else if (els.ipv4CombinedTbody) {
+      els.ipv4CombinedTbody.innerHTML = "";
+      els.ipv4CombinedTbody.dataset.gcIfCmbKey = "";
+    }
+    if (v6s && srcs.length) {
+      var tb6 = els.ipv6CombinedTbody;
+      var needV6 =
+        force ||
+        !tb6 ||
+        tb6.dataset.gcIfCmbKey !== srcKey ||
+        countCombinedDataRows(tb6) !== srcs.length;
+      if (needV6) buildIpv6Combined(els, row, ro);
+      else syncCombinedGwCols(els, ro);
+    } else if (els.ipv6CombinedTbody) {
+      els.ipv6CombinedTbody.innerHTML = "";
+      els.ipv6CombinedTbody.dataset.gcIfCmbKey = "";
+    }
+    if (!v4s && !v6s) syncCombinedGwCols(els, ro);
+  };
+
+  window.gcNetIfCombinedStaticUsesV4 = function (els, row, opts) {
+    var ro = resolveOpts(opts);
+    return (
+      combinedRowActive(row) &&
+      els &&
+      els.ipv4Cb &&
+      els.ipv4Cb.checked &&
+      modeV4From(ro) === "static"
+    );
+  };
+
+  window.gcNetIfCombinedStaticUsesV6 = function (els, row, opts) {
+    var ro = resolveOpts(opts);
+    return (
+      combinedRowActive(row) &&
+      els &&
+      els.ipv6Cb &&
+      els.ipv6Cb.checked &&
+      modeV6From(ro) === "static"
+    );
+  };
+
+  window.gcNetIfInvalidateIpamPoolsCache = function () {
+    ipamPoolsCache = null;
+  };
+})();
