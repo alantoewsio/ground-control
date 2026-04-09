@@ -1,14 +1,14 @@
 (function () {
   "use strict";
 
-  var root = document.querySelector("[data-gc-dashboard-api]");
-  if (!root || !window.Chart) return;
+  let root = document.querySelector("[data-gc-dashboard-api]");
+  if (!root || !globalThis.Chart) return;
 
-  var apiUrl = root.getAttribute("data-gc-dashboard-api") || "";
-  var statusEl = document.getElementById("gc-dashboard-status");
-  var emptyHint = document.getElementById("gc-dashboard-empty-hint");
+  let apiUrl = root.dataset.gcDashboardApi || "";
+  let statusEl = document.getElementById("gc-dashboard-status");
+  let emptyHint = document.getElementById("gc-dashboard-empty-hint");
 
-  var charts = {
+  let charts = {
     connected: null,
     syncTypes: null,
     syncRuns: null,
@@ -16,10 +16,10 @@
     cacheStacked: null,
     latency: [],
   };
-  var layoutStorageKey = "gc.dashboard.layout.v1";
-  var widgetRoot = null;
-  var resizeObserver = null;
-  var saveLayoutTimer = null;
+  let layoutStorageKey = "gc.dashboard.layout.v1";
+  let widgetRoot = null;
+  let resizeObserver = null;
+  let saveLayoutTimer = null;
 
   function destroyChart(ch) {
     if (ch) {
@@ -31,18 +31,18 @@
   }
 
   function clearOfflineStatDanger() {
-    var offlineEl = document.getElementById("gc-dashboard-offline");
+    let offlineEl = document.getElementById("gc-dashboard-offline");
     if (offlineEl) offlineEl.classList.remove("dashboard-page__stat-value--danger");
   }
 
   function clearPendingStatDanger() {
-    var el = document.getElementById("gc-dashboard-pending");
+    let el = document.getElementById("gc-dashboard-pending");
     if (el) el.classList.remove("dashboard-page__stat-value--danger");
   }
 
   function clearHistDeniedDanger() {
     ["gc-dashboard-hist-denied-7d", "gc-dashboard-hist-denied-today"].forEach(function (id) {
-      var el = document.getElementById(id);
+      let el = document.getElementById(id);
       if (el) el.classList.remove("dashboard-page__stat-value--danger");
     });
   }
@@ -65,15 +65,15 @@
       destroyChart(c);
     });
     charts.latency = [];
-    var grid = document.getElementById("gc-dashboard-latency-grid");
+    let grid = document.getElementById("gc-dashboard-latency-grid");
     if (grid) grid.innerHTML = "";
   }
 
   function readSavedLayout() {
     try {
-      var raw = window.localStorage ? window.localStorage.getItem(layoutStorageKey) : "";
+      let raw = globalThis.localStorage ? globalThis.localStorage.getItem(layoutStorageKey) : "";
       if (!raw) return { order: [], heights: {} };
-      var parsed = JSON.parse(raw);
+      let parsed = JSON.parse(raw);
       return {
         order: Array.isArray(parsed.order) ? parsed.order : [],
         heights: parsed && parsed.heights && typeof parsed.heights === "object" ? parsed.heights : {},
@@ -84,29 +84,29 @@
   }
 
   function saveLayoutSoon() {
-    if (saveLayoutTimer) window.clearTimeout(saveLayoutTimer);
-    saveLayoutTimer = window.setTimeout(function () {
+    if (saveLayoutTimer) globalThis.clearTimeout(saveLayoutTimer);
+    saveLayoutTimer = globalThis.setTimeout(function () {
       saveLayoutTimer = null;
       saveLayoutNow();
     }, 180);
   }
 
   function saveLayoutNow() {
-    if (!widgetRoot || !window.localStorage) return;
-    var order = [];
-    var heights = {};
+    if (!widgetRoot || !globalThis.localStorage) return;
+    let order = [];
+    let heights = {};
     widgetRoot.querySelectorAll(".dashboard-page__widget").forEach(function (widget) {
-      var id = widget.getAttribute("data-widget-id");
+      let id = widget.dataset.widgetId;
       if (id) order.push(id);
       widget.querySelectorAll(".dashboard-page__chart-wrap[data-resize-key]").forEach(function (wrap) {
-        var key = wrap.getAttribute("data-resize-key");
+        let key = wrap.dataset.resizeKey;
         if (!key) return;
-        var h = Math.round(wrap.getBoundingClientRect().height || 0);
+        let h = Math.round(wrap.getBoundingClientRect().height || 0);
         if (h > 0) heights[key] = h;
       });
     });
     try {
-      window.localStorage.setItem(
+      globalThis.localStorage.setItem(
         layoutStorageKey,
         JSON.stringify({
           order: order,
@@ -119,20 +119,20 @@
 
   function applySavedOrder(saved) {
     if (!widgetRoot || !saved || !Array.isArray(saved.order) || saved.order.length === 0) return;
-    var byId = {};
+    let byId = {};
     widgetRoot.querySelectorAll(".dashboard-page__widget").forEach(function (widget) {
-      var id = widget.getAttribute("data-widget-id");
+      let id = widget.dataset.widgetId;
       if (id) byId[id] = widget;
     });
     saved.order.forEach(function (id) {
-      var widget = byId[id];
+      let widget = byId[id];
       if (widget) widgetRoot.appendChild(widget);
     });
   }
 
   function clampHeight(wrap, height) {
-    var minH = parseInt(wrap.getAttribute("data-min-height") || "220", 10);
-    var maxH = parseInt(wrap.getAttribute("data-max-height") || "520", 10);
+    let minH = parseInt(wrap.dataset.minHeight || "220", 10);
+    let maxH = parseInt(wrap.dataset.maxHeight || "520", 10);
     if (!isFinite(minH)) minH = 220;
     if (!isFinite(maxH)) maxH = 520;
     return Math.max(minH, Math.min(maxH, height));
@@ -141,30 +141,30 @@
   function applySavedHeights(saved) {
     if (!widgetRoot || !saved || !saved.heights) return;
     widgetRoot.querySelectorAll(".dashboard-page__chart-wrap[data-resize-key]").forEach(function (wrap) {
-      var key = wrap.getAttribute("data-resize-key");
-      var h = key ? saved.heights[key] : null;
+      let key = wrap.dataset.resizeKey;
+      let h = key ? saved.heights[key] : null;
       if (typeof h !== "number" || !isFinite(h) || h <= 0) return;
-      var clamped = clampHeight(wrap, h);
+      let clamped = clampHeight(wrap, h);
       wrap.style.height = clamped + "px";
       wrap.setAttribute("data-user-resized", "1");
     });
   }
 
   function decorateWidget(widget) {
-    if (!widget || widget.getAttribute("data-widget-ready") === "1") return;
+    if (!widget || widget.dataset.widgetReady === "1") return;
     widget.setAttribute("data-widget-ready", "1");
-    var heading = widget.querySelector(".dashboard-page__panel-title");
+    let heading = widget.querySelector(".dashboard-page__panel-title");
     if (!heading) return;
-    var controls = document.createElement("div");
+    let controls = document.createElement("div");
     controls.className = "dashboard-page__widget-controls";
-    var dragBtn = document.createElement("button");
+    let dragBtn = document.createElement("button");
     dragBtn.type = "button";
     dragBtn.className = "dashboard-page__widget-btn dashboard-page__widget-btn--drag";
     dragBtn.textContent = "↕";
     dragBtn.setAttribute("title", "Drag to move this widget");
     dragBtn.setAttribute("aria-label", "Drag to move this widget");
     dragBtn.draggable = true;
-    var resetBtn = document.createElement("button");
+    let resetBtn = document.createElement("button");
     resetBtn.type = "button";
     resetBtn.className = "dashboard-page__widget-btn";
     resetBtn.textContent = "Reset size";
@@ -186,7 +186,7 @@
     });
     controls.appendChild(dragBtn);
     controls.appendChild(resetBtn);
-    var header = document.createElement("div");
+    let header = document.createElement("div");
     header.className = "dashboard-page__widget-header";
     heading.parentNode.insertBefore(header, heading);
     header.appendChild(heading);
@@ -196,20 +196,20 @@
 
   function bindWidgetDragging() {
     if (!widgetRoot) return;
-    var dragging = null;
+    let dragging = null;
     widgetRoot.addEventListener("dragstart", function (ev) {
-      var handle = ev.target && ev.target.closest ? ev.target.closest(".dashboard-page__widget-btn--drag") : null;
+      let handle = ev.target && ev.target.closest ? ev.target.closest(".dashboard-page__widget-btn--drag") : null;
       if (!handle) {
         ev.preventDefault();
         return;
       }
-      var widget = handle.closest(".dashboard-page__widget");
+      let widget = handle.closest(".dashboard-page__widget");
       if (!widget) return;
       dragging = widget;
       widget.classList.add("dragging");
       if (ev.dataTransfer) {
         ev.dataTransfer.effectAllowed = "move";
-        ev.dataTransfer.setData("text/plain", widget.getAttribute("data-widget-id") || "");
+        ev.dataTransfer.setData("text/plain", widget.dataset.widgetId || "");
       }
     });
     widgetRoot.addEventListener("dragend", function () {
@@ -222,15 +222,15 @@
     });
     widgetRoot.addEventListener("dragover", function (ev) {
       if (!dragging) return;
-      var over = ev.target && ev.target.closest ? ev.target.closest(".dashboard-page__widget") : null;
+      let over = ev.target && ev.target.closest ? ev.target.closest(".dashboard-page__widget") : null;
       if (!over || over === dragging) return;
       ev.preventDefault();
       widgetRoot.querySelectorAll(".dashboard-page__widget").forEach(function (w) {
         w.classList.remove("drop-target");
       });
       over.classList.add("drop-target");
-      var rect = over.getBoundingClientRect();
-      var insertBefore = ev.clientY < rect.top + rect.height / 2;
+      let rect = over.getBoundingClientRect();
+      let insertBefore = ev.clientY < rect.top + rect.height / 2;
       if (insertBefore) widgetRoot.insertBefore(dragging, over);
       else widgetRoot.insertBefore(dragging, over.nextSibling);
     });
@@ -248,11 +248,11 @@
     if (!widgetRoot || typeof ResizeObserver !== "function") return;
     resizeObserver = new ResizeObserver(function (entries) {
       entries.forEach(function (entry) {
-        var wrap = entry.target;
+        let wrap = entry.target;
         if (!(wrap instanceof HTMLElement)) return;
-        var h = Math.round(entry.contentRect.height || 0);
+        let h = Math.round(entry.contentRect.height || 0);
         if (!h) return;
-        var clamped = clampHeight(wrap, h);
+        let clamped = clampHeight(wrap, h);
         if (clamped !== h) wrap.style.height = clamped + "px";
         wrap.setAttribute("data-user-resized", "1");
         saveLayoutSoon();
@@ -266,14 +266,14 @@
   function initializeDashboardLayout() {
     widgetRoot = document.getElementById("gc-dashboard-widgets");
     if (!widgetRoot) return;
-    var saved = readSavedLayout();
+    let saved = readSavedLayout();
     applySavedOrder(saved);
     widgetRoot.querySelectorAll(".dashboard-page__widget").forEach(function (widget) {
       decorateWidget(widget);
-      var id = widget.getAttribute("data-widget-id") || "widget";
+      let id = widget.dataset.widgetId || "widget";
       widget.querySelectorAll(".dashboard-page__chart-wrap").forEach(function (wrap, idx) {
-        var maxH = wrap.classList.contains("dashboard-page__chart-wrap--sync") ? 600 : 520;
-        var minH = wrap.classList.contains("dashboard-page__chart-wrap--sync") ? 320 : 220;
+        let maxH = wrap.classList.contains("dashboard-page__chart-wrap--sync") ? 600 : 520;
+        let minH = wrap.classList.contains("dashboard-page__chart-wrap--sync") ? 320 : 220;
         wrap.setAttribute("data-resize-key", id + ":" + idx);
         wrap.setAttribute("data-max-height", String(maxH));
         wrap.setAttribute("data-min-height", String(minH));
@@ -285,14 +285,14 @@
   }
 
   function getSelectedIds() {
-    if (typeof window.gcGetSelectedFirewallIds !== "function") return [];
-    var ids = window.gcGetSelectedFirewallIds();
+    if (typeof globalThis.gcGetSelectedFirewallIds !== "function") return [];
+    let ids = globalThis.gcGetSelectedFirewallIds();
     return Array.isArray(ids) ? ids : [];
   }
 
   function themeColors() {
-    var r = getComputedStyle(document.documentElement);
-    var b = document.body ? getComputedStyle(document.body) : r;
+    let r = getComputedStyle(document.documentElement);
+    let b = document.body ? getComputedStyle(document.body) : r;
     return {
       accent: (r.getPropertyValue("--accent") || "#0066cc").trim(),
       success: (r.getPropertyValue("--success") || "#1a9b4a").trim(),
@@ -306,7 +306,7 @@
 
 
   function truncateSankeyDisplayLabel(s, maxLen) {
-    var str = String(s == null ? "" : s).trim();
+    let str = String(s == null ? "" : s).trim();
     if (!maxLen || str.length <= maxLen) return str;
     if (maxLen < 2) return "\u2026";
     return str.slice(0, maxLen - 1) + "\u2026";
@@ -314,9 +314,9 @@
 
   function formatDayLabel(isoDate) {
     try {
-      var p = String(isoDate || "").split("-");
+      let p = String(isoDate || "").split("-");
       if (p.length !== 3) return isoDate;
-      var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+      let d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
       if (isNaN(d.getTime())) return isoDate;
       return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
     } catch (e) {
@@ -327,9 +327,9 @@
   /** Labels for UTC calendar date (matches bucket ``date`` / midnight grid). */
   function formatDayLabelUtc(isoDate) {
     try {
-      var p = String(isoDate || "").split("-");
+      let p = String(isoDate || "").split("-");
       if (p.length !== 3) return isoDate;
-      var d = new Date(Date.UTC(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)));
+      let d = new Date(Date.UTC(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)));
       if (isNaN(d.getTime())) return isoDate;
       return d.toLocaleDateString(undefined, {
         weekday: "short",
@@ -343,13 +343,13 @@
   }
 
   function isUtcMidnightHourStart(iso) {
-    var d = new Date(iso);
+    let d = new Date(iso);
     if (isNaN(d.getTime())) return false;
     return d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
   }
 
   function isLocalMidnightHourStart(iso) {
-    var d = new Date(iso);
+    let d = new Date(iso);
     if (isNaN(d.getTime())) return false;
     return d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
   }
@@ -360,7 +360,7 @@
 
   function formatProbeTime(iso) {
     try {
-      var d = new Date(iso);
+      let d = new Date(iso);
       if (isNaN(d.getTime())) return iso;
       return d.toLocaleString(undefined, {
         month: "short",
@@ -375,46 +375,46 @@
 
   function renderConnected(canvas, hourlySeries, colors, managedCount, chartTzLabel) {
     charts.connected = destroyChart(charts.connected);
-    var raw = hourlySeries || [];
-    var nowMs = Date.now();
-    var series = raw.filter(function (d) {
-      var t = d.hour_start ? new Date(d.hour_start).getTime() : NaN;
+    let raw = hourlySeries || [];
+    let nowMs = Date.now();
+    let series = raw.filter(function (d) {
+      let t = d.hour_start ? new Date(d.hour_start).getTime() : NaN;
       return !isNaN(t) && t <= nowMs;
     });
     if (series.length === 0) return;
-    var utcBasis = chartUsesUtcBasis(chartTzLabel);
+    let utcBasis = chartUsesUtcBasis(chartTzLabel);
 
-    var labels = series.map(function (d) {
-      var atMidnight = utcBasis
+    let labels = series.map(function (d) {
+      let atMidnight = utcBasis
         ? isUtcMidnightHourStart(d.hour_start)
         : isLocalMidnightHourStart(d.hour_start);
       if (!atMidnight) return "";
       return utcBasis ? formatDayLabelUtc(d.date) : formatDayLabel(d.date);
     });
-    var connectedVals = series.map(function (d) {
+    let connectedVals = series.map(function (d) {
       return typeof d.connected_count === "number" ? d.connected_count : 0;
     });
-    var offlineVals = series.map(function (d) {
+    let offlineVals = series.map(function (d) {
       return typeof d.offline_count === "number" ? d.offline_count : 0;
     });
-    var maxData = 0;
+    let maxData = 0;
     connectedVals.forEach(function (v) {
       maxData = Math.max(maxData, v);
     });
     offlineVals.forEach(function (v) {
       maxData = Math.max(maxData, v);
     });
-    var mc = typeof managedCount === "number" && !isNaN(managedCount) ? managedCount : 0;
-    var ySuggestedMax = Math.max(maxData, mc);
-    var dense = series.length > 48;
+    let mc = typeof managedCount === "number" && !isNaN(managedCount) ? managedCount : 0;
+    let ySuggestedMax = Math.max(maxData, mc);
+    let dense = series.length > 48;
 
     function xGridStyle(ctx) {
-      var i = typeof ctx.index === "number" ? ctx.index : -1;
+      let i = typeof ctx.index === "number" ? ctx.index : -1;
       if (i < 0 || i >= series.length) {
         return { color: "rgba(0,0,0,0.06)", lineWidth: 1 };
       }
-      var row = series[i];
-      var atMid =
+      let row = series[i];
+      let atMid =
         row &&
         row.hour_start &&
         (utcBasis ? isUtcMidnightHourStart(row.hour_start) : isLocalMidnightHourStart(row.hour_start));
@@ -462,12 +462,12 @@
           tooltip: {
             callbacks: {
               title: function (items) {
-                var i = items.length ? items[0].dataIndex : 0;
-                var row = series[i];
+                let i = items.length ? items[0].dataIndex : 0;
+                let row = series[i];
                 if (!row || !row.hour_start) return "";
-                var s = new Date(row.hour_start);
+                let s = new Date(row.hour_start);
                 if (isNaN(s.getTime())) return row.hour_start;
-                var e = new Date(s.getTime() + 3600000);
+                let e = new Date(s.getTime() + 3600000);
                 return (
                   s.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) +
                   " – " +
@@ -506,23 +506,23 @@
   }
 
   function setDashboardChartSection(canvasId, emptyId, showChart) {
-    var canvas = document.getElementById(canvasId);
-    var emptyEl = document.getElementById(emptyId);
-    var wrap = canvas && canvas.parentElement;
+    let canvas = document.getElementById(canvasId);
+    let emptyEl = document.getElementById(emptyId);
+    let wrap = canvas && canvas.parentElement;
     if (emptyEl) emptyEl.hidden = !!showChart;
     if (wrap) wrap.hidden = !showChart;
   }
 
   function hideDashboardInsightPanels() {
-    var pairs = [
+    let pairs = [
       ["gc-dashboard-sync-runs-chart", "gc-dashboard-sync-runs-empty"],
       ["gc-dashboard-deploy-chart", "gc-dashboard-deploy-empty"],
       ["gc-dashboard-cache-chart", "gc-dashboard-cache-empty"],
     ];
     pairs.forEach(function (pair) {
-      var canvas = document.getElementById(pair[0]);
-      var emptyEl = document.getElementById(pair[1]);
-      var wrap = canvas && canvas.parentElement;
+      let canvas = document.getElementById(pair[0]);
+      let emptyEl = document.getElementById(pair[1]);
+      let wrap = canvas && canvas.parentElement;
       if (wrap) wrap.hidden = true;
       if (emptyEl) emptyEl.hidden = true;
     });
@@ -530,23 +530,23 @@
 
   function renderSyncRunsDaily(canvas, series, colors) {
     charts.syncRuns = destroyChart(charts.syncRuns);
-    var raw = series || [];
+    let raw = series || [];
     if (!canvas || raw.length === 0) {
       setDashboardChartSection("gc-dashboard-sync-runs-chart", "gc-dashboard-sync-runs-empty", false);
       return;
     }
     setDashboardChartSection("gc-dashboard-sync-runs-chart", "gc-dashboard-sync-runs-empty", true);
 
-    var labels = raw.map(function (d) {
+    let labels = raw.map(function (d) {
       return formatDayLabelUtc(d.date);
     });
-    var success = raw.map(function (d) {
+    let success = raw.map(function (d) {
       return d.success != null ? d.success : 0;
     });
-    var errors = raw.map(function (d) {
+    let errors = raw.map(function (d) {
       return d.error != null ? d.error : 0;
     });
-    var running = raw.map(function (d) {
+    let running = raw.map(function (d) {
       return (d.running != null ? d.running : 0) + (d.other != null ? d.other : 0);
     });
 
@@ -602,7 +602,7 @@
 
   function renderDeployHorizontalBar(canvas, rows, labelMap, colors) {
     charts.deployHbar = destroyChart(charts.deployHbar);
-    var list = (rows || []).slice();
+    let list = (rows || []).slice();
     list.sort(function (a, b) {
       return (a.count || 0) - (b.count || 0);
     });
@@ -613,11 +613,11 @@
     }
     setDashboardChartSection("gc-dashboard-deploy-chart", "gc-dashboard-deploy-empty", true);
 
-    var labels = list.map(function (r) {
-      var k = firewallFwKey(r.firewall_id);
+    let labels = list.map(function (r) {
+      let k = firewallFwKey(r.firewall_id);
       return labelMap[k] || "Firewall #" + r.firewall_id;
     });
-    var vals = list.map(function (r) {
+    let vals = list.map(function (r) {
       return r.count != null ? r.count : 0;
     });
 
@@ -660,27 +660,27 @@
 
   function renderCacheFreshnessStackedByType(canvas, rows, colors) {
     charts.cacheStacked = destroyChart(charts.cacheStacked);
-    var list = rows || [];
+    let list = rows || [];
     if (!canvas || list.length === 0) {
       setDashboardChartSection("gc-dashboard-cache-chart", "gc-dashboard-cache-empty", false);
       return;
     }
     setDashboardChartSection("gc-dashboard-cache-chart", "gc-dashboard-cache-empty", true);
 
-    var labels = list.map(function (r) {
-      var lab = (r.label && String(r.label).trim()) || r.entity_type || "—";
+    let labels = list.map(function (r) {
+      let lab = (r.label && String(r.label).trim()) || r.entity_type || "—";
       return truncateSankeyDisplayLabel(lab, 26);
     });
-    var fresh = list.map(function (r) {
+    let fresh = list.map(function (r) {
       return r.fresh != null ? r.fresh : 0;
     });
-    var recent = list.map(function (r) {
+    let recent = list.map(function (r) {
       return r.recent != null ? r.recent : 0;
     });
-    var aging = list.map(function (r) {
+    let aging = list.map(function (r) {
       return r.aging != null ? r.aging : 0;
     });
-    var stale = list.map(function (r) {
+    let stale = list.map(function (r) {
       return r.stale != null ? r.stale : 0;
     });
 
@@ -725,10 +725,10 @@
             callbacks: {
               footer: function (items) {
                 if (!items || !items.length) return "";
-                var i = items[0].dataIndex;
-                var row = list[i];
+                let i = items[0].dataIndex;
+                let row = list[i];
                 if (!row) return "";
-                var t =
+                let t =
                   (row.fresh || 0) +
                   (row.recent || 0) +
                   (row.aging || 0) +
@@ -764,16 +764,16 @@
 
   function sankeyControllerAvailable() {
     try {
-      return !!(window.Chart && Chart.registry && Chart.registry.getController("sankey"));
+      return !!(globalThis.Chart && Chart.registry && Chart.registry.getController("sankey"));
     } catch (eSankey) {
       return false;
     }
   }
 
   function hashString32(s) {
-    var h = 2166136261;
-    var str = String(s);
-    for (var i = 0; i < str.length; i++) {
+    let h = 2166136261;
+    let str = String(s);
+    for (let i = 0; i < str.length; i++) {
       h ^= str.charCodeAt(i);
       h = Math.imul(h, 16777619);
     }
@@ -781,12 +781,12 @@
   }
 
   function hslForEntityType(entityType) {
-    var hue = hashString32(entityType) % 360;
+    let hue = hashString32(entityType) % 360;
     return "hsl(" + hue + ", 58%, 46%)";
   }
 
   function hslHoverForEntityType(entityType) {
-    var hue = hashString32(entityType) % 360;
+    let hue = hashString32(entityType) % 360;
     return "hsl(" + hue + ", 58%, 38%)";
   }
 
@@ -795,36 +795,36 @@
   }
 
   function buildFirewallLabelMap(firewalls) {
-    var names = (firewalls || []).map(function (fw) {
-      var n = (fw.name && String(fw.name).trim()) || (fw.host && String(fw.host).trim()) || "";
+    let names = (firewalls || []).map(function (fw) {
+      let n = (fw.name && String(fw.name).trim()) || (fw.host && String(fw.host).trim()) || "";
       return n || "Firewall " + fw.id;
     });
-    var freq = {};
+    let freq = {};
     names.forEach(function (n) {
       freq[n] = (freq[n] || 0) + 1;
     });
-    var labels = {};
+    let labels = {};
     (firewalls || []).forEach(function (fw, i) {
-      var base = names[i];
+      let base = names[i];
       labels[firewallFwKey(fw.id)] =
         freq[base] > 1 ? base + " · #" + fw.id : base;
     });
     return labels;
   }
 
-  var sankeyToolbarBound = false;
-  var sankeyState = null;
+  let sankeyToolbarBound = false;
+  let sankeyState = null;
 
   function buildSankeyTypeList(flows, entity_rows) {
-    var labelById = {};
+    let labelById = {};
     (entity_rows || []).forEach(function (r) {
       if (r && r.entity_type) labelById[r.entity_type] = r.label || r.entity_type;
     });
-    var seen = {};
+    let seen = {};
     (flows || []).forEach(function (f) {
       if (f && f.entity_type) seen[f.entity_type] = true;
     });
-    var types = Object.keys(seen).map(function (et) {
+    let types = Object.keys(seen).map(function (et) {
       return { entity_type: et, label: labelById[et] || et };
     });
     types.sort(function (a, b) {
@@ -834,18 +834,18 @@
   }
 
   function closeSankeyTypePanel() {
-    var panel = document.getElementById("gc-dashboard-sankey-panel");
-    var trigger = document.getElementById("gc-dashboard-sankey-trigger");
+    let panel = document.getElementById("gc-dashboard-sankey-panel");
+    let trigger = document.getElementById("gc-dashboard-sankey-trigger");
     if (panel) panel.hidden = true;
     if (trigger) trigger.setAttribute("aria-expanded", "false");
   }
 
   function resetSankeyToolbar() {
     sankeyState = null;
-    var tb = document.getElementById("gc-dashboard-sankey-toolbar");
-    var list = document.getElementById("gc-dashboard-sankey-list");
-    var srch = document.getElementById("gc-dashboard-sankey-search");
-    var fe = document.getElementById("gc-dashboard-sankey-filter-empty");
+    let tb = document.getElementById("gc-dashboard-sankey-toolbar");
+    let list = document.getElementById("gc-dashboard-sankey-list");
+    let srch = document.getElementById("gc-dashboard-sankey-search");
+    let fe = document.getElementById("gc-dashboard-sankey-filter-empty");
     if (tb) tb.hidden = true;
     if (list) list.innerHTML = "";
     if (srch) srch.value = "";
@@ -854,10 +854,10 @@
   }
 
   function updateSankeyTriggerLabel() {
-    var el = document.getElementById("gc-dashboard-sankey-trigger-label");
+    let el = document.getElementById("gc-dashboard-sankey-trigger-label");
     if (!el || !sankeyState) return;
-    var n = sankeyState.types.length;
-    var s = sankeyState.selected.size;
+    let n = sankeyState.types.length;
+    let s = sankeyState.selected.size;
     if (n === 0) el.textContent = "Sync types";
     else if (s === 0) el.textContent = "Choose types…";
     else if (s === n) el.textContent = "All types (" + n + ")";
@@ -865,37 +865,37 @@
   }
 
   function filterSankeyTypeListRows() {
-    var search = document.getElementById("gc-dashboard-sankey-search");
-    var list = document.getElementById("gc-dashboard-sankey-list");
+    let search = document.getElementById("gc-dashboard-sankey-search");
+    let list = document.getElementById("gc-dashboard-sankey-list");
     if (!search || !list) return;
-    var q = (search.value || "").trim().toLowerCase();
+    let q = (search.value || "").trim().toLowerCase();
     list.querySelectorAll(".dashboard-page__sankey-option").forEach(function (row) {
-      var lab = row.getAttribute("data-label") || "";
+      let lab = row.dataset.label || "";
       row.hidden = !!(q && lab.indexOf(q) === -1);
     });
   }
 
   function syncSankeyCheckboxesToSelection() {
     if (!sankeyState) return;
-    var list = document.getElementById("gc-dashboard-sankey-list");
+    let list = document.getElementById("gc-dashboard-sankey-list");
     if (!list) return;
     list.querySelectorAll('input[type="checkbox"][data-entity-type]').forEach(function (inp) {
-      var et = inp.getAttribute("data-entity-type");
+      let et = inp.dataset.entityType;
       inp.checked = et ? sankeyState.selected.has(et) : false;
     });
   }
 
   function applySankeyTypeFilter() {
-    var sCanvas = document.getElementById("gc-dashboard-sync-chart");
-    var filterEmpty = document.getElementById("gc-dashboard-sankey-filter-empty");
+    let sCanvas = document.getElementById("gc-dashboard-sync-chart");
+    let filterEmpty = document.getElementById("gc-dashboard-sankey-filter-empty");
     if (!sankeyState || !sCanvas) return;
-    var colors = themeColors();
-    var selected = sankeyState.selected;
+    let colors = themeColors();
+    let selected = sankeyState.selected;
     updateSankeyTriggerLabel();
 
     if (selected.size === 0) {
       charts.syncTypes = destroyChart(charts.syncTypes);
-      var wrap0 = sCanvas.parentElement;
+      let wrap0 = sCanvas.parentElement;
       if (wrap0 && wrap0.style) wrap0.style.height = "";
       sCanvas.hidden = true;
       if (filterEmpty) filterEmpty.hidden = false;
@@ -905,7 +905,7 @@
     if (filterEmpty) filterEmpty.hidden = true;
     sCanvas.hidden = false;
 
-    var filtered = sankeyState.flows.filter(function (f) {
+    let filtered = sankeyState.flows.filter(function (f) {
       return f && selected.has(f.entity_type);
     });
 
@@ -921,18 +921,18 @@
   }
 
   function populateSankeyTypeList() {
-    var list = document.getElementById("gc-dashboard-sankey-list");
+    let list = document.getElementById("gc-dashboard-sankey-list");
     if (!list || !sankeyState) return;
     list.innerHTML = "";
     sankeyState.types.forEach(function (tp) {
-      var labelEl = document.createElement("label");
+      let labelEl = document.createElement("label");
       labelEl.className = "dashboard-page__sankey-option";
       labelEl.setAttribute("data-label", String(tp.label || "").toLowerCase());
-      var inp = document.createElement("input");
+      let inp = document.createElement("input");
       inp.type = "checkbox";
       inp.checked = sankeyState.selected.has(tp.entity_type);
       inp.setAttribute("data-entity-type", tp.entity_type);
-      var span = document.createElement("span");
+      let span = document.createElement("span");
       span.textContent = tp.label;
       labelEl.appendChild(inp);
       labelEl.appendChild(span);
@@ -943,10 +943,10 @@
 
   function setupSankeyToolbar(flows, entity_rows, firewalls) {
     closeSankeyTypePanel();
-    var tb = document.getElementById("gc-dashboard-sankey-toolbar");
+    let tb = document.getElementById("gc-dashboard-sankey-toolbar");
     if (!tb) return;
-    var types = buildSankeyTypeList(flows, entity_rows);
-    var selected = new Set();
+    let types = buildSankeyTypeList(flows, entity_rows);
+    let selected = new Set();
     types.forEach(function (t) {
       selected.add(t.entity_type);
     });
@@ -967,18 +967,18 @@
     if (sankeyToolbarBound) return;
     sankeyToolbarBound = true;
 
-    var trigger = document.getElementById("gc-dashboard-sankey-trigger");
-    var panel = document.getElementById("gc-dashboard-sankey-panel");
-    var root = document.getElementById("gc-dashboard-sankey-root");
-    var list = document.getElementById("gc-dashboard-sankey-list");
-    var search = document.getElementById("gc-dashboard-sankey-search");
-    var btnAll = document.getElementById("gc-dashboard-sankey-all");
-    var btnNone = document.getElementById("gc-dashboard-sankey-none");
+    let trigger = document.getElementById("gc-dashboard-sankey-trigger");
+    let panel = document.getElementById("gc-dashboard-sankey-panel");
+    let root = document.getElementById("gc-dashboard-sankey-root");
+    let list = document.getElementById("gc-dashboard-sankey-list");
+    let search = document.getElementById("gc-dashboard-sankey-search");
+    let btnAll = document.getElementById("gc-dashboard-sankey-all");
+    let btnNone = document.getElementById("gc-dashboard-sankey-none");
 
     if (trigger && panel) {
       trigger.addEventListener("click", function (ev) {
         ev.stopPropagation();
-        var willOpen = panel.hidden;
+        let willOpen = panel.hidden;
         if (willOpen) {
           panel.hidden = false;
           trigger.setAttribute("aria-expanded", "true");
@@ -996,7 +996,7 @@
     }
 
     document.addEventListener("click", function (ev) {
-      var tb = document.getElementById("gc-dashboard-sankey-toolbar");
+      let tb = document.getElementById("gc-dashboard-sankey-toolbar");
       if (!tb || tb.hidden || !root) return;
       if (root.contains(ev.target)) return;
       closeSankeyTypePanel();
@@ -1004,7 +1004,7 @@
 
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape") return;
-      var p = document.getElementById("gc-dashboard-sankey-panel");
+      let p = document.getElementById("gc-dashboard-sankey-panel");
       if (p && !p.hidden) {
         ev.preventDefault();
         closeSankeyTypePanel();
@@ -1020,9 +1020,9 @@
 
     if (list) {
       list.addEventListener("change", function (ev) {
-        var t = ev.target;
+        let t = ev.target;
         if (!t || t.type !== "checkbox" || !sankeyState) return;
-        var et = t.getAttribute("data-entity-type");
+        let et = t.dataset.entityType;
         if (!et) return;
         if (t.checked) sankeyState.selected.add(et);
         else sankeyState.selected.delete(et);
@@ -1064,55 +1064,55 @@
 
   function renderSyncSankey(canvas, payload, theme) {
     charts.syncTypes = destroyChart(charts.syncTypes);
-    var wrap = canvas && canvas.parentElement;
+    let wrap = canvas && canvas.parentElement;
     if (wrap && wrap.style) wrap.style.height = "";
 
-    var flows = (payload && payload.flows) || [];
-    var entityRows = (payload && payload.entity_rows) || [];
-    var firewalls = (payload && payload.firewalls) || [];
+    let flows = (payload && payload.flows) || [];
+    let entityRows = (payload && payload.entity_rows) || [];
+    let firewalls = (payload && payload.firewalls) || [];
 
     if (!canvas || !sankeyControllerAvailable()) return;
     if (!flows.length) return;
 
-    var entityLabel = {};
+    let entityLabel = {};
     entityRows.forEach(function (r) {
       if (r && r.entity_type)
         entityLabel[r.entity_type] = r.label || r.entity_type;
     });
 
-    var fwLabels = buildFirewallLabelMap(firewalls);
+    let fwLabels = buildFirewallLabelMap(firewalls);
     flows.forEach(function (f) {
       if (!f || f.firewall_id == null) return;
-      var k = firewallFwKey(f.firewall_id);
+      let k = firewallFwKey(f.firewall_id);
       if (!fwLabels[k]) fwLabels[k] = "Firewall #" + f.firewall_id;
     });
-    var nodeLabels = Object.assign({}, entityLabel, fwLabels);
-    var displayLabels = {};
-    var labelMaxChars = 36;
+    let nodeLabels = Object.assign({}, entityLabel, fwLabels);
+    let displayLabels = {};
+    let labelMaxChars = 36;
     Object.keys(nodeLabels).forEach(function (k) {
       displayLabels[k] = truncateSankeyDisplayLabel(nodeLabels[k], labelMaxChars);
     });
 
-    var column = {};
+    let column = {};
     flows.forEach(function (f) {
       if (f && f.entity_type != null) column[f.entity_type] = 0;
       if (f && f.firewall_id != null) column[firewallFwKey(f.firewall_id)] = 1;
     });
 
-    var typeKeys = {};
+    let typeKeys = {};
     flows.forEach(function (f) {
       if (f && f.entity_type) typeKeys[f.entity_type] = true;
     });
-    var colorByType = {};
+    let colorByType = {};
     Object.keys(typeKeys).forEach(function (et) {
       colorByType[et] = hslForEntityType(et);
     });
-    var hoverByType = {};
+    let hoverByType = {};
     Object.keys(typeKeys).forEach(function (et) {
       hoverByType[et] = hslHoverForEntityType(et);
     });
 
-    var data = flows.map(function (f) {
+    let data = flows.map(function (f) {
       return {
         from: f.entity_type,
         to: firewallFwKey(f.firewall_id),
@@ -1120,20 +1120,20 @@
       };
     });
 
-    var leftN = Object.keys(
+    let leftN = Object.keys(
       data.reduce(function (acc, row) {
         acc[row.from] = true;
         return acc;
       }, {})
     ).length;
-    var rightN = Object.keys(
+    let rightN = Object.keys(
       data.reduce(function (acc, row) {
         acc[row.to] = true;
         return acc;
       }, {})
     ).length;
-    var estH = Math.min(600, Math.max(340, Math.max(leftN, rightN) * 26));
-    if (wrap && wrap.style && wrap.getAttribute("data-user-resized") !== "1") {
+    let estH = Math.min(600, Math.max(340, Math.max(leftN, rightN) * 26));
+    if (wrap && wrap.style && wrap.dataset.userResized !== "1") {
       wrap.style.height = estH + "px";
     }
 
@@ -1157,19 +1157,19 @@
             nodePadding: 26,
             borderWidth: 0,
             colorFrom: function (c) {
-              var row = c.dataset.data[c.dataIndex];
+              let row = c.dataset.data[c.dataIndex];
               return colorByType[row.from] || theme.accent;
             },
             colorTo: function (c) {
-              var row = c.dataset.data[c.dataIndex];
+              let row = c.dataset.data[c.dataIndex];
               return colorByType[row.from] || theme.accent;
             },
             hoverColorFrom: function (c) {
-              var row = c.dataset.data[c.dataIndex];
+              let row = c.dataset.data[c.dataIndex];
               return hoverByType[row.from] || theme.accent;
             },
             hoverColorTo: function (c) {
-              var row = c.dataset.data[c.dataIndex];
+              let row = c.dataset.data[c.dataIndex];
               return hoverByType[row.from] || theme.accent;
             },
             colorMode: "from",
@@ -1208,10 +1208,10 @@
             padding: 10,
             callbacks: {
               label: function (ctx) {
-                var raw = ctx.raw;
+                let raw = ctx.raw;
                 if (!raw) return "";
-                var fromL = nodeLabels[raw.from] || raw.from;
-                var toL = nodeLabels[raw.to] || raw.to;
+                let fromL = nodeLabels[raw.from] || raw.from;
+                let toL = nodeLabels[raw.to] || raw.to;
                 return fromL + " → " + toL + ": " + raw.flow;
               },
             },
@@ -1222,45 +1222,45 @@
   }
 
   function renderLatencyCard(container, fw, series, colors) {
-    var wrap = document.createElement("div");
+    let wrap = document.createElement("div");
     wrap.className = "dashboard-page__latency-card panel";
-    var title = (fw.name && String(fw.name).trim()) || fw.host || "Firewall " + fw.id;
-    var sub = fw.monitor_enabled
+    let title = (fw.name && String(fw.name).trim()) || fw.host || "Firewall " + fw.id;
+    let sub = fw.monitor_enabled
       ? "Admin UI response time, last 24 hours"
       : "Turn on monitoring to collect latency";
-    var head = document.createElement("div");
+    let head = document.createElement("div");
     head.className = "dashboard-page__latency-head";
-    var h3 = document.createElement("h3");
+    let h3 = document.createElement("h3");
     h3.className = "dashboard-page__latency-title";
     h3.textContent = title;
-    var p = document.createElement("p");
+    let p = document.createElement("p");
     p.className = "dashboard-page__latency-sub muted";
     p.textContent = sub;
-    var a = document.createElement("a");
+    let a = document.createElement("a");
     a.className = "dashboard-page__latency-link";
     a.href = "/firewalls/" + encodeURIComponent(String(fw.id)) + "/monitor";
     a.textContent = "Full monitor";
     head.appendChild(h3);
     head.appendChild(p);
     head.appendChild(a);
-    var chartWrap = document.createElement("div");
+    let chartWrap = document.createElement("div");
     chartWrap.className = "dashboard-page__latency-chart-wrap";
-    var canvas = document.createElement("canvas");
+    let canvas = document.createElement("canvas");
     canvas.setAttribute("aria-label", "Admin UI response time over the last 24 hours");
     chartWrap.appendChild(canvas);
     wrap.appendChild(head);
     wrap.appendChild(chartWrap);
     container.appendChild(wrap);
     if (!canvas) return;
-    var pts = (series && series.points) || [];
-    var gran = series && series.granularity ? series.granularity : "";
-    var labels = pts.map(function (p) {
+    let pts = (series && series.points) || [];
+    let gran = series && series.granularity ? series.granularity : "";
+    let labels = pts.map(function (p) {
       return formatProbeTime(p.t);
     });
-    var ms = pts.map(function (p) {
+    let ms = pts.map(function (p) {
       return p.avg_ms != null && typeof p.avg_ms === "number" ? p.avg_ms : null;
     });
-    var ch = new Chart(canvas.getContext("2d"), {
+    let ch = new Chart(canvas.getContext("2d"), {
       type: "line",
       data: {
         labels: labels,
@@ -1287,7 +1287,7 @@
           tooltip: {
             callbacks: {
               title: function (items) {
-                var i = items.length ? items[0].dataIndex : 0;
+                let i = items.length ? items[0].dataIndex : 0;
                 return pts[i] && pts[i].t ? pts[i].t : "";
               },
             },
@@ -1316,14 +1316,14 @@
   }
 
   function setText(id, text) {
-    var el = document.getElementById(id);
+    let el = document.getElementById(id);
     if (el) el.textContent = text;
   }
 
   function load() {
-    var ids = getSelectedIds();
-    var q = ids.length ? "?firewall_ids=" + encodeURIComponent(ids.join(",")) : "?firewall_ids=";
-    var browserTz = "";
+    let ids = getSelectedIds();
+    let q = ids.length ? "?firewall_ids=" + encodeURIComponent(ids.join(",")) : "?firewall_ids=";
+    let browserTz = "";
     try {
       browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
     } catch (eTz) {}
@@ -1350,7 +1350,7 @@
           if (x.status === 401) {
             if (statusEl) statusEl.textContent = "Sign in to load dashboard data.";
           } else {
-            var d = x.body && x.body.detail;
+            let d = x.body && x.body.detail;
             if (statusEl) {
               statusEl.textContent =
                 typeof d === "string" ? d : d ? JSON.stringify(d) : "Could not load dashboard.";
@@ -1359,35 +1359,35 @@
           return;
         }
         if (statusEl) statusEl.textContent = "";
-        var data = x.body;
-        var colors = themeColors();
+        let data = x.body;
+        let colors = themeColors();
 
         setText("gc-dashboard-managed", String(data.managed_count != null ? data.managed_count : 0));
-        var offlineN = data.offline_count != null ? data.offline_count : 0;
+        let offlineN = data.offline_count != null ? data.offline_count : 0;
         setText("gc-dashboard-offline", String(offlineN));
-        var offlineEl = document.getElementById("gc-dashboard-offline");
+        let offlineEl = document.getElementById("gc-dashboard-offline");
         if (offlineEl) {
           offlineEl.classList.toggle("dashboard-page__stat-value--danger", offlineN > 0);
         }
-        var pendN = data.pending_tasks_total != null ? data.pending_tasks_total : 0;
+        let pendN = data.pending_tasks_total != null ? data.pending_tasks_total : 0;
         setText("gc-dashboard-pending", String(pendN));
-        var pendEl = document.getElementById("gc-dashboard-pending");
+        let pendEl = document.getElementById("gc-dashboard-pending");
         if (pendEl) {
           pendEl.classList.toggle("dashboard-page__stat-value--danger", pendN > 0);
         }
 
-        var hist = data.task_queue_history_summary || {};
-        var ha7 = hist.approved_7d != null ? hist.approved_7d : 0;
-        var hd7 = hist.denied_7d != null ? hist.denied_7d : 0;
-        var hat = hist.approved_today != null ? hist.approved_today : 0;
-        var hdt = hist.denied_today != null ? hist.denied_today : 0;
+        let hist = data.task_queue_history_summary || {};
+        let ha7 = hist.approved_7d != null ? hist.approved_7d : 0;
+        let hd7 = hist.denied_7d != null ? hist.denied_7d : 0;
+        let hat = hist.approved_today != null ? hist.approved_today : 0;
+        let hdt = hist.denied_today != null ? hist.denied_today : 0;
         setText("gc-dashboard-hist-approved-7d", String(ha7));
         setText("gc-dashboard-hist-denied-7d", String(hd7));
         setText("gc-dashboard-hist-approved-today", String(hat));
         setText("gc-dashboard-hist-denied-today", String(hdt));
-        var hEl7 = document.getElementById("gc-dashboard-hist-denied-7d");
+        let hEl7 = document.getElementById("gc-dashboard-hist-denied-7d");
         if (hEl7) hEl7.classList.toggle("dashboard-page__stat-value--danger", hd7 > 0);
-        var hElt = document.getElementById("gc-dashboard-hist-denied-today");
+        let hElt = document.getElementById("gc-dashboard-hist-denied-today");
         if (hElt) hElt.classList.toggle("dashboard-page__stat-value--danger", hdt > 0);
 
         if (emptyHint) {
@@ -1396,7 +1396,7 @@
 
         destroyAllCharts();
 
-        var fwLabelMap = buildFirewallLabelMap(data.firewalls || []);
+        let fwLabelMap = buildFirewallLabelMap(data.firewalls || []);
         renderSyncRunsDaily(
           document.getElementById("gc-dashboard-sync-runs-chart"),
           data.sync_runs_daily || [],
@@ -1414,8 +1414,8 @@
           colors
         );
 
-        var cCanvas = document.getElementById("gc-dashboard-connected-chart");
-        var hourly =
+        let cCanvas = document.getElementById("gc-dashboard-connected-chart");
+        let hourly =
           data.connected_chart_hourly && data.connected_chart_hourly.length
             ? data.connected_chart_hourly
             : [];
@@ -1428,10 +1428,10 @@
             data.chart_timezone
           );
 
-        var sCanvas = document.getElementById("gc-dashboard-sync-chart");
-        var syncEmptyEl = document.getElementById("gc-dashboard-sync-sankey-empty");
-        var filterEmptyEl = document.getElementById("gc-dashboard-sankey-filter-empty");
-        var flows = Array.isArray(data.sync_sankey_flows) ? data.sync_sankey_flows : [];
+        let sCanvas = document.getElementById("gc-dashboard-sync-chart");
+        let syncEmptyEl = document.getElementById("gc-dashboard-sync-sankey-empty");
+        let filterEmptyEl = document.getElementById("gc-dashboard-sankey-filter-empty");
+        let flows = Array.isArray(data.sync_sankey_flows) ? data.sync_sankey_flows : [];
         if (syncEmptyEl) {
           syncEmptyEl.hidden = !(ids.length > 0 && flows.length === 0);
         }
@@ -1445,16 +1445,16 @@
             resetSankeyToolbar();
             charts.syncTypes = destroyChart(charts.syncTypes);
             sCanvas.hidden = true;
-            var wrapSan = sCanvas.parentElement;
+            let wrapSan = sCanvas.parentElement;
             if (wrapSan && wrapSan.style) wrapSan.style.height = "";
           }
         }
 
-        var grid = document.getElementById("gc-dashboard-latency-grid");
-        var latMap = data.latency_by_firewall || {};
+        let grid = document.getElementById("gc-dashboard-latency-grid");
+        let latMap = data.latency_by_firewall || {};
         if (grid && Array.isArray(data.firewalls)) {
           data.firewalls.forEach(function (fw) {
-            var series = latMap[String(fw.id)] || { points: [] };
+            let series = latMap[String(fw.id)] || { points: [] };
             renderLatencyCard(grid, fw, series, colors);
           });
         }
@@ -1471,7 +1471,7 @@
       });
   }
 
-  var t = null;
+  let t = null;
   function scheduleLoad() {
     if (t) clearTimeout(t);
     t = setTimeout(function () {

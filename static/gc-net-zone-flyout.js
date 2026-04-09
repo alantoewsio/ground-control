@@ -4,13 +4,13 @@
 (function () {
   "use strict";
 
-  var addMode = false;
-  var currentRow = null;
-  var initialSnapshot = "";
-  var flyout = null;
-  var els = {};
+  let addMode = false;
+  let currentRow = null;
+  let initialSnapshot = "";
+  let flyout = null;
+  let els = {};
 
-  var ACCESS_GROUPS = [
+  let ACCESS_GROUPS = [
     {
       title: "Admin services",
       items: [
@@ -62,11 +62,11 @@
   }
 
   function isCfgTarget() {
-    return typeof window.gcHsEntityTarget === "string" && window.gcHsEntityTarget === "configuration";
+    return typeof globalThis.gcHsEntityTarget === "string" && globalThis.gcHsEntityTarget === "configuration";
   }
 
   function truthySophosFlag(x) {
-    var s = String(x == null ? "" : x)
+    let s = String(x == null ? "" : x)
       .trim()
       .toLowerCase();
     return s === "enable" || s === "enabled" || s === "1" || s === "true" || s === "on";
@@ -74,28 +74,28 @@
 
   function selectedScopeIdsTopBar() {
     if (isCfgTarget()) {
-      if (typeof window.gcGetEffectiveConfigurationIds === "function") {
-        return window.gcGetEffectiveConfigurationIds() || [];
+      if (typeof globalThis.gcGetEffectiveConfigurationIds === "function") {
+        return globalThis.gcGetEffectiveConfigurationIds() || [];
       }
-      if (typeof window.gcGetSelectedConfigurationIds === "function") {
-        return window.gcGetSelectedConfigurationIds() || [];
+      if (typeof globalThis.gcGetSelectedConfigurationIds === "function") {
+        return globalThis.gcGetSelectedConfigurationIds() || [];
       }
     } else {
-      if (typeof window.gcGetSelectedFirewallIds === "function") {
-        return window.gcGetSelectedFirewallIds() || [];
+      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        return globalThis.gcGetSelectedFirewallIds() || [];
       }
     }
     return [];
   }
 
   function buildAccessGroupsHtml() {
-    var parts = [];
+    let parts = [];
     ACCESS_GROUPS.forEach(function (g, gi) {
       if (gi > 0) parts.push('<hr class="gc-if-flyout__rule gc-zone-flyout__access-rule" />');
       parts.push('<p class="gc-zone-flyout__access-head">' + escapeHtml(g.title) + "</p>");
       parts.push('<div class="gc-zone-flyout__access-checks">');
       g.items.forEach(function (it) {
-        var cid = combineColId(it.group, it.leaf);
+        let cid = combineColId(it.group, it.leaf);
         parts.push(
           '<div class="gc-combine-flyout-conflict-scope gc-zone-flyout__access-line" data-gc-combine-field-keys="' +
             escapeHtml(cid) +
@@ -142,17 +142,17 @@
   }
 
   function bindPanelResize(root) {
-    var panel = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let panel = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!panel || !handle || handle.dataset.gcZoneResizeBound === "1") return;
     handle.dataset.gcZoneResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = panel.getBoundingClientRect().width;
-      var maxW = Math.min(960, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = panel.getBoundingClientRect().width;
+      let maxW = Math.min(960, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(280, Math.min(maxW, w));
         panel.style.width = w + "px";
       }
@@ -166,16 +166,16 @@
   }
 
   function targetsMapFromRow(row) {
-    var m = {};
+    let m = {};
     (row && row.zone_edit_targets ? row.zone_edit_targets : []).forEach(function (t) {
       if (!t) return;
-      var sid =
+      let sid =
         t.configuration_id != null && t.configuration_id !== ""
           ? Number(t.configuration_id)
           : t.firewall_id != null && t.firewall_id !== ""
             ? Number(t.firewall_id)
             : NaN;
-      var ce = t.config_entry_id != null ? Number(t.config_entry_id) : NaN;
+      let ce = t.config_entry_id != null ? Number(t.config_entry_id) : NaN;
       if (!isNaN(sid) && sid > 0 && !isNaN(ce) && ce > 0) m[sid] = ce;
     });
     return m;
@@ -188,30 +188,30 @@
   }
 
   function collectFlyoutScopeIdsOrdered() {
-    var root = els.form;
+    let root = els.form;
     if (!root) return [];
-    var cfg = isCfgTarget();
-    var ms = root.querySelector(cfg ? "[data-gc-cfg-ms]" : "[data-gc-fw-ms]");
+    let cfg = isCfgTarget();
+    let ms = root.querySelector(cfg ? "[data-gc-cfg-ms]" : "[data-gc-fw-ms]");
     if (!ms) return [];
-    var idAttr = cfg ? "data-gc-cfg-id" : "data-gc-fw-id";
-    var out = [];
+    let idAttr = cfg ? "data-gc-cfg-id" : "data-gc-fw-id";
+    let out = [];
     ms.querySelectorAll("input[type=\"checkbox\"]").forEach(function (cb) {
       if (!cb.checked || !cb.hasAttribute(idAttr)) return;
-      var n = parseInt(String(cb.getAttribute(idAttr) || ""), 10);
+      let n = parseInt(String(cb.getAttribute(idAttr) || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
   }
 
   function setTypeRadio(val) {
-    var v = String(val || "LAN").trim().toUpperCase();
+    let v = String(val || "LAN").trim().toUpperCase();
     if (v !== "DMZ") v = "LAN";
-    var r = els.form.querySelector('input[name="gc-zone-flyout-type"][value="' + v + '"]');
+    let r = els.form.querySelector('input[name="gc-zone-flyout-type"][value="' + v + '"]');
     if (r) r.checked = true;
   }
 
   function getTypeRadio() {
-    var r = els.form.querySelector('input[name="gc-zone-flyout-type"]:checked');
+    let r = els.form.querySelector('input[name="gc-zone-flyout-type"]:checked');
     return r ? String(r.value || "LAN").trim() : "LAN";
   }
 
@@ -219,25 +219,25 @@
     flat = flat || {};
     if (els.name) els.name.value = String(flat.Name != null ? flat.Name : "").trim();
     if (els.desc) els.desc.value = String(flat.Description != null ? flat.Description : "").trim();
-    var zt = String(flat.Type != null ? flat.Type : "LAN").trim().toUpperCase();
+    let zt = String(flat.Type != null ? flat.Type : "LAN").trim().toUpperCase();
     setTypeRadio(zt === "DMZ" ? "DMZ" : "LAN");
-    var mem = String(flat.MemberPorts != null ? flat.MemberPorts : "").trim();
+    let mem = String(flat.MemberPorts != null ? flat.MemberPorts : "").trim();
     if (els.members) els.members.textContent = mem || "None";
 
     els.form.querySelectorAll(".gc-zone-flyout__access-cb").forEach(function (cb) {
-      var g = cb.getAttribute("data-gc-zone-g");
-      var l = cb.getAttribute("data-gc-zone-l");
+      let g = cb.dataset.gcZoneG;
+      let l = cb.dataset.gcZoneL;
       if (!g || !l) return;
-      var key = combineColId(g, l);
+      let key = combineColId(g, l);
       cb.checked = truthySophosFlag(flat[key]);
     });
   }
 
   function collectFormPayload() {
-    var access = {};
+    let access = {};
     els.form.querySelectorAll(".gc-zone-flyout__access-cb").forEach(function (cb) {
-      var g = cb.getAttribute("data-gc-zone-g");
-      var l = cb.getAttribute("data-gc-zone-l");
+      let g = cb.dataset.gcZoneG;
+      let l = cb.dataset.gcZoneL;
       if (!g || !l) return;
       access[l] = !!cb.checked;
     });
@@ -263,14 +263,14 @@
   }
 
   function mountFirewallPicker(mode, initialIds, assignedIds) {
-    if (!els.fwSlot || typeof window.gcHsBuildFirewallPickerSectionHtml !== "function") return;
-    els.fwSlot.innerHTML = window.gcHsBuildFirewallPickerSectionHtml(mode, initialIds, assignedIds);
-    if (typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
+    if (!els.fwSlot || typeof globalThis.gcHsBuildFirewallPickerSectionHtml !== "function") return;
+    els.fwSlot.innerHTML = globalThis.gcHsBuildFirewallPickerSectionHtml(mode, initialIds, assignedIds);
+    if (typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
       try {
-        window.gcHsHydrateFlyoutFirewallPicker(els.form, { row: currentRow || {} });
+        globalThis.gcHsHydrateFlyoutFirewallPicker(els.form, { row: currentRow || {} });
       } catch (e1) {}
     }
-    var ms = els.form.querySelector("[data-gc-fw-ms], [data-gc-cfg-ms]");
+    let ms = els.form.querySelector("[data-gc-fw-ms], [data-gc-cfg-ms]");
     if (ms) {
       ms.querySelectorAll("input[type=\"checkbox\"]").forEach(function (cb) {
         cb.addEventListener("change", syncDirty);
@@ -279,21 +279,21 @@
   }
 
   function clearCombineChrome() {
-    if (typeof window.gcCombineFlyoutClearConflictChrome === "function") {
+    if (typeof globalThis.gcCombineFlyoutClearConflictChrome === "function") {
       try {
-        window.gcCombineFlyoutClearConflictChrome(flyout);
+        globalThis.gcCombineFlyoutClearConflictChrome(flyout);
       } catch (e) {}
     }
   }
 
-  var FLYOUT_LAYOUT_CONFLICT_IDS = [
+  let FLYOUT_LAYOUT_CONFLICT_IDS = [
     { lk: "__flyout.NetworkZone", id: "gc-zone-flyout-conflict-network-zone" },
     { lk: "__flyout.Hardware", id: "gc-zone-flyout-conflict-hardware" },
     { lk: "__flyout.GatewayName", id: "gc-zone-flyout-conflict-gateway-name" },
     { lk: "__flyout.GatewayIP", id: "gc-zone-flyout-conflict-gateway-ip" },
   ];
 
-  var FLYOUT_LAYOUT_COL_LABELS = {
+  let FLYOUT_LAYOUT_COL_LABELS = {
     "__flyout.NetworkZone": "Network zone",
     "__flyout.Hardware": "Hardware",
     "__flyout.GatewayName": "Gateway name",
@@ -302,19 +302,19 @@
 
   function setFlyoutLayoutConflictRowVisibility(row) {
     if (!flyout) return;
-    var per = row && row.access_per_firewall;
+    let per = row && row.access_per_firewall;
     FLYOUT_LAYOUT_CONFLICT_IDS.forEach(function (d) {
-      var el = flyout.querySelector("#" + d.id);
+      let el = flyout.querySelector("#" + d.id);
       if (!el) return;
       el.hidden = !(per && per[d.lk]);
     });
   }
 
   function renderScopeDetailTable(row) {
-    var wrap = els.scopeWrap;
-    var tb = els.scopeTbody;
+    let wrap = els.scopeWrap;
+    let tb = els.scopeTbody;
     if (!wrap || !tb) return;
-    var targets = row && Array.isArray(row.zone_edit_targets) ? row.zone_edit_targets : [];
+    let targets = row && Array.isArray(row.zone_edit_targets) ? row.zone_edit_targets : [];
     if (!targets.length) {
       wrap.hidden = true;
       tb.innerHTML = "";
@@ -324,10 +324,10 @@
     tb.innerHTML = targets
       .map(function (t) {
         if (!t || typeof t !== "object") return "";
-        var lab = String(t.scope_label != null ? t.scope_label : "").trim();
-        var scopeCell =
-          lab && typeof window.gcFirewallScopePillHtml === "function"
-            ? window.gcFirewallScopePillHtml(lab)
+        let lab = String(t.scope_label != null ? t.scope_label : "").trim();
+        let scopeCell =
+          lab && typeof globalThis.gcFirewallScopePillHtml === "function"
+            ? globalThis.gcFirewallScopePillHtml(lab)
             : escapeHtml(lab || "—");
         return (
           "<tr>" +
@@ -359,10 +359,10 @@
       row &&
       row.access_conflict &&
       row.access_per_firewall &&
-      typeof window.gcCombineFlyoutApplyConflictChrome === "function"
+      typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function"
     ) {
       try {
-        window.gcCombineFlyoutApplyConflictChrome(flyout, row, {
+        globalThis.gcCombineFlyoutApplyConflictChrome(flyout, row, {
           columnLabels: FLYOUT_LAYOUT_COL_LABELS,
         });
       } catch (e) {}
@@ -404,13 +404,13 @@
         document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
       } catch (e2) {}
     }
-    if (typeof window.gcNetIfRefresh === "function") window.gcNetIfRefresh();
+    if (typeof globalThis.gcNetIfRefresh === "function") globalThis.gcNetIfRefresh();
   }
 
   function openAdd() {
     if (!flyout || !els.form) {
       try {
-        window.gcNetZoneFlyoutInit();
+        globalThis.gcNetZoneFlyoutInit();
       } catch (eInit) {}
     }
     if (!flyout || !els.form) return;
@@ -427,7 +427,7 @@
     els.form.querySelectorAll(".gc-zone-flyout__access-cb").forEach(function (cb) {
       cb.checked = false;
     });
-    var top = selectedScopeIdsTopBar().filter(function (id) {
+    let top = selectedScopeIdsTopBar().filter(function (id) {
       return !isNaN(Number(id)) && Number(id) > 0;
     });
     mountFirewallPicker("add", top, []);
@@ -442,9 +442,9 @@
     addMode = false;
     currentRow = row;
     if (els.title) els.title.textContent = "Edit zone";
-    var flat = row.flat && typeof row.flat === "object" ? row.flat : {};
+    let flat = row.flat && typeof row.flat === "object" ? row.flat : {};
     populateFromFlat(flat);
-    var assigned = assignedScopeIdsFromRow(row);
+    let assigned = assignedScopeIdsFromRow(row);
     mountFirewallPicker("edit", assigned, assigned);
     if (els.name) els.name.removeAttribute("readonly");
     renderScopeDetailTable(row);
@@ -472,24 +472,24 @@
   }
 
   function save() {
-    var form = collectFormPayload();
+    let form = collectFormPayload();
     if (!form.name) {
       alert("Name is required.");
       return;
     }
-    var upBatch = isCfgTarget()
-      ? typeof window.gcNetZoneApplyUpdateBatchUrl === "string"
-        ? window.gcNetZoneApplyUpdateBatchUrl
+    let upBatch = isCfgTarget()
+      ? typeof globalThis.gcNetZoneApplyUpdateBatchUrl === "string"
+        ? globalThis.gcNetZoneApplyUpdateBatchUrl
         : ""
-      : typeof window.gcNetZoneEnqueueUpdateBatchUrl === "string"
-        ? window.gcNetZoneEnqueueUpdateBatchUrl
+      : typeof globalThis.gcNetZoneEnqueueUpdateBatchUrl === "string"
+        ? globalThis.gcNetZoneEnqueueUpdateBatchUrl
         : "";
-    var crBatch = isCfgTarget()
-      ? typeof window.gcNetZoneApplyCreateBatchUrl === "string"
-        ? window.gcNetZoneApplyCreateBatchUrl
+    let crBatch = isCfgTarget()
+      ? typeof globalThis.gcNetZoneApplyCreateBatchUrl === "string"
+        ? globalThis.gcNetZoneApplyCreateBatchUrl
         : ""
-      : typeof window.gcNetZoneEnqueueCreateBatchUrl === "string"
-        ? window.gcNetZoneEnqueueCreateBatchUrl
+      : typeof globalThis.gcNetZoneEnqueueCreateBatchUrl === "string"
+        ? globalThis.gcNetZoneEnqueueCreateBatchUrl
         : "";
 
     if (addMode) {
@@ -497,7 +497,7 @@
         alert("Zone create URL is not configured.");
         return;
       }
-      var scopeIds = collectFlyoutScopeIdsOrdered();
+      let scopeIds = collectFlyoutScopeIdsOrdered();
       if (!scopeIds.length) {
         alert(
           isCfgTarget()
@@ -506,7 +506,7 @@
         );
         return;
       }
-      var body = isCfgTarget()
+      let body = isCfgTarget()
         ? { configuration_ids: scopeIds, form: form }
         : { firewall_ids: scopeIds, form: form };
       if (els.saveBtn) els.saveBtn.disabled = true;
@@ -514,7 +514,7 @@
         .then(function (x) {
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (!x.ok) {
-            var em = (x.j && (x.j.detail || x.j.message)) || "Could not save.";
+            let em = (x.j && (x.j.detail || x.j.message)) || "Could not save.";
             alert(typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
@@ -532,8 +532,8 @@
       alert("Zone update URL is not configured.");
       return;
     }
-    var tmap = targetsMapFromRow(currentRow);
-    var checked = collectFlyoutScopeIdsOrdered();
+    let tmap = targetsMapFromRow(currentRow);
+    let checked = collectFlyoutScopeIdsOrdered();
     if (!checked.length) {
       alert(
         isCfgTarget()
@@ -542,8 +542,8 @@
       );
       return;
     }
-    var updateIds = [];
-    var createIds = [];
+    let updateIds = [];
+    let createIds = [];
     checked.forEach(function (sid) {
       if (tmap[sid]) updateIds.push(tmap[sid]);
       else createIds.push(sid);
@@ -563,14 +563,14 @@
         if (els.saveBtn) els.saveBtn.disabled = false;
         return;
       }
-      var cbody = isCfgTarget()
+      let cbody = isCfgTarget()
         ? { configuration_ids: createIds, form: form }
         : { firewall_ids: createIds, form: form };
       postJson(crBatch, cbody)
         .then(function (x) {
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (!x.ok) {
-            var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue zone creates.";
+            let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue zone creates.";
             alert(typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
@@ -588,7 +588,7 @@
         .then(function (x) {
           if (!x.ok) {
             if (els.saveBtn) els.saveBtn.disabled = false;
-            var em = (x.j && (x.j.detail || x.j.message)) || "Could not save zone updates.";
+            let em = (x.j && (x.j.detail || x.j.message)) || "Could not save zone updates.";
             alert(typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
@@ -642,10 +642,10 @@
     openEdit(tr._gcNetRow);
   }
 
-  window.gcNetZoneFlyoutInit = function () {
-    var root = document.getElementById("gc-net-zone-flyout");
+  globalThis.gcNetZoneFlyoutInit = function () {
+    let root = document.getElementById("gc-net-zone-flyout");
     if (root) bind(root);
   };
-  window.gcNetZoneFlyoutOpenAdd = openAdd;
-  window.gcNetZoneFlyoutOpenFromTr = openFromTr;
+  globalThis.gcNetZoneFlyoutOpenAdd = openAdd;
+  globalThis.gcNetZoneFlyoutOpenFromTr = openFromTr;
 })();

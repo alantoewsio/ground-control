@@ -1,35 +1,35 @@
 (function () {
   "use strict";
 
-  var STORAGE_H = "ground-control-task-queue-dock-height-px";
-  var DEFAULT_H = 320;
-  var MIN_H = 160;
-  var EMBED_PATH = "/task-queue/embed";
-  var SEND_ALL_URL = "/api/task-queue/send-all";
-  var DELETE_URL = "/api/task-queue/delete";
+  let STORAGE_H = "ground-control-task-queue-dock-height-px";
+  let DEFAULT_H = 320;
+  let MIN_H = 160;
+  let EMBED_PATH = "/task-queue/embed";
+  let SEND_ALL_URL = "/api/task-queue/send-all";
+  let DELETE_URL = "/api/task-queue/delete";
 
   function qs(id) {
     return document.getElementById(id);
   }
 
   function bannerProgress(msg) {
-    if (typeof window.gcGlobalBannerShowProgress === "function") {
-      window.gcGlobalBannerShowProgress(msg);
+    if (typeof globalThis.gcGlobalBannerShowProgress === "function") {
+      globalThis.gcGlobalBannerShowProgress(msg);
     }
   }
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     }
   }
 
   function postSyncStatusSuffix(j) {
-    var ps = j && j.post_sync;
+    let ps = j && j.post_sync;
     if (ps == null) return "";
-    var list = Array.isArray(ps) ? ps : [ps];
+    let list = Array.isArray(ps) ? ps : [ps];
     if (!list.length) return "";
-    var bad = list.filter(function (p) {
+    let bad = list.filter(function (p) {
       return p && p.ok === false;
     });
     if (bad.length) return " Config cache refresh had errors.";
@@ -38,13 +38,13 @@
 
   function firewallIdsFromPostSync(ps) {
     if (ps == null) return [];
-    var list = Array.isArray(ps) ? ps : [ps];
-    var out = [];
-    for (var i = 0; i < list.length; i++) {
-      var p = list[i];
+    let list = Array.isArray(ps) ? ps : [ps];
+    let out = [];
+    for (let i = 0; i < list.length; i++) {
+      let p = list[i];
       if (!p || p.firewall_id == null) continue;
       if (p.ok !== true) continue;
-      var n = parseInt(p.firewall_id, 10);
+      let n = parseInt(p.firewall_id, 10);
       if (!isNaN(n) && n > 0 && out.indexOf(n) === -1) out.push(n);
     }
     return out;
@@ -59,14 +59,14 @@
   }
 
   function notifyConfigCacheSynced(j) {
-    var ps = j && j.post_sync;
+    let ps = j && j.post_sync;
     if (ps == null) return;
-    var list = Array.isArray(ps) ? ps : [ps];
-    var anyOk = list.some(function (p) {
+    let list = Array.isArray(ps) ? ps : [ps];
+    let anyOk = list.some(function (p) {
       return p && p.ok === true;
     });
     if (!anyOk) return;
-    var fwIds = firewallIdsFromPostSync(ps);
+    let fwIds = firewallIdsFromPostSync(ps);
     try {
       document.dispatchEvent(
         new CustomEvent("gc-config-cache-synced", {
@@ -77,28 +77,28 @@
   }
 
   function init() {
-    var root = qs("gc-task-queue-dock");
-    var bottomTab = qs("gc-task-queue-bottom-tab");
-    var openBtn = qs("gc-task-queue-dock-open");
-    var backdrop = root && root.querySelector(".gc-task-queue-dock__backdrop");
-    var panel = root && root.querySelector(".gc-task-queue-dock__panel");
-    var resizeEl = root && root.querySelector(".gc-task-queue-dock__resize");
-    var closeBtn = root && root.querySelector(".gc-task-queue-dock__close");
-    var fullHeightBtn = root && root.querySelector(".gc-task-queue-dock__full-height-btn");
-    var iframe = qs("gc-task-queue-dock-iframe");
-    var dockFiltersBtn = qs("gc-task-queue-dock-filters-toggle");
-    var dockSearchIn = qs("gc-task-queue-dock-search");
-    var dockApproveSelectedBtn = qs("gc-task-queue-dock-approve-selected");
-    var dockRejectSelectedBtn = qs("gc-task-queue-dock-reject-selected");
-    var approveBtns = document.querySelectorAll(".gc-task-queue-dock-approve-all");
+    let root = qs("gc-task-queue-dock");
+    let bottomTab = qs("gc-task-queue-bottom-tab");
+    let openBtn = qs("gc-task-queue-dock-open");
+    let backdrop = root && root.querySelector(".gc-task-queue-dock__backdrop");
+    let panel = root && root.querySelector(".gc-task-queue-dock__panel");
+    let resizeEl = root && root.querySelector(".gc-task-queue-dock__resize");
+    let closeBtn = root && root.querySelector(".gc-task-queue-dock__close");
+    let fullHeightBtn = root && root.querySelector(".gc-task-queue-dock__full-height-btn");
+    let iframe = qs("gc-task-queue-dock-iframe");
+    let dockFiltersBtn = qs("gc-task-queue-dock-filters-toggle");
+    let dockSearchIn = qs("gc-task-queue-dock-search");
+    let dockApproveSelectedBtn = qs("gc-task-queue-dock-approve-selected");
+    let dockRejectSelectedBtn = qs("gc-task-queue-dock-reject-selected");
+    let approveBtns = document.querySelectorAll(".gc-task-queue-dock-approve-all");
     if (!root || !openBtn || !backdrop || !panel || !iframe) return;
 
-    var iframeEverLoaded = false;
-    var fullHeightOn = false;
-    var heightBeforeFull = DEFAULT_H;
-    var dockMirrorTimer = null;
-    var compareModal = null;
-    var compareTaskId = null;
+    let iframeEverLoaded = false;
+    let fullHeightOn = false;
+    let heightBeforeFull = DEFAULT_H;
+    let dockMirrorTimer = null;
+    let compareModal = null;
+    let compareTaskId = null;
 
     function getIframeDoc() {
       try {
@@ -110,12 +110,12 @@
     }
 
     function syncDockHeaderControlsFromIframe() {
-      var doc = getIframeDoc();
+      let doc = getIframeDoc();
       if (!doc) return;
-      var inSearch = doc.getElementById("task-queue-search");
-      var inFilters = doc.getElementById("task-queue-filters-toggle");
-      var inApproveSelected = doc.getElementById("task-queue-approve-selected");
-      var inRejectSelected = doc.getElementById("task-queue-delete-selected");
+      let inSearch = doc.getElementById("task-queue-search");
+      let inFilters = doc.getElementById("task-queue-filters-toggle");
+      let inApproveSelected = doc.getElementById("task-queue-approve-selected");
+      let inRejectSelected = doc.getElementById("task-queue-delete-selected");
       if (dockApproveSelectedBtn && inApproveSelected) {
         dockApproveSelectedBtn.disabled = !!inApproveSelected.disabled;
       }
@@ -152,22 +152,22 @@
 
     function readStoredHeight() {
       try {
-        var v = localStorage.getItem(STORAGE_H);
-        var n = v ? parseInt(v, 10) : NaN;
+        let v = localStorage.getItem(STORAGE_H);
+        let n = v ? parseInt(v, 10) : NaN;
         if (Number.isFinite(n) && n >= MIN_H) return n;
       } catch (e) {}
       return DEFAULT_H;
     }
 
     function maxHeightPx() {
-      var host = root.parentElement;
-      var h = host && host.clientHeight ? host.clientHeight : window.innerHeight;
+      let host = root.parentElement;
+      let h = host && host.clientHeight ? host.clientHeight : globalThis.innerHeight;
       return Math.max(MIN_H, Math.floor(h * 0.92));
     }
 
     function applyHeight(px) {
-      var maxH = maxHeightPx();
-      var clamped = fullHeightOn
+      let maxH = maxHeightPx();
+      let clamped = fullHeightOn
         ? maxH
         : Math.min(Math.max(px, MIN_H), maxH);
       panel.style.height = clamped + "px";
@@ -186,8 +186,8 @@
         fullHeightOn ? "Restore task queue panel height" : "Expand task queue panel to full height",
       );
       fullHeightBtn.title = fullHeightOn ? "Restore height" : "Expand to full height";
-      var iconExpand = fullHeightBtn.querySelector("[data-gc-tq-expand]");
-      var iconCollapse = fullHeightBtn.querySelector("[data-gc-tq-collapse]");
+      let iconExpand = fullHeightBtn.querySelector("[data-gc-tq-expand]");
+      let iconCollapse = fullHeightBtn.querySelector("[data-gc-tq-collapse]");
       if (iconExpand) iconExpand.hidden = fullHeightOn;
       if (iconCollapse) iconCollapse.hidden = !fullHeightOn;
     }
@@ -208,7 +208,7 @@
     syncFullHeightChrome();
 
     function loadIframe() {
-      var base = window.location.origin + EMBED_PATH;
+      let base = globalThis.location.origin + EMBED_PATH;
       if (!iframeEverLoaded) {
         iframe.src = base;
         iframeEverLoaded = true;
@@ -227,19 +227,19 @@
 
     function applyDockSearchToIframe() {
       if (!dockSearchIn) return;
-      var doc = getIframeDoc();
+      let doc = getIframeDoc();
       if (!doc) return;
-      var inSearch = doc.getElementById("task-queue-search");
+      let inSearch = doc.getElementById("task-queue-search");
       if (!inSearch) return;
       inSearch.value = dockSearchIn.value || "";
       inSearch.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
     function compareStatusSuffix(j) {
-      var ps = j && j.post_sync;
+      let ps = j && j.post_sync;
       if (ps == null) return "";
-      var list = Array.isArray(ps) ? ps : [ps];
-      var bad = list.filter(function (p) {
+      let list = Array.isArray(ps) ? ps : [ps];
+      let bad = list.filter(function (p) {
         return p && p.ok === false;
       });
       return bad.length ? " Config cache refresh had errors." : " Config cache updated.";
@@ -247,7 +247,7 @@
 
     function createCompareModal() {
       if (compareModal) return compareModal;
-      var wrap = document.createElement("div");
+      let wrap = document.createElement("div");
       wrap.id = "gc-task-queue-dock-compare-modal";
       wrap.className = "task-queue-compare-modal";
       wrap.setAttribute("aria-hidden", "true");
@@ -293,7 +293,7 @@
 
       function rejectCompareTask() {
         if (!compareTaskId) return;
-        var rid = compareTaskId;
+        let rid = compareTaskId;
         fetch(DELETE_URL, {
           method: "POST",
           credentials: "same-origin",
@@ -310,7 +310,7 @@
             bannerResult(true, "Task rejected and removed from the queue.");
             closeCompareModal();
             loadIframe();
-            if (window.gcRefreshTaskQueueBadge) window.gcRefreshTaskQueueBadge();
+            if (globalThis.gcRefreshTaskQueueBadge) globalThis.gcRefreshTaskQueueBadge();
           })
           .catch(function (e) {
             bannerResult(false, (e && e.message) || "Reject failed.");
@@ -319,7 +319,7 @@
 
       function approveCompareTask() {
         if (!compareTaskId) return;
-        var aid = compareTaskId;
+        let aid = compareTaskId;
         fetch("/api/task-queue/" + aid + "/send", {
           method: "POST",
           credentials: "same-origin",
@@ -331,8 +331,8 @@
           })
           .then(function (x) {
             if (x.status === 202 && x.j && x.j.accepted) {
-              if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
-                window.gcGlobalBannerTrackBackgroundSync(
+              if (typeof globalThis.gcGlobalBannerTrackBackgroundSync === "function") {
+                globalThis.gcGlobalBannerTrackBackgroundSync(
                   "Task " +
                     aid +
                     " sync is running in the background. You can keep navigating; refresh the queue for the final status.",
@@ -341,14 +341,14 @@
               closeCompareModal();
               loadIframe();
               scheduleTaskQueueBackgroundRefreshes(loadIframe);
-              if (window.gcRefreshTaskQueueBadge) window.gcRefreshTaskQueueBadge();
+              if (globalThis.gcRefreshTaskQueueBadge) globalThis.gcRefreshTaskQueueBadge();
               return;
             }
             if (!x.ok) throw new Error((x.j && x.j.error) || "Sync failed");
             bannerResult(true, "Task " + aid + " synced." + compareStatusSuffix(x.j));
             closeCompareModal();
             loadIframe();
-            if (window.gcRefreshTaskQueueBadge) window.gcRefreshTaskQueueBadge();
+            if (globalThis.gcRefreshTaskQueueBadge) globalThis.gcRefreshTaskQueueBadge();
           })
           .catch(function (e) {
             bannerResult(false, (e && e.message) || "Sync failed.");
@@ -356,7 +356,7 @@
       }
 
       wrap.addEventListener("click", function (e) {
-        var t = e.target;
+        let t = e.target;
         if (
           t.closest("[data-gc-dock-cmp-close]") ||
           t.classList.contains("task-queue-compare-modal__backdrop")
@@ -382,14 +382,14 @@
     }
 
     function renderCompareRows(rows) {
-      var body = compareModal && compareModal.querySelector("[data-gc-dock-cmp-body]");
+      let body = compareModal && compareModal.querySelector("[data-gc-dock-cmp-body]");
       if (!body) return;
-      var out = "";
+      let out = "";
       (rows || []).forEach(function (row) {
-        var lc = row.left_class || "eq";
-        var rc = row.right_class || "eq";
-        var left = row.left != null ? String(row.left) : "";
-        var right = row.right != null ? String(row.right) : "";
+        let lc = row.left_class || "eq";
+        let rc = row.right_class || "eq";
+        let left = row.left != null ? String(row.left) : "";
+        let right = row.right != null ? String(row.right) : "";
         out +=
           "<tr>" +
           '<td class="task-queue-diff__cell task-queue-diff__cell--' +
@@ -412,12 +412,12 @@
       compareTaskId = taskId;
       compareModal.hidden = false;
       compareModal.setAttribute("aria-hidden", "false");
-      var meta = compareModal.querySelector("[data-gc-dock-cmp-meta]");
-      var missing = compareModal.querySelector("[data-gc-dock-cmp-missing]");
-      var statusWrap = compareModal.querySelector("[data-gc-dock-cmp-status-wrap]");
-      var statusBadge = compareModal.querySelector("[data-gc-dock-cmp-status]");
-      var errorEl = compareModal.querySelector("[data-gc-dock-cmp-error]");
-      var approveBtn = compareModal.querySelector("[data-gc-dock-cmp-approve]");
+      let meta = compareModal.querySelector("[data-gc-dock-cmp-meta]");
+      let missing = compareModal.querySelector("[data-gc-dock-cmp-missing]");
+      let statusWrap = compareModal.querySelector("[data-gc-dock-cmp-status-wrap]");
+      let statusBadge = compareModal.querySelector("[data-gc-dock-cmp-status]");
+      let errorEl = compareModal.querySelector("[data-gc-dock-cmp-error]");
+      let approveBtn = compareModal.querySelector("[data-gc-dock-cmp-approve]");
       if (meta) meta.textContent = "Loading…";
       if (missing) missing.hidden = true;
       if (statusWrap) statusWrap.hidden = true;
@@ -439,7 +439,7 @@
             if (meta) meta.textContent = (x.j && x.j.detail) || "Could not load comparison.";
             return;
           }
-          var j = x.j || {};
+          let j = x.j || {};
           if (meta) {
             meta.textContent =
               (j.entity_type || "") +
@@ -450,13 +450,13 @@
           }
           if (missing) missing.hidden = !j.stored_missing;
           if (statusWrap && statusBadge) {
-            var st = j.status != null ? String(j.status) : "";
+            let st = j.status != null ? String(j.status) : "";
             statusWrap.hidden = false;
             statusBadge.setAttribute("data-status", st);
             statusBadge.textContent = st === "pending" ? "Pending Approval" : st;
             if (approveBtn) approveBtn.disabled = st === "sending";
             if (errorEl) {
-              var err = j.error_message != null ? String(j.error_message).trim() : "";
+              let err = j.error_message != null ? String(j.error_message).trim() : "";
               if (err) {
                 errorEl.textContent = err;
                 errorEl.hidden = false;
@@ -476,7 +476,7 @@
         bottomTab.hidden = true;
         bottomTab.setAttribute("aria-hidden", "true");
       } else {
-        var c = typeof window.gcTaskQueueBadgeCount === "number" ? window.gcTaskQueueBadgeCount : 0;
+        let c = typeof globalThis.gcTaskQueueBadgeCount === "number" ? globalThis.gcTaskQueueBadgeCount : 0;
         if (c >= 1) {
           bottomTab.hidden = false;
           bottomTab.setAttribute("aria-hidden", "false");
@@ -508,7 +508,7 @@
         applyHeight(heightBeforeFull);
       }
       stopDockMirror();
-      if (window.gcRefreshTaskQueueBadge) window.gcRefreshTaskQueueBadge();
+      if (globalThis.gcRefreshTaskQueueBadge) globalThis.gcRefreshTaskQueueBadge();
     }
 
     function sendApproveAllBody() {
@@ -517,7 +517,7 @@
     }
 
     function runApproveAll() {
-      var c = typeof window.gcTaskQueueBadgeCount === "number" ? window.gcTaskQueueBadgeCount : 0;
+      let c = typeof globalThis.gcTaskQueueBadgeCount === "number" ? globalThis.gcTaskQueueBadgeCount : 0;
       if (c < 1) return;
       if (
         !confirm(
@@ -543,13 +543,13 @@
         })
         .then(function (x) {
           if (!x.ok) throw new Error((x.j && x.j.detail) || "Approve all failed");
-          var j = x.j || {};
+          let j = x.j || {};
           if (x.status === 202 && j.accepted) {
-            var q = j.queued != null ? j.queued : 0;
+            let q = j.queued != null ? j.queued : 0;
             if (q < 1) {
               bannerResult(true, "No tasks were queued.");
-            } else if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
-              window.gcGlobalBannerTrackBackgroundSync(
+            } else if (typeof globalThis.gcGlobalBannerTrackBackgroundSync === "function") {
+              globalThis.gcGlobalBannerTrackBackgroundSync(
                 "Approving " +
                   q +
                   " task(s) in the background. You can keep navigating; refresh the queue for results.",
@@ -565,7 +565,7 @@
             scheduleTaskQueueBackgroundRefreshes(loadIframe);
             return;
           }
-          var msg =
+          let msg =
             "Processed " +
             (j.processed != null ? j.processed : 0) +
             ": " +
@@ -573,7 +573,7 @@
             " synced";
           if (j.failed) msg += ", " + j.failed + " failed";
           msg += "." + postSyncStatusSuffix(j);
-          var failedN = j.failed != null ? j.failed : 0;
+          let failedN = j.failed != null ? j.failed : 0;
           bannerResult(failedN === 0, msg);
           notifyConfigCacheSynced(j);
           document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
@@ -586,7 +586,7 @@
           approveBtns.forEach(function (b) {
             b.disabled = false;
           });
-          if (window.gcRefreshTaskQueueBadge) window.gcRefreshTaskQueueBadge();
+          if (globalThis.gcRefreshTaskQueueBadge) globalThis.gcRefreshTaskQueueBadge();
         });
     }
 
@@ -604,9 +604,9 @@
 
     if (dockFiltersBtn) {
       dockFiltersBtn.addEventListener("click", function () {
-        var doc = getIframeDoc();
+        let doc = getIframeDoc();
         if (!doc) return;
-        var inFilters = doc.getElementById("task-queue-filters-toggle");
+        let inFilters = doc.getElementById("task-queue-filters-toggle");
         if (inFilters) inFilters.click();
         syncDockHeaderControlsFromIframe();
       });
@@ -614,24 +614,24 @@
 
     if (dockApproveSelectedBtn) {
       dockApproveSelectedBtn.addEventListener("click", function () {
-        var doc = getIframeDoc();
+        let doc = getIframeDoc();
         if (!doc) return;
-        var inBtn = doc.getElementById("task-queue-approve-selected");
+        let inBtn = doc.getElementById("task-queue-approve-selected");
         if (inBtn && !inBtn.disabled) inBtn.click();
       });
     }
 
     if (dockRejectSelectedBtn) {
       dockRejectSelectedBtn.addEventListener("click", function () {
-        var doc = getIframeDoc();
+        let doc = getIframeDoc();
         if (!doc) return;
-        var inBtn = doc.getElementById("task-queue-delete-selected");
+        let inBtn = doc.getElementById("task-queue-delete-selected");
         if (inBtn && !inBtn.disabled) inBtn.click();
       });
     }
 
-    window.gcTaskQueueDockOpenCompareModal = function (taskId) {
-      var n = parseInt(taskId, 10);
+    globalThis.gcTaskQueueDockOpenCompareModal = function (taskId) {
+      let n = parseInt(taskId, 10);
       if (isNaN(n) || n <= 0) return;
       openDockCompareModal(n);
     };
@@ -667,14 +667,14 @@
       }
     });
 
-    window.addEventListener(
+    globalThis.addEventListener(
       "resize",
       function () {
         if (!root.hidden) {
           if (fullHeightOn) {
             applyHeight(maxHeightPx());
           } else {
-            var cur = parseInt(panel.style.height, 10) || readStoredHeight();
+            let cur = parseInt(panel.style.height, 10) || readStoredHeight();
             applyHeight(cur);
           }
         }
@@ -689,9 +689,9 @@
     }
 
     if (resizeEl) {
-      var dragging = false;
-      var startY = 0;
-      var startH = 0;
+      let dragging = false;
+      let startY = 0;
+      let startH = 0;
 
       resizeEl.addEventListener("mousedown", function (e) {
         e.preventDefault();
@@ -709,7 +709,7 @@
 
       document.addEventListener("mousemove", function (e) {
         if (!dragging) return;
-        var delta = startY - e.clientY;
+        let delta = startY - e.clientY;
         applyHeight(startH + delta);
       });
 

@@ -4,16 +4,16 @@
 (function () {
   "use strict";
 
-  var root = null;
-  var els = {};
-  var mode = "edit";
-  var currentRow = null;
-  var CREATE_BATCH_URL = "";
-  var UPDATE_URL = "";
+  let root = null;
+  let els = {};
+  let mode = "edit";
+  let currentRow = null;
+  let CREATE_BATCH_URL = "";
+  let UPDATE_URL = "";
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -38,20 +38,20 @@
   }
 
   function mountFwPicker(mode, row) {
-    var slot = root.querySelector("#gc-ips-sig-fw-slot");
-    var tmpl = root.querySelector("#gc-ips-sig-fw-ms-template");
+    let slot = root.querySelector("#gc-ips-sig-fw-slot");
+    let tmpl = root.querySelector("#gc-ips-sig-fw-ms-template");
     if (!slot || !tmpl) return;
     slot.innerHTML = "";
     slot.appendChild(tmpl.content.cloneNode(true));
-    var ms = slot.querySelector("[data-gc-fw-ms]");
+    let ms = slot.querySelector("[data-gc-fw-ms]");
     if (!ms) return;
-    var initial = [];
-    var assigned = [];
+    let initial = [];
+    let assigned = [];
     if (mode === "create") {
       ms.setAttribute("data-fw-picker-mode", "add");
-      if (typeof window.gcGetSelectedFirewallIds === "function") {
-        (window.gcGetSelectedFirewallIds() || []).forEach(function (x) {
-          var n = parseInt(String(x), 10);
+      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        (globalThis.gcGetSelectedFirewallIds() || []).forEach(function (x) {
+          let n = parseInt(String(x), 10);
           if (!isNaN(n) && n > 0) initial.push(n);
         });
       }
@@ -59,7 +59,7 @@
       ms.setAttribute("data-fw-picker-mode", "edit");
       collectIpsCustomSigUpdateTargets(row || {}).forEach(function (t) {
         if (t && t.firewall_id != null) {
-          var fid = parseInt(String(t.firewall_id), 10);
+          let fid = parseInt(String(t.firewall_id), 10);
           if (!isNaN(fid) && fid > 0) initial.push(fid);
         }
       });
@@ -67,11 +67,11 @@
     }
     ms.setAttribute("data-fw-initial-selected", JSON.stringify(initial));
     ms.setAttribute("data-fw-assigned-ids", JSON.stringify(assigned));
-    var body = formBodyEl();
-    if (body && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-      window.gcHsHydrateFlyoutFirewallPicker(body, { row: row || {} });
+    let body = formBodyEl();
+    if (body && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+      globalThis.gcHsHydrateFlyoutFirewallPicker(body, { row: row || {} });
     }
-    var mh = root.querySelector("#gc-ips-sig-fw-ms-hint");
+    let mh = root.querySelector("#gc-ips-sig-fw-ms-hint");
     if (mh) {
       mh.textContent =
         mode === "create"
@@ -81,21 +81,21 @@
   }
 
   function collectCreateFirewallIds() {
-    var slot = root.querySelector("#gc-ips-sig-fw-slot");
+    let slot = root.querySelector("#gc-ips-sig-fw-slot");
     if (!slot) return [];
-    var ms = slot.querySelector("[data-gc-fw-ms]");
+    let ms = slot.querySelector("[data-gc-fw-ms]");
     if (!ms) return [];
-    var out = [];
+    let out = [];
     ms.querySelectorAll('input[type="checkbox"][data-gc-fw-id]').forEach(function (cb) {
       if (!cb.checked) return;
-      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      let n = parseInt(String(cb.dataset.gcFwId || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
   }
 
   function collectIpsCustomSigUpdateTargets(row) {
-    var t = row && row.ips_custom_sig_edit_targets;
+    let t = row && row.ips_custom_sig_edit_targets;
     if (Array.isArray(t) && t.length) return t.slice();
     if (row && row.config_entry_id != null) {
       return [{ config_entry_id: row.config_entry_id }];
@@ -108,7 +108,7 @@
     root.hidden = false;
     root.setAttribute("aria-hidden", "false");
     document.body.classList.add("gc-if-flyout--open");
-    var panel = root.querySelector(".gc-if-flyout__panel");
+    let panel = root.querySelector(".gc-if-flyout__panel");
     if (panel) {
       try {
         panel.focus();
@@ -125,17 +125,17 @@
   }
 
   function syncRuleHighlight() {
-    var ta = els.ruleTa;
-    var code = els.ruleHl;
+    let ta = els.ruleTa;
+    let code = els.ruleHl;
     if (!ta || !code) return;
-    if (typeof window.gcSnortRuleHighlightToHtml === "function") {
-      code.innerHTML = window.gcSnortRuleHighlightToHtml(ta.value);
+    if (typeof globalThis.gcSnortRuleHighlightToHtml === "function") {
+      code.innerHTML = globalThis.gcSnortRuleHighlightToHtml(ta.value);
     } else {
       code.textContent = ta.value;
     }
-    var wrap = ta.closest(".gc-snort-editor");
+    let wrap = ta.closest(".gc-snort-editor");
     if (wrap) {
-      var hlPre = wrap.querySelector(".gc-snort-editor__highlights");
+      let hlPre = wrap.querySelector(".gc-snort-editor__highlights");
       if (hlPre) {
         hlPre.scrollTop = ta.scrollTop;
         hlPre.scrollLeft = ta.scrollLeft;
@@ -144,14 +144,14 @@
   }
 
   function bindSnortEditor() {
-    var ta = els.ruleTa;
+    let ta = els.ruleTa;
     if (!ta || ta.dataset.gcSnortEditorBound === "1") return;
     ta.dataset.gcSnortEditorBound = "1";
     ta.addEventListener("input", syncRuleHighlight);
     ta.addEventListener("scroll", function () {
-      var wrap = ta.closest(".gc-snort-editor");
+      let wrap = ta.closest(".gc-snort-editor");
       if (!wrap) return;
-      var hlPre = wrap.querySelector(".gc-snort-editor__highlights");
+      let hlPre = wrap.querySelector(".gc-snort-editor__highlights");
       if (hlPre) {
         hlPre.scrollTop = ta.scrollTop;
         hlPre.scrollLeft = ta.scrollLeft;
@@ -161,17 +161,17 @@
 
   function fillSelect(sel, options, placeholder) {
     if (!sel) return;
-    var opts = options || [];
-    var isPh = !!placeholder;
+    let opts = options || [];
+    let isPh = !!placeholder;
     sel.innerHTML = "";
     if (isPh) {
-      var ph = document.createElement("option");
+      let ph = document.createElement("option");
       ph.value = "";
       ph.textContent = placeholder;
       sel.appendChild(ph);
     }
     opts.forEach(function (opt) {
-      var o = document.createElement("option");
+      let o = document.createElement("option");
       o.value = opt;
       o.textContent = opt;
       sel.appendChild(o);
@@ -181,20 +181,20 @@
 
   function setSelectValue(sel, val, allowEmpty) {
     if (!sel) return;
-    var v = String(val || "").trim();
+    let v = String(val || "").trim();
     if (!v) {
       if (allowEmpty) sel.value = "";
       return;
     }
-    var found = false;
-    for (var i = 0; i < sel.options.length; i++) {
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === v) {
         found = true;
         break;
       }
     }
     if (!found) {
-      var o = document.createElement("option");
+      let o = document.createElement("option");
       o.value = v;
       o.textContent = v;
       sel.appendChild(o);
@@ -203,7 +203,7 @@
   }
 
   function loadDropdowns() {
-    var raw = window.GC_IPS_CUSTOM_SIGNATURE_DROPDOWNS;
+    let raw = globalThis.GC_IPS_CUSTOM_SIGNATURE_DROPDOWNS;
     if (!raw || typeof raw !== "object") raw = {};
     fillSelect(els.protoSel, raw.protocols || [], "Select here");
     fillSelect(els.sevSel, raw.severities || [], "Select here");
@@ -212,7 +212,7 @@
 
   function populateFromSignature(sig, row) {
     sig = sig && typeof sig === "object" ? sig : {};
-    var fwField = root.querySelector("#gc-ips-sig-fw-field");
+    let fwField = root.querySelector("#gc-ips-sig-fw-field");
     if (fwField) {
       fwField.hidden = false;
     }
@@ -244,17 +244,17 @@
   }
 
   function bindPanelResize() {
-    var panel = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let panel = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!panel || !handle || handle.dataset.gcIpsSigResizeBound === "1") return;
     handle.dataset.gcIpsSigResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = panel.getBoundingClientRect().width;
-      var maxW = Math.min(720, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = panel.getBoundingClientRect().width;
+      let maxW = Math.min(720, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(320, Math.min(maxW, w));
         panel.style.width = w + "px";
       }
@@ -292,7 +292,7 @@
       els.form.addEventListener("click", function (e) {
         if (!root || root.hidden) return;
         if (e.target.closest("[data-gc-fw-ms]")) return;
-        var body = formBodyEl();
+        let body = formBodyEl();
         if (!body) return;
         body.querySelectorAll(".gc-hs-ip-host-flyout__fw-dropdown").forEach(function (d) {
           d.hidden = true;
@@ -306,7 +306,7 @@
     if (els.cancelBtn) {
       els.cancelBtn.addEventListener("click", closeFlyout);
     }
-    var backdrop = root.querySelector(".gc-if-flyout__backdrop");
+    let backdrop = root.querySelector(".gc-if-flyout__backdrop");
     if (backdrop) {
       backdrop.addEventListener("click", closeFlyout);
     }
@@ -314,7 +314,7 @@
     if (els.form) {
       els.form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var body = collectSignature();
+        let body = collectSignature();
         if (!body.Name || !body.Name.trim()) {
           bannerResult(false, "Name is required (max 15 characters).");
           return;
@@ -332,7 +332,7 @@
           return;
         }
         if (mode === "create") {
-          var fwIds = collectCreateFirewallIds();
+          let fwIds = collectCreateFirewallIds();
           if (!fwIds.length) {
             bannerResult(false, "Select at least one firewall in the flyout.");
             return;
@@ -360,11 +360,11 @@
             .then(function (x) {
               if (els.saveBtn) els.saveBtn.disabled = false;
               if (!x.ok) {
-                var em = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
                 return;
               }
-              var n = (x.j && x.j.count) || 0;
+              let n = (x.j && x.j.count) || 0;
               bannerResult(
                 true,
                 n === 1
@@ -373,8 +373,8 @@
               );
               dispatchTaskQueueUpdated();
               closeFlyout();
-              if (typeof window.gcIpsCustomSignatureTableRefresh === "function") {
-                window.gcIpsCustomSignatureTableRefresh();
+              if (typeof globalThis.gcIpsCustomSignatureTableRefresh === "function") {
+                globalThis.gcIpsCustomSignatureTableRefresh();
               }
             })
             .catch(function () {
@@ -383,14 +383,14 @@
             });
           return;
         }
-        var allSigTargets = collectIpsCustomSigUpdateTargets(currentRow);
-        var byFw = {};
+        let allSigTargets = collectIpsCustomSigUpdateTargets(currentRow);
+        let byFw = {};
         allSigTargets.forEach(function (t) {
           if (t && t.firewall_id != null) byFw[t.firewall_id] = t;
         });
-        var selectedFw = collectCreateFirewallIds();
-        var toUpdate = [];
-        var toCreateFw = [];
+        let selectedFw = collectCreateFirewallIds();
+        let toUpdate = [];
+        let toCreateFw = [];
         selectedFw.forEach(function (fid) {
           if (byFw[fid]) toUpdate.push(byFw[fid]);
           else toCreateFw.push(fid);
@@ -408,8 +408,8 @@
           return;
         }
         if (els.saveBtn) els.saveBtn.disabled = true;
-        var sIdx = 0;
-        var queued = 0;
+        let sIdx = 0;
+        let queued = 0;
         function finishSigSave(errMsg) {
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (errMsg) {
@@ -428,8 +428,8 @@
             dispatchTaskQueueUpdated();
           }
           closeFlyout();
-          if (typeof window.gcIpsCustomSignatureTableRefresh === "function") {
-            window.gcIpsCustomSignatureTableRefresh();
+          if (typeof globalThis.gcIpsCustomSignatureTableRefresh === "function") {
+            globalThis.gcIpsCustomSignatureTableRefresh();
           }
         }
         function runBatchCreateForNew() {
@@ -454,11 +454,11 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var em3 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em3 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 finishSigSave(typeof em3 === "string" ? em3 : JSON.stringify(em3));
                 return;
               }
-              var n = (x.j && x.j.count) || 0;
+              let n = (x.j && x.j.count) || 0;
               queued += n;
               finishSigSave(null);
             })
@@ -471,7 +471,7 @@
             runBatchCreateForNew();
             return;
           }
-          var tid = toUpdate[sIdx].config_entry_id;
+          let tid = toUpdate[sIdx].config_entry_id;
           sIdx++;
           fetch(UPDATE_URL, {
             method: "POST",
@@ -490,7 +490,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var em2 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em2 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 finishSigSave(typeof em2 === "string" ? em2 : JSON.stringify(em2));
                 return;
               }
@@ -512,32 +512,32 @@
     });
   }
 
-  window.gcIpsCustomSignatureFlyoutInit = function () {
+  globalThis.gcIpsCustomSignatureFlyoutInit = function () {
     root = document.getElementById("gc-ips-sig-flyout");
     CREATE_BATCH_URL =
-      typeof window.GC_IPS_CUSTOM_SIGNATURE_CREATE_BATCH_URL === "string"
-        ? window.GC_IPS_CUSTOM_SIGNATURE_CREATE_BATCH_URL
+      typeof globalThis.GC_IPS_CUSTOM_SIGNATURE_CREATE_BATCH_URL === "string"
+        ? globalThis.GC_IPS_CUSTOM_SIGNATURE_CREATE_BATCH_URL
         : "";
     UPDATE_URL =
-      typeof window.GC_IPS_CUSTOM_SIGNATURE_UPDATE_URL === "string"
-        ? window.GC_IPS_CUSTOM_SIGNATURE_UPDATE_URL
+      typeof globalThis.GC_IPS_CUSTOM_SIGNATURE_UPDATE_URL === "string"
+        ? globalThis.GC_IPS_CUSTOM_SIGNATURE_UPDATE_URL
         : "";
     if (!root) return;
     bindOnce();
     loadDropdowns();
   };
 
-  window.gcIpsCustomSignatureFlyoutOpenFromTr = function (tr) {
-    window.gcIpsCustomSignatureFlyoutInit();
-    var row = tr && tr._gcNetRow;
+  globalThis.gcIpsCustomSignatureFlyoutOpenFromTr = function (tr) {
+    globalThis.gcIpsCustomSignatureFlyoutInit();
+    let row = tr && tr._gcNetRow;
     if (!row || !root) return;
     mode = "edit";
     currentRow = row;
     populateFromSignature(row.signature, row);
     openFlyout();
-    var b = formBodyEl();
-    if (b && typeof window.gcCombineFlyoutApplyConflictChrome === "function") {
-      window.gcCombineFlyoutApplyConflictChrome(b, row, {
+    let b = formBodyEl();
+    if (b && typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function") {
+      globalThis.gcCombineFlyoutApplyConflictChrome(b, row, {
         columnLabels: {
           __protocol: "Protocol",
           __severity: "Severity",
@@ -548,8 +548,8 @@
     }
   };
 
-  window.gcIpsCustomSignatureFlyoutOpenCreate = function () {
-    window.gcIpsCustomSignatureFlyoutInit();
+  globalThis.gcIpsCustomSignatureFlyoutOpenCreate = function () {
+    globalThis.gcIpsCustomSignatureFlyoutInit();
     if (!root) return;
     mode = "create";
     currentRow = null;

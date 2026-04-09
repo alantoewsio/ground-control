@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  var COUNT_URL = "/api/task-queue/count";
-  var pollMs = 8000;
+  let COUNT_URL = "/api/task-queue/count";
+  let pollMs = 8000;
 
   function badgeWraps() {
     return document.querySelectorAll("[data-gc-task-queue-badge]");
@@ -13,19 +13,19 @@
   }
 
   function applyCount(n, errorCount) {
-    var c = typeof n === "number" && n >= 0 ? n : 0;
-    var err =
+    let c = typeof n === "number" && n >= 0 ? n : 0;
+    let err =
       typeof errorCount === "number" && errorCount >= 0 ? errorCount : 0;
-    var wraps = badgeWraps();
-    var label =
+    let wraps = badgeWraps();
+    let label =
       "Task queue, " + c + " item" + (c === 1 ? "" : "s") + " queued";
-    var labelFull =
+    let labelFull =
       err > 0
         ? label +
           (err === 1 ? ", 1 with an error" : ", " + err + " with errors")
         : label;
-    var numText = c > 99 ? "99+" : String(c);
-    var tabLine =
+    let numText = c > 99 ? "99+" : String(c);
+    let tabLine =
       c < 1
         ? ""
         : "Task Queue - " +
@@ -40,7 +40,7 @@
           "task-queue-nav-badge--pending",
           "task-queue-nav-badge--error",
         );
-        var num = wrap.querySelector("[data-gc-task-queue-badge-num]");
+        let num = wrap.querySelector("[data-gc-task-queue-badge-num]");
         if (c < 1) {
           wrap.hidden = true;
           wrap.setAttribute("aria-hidden", "true");
@@ -69,14 +69,14 @@
       el.textContent = tabLine;
     });
 
-    var bottomTab = document.getElementById("gc-task-queue-bottom-tab");
+    let bottomTab = document.getElementById("gc-task-queue-bottom-tab");
     if (bottomTab) {
       if (c < 1) {
         bottomTab.hidden = true;
         bottomTab.setAttribute("aria-hidden", "true");
       } else {
-        var dock = document.getElementById("gc-task-queue-dock");
-        var dockOpen = dock && !dock.hidden;
+        let dock = document.getElementById("gc-task-queue-dock");
+        let dockOpen = dock && !dock.hidden;
         if (!dockOpen) {
           bottomTab.hidden = false;
           bottomTab.setAttribute("aria-hidden", "false");
@@ -84,7 +84,7 @@
       }
     }
 
-    var openDockBtn = document.getElementById("gc-task-queue-dock-open");
+    let openDockBtn = document.getElementById("gc-task-queue-dock-open");
     if (openDockBtn) {
       if (c < 1) {
         openDockBtn.removeAttribute("aria-label");
@@ -93,7 +93,7 @@
       }
     }
 
-    window.gcTaskQueueBadgeCount = c;
+    globalThis.gcTaskQueueBadgeCount = c;
   }
 
   function refresh() {
@@ -103,8 +103,8 @@
         return r.json();
       })
       .then(function (data) {
-        var n = data && typeof data.count === "number" ? data.count : 0;
-        var ec =
+        let n = data && typeof data.count === "number" ? data.count : 0;
+        let ec =
           data && typeof data.error_count === "number" ? data.error_count : 0;
         applyCount(n, ec);
       })
@@ -113,7 +113,7 @@
       });
   }
 
-  window.gcRefreshTaskQueueBadge = refresh;
+  globalThis.gcRefreshTaskQueueBadge = refresh;
 
   document.addEventListener("gc-task-queue-updated", refresh);
 
@@ -123,6 +123,6 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     refresh();
-    window.setInterval(refresh, pollMs);
+    globalThis.setInterval(refresh, pollMs);
   });
 })();

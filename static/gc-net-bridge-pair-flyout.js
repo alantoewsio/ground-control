@@ -4,18 +4,18 @@
 (function () {
   "use strict";
 
-  var currentNetRow = null;
-  var addMode = false;
-  var currentRaw = null;
-  var routingKeyUsed = "EnableRoutingOnBridge";
-  var initialFormSnapshot = "";
-  var els = {};
-  var memberScopeFw;
-  var memberScopeCfg;
-  var memberScopeRequired = false;
+  let currentNetRow = null;
+  let addMode = false;
+  let currentRaw = null;
+  let routingKeyUsed = "EnableRoutingOnBridge";
+  let initialFormSnapshot = "";
+  let els = {};
+  let memberScopeFw;
+  let memberScopeCfg;
+  let memberScopeRequired = false;
 
   function ifTbodyId() {
-    var p = (typeof window.gcNetVlanIfPrefix === "string" && window.gcNetVlanIfPrefix) || "gc-net-if";
+    let p = (typeof globalThis.gcNetVlanIfPrefix === "string" && globalThis.gcNetVlanIfPrefix) || "gc-net-if";
     return p + "-tbody";
   }
 
@@ -37,15 +37,15 @@
 
   function pick(raw, keys) {
     if (!raw || typeof raw !== "object") return "";
-    for (var i = 0; i < keys.length; i++) {
-      var v = raw[keys[i]];
+    for (let i = 0; i < keys.length; i++) {
+      let v = raw[keys[i]];
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
     return "";
   }
 
   function truthyRaw(raw, keys) {
-    var s = normLower(pick(raw, keys));
+    let s = normLower(pick(raw, keys));
     if (
       s === "false" ||
       s === "0" ||
@@ -60,8 +60,8 @@
   }
 
   function rowMatchesNetScope(row, fwId, cfgId) {
-    var wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
-    var wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
+    let wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
+    let wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
     if (!wantFw && !wantCfg) return true;
     if (wantFw) {
       if (row.firewall_id == null || Number(row.firewall_id) !== Number(fwId)) return false;
@@ -73,26 +73,26 @@
   }
 
   function zoneTbodyIds() {
-    var ifId = ifTbodyId();
-    var vlanP = (typeof window.gcNetVlanVlanPrefix === "string" && window.gcNetVlanVlanPrefix) || "gc-net-vlan";
+    let ifId = ifTbodyId();
+    let vlanP = (typeof globalThis.gcNetVlanVlanPrefix === "string" && globalThis.gcNetVlanVlanPrefix) || "gc-net-vlan";
     return [ifId, vlanP + "-tbody"];
   }
 
   function collectZonesFromNetworkTablesScoped(fwId, cfgId, opts) {
-    var require = opts && opts.requireScope;
-    var wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
-    var wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
+    let require = opts && opts.requireScope;
+    let wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
+    let wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
     if (require && !wantFw && !wantCfg) return [];
-    var set = {};
+    let set = {};
     zoneTbodyIds().forEach(function (tid) {
-      var tbody = document.getElementById(tid);
+      let tbody = document.getElementById(tid);
       if (!tbody) return;
       tbody.querySelectorAll("tr[data-search]").forEach(function (tr) {
-        var row = tr._gcNetRow;
+        let row = tr._gcNetRow;
         if (!row) return;
         if (!rowMatchesNetScope(row, fwId, cfgId)) return;
-        var td = tr.querySelector('td[data-gc-col="__zone"]');
-        var t = td ? (td.textContent || "").trim().replace(/\s+/g, " ") : "";
+        let td = tr.querySelector('td[data-gc-col="__zone"]');
+        let t = td ? (td.textContent || "").trim().replace(/\s+/g, " ") : "";
         if (t && normLower(t) !== "none") set[t] = true;
       });
     });
@@ -102,20 +102,20 @@
   }
 
   function collectPhysicalInterfaceNamesScoped(fwId, cfgId, opts) {
-    var require = opts && opts.requireScope;
-    var wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
-    var wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
+    let require = opts && opts.requireScope;
+    let wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
+    let wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
     if (require && !wantFw && !wantCfg) return [];
-    var tbody = document.getElementById(ifTbodyId());
+    let tbody = document.getElementById(ifTbodyId());
     if (!tbody) return [];
-    var names = [];
-    var seen = {};
+    let names = [];
+    let seen = {};
     tbody.querySelectorAll("tr.gc-net-entity-row--clickable, tr[class*='-data-row']").forEach(function (tr) {
-      var row = tr._gcNetRow;
+      let row = tr._gcNetRow;
       if (!row || !row.cells) return;
       if (row.entity_type && row.entity_type !== "interface") return;
       if (!rowMatchesNetScope(row, fwId, cfgId)) return;
-      var n = String(row.cells.__name != null ? row.cells.__name : "").trim();
+      let n = String(row.cells.__name != null ? row.cells.__name : "").trim();
       if (!n || seen[n]) return;
       seen[n] = true;
       names.push(n);
@@ -161,7 +161,7 @@
     if (x == null) return { iface: "", zone: "" };
     if (typeof x === "string") return { iface: x.trim(), zone: "" };
     if (typeof x !== "object") return { iface: "", zone: "" };
-    var ifaceRaw =
+    let ifaceRaw =
       x.Interface !== undefined && x.Interface !== null
         ? x.Interface
         : x.interface !== undefined && x.interface !== null
@@ -177,7 +177,7 @@
                   : x.Port !== undefined && x.Port !== null
                     ? x.Port
                     : x.port;
-    var zoneRaw =
+    let zoneRaw =
       x.NetworkZone !== undefined && x.NetworkZone !== null
         ? x.NetworkZone
         : x.networkZone !== undefined && x.networkZone !== null
@@ -203,9 +203,9 @@
     if (typeof block !== "object") return block;
     if (Array.isArray(block.Member)) return block.Member;
     if (block.Member != null && typeof block.Member === "object") {
-      var inner = block.Member;
+      let inner = block.Member;
       if (Array.isArray(inner)) return inner;
-      var numArr = objectNumericKeysToArray(inner);
+      let numArr = objectNumericKeysToArray(inner);
       if (numArr) return numArr;
       return [inner];
     }
@@ -216,7 +216,7 @@
   /** Turn { "0": row, "1": row } into [row, row] (some JSON encoders). */
   function objectNumericKeysToArray(block) {
     if (!block || typeof block !== "object" || Array.isArray(block)) return null;
-    var keys = Object.keys(block);
+    let keys = Object.keys(block);
     if (!keys.length) return null;
     if (
       !keys.every(function (k) {
@@ -239,17 +239,17 @@
   /** Map of interface name -> zone or nested member object (Sophos-style). */
   function membersFromInterfaceMap(obj) {
     if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
-    var keys = Object.keys(obj);
+    let keys = Object.keys(obj);
     if (!keys.length) return null;
-    var numeric = keys.every(function (k) {
+    let numeric = keys.every(function (k) {
       return /^\d+$/.test(k);
     });
     if (numeric) return null;
-    var out = [];
+    let out = [];
     keys.forEach(function (k) {
-      var v = obj[k];
+      let v = obj[k];
       if (v && typeof v === "object" && !Array.isArray(v)) {
-        var m = coalesceMember(v);
+        let m = coalesceMember(v);
         if (!m.iface) m.iface = String(k).trim();
         out.push(m);
       } else if (typeof v === "string") {
@@ -265,17 +265,17 @@
   function membersFromResolvedBlock(block) {
     if (block == null) return [];
     if (typeof block === "string") {
-      var st = block.trim();
+      let st = block.trim();
       return st ? [{ iface: st, zone: "" }] : [];
     }
-    var asArray = Array.isArray(block) ? block : objectNumericKeysToArray(block);
+    let asArray = Array.isArray(block) ? block : objectNumericKeysToArray(block);
     if (asArray) {
       return asArray.map(coalesceMember);
     }
     if (typeof block === "object") {
-      var single = coalesceMember(block);
+      let single = coalesceMember(block);
       if (single.iface || single.zone) return [single];
-      var mapped = membersFromInterfaceMap(block);
+      let mapped = membersFromInterfaceMap(block);
       if (mapped && mapped.length) return mapped;
     }
     return [];
@@ -285,7 +285,7 @@
     if (!raw || typeof raw !== "object") return [];
     /* Prefer BridgeMembers / member lists before raw.Interface — bridge payloads often set
      * Interface to the bridge's own port name (string or object), which is not the member list. */
-    var candidates = [
+    let candidates = [
       raw.BridgeMembers,
       raw.BridgedInterfaces,
       raw.MemberInterfaces,
@@ -295,11 +295,11 @@
       raw.BridgeInterface,
       raw.Interface,
     ];
-    for (var c = 0; c < candidates.length; c++) {
-      var cand = candidates[c];
+    for (let c = 0; c < candidates.length; c++) {
+      let cand = candidates[c];
       if (cand == null) continue;
       if (typeof cand === "string") {
-        var ts = cand.trim();
+        let ts = cand.trim();
         if (!ts) continue;
         if (ts.charAt(0) === "{" || ts.charAt(0) === "[") {
           try {
@@ -314,11 +314,11 @@
       if (Array.isArray(cand) && cand.length === 0) continue;
       if (typeof cand === "object" && !Array.isArray(cand) && Object.keys(cand).length === 0) continue;
 
-      var unwrapped = unwrapMembersBlock(cand);
+      let unwrapped = unwrapMembersBlock(cand);
       if (Array.isArray(unwrapped) && unwrapped.length === 0) {
         return [];
       }
-      var got = membersFromResolvedBlock(unwrapped);
+      let got = membersFromResolvedBlock(unwrapped);
       if (got.length > 0) return got;
     }
     return [];
@@ -329,29 +329,29 @@
    */
   function interfaceMembersFromFlat(flat) {
     if (!flat || typeof flat !== "object") return [];
-    var bmFlat = flat.BridgeMembers;
+    let bmFlat = flat.BridgeMembers;
     if (typeof bmFlat === "string") {
-      var bms = bmFlat.trim();
+      let bms = bmFlat.trim();
       if (bms.charAt(0) === "{" || bms.charAt(0) === "[") {
         try {
-          var parsedBm = JSON.parse(bms);
-          var fromBm = interfaceMembersFromRaw({ BridgeMembers: parsedBm });
+          let parsedBm = JSON.parse(bms);
+          let fromBm = interfaceMembersFromRaw({ BridgeMembers: parsedBm });
           if (fromBm.length) return fromBm;
         } catch (e) {}
       }
     }
-    var prefixes = ["Interface", "Interfaces", "Member", "Members", "BridgeInterface", "BridgedInterface"];
-    var byIx = {};
-    var byNamed = {};
+    let prefixes = ["Interface", "Interfaces", "Member", "Members", "BridgeInterface", "BridgedInterface"];
+    let byIx = {};
+    let byNamed = {};
     function touch(i) {
       if (!byIx[i]) byIx[i] = { iface: "", zone: "" };
       return byIx[i];
     }
     function setField(i, leaf, val) {
-      var s = val != null ? String(val).trim() : "";
+      let s = val != null ? String(val).trim() : "";
       if (!s) return;
-      var m = touch(i);
-      var L = leaf.toLowerCase();
+      let m = touch(i);
+      let L = leaf.toLowerCase();
       if (
         L === "name" ||
         L === "interface" ||
@@ -366,22 +366,22 @@
       }
     }
     Object.keys(flat).forEach(function (k) {
-      for (var p = 0; p < prefixes.length; p++) {
-        var pref = prefixes[p];
-        var esc = pref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        var mNum = k.match(new RegExp("^" + esc + "\\.(\\d+)\\.(.+)$"));
+      for (let p = 0; p < prefixes.length; p++) {
+        let pref = prefixes[p];
+        let esc = pref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        let mNum = k.match(new RegExp("^" + esc + "\\.(\\d+)\\.(.+)$"));
         if (mNum) {
           setField(parseInt(mNum[1], 10), mNum[2], flat[k]);
           return;
         }
-        var mNamed = k.match(
+        let mNamed = k.match(
           new RegExp("^" + esc + "\\.([^\\.]+)\\.(NetworkZone|Zone|ZoneName|Name|Interface|InterfaceName|Hardware)$", "i"),
         );
         if (mNamed) {
-          var slug = mNamed[1];
+          let slug = mNamed[1];
           if (/^\d+$/.test(slug)) return;
-          var leaf = mNamed[2].toLowerCase();
-          var sv = String(flat[k] || "").trim();
+          let leaf = mNamed[2].toLowerCase();
+          let sv = String(flat[k] || "").trim();
           if (!sv) return;
           if (!byNamed[slug]) byNamed[slug] = { iface: "", zone: "" };
           if (leaf === "name" || leaf === "interface" || leaf === "interfacename" || leaf === "hardware") {
@@ -393,19 +393,19 @@
         }
       }
     });
-    var bbm = {};
+    let bbm = {};
     Object.keys(flat).forEach(function (k) {
-      var m = k.match(/^BridgeMembers\.Member\.(\d+)\.(Interface|Zone|NetworkZone|Name)$/i);
+      let m = k.match(/^BridgeMembers\.Member\.(\d+)\.(Interface|Zone|NetworkZone|Name)$/i);
       if (!m) return;
-      var i = parseInt(m[1], 10);
-      var leaf = m[2].toLowerCase();
-      var sv = String(flat[k] != null ? flat[k] : "").trim();
+      let i = parseInt(m[1], 10);
+      let leaf = m[2].toLowerCase();
+      let sv = String(flat[k] != null ? flat[k] : "").trim();
       if (!sv) return;
       if (!bbm[i]) bbm[i] = { iface: "", zone: "" };
       if (leaf === "interface" || leaf === "name") bbm[i].iface = bbm[i].iface || sv;
       else if (leaf === "zone" || leaf === "networkzone") bbm[i].zone = bbm[i].zone || sv;
     });
-    var bridgeNums = Object.keys(bbm)
+    let bridgeNums = Object.keys(bbm)
       .map(Number)
       .filter(function (n) {
         return !isNaN(n);
@@ -413,7 +413,7 @@
       .sort(function (a, b) {
         return a - b;
       });
-    var bridgeList = bridgeNums.map(function (n) {
+    let bridgeList = bridgeNums.map(function (n) {
       return bbm[n];
     });
     if (
@@ -422,7 +422,7 @@
       })
     )
       return bridgeList;
-    var nums = Object.keys(byIx)
+    let nums = Object.keys(byIx)
       .map(Number)
       .filter(function (n) {
         return !isNaN(n);
@@ -430,13 +430,13 @@
       .sort(function (a, b) {
         return a - b;
       });
-    var numericList = nums.map(function (n) {
+    let numericList = nums.map(function (n) {
       return byIx[n];
     });
-    var namedList = Object.keys(byNamed)
+    let namedList = Object.keys(byNamed)
       .sort()
       .map(function (slug) {
-        var o = byNamed[slug];
+        let o = byNamed[slug];
         if (!o.iface) o.iface = slug;
         return o;
       });
@@ -457,13 +457,13 @@
   }
 
   function resolveMemberRowsForEdit(row, raw) {
-    var fromRaw = interfaceMembersFromRaw(raw);
-    var hasData = fromRaw.some(function (m) {
+    let fromRaw = interfaceMembersFromRaw(raw);
+    let hasData = fromRaw.some(function (m) {
       return (m.iface && m.iface.length) || (m.zone && m.zone.length);
     });
     if (hasData) return fromRaw;
-    var fromFlat = interfaceMembersFromFlat((row && row.flat) || {});
-    var hasFlat = fromFlat.some(function (m) {
+    let fromFlat = interfaceMembersFromFlat((row && row.flat) || {});
+    let hasFlat = fromFlat.some(function (m) {
       return (m.iface && m.iface.length) || (m.zone && m.zone.length);
     });
     if (hasFlat) return fromFlat;
@@ -472,30 +472,30 @@
 
   /** SFOS stores bridge MSS as { Override, MSSValue }; pick() on raw.MSS would stringify [object Object]. */
   function bridgeMssBlock(raw) {
-    var m = raw && raw.MSS;
+    let m = raw && raw.MSS;
     if (m && typeof m === "object" && !Array.isArray(m)) return m;
     return null;
   }
 
   function bridgeMssOverrideEnabled(raw) {
-    var m = bridgeMssBlock(raw);
+    let m = bridgeMssBlock(raw);
     if (!m) return null;
-    var o = m.Override != null ? String(m.Override).trim() : "";
+    let o = m.Override != null ? String(m.Override).trim() : "";
     if (!o) return null;
-    var lo = o.toLowerCase();
+    let lo = o.toLowerCase();
     if (lo === "enable" || lo === "enabled") return true;
     if (lo === "disable" || lo === "disabled") return false;
     return null;
   }
 
   function bridgeMssValue(raw) {
-    var m = bridgeMssBlock(raw);
+    let m = bridgeMssBlock(raw);
     if (m && m.MSSValue != null) {
-      var inner = m.MSSValue;
+      let inner = m.MSSValue;
       if (inner && typeof inner === "object" && !Array.isArray(inner) && inner["#text"] != null) {
         inner = inner["#text"];
       }
-      var s = String(inner).trim();
+      let s = String(inner).trim();
       if (s) return s;
     }
     return "";
@@ -503,7 +503,7 @@
 
   function detectRoutingKey(raw) {
     if (!raw || typeof raw !== "object") return "EnableRoutingOnBridge";
-    var candidates = [
+    let candidates = [
       "RoutingOnBridgePair",
       "EnableRoutingOnBridge",
       "RoutingOnBridge",
@@ -511,60 +511,60 @@
       "BridgeRouting",
       "RoutingEnabled",
     ];
-    for (var i = 0; i < candidates.length; i++) {
+    for (let i = 0; i < candidates.length; i++) {
       if (Object.prototype.hasOwnProperty.call(raw, candidates[i])) return candidates[i];
     }
     return "EnableRoutingOnBridge";
   }
 
-  var MEMBER_TRASH_SVG =
+  let MEMBER_TRASH_SVG =
     '<svg class="gc-bridge-flyout__member-trash-svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4v-2h-3.5l-1-1h-5l-1 1H5v2h14zM8 9h8v10H8V9z"/></svg>';
 
   /** Build options with DOM APIs and set .value — innerHTML on <select> is unreliable in some browsers. */
   function populateMemberSelect(selectEl, currentValue, choiceList) {
-    var cur = currentValue != null ? String(currentValue).trim() : "";
-    var curLower = cur.toLowerCase();
+    let cur = currentValue != null ? String(currentValue).trim() : "";
+    let curLower = cur.toLowerCase();
     while (selectEl.firstChild) {
       selectEl.removeChild(selectEl.firstChild);
     }
-    var optPlaceholder = document.createElement("option");
+    let optPlaceholder = document.createElement("option");
     optPlaceholder.value = "";
     optPlaceholder.textContent = "\u2014";
     selectEl.appendChild(optPlaceholder);
 
-    for (var i = 0; i < choiceList.length; i++) {
-      var ch = choiceList[i];
-      var opt = document.createElement("option");
+    for (let i = 0; i < choiceList.length; i++) {
+      let ch = choiceList[i];
+      let opt = document.createElement("option");
       opt.value = ch;
       opt.textContent = ch;
       selectEl.appendChild(opt);
     }
 
     if (cur) {
-      var valueToSet = cur;
-      for (var j = 0; j < choiceList.length; j++) {
+      let valueToSet = cur;
+      for (let j = 0; j < choiceList.length; j++) {
         if (choiceList[j] === cur) {
           valueToSet = choiceList[j];
           break;
         }
       }
       if (valueToSet === cur) {
-        for (var k = 0; k < choiceList.length; k++) {
+        for (let k = 0; k < choiceList.length; k++) {
           if (choiceList[k].toLowerCase() === curLower) {
             valueToSet = choiceList[k];
             break;
           }
         }
       }
-      var hasOption = false;
-      for (var n = 0; n < selectEl.options.length; n++) {
+      let hasOption = false;
+      for (let n = 0; n < selectEl.options.length; n++) {
         if (selectEl.options[n].value === valueToSet) {
           hasOption = true;
           break;
         }
       }
       if (!hasOption) {
-        var ox = document.createElement("option");
+        let ox = document.createElement("option");
         ox.value = valueToSet;
         ox.textContent = valueToSet;
         selectEl.appendChild(ox);
@@ -581,28 +581,28 @@
   }
 
   function renderMemberRows(members) {
-    var tb = els.membersTbody;
+    let tb = els.membersTbody;
     if (!tb) return;
-    var scopeOpts = { requireScope: memberScopeRequired };
-    var ifaces = collectPhysicalInterfaceNamesScoped(memberScopeFw, memberScopeCfg, scopeOpts);
-    var zones = collectZonesFromNetworkTablesScoped(memberScopeFw, memberScopeCfg, scopeOpts);
-    var dataRows = (members || []).filter(memberRowHasValue);
+    let scopeOpts = { requireScope: memberScopeRequired };
+    let ifaces = collectPhysicalInterfaceNamesScoped(memberScopeFw, memberScopeCfg, scopeOpts);
+    let zones = collectZonesFromNetworkTablesScoped(memberScopeFw, memberScopeCfg, scopeOpts);
+    let dataRows = (members || []).filter(memberRowHasValue);
     tb.innerHTML = "";
 
     function appendRow(m, isBlankRow) {
-      var tr = document.createElement("tr");
+      let tr = document.createElement("tr");
       tr.setAttribute("data-gc-bridge-member-row", "1");
       if (isBlankRow) tr.setAttribute("data-gc-bridge-member-blank", "1");
 
-      var td1 = document.createElement("td");
-      var sel1 = document.createElement("select");
+      let td1 = document.createElement("td");
+      let sel1 = document.createElement("select");
       sel1.className =
         "gc-if-flyout__input gc-if-flyout__select gc-bridge-flyout__member-if gc-bridge-flyout__member-select";
       sel1.setAttribute("aria-label", isBlankRow ? "New member interface" : "Member interface");
       populateMemberSelect(sel1, m.iface, ifaces);
 
-      var td2 = document.createElement("td");
-      var sel2 = document.createElement("select");
+      let td2 = document.createElement("td");
+      let sel2 = document.createElement("select");
       sel2.className =
         "gc-if-flyout__input gc-if-flyout__select gc-bridge-flyout__member-zone gc-bridge-flyout__member-select";
       sel2.setAttribute("aria-label", isBlankRow ? "New member zone" : "Member zone");
@@ -611,8 +611,8 @@
       td1.appendChild(sel1);
       td2.appendChild(sel2);
 
-      var td3 = document.createElement("td");
-      var rm = document.createElement("button");
+      let td3 = document.createElement("td");
+      let rm = document.createElement("button");
       rm.type = "button";
       rm.className = "btn-icon gc-bridge-flyout__member-remove";
       rm.innerHTML = MEMBER_TRASH_SVG;
@@ -645,12 +645,12 @@
   }
 
   function readMembersFromDom() {
-    var tb = els.membersTbody;
+    let tb = els.membersTbody;
     if (!tb) return [];
-    var out = [];
+    let out = [];
     tb.querySelectorAll("tr[data-gc-bridge-member-row]").forEach(function (tr) {
-      var si = tr.querySelector(".gc-bridge-flyout__member-if");
-      var sz = tr.querySelector(".gc-bridge-flyout__member-zone");
+      let si = tr.querySelector(".gc-bridge-flyout__member-if");
+      let sz = tr.querySelector(".gc-bridge-flyout__member-zone");
       out.push({
         iface: si ? si.value.trim() : "",
         zone: sz ? sz.value.trim() : "",
@@ -665,7 +665,7 @@
   }
 
   function guessBridgeIpv6Mode(raw) {
-    var v = normLower(
+    let v = normLower(
       pick(raw, [
         "IPv6Assignment",
         "IPv6_Assignment",
@@ -676,7 +676,7 @@
     if (v.indexOf("delegat") !== -1) return "delegated";
     if (v.indexOf("dhcp") !== -1) return "dhcp";
     if (v.indexOf("static") !== -1) return "static";
-    var ip = pick(raw, ["IPv6Address", "IPv6_Address"]);
+    let ip = pick(raw, ["IPv6Address", "IPv6_Address"]);
     if (ip) return "static";
     return "static";
   }
@@ -692,12 +692,12 @@
   function tryApplyIpv6CidrOnBlur() {
     if (!els.ipv6Ip || !els.ipv6Prefix) return;
     if (els.ipv6Ip.readOnly) return;
-    var raw = els.ipv6Ip.value.trim();
-    var slash = raw.lastIndexOf("/");
+    let raw = els.ipv6Ip.value.trim();
+    let slash = raw.lastIndexOf("/");
     if (slash < 0) return;
-    var addr = raw.slice(0, slash).trim();
-    var pstr = raw.slice(slash + 1).trim();
-    var prefix = parseInt(pstr, 10);
+    let addr = raw.slice(0, slash).trim();
+    let pstr = raw.slice(slash + 1).trim();
+    let prefix = parseInt(pstr, 10);
     if (pstr !== String(prefix) || prefix < 0 || prefix > 128) return;
     if (!addr || addr.indexOf(":") < 0) return;
     els.ipv6Ip.value = addr;
@@ -707,8 +707,8 @@
 
   function syncBridgeIpv6ModeUi() {
     if (!els.ipv6ModeDhcp) return;
-    var mode = bridgeIpv6ModeValue();
-    var ro = mode === "dhcp";
+    let mode = bridgeIpv6ModeValue();
+    let ro = mode === "dhcp";
     [els.ipv6Ip, els.ipv6Prefix, els.ipv6GwName, els.ipv6GwIp].forEach(function (inp) {
       if (!inp) return;
       inp.readOnly = ro;
@@ -719,7 +719,7 @@
   /** Bridge flyout has no zone selector; show IPv6 gateway fields for static assignment only. */
   function syncBridgeIpv6GatewayWrap() {
     if (!els.ipv6GatewayWrap) return;
-    var show = bridgeIpv6ModeValue() === "static";
+    let show = bridgeIpv6ModeValue() === "static";
     els.ipv6GatewayWrap.hidden = !show;
     els.ipv6GatewayWrap.setAttribute("aria-hidden", show ? "false" : "true");
   }
@@ -736,8 +736,8 @@
 
   function applyBridgeIpv6CheckboxOnLoad() {
     if (!els.ipv6Cb || !els.ipv6Ip) return;
-    var staticMode = bridgeIpv6ModeValue() === "static";
-    var blank = els.ipv6Ip.value.trim() === "";
+    let staticMode = bridgeIpv6ModeValue() === "static";
+    let blank = els.ipv6Ip.value.trim() === "";
     if (staticMode && blank) {
       clearBridgeIpv6Section();
       els.ipv6Cb.checked = false;
@@ -746,13 +746,13 @@
   }
 
   function collectBridgeForm() {
-    var out = {};
+    let out = {};
     out.Name = els.nameInp ? els.nameInp.value.trim() : "";
     out.Hardware = els.hwInp ? els.hwInp.value.trim() : "";
     out.Description = els.descInp ? els.descInp.value.trim() : "";
     out[routingKeyUsed] = !!(els.routingCb && els.routingCb.checked);
 
-    var members = readMembersFromDom().filter(memberRowHasValue);
+    let members = readMembersFromDom().filter(memberRowHasValue);
     out.BridgeMembers = {
       Member: members.map(function (m) {
         return { Interface: m.iface, Zone: m.zone };
@@ -780,7 +780,7 @@
 
     if (els.ipv6Cb && els.ipv6Cb.checked) {
       out.IPv6Enabled = true;
-      var v6m = bridgeIpv6ModeValue();
+      let v6m = bridgeIpv6ModeValue();
       out.IPv6Assignment =
         v6m === "dhcp" ? "DHCP" : v6m === "delegated" ? "Delegated" : "Static";
       out.IPv6Address = els.ipv6Ip ? els.ipv6Ip.value.trim() : "";
@@ -818,14 +818,14 @@
 
   function syncIpv4Body() {
     if (!els.ipv4Body) return;
-    var on = els.ipv4Cb && els.ipv4Cb.checked;
+    let on = els.ipv4Cb && els.ipv4Cb.checked;
     els.ipv4Body.hidden = !on;
     els.ipv4Body.setAttribute("aria-hidden", on ? "false" : "true");
   }
 
   function syncIpv6Body() {
     if (!els.ipv6Cb || !els.ipv6Body) return;
-    var on = els.ipv6Cb.checked;
+    let on = els.ipv6Cb.checked;
     els.ipv6Body.hidden = !on;
     els.ipv6Body.setAttribute("aria-hidden", on ? "false" : "true");
     if (on) {
@@ -839,7 +839,7 @@
 
   function syncAdv() {
     if (!els.advBody || !els.advToggle) return;
-    var open = els.advToggle.getAttribute("aria-expanded") === "true";
+    let open = els.advToggle.getAttribute("aria-expanded") === "true";
     els.advBody.hidden = !open;
     els.advBody.setAttribute("aria-hidden", open ? "false" : "true");
   }
@@ -848,7 +848,7 @@
     root.hidden = false;
     root.setAttribute("aria-hidden", "false");
     document.body.classList.add("gc-if-flyout--open");
-    var panel = root.querySelector(".gc-if-flyout__panel");
+    let panel = root.querySelector(".gc-if-flyout__panel");
     if (panel) {
       try {
         panel.focus();
@@ -867,11 +867,11 @@
   }
 
   function syncBridgeAddTargetRows() {
-    var fwRow = document.getElementById("gc-bridge-flyout-target-fw-row");
-    var cfgRow = document.getElementById("gc-bridge-flyout-target-cfg-row");
-    var target = typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
-    var showFw = !!(addMode && target === "firewall" && fwRow);
-    var showCfg = !!(addMode && target === "configuration" && cfgRow);
+    let fwRow = document.getElementById("gc-bridge-flyout-target-fw-row");
+    let cfgRow = document.getElementById("gc-bridge-flyout-target-cfg-row");
+    let target = typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
+    let showFw = !!(addMode && target === "firewall" && fwRow);
+    let showCfg = !!(addMode && target === "configuration" && cfgRow);
     if (fwRow) {
       fwRow.hidden = !showFw;
       fwRow.setAttribute("aria-hidden", showFw ? "false" : "true");
@@ -884,7 +884,7 @@
 
   function fillBridgeAddTargetSelect(target) {
     if (target === "firewall" && els.addFwSelect) {
-      var inv = typeof window.gcGetFirewallNavInventory === "function" ? window.gcGetFirewallNavInventory() : [];
+      let inv = typeof globalThis.gcGetFirewallNavInventory === "function" ? globalThis.gcGetFirewallNavInventory() : [];
       els.addFwSelect.innerHTML =
         '<option value="">Select firewall…</option>' +
         inv
@@ -895,8 +895,8 @@
       els.addFwSelect.value = "";
     }
     if (target === "configuration" && els.addCfgSelect) {
-      var inv2 =
-        typeof window.gcGetConfigurationNavInventory === "function" ? window.gcGetConfigurationNavInventory() : [];
+      let inv2 =
+        typeof globalThis.gcGetConfigurationNavInventory === "function" ? globalThis.gcGetConfigurationNavInventory() : [];
       els.addCfgSelect.innerHTML =
         '<option value="">Select configuration…</option>' +
         inv2
@@ -910,16 +910,16 @@
 
   function applyBridgeAddScopeFromSelectors() {
     if (!addMode) return;
-    var target = typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
+    let target = typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
     memberScopeRequired = true;
     if (target === "firewall") {
-      var fv = els.addFwSelect ? els.addFwSelect.value.trim() : "";
-      var fn = parseInt(fv, 10);
+      let fv = els.addFwSelect ? els.addFwSelect.value.trim() : "";
+      let fn = parseInt(fv, 10);
       memberScopeFw = fv && !isNaN(fn) && fn > 0 ? fn : undefined;
       memberScopeCfg = undefined;
     } else {
-      var cv = els.addCfgSelect ? els.addCfgSelect.value.trim() : "";
-      var cn = parseInt(cv, 10);
+      let cv = els.addCfgSelect ? els.addCfgSelect.value.trim() : "";
+      let cn = parseInt(cv, 10);
       memberScopeCfg = cv && !isNaN(cn) && cn > 0 ? cn : undefined;
       memberScopeFw = undefined;
     }
@@ -940,7 +940,7 @@
       row && row.configuration_id != null && row.configuration_id !== "" ? Number(row.configuration_id) : undefined;
     syncBridgeAddTargetRows();
     currentNetRow = row || null;
-    var raw = (row && row.raw_payload) || {};
+    let raw = (row && row.raw_payload) || {};
     currentRaw = raw;
     routingKeyUsed = detectRoutingKey(raw);
     if (els.title) els.title.textContent = "Edit bridge pair";
@@ -949,7 +949,7 @@
     if (els.hwInp) els.hwInp.value = pick(raw, ["Hardware"]) || String((row && row.cells && row.cells.__hardware) || "").trim();
     if (els.descInp) els.descInp.value = pick(raw, ["Description"]);
 
-    var rt = truthyRaw(raw, [
+    let rt = truthyRaw(raw, [
       routingKeyUsed,
       "RoutingOnBridgePair",
       "EnableRoutingOnBridge",
@@ -960,18 +960,18 @@
 
     renderMemberRows(resolveMemberRowsForEdit(row, raw));
 
-    var v4 = normLower(pick(raw, ["IPv4Assignment", "AddressType", "IPv4AddressType"]));
+    let v4 = normLower(pick(raw, ["IPv4Assignment", "AddressType", "IPv4AddressType"]));
     if (els.ipv4Dhcp) els.ipv4Dhcp.checked = v4.indexOf("dhcp") !== -1;
     if (els.ipv4Static) els.ipv4Static.checked = v4.indexOf("dhcp") === -1;
     if (els.ipv4Ip) els.ipv4Ip.value = pick(raw, ["IPAddress", "IPv4Address"]);
     if (els.ipv4Nm) {
-      els.ipv4Nm.value = window.gcNetIpv4FlyoutBlur.netmaskToDisplay(pick(raw, ["Netmask", "IPv4Netmask"]));
+      els.ipv4Nm.value = globalThis.gcNetIpv4FlyoutBlur.netmaskToDisplay(pick(raw, ["Netmask", "IPv4Netmask"]));
     }
-    var hasV4 = !!(pick(raw, ["IPAddress"]) || v4);
+    let hasV4 = !!(pick(raw, ["IPAddress"]) || v4);
     if (els.ipv4Cb) els.ipv4Cb.checked = hasV4 || truthyRaw(raw, ["IPv4Enabled"]) === true;
     syncIpv4Body();
 
-    var v6 = guessBridgeIpv6Mode(raw);
+    let v6 = guessBridgeIpv6Mode(raw);
     if (els.ipv6ModeStatic) els.ipv6ModeStatic.checked = v6 === "static";
     if (els.ipv6ModeDhcp) els.ipv6ModeDhcp.checked = v6 === "dhcp";
     if (els.ipv6ModeDel) els.ipv6ModeDel.checked = v6 === "delegated";
@@ -983,8 +983,8 @@
     if (els.ipv6GwIp) {
       els.ipv6GwIp.value = pick(raw, ["GatewayIPv6", "IPv6Gateway", "IPv6_Gateway", "IPv6DefaultGateway"]);
     }
-    var v6OnExplicit = truthyRaw(raw, ["IPv6Enabled"]);
-    var hasV6Addr = !!(pick(raw, ["IPv6Address", "IPv6_Address"]) || "").trim();
+    let v6OnExplicit = truthyRaw(raw, ["IPv6Enabled"]);
+    let hasV6Addr = !!(pick(raw, ["IPv6Address", "IPv6_Address"]) || "").trim();
     if (els.ipv6Cb) {
       els.ipv6Cb.checked = v6OnExplicit === true || (v6OnExplicit !== false && hasV6Addr);
     }
@@ -994,14 +994,14 @@
     if (els.vlanIdsInp) els.vlanIdsInp.value = pick(raw, ["PermittedVLANIDs", "PermittedVLANId", "VLANPermitted"]);
 
     if (els.arpCb) {
-      var arp = truthyRaw(raw, ["PermitArpBroadcast", "ARPBroadcast"]);
+      let arp = truthyRaw(raw, ["PermitArpBroadcast", "ARPBroadcast"]);
       els.arpCb.checked = arp !== false;
     }
     if (els.stpCb) els.stpCb.checked = truthyRaw(raw, ["EnableSTP", "STPEnabled", "SpanningTree"]) === true;
     if (els.stpMaxInp) els.stpMaxInp.value = pick(raw, ["STPMaxAge", "STPMaxAgeSeconds", "MAXAge"]) || "20";
     if (els.macAgingInp) els.macAgingInp.value = pick(raw, ["MACAging", "MacAgingSeconds"]) || "300";
     if (els.mtuInp) els.mtuInp.value = pick(raw, ["MTU"]) || "1500";
-    var mssOv = bridgeMssOverrideEnabled(raw);
+    let mssOv = bridgeMssOverrideEnabled(raw);
     if (els.mssCb)
       els.mssCb.checked =
         mssOv === true || (mssOv === null && truthyRaw(raw, ["OverrideMSS", "MSSOverride"]) === true);
@@ -1020,7 +1020,7 @@
     memberScopeRequired = true;
     memberScopeFw = undefined;
     memberScopeCfg = undefined;
-    var target = typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
+    let target = typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
     syncBridgeAddTargetRows();
     fillBridgeAddTargetSelect(target);
     if (els.title) els.title.textContent = "Add bridge pair";
@@ -1053,17 +1053,17 @@
   }
 
   function bindPanelResize(root) {
-    var panel = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let panel = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!panel || !handle || handle.dataset.gcBridgeResizeBound === "1") return;
     handle.dataset.gcBridgeResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = panel.getBoundingClientRect().width;
-      var maxW = Math.min(900, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = panel.getBoundingClientRect().width;
+      let maxW = Math.min(900, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(320, Math.min(maxW, w));
         panel.style.width = w + "px";
       }
@@ -1130,15 +1130,15 @@
 
     if (els.membersTbody) {
       els.membersTbody.addEventListener("change", function (e) {
-        var t = e.target;
+        let t = e.target;
         if (!t || typeof t.matches !== "function") return;
         if (!t.matches(".gc-bridge-flyout__member-if, .gc-bridge-flyout__member-zone")) return;
-        var tr = t.closest("tr[data-gc-bridge-member-row]");
+        let tr = t.closest("tr[data-gc-bridge-member-row]");
         if (!tr) return;
-        var isBlank = tr.getAttribute("data-gc-bridge-member-blank") === "1";
-        var si = tr.querySelector(".gc-bridge-flyout__member-if");
-        var sz = tr.querySelector(".gc-bridge-flyout__member-zone");
-        var has = (si && si.value.trim()) || (sz && sz.value.trim());
+        let isBlank = tr.dataset.gcBridgeMemberBlank === "1";
+        let si = tr.querySelector(".gc-bridge-flyout__member-if");
+        let sz = tr.querySelector(".gc-bridge-flyout__member-zone");
+        let has = (si && si.value.trim()) || (sz && sz.value.trim());
         if (isBlank && has) {
           renderMemberRows(readMembersFromDom().filter(memberRowHasValue));
           syncDirty();
@@ -1157,12 +1157,12 @@
     if (els.ipv4Cb) els.ipv4Cb.addEventListener("change", syncIpv4Body);
     if (els.ipv4Ip) {
       els.ipv4Ip.addEventListener("blur", function () {
-        window.gcNetIpv4FlyoutBlur.applyCidrSplit(els, syncDirty);
+        globalThis.gcNetIpv4FlyoutBlur.applyCidrSplit(els, syncDirty);
       });
     }
     if (els.ipv4Nm) {
       els.ipv4Nm.addEventListener("blur", function () {
-        window.gcNetIpv4FlyoutBlur.applyNetmaskNormalize(els, syncDirty);
+        globalThis.gcNetIpv4FlyoutBlur.applyNetmaskNormalize(els, syncDirty);
       });
     }
 
@@ -1193,7 +1193,7 @@
 
     if (els.advToggle) {
       els.advToggle.addEventListener("click", function () {
-        var open = els.advToggle.getAttribute("aria-expanded") === "true";
+        let open = els.advToggle.getAttribute("aria-expanded") === "true";
         els.advToggle.setAttribute("aria-expanded", open ? "false" : "true");
         syncAdv();
       });
@@ -1212,10 +1212,10 @@
         e.preventDefault();
         if (els.saveBtn && els.saveBtn.disabled) return;
 
-        var target =
-          typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
-        var rowBr = currentNetRow;
-        var isCfg =
+        let target =
+          typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
+        let rowBr = currentNetRow;
+        let isCfg =
           target === "configuration" ||
           !!(
             rowBr &&
@@ -1223,12 +1223,12 @@
           );
 
         if (addMode) {
-          var createUrl = isCfg
-            ? typeof window.gcNetBridgePairApplyCreateUrl === "string"
-              ? window.gcNetBridgePairApplyCreateUrl
+          let createUrl = isCfg
+            ? typeof globalThis.gcNetBridgePairApplyCreateUrl === "string"
+              ? globalThis.gcNetBridgePairApplyCreateUrl
               : ""
-            : typeof window.gcNetBridgePairEnqueueCreateUrl === "string"
-              ? window.gcNetBridgePairEnqueueCreateUrl
+            : typeof globalThis.gcNetBridgePairEnqueueCreateUrl === "string"
+              ? globalThis.gcNetBridgePairEnqueueCreateUrl
               : "";
           if (!createUrl) {
             alert(
@@ -1239,19 +1239,19 @@
             return;
           }
           if (isCfg) {
-            var cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
+            let cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
             if (!els.addCfgSelect || !els.addCfgSelect.value.trim() || isNaN(cfgIdSel) || cfgIdSel <= 0) {
               alert("Select a configuration.");
               return;
             }
           } else {
-            var fwIdSel = els.addFwSelect ? parseInt(els.addFwSelect.value.trim(), 10) : NaN;
+            let fwIdSel = els.addFwSelect ? parseInt(els.addFwSelect.value.trim(), 10) : NaN;
             if (!els.addFwSelect || !els.addFwSelect.value.trim() || isNaN(fwIdSel) || fwIdSel <= 0) {
               alert("Select a firewall.");
               return;
             }
           }
-          var hw = els.hwInp ? els.hwInp.value.trim() : "";
+          let hw = els.hwInp ? els.hwInp.value.trim() : "";
           if (!hw) {
             alert("Hardware name is required.");
             return;
@@ -1266,22 +1266,22 @@
             );
             return;
           }
-          var nm = els.nameInp ? els.nameInp.value.trim() : "";
+          let nm = els.nameInp ? els.nameInp.value.trim() : "";
           if (nm.length > 58) {
             alert("Name must be at most 58 characters.");
             return;
           }
-          var dsc = els.descInp ? els.descInp.value.trim() : "";
+          let dsc = els.descInp ? els.descInp.value.trim() : "";
           if (dsc.length > 100) {
             alert("Description must be at most 100 characters.");
             return;
           }
-          var mems = readMembersFromDom().filter(memberRowHasValue);
+          let mems = readMembersFromDom().filter(memberRowHasValue);
           if (mems.length < 2) {
             alert("Add at least two member interfaces, each with a zone.");
             return;
           }
-          for (var mi = 0; mi < mems.length; mi++) {
+          for (let mi = 0; mi < mems.length; mi++) {
             if (!mems[mi].iface || !mems[mi].zone) {
               alert("Each member needs an interface and a zone.");
               return;
@@ -1294,10 +1294,10 @@
             syncDirty();
           }
           function runBridgePairCreateRequest(force) {
-            var payloadObj = isCfg
+            let payloadObj = isCfg
               ? { configuration_id: cfgIdSel, form: collectBridgeForm() }
               : (function () {
-                  var o = { firewall_id: fwIdSel, form: collectBridgeForm() };
+                  let o = { firewall_id: fwIdSel, form: collectBridgeForm() };
                   if (force) o.force = true;
                   return o;
                 })();
@@ -1313,7 +1313,7 @@
             });
           }
           function detailMessage(j, fallback) {
-            var d = j && j.detail;
+            let d = j && j.detail;
             if (typeof d === "string") return d;
             if (d && typeof d.message === "string") return d.message;
             if (j && typeof j.message === "string") return j.message;
@@ -1322,14 +1322,14 @@
           runBridgePairCreateRequest(false)
             .then(function (x) {
               if (!x.ok) {
-                var d = x.j && x.j.detail;
-                var code = typeof d === "object" && d && d.code;
-                var msg = detailMessage(x.j, "Could not add bridge pair.");
+                let d = x.j && x.j.detail;
+                let code = typeof d === "object" && d && d.code;
+                let msg = detailMessage(x.j, "Could not add bridge pair.");
                 if (!isCfg && x.status === 409 && code === "bridge_pair_cache_conflict") {
-                  var q =
+                  let q =
                     msg +
                     "\n\nQueue this add anyway? Choose OK to proceed, or Cancel to stop.";
-                  if (window.confirm(q)) {
+                  if (globalThis.confirm(q)) {
                     return runBridgePairCreateRequest(true).then(function (x2) {
                       if (!x2.ok) {
                         finishBridgePairCreateError(detailMessage(x2.j, "Could not add bridge pair."));
@@ -1357,14 +1357,14 @@
           return;
         }
 
-        var url = isCfg
-          ? typeof window.gcNetBridgePairApplyUrl === "string"
-            ? window.gcNetBridgePairApplyUrl
+        let url = isCfg
+          ? typeof globalThis.gcNetBridgePairApplyUrl === "string"
+            ? globalThis.gcNetBridgePairApplyUrl
             : ""
-          : typeof window.gcNetBridgePairEnqueueUrl === "string"
-            ? window.gcNetBridgePairEnqueueUrl
+          : typeof globalThis.gcNetBridgePairEnqueueUrl === "string"
+            ? globalThis.gcNetBridgePairEnqueueUrl
             : "";
-        var cid = currentNetRow && currentNetRow.config_entry_id;
+        let cid = currentNetRow && currentNetRow.config_entry_id;
         if (!url || cid == null) {
           alert(
             isCfg
@@ -1373,7 +1373,7 @@
           );
           return;
         }
-        var payload = JSON.stringify({
+        let payload = JSON.stringify({
           config_entry_id: cid,
           form: collectBridgeForm(),
         });
@@ -1391,7 +1391,7 @@
           })
           .then(function (x) {
             if (!x.ok) {
-              var msg =
+              let msg =
                 (x.j && (x.j.detail || x.j.message)) ||
                 (isCfg ? "Could not save configuration." : "Could not save to task queue.");
               alert(typeof msg === "string" ? msg : JSON.stringify(msg));
@@ -1411,24 +1411,24 @@
     }
   }
 
-  window.gcNetBridgePairFlyoutInit = function () {
-    var root = document.getElementById("gc-net-bridge-pair-flyout");
+  globalThis.gcNetBridgePairFlyoutInit = function () {
+    let root = document.getElementById("gc-net-bridge-pair-flyout");
     if (!root) return;
     bind(root);
   };
 
-  window.gcNetBridgePairFlyoutOpenFromTr = function (tr) {
-    var row = tr && tr._gcNetRow;
+  globalThis.gcNetBridgePairFlyoutOpenFromTr = function (tr) {
+    let row = tr && tr._gcNetRow;
     if (!row || row.entity_type !== "bridge_pair") return;
-    var root = document.getElementById("gc-net-bridge-pair-flyout");
+    let root = document.getElementById("gc-net-bridge-pair-flyout");
     if (!root) return;
     bind(root);
     populateFromRow(row);
     open(root);
   };
 
-  window.gcNetBridgePairFlyoutOpenAdd = function () {
-    var root = document.getElementById("gc-net-bridge-pair-flyout");
+  globalThis.gcNetBridgePairFlyoutOpenAdd = function () {
+    let root = document.getElementById("gc-net-bridge-pair-flyout");
     if (!root) return;
     bind(root);
     populateAdd();

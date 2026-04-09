@@ -5,13 +5,16 @@ from __future__ import annotations
 import json
 
 import pytest
+from starlette.exceptions import HTTPException
 from starlette.responses import StreamingResponse
 
 from app.models import Firewall
 from app.webadmin_proxy import (
     _apply_response_header_list,
+    _normalized_proxy_path,
     _rewrite_forwarded_origin_or_referer,
     _rewrite_set_cookie_for_proxy,
+    _upstream_target_url,
     try_auto_login_webadmin,
 )
 from app.webadmin_proxy_log import (
@@ -151,6 +154,25 @@ async def test_try_auto_login_webadmin_skips_non_get():
     fw = Firewall(id=1, host="fw.example", port=4444, username="admin", verify_ssl=False)
     out = await try_auto_login_webadmin(req, fw, username="admin", password="pw")
     assert out is None
+
+
+def test_normalized_proxy_path_collapses_and_rejects_traversal():
+    assert _normalized_proxy_path("webconsole/index.jsp") == "/webconsole/index.jsp"
+    assert _normalized_proxy_path("webconsole/") == "/webconsole/"
+    assert _normalized_proxy_path("/a/./b//c") == "/a/b/c"
+    assert _normalized_proxy_path("") == "/"
+    with pytest.raises(HTTPException) as exc:
+        _normalized_proxy_path("x/../y")
+    assert exc.value.status_code == 400
+
+
+def test_upstream_target_url_joins_base_without_raw_concat():
+    base = "https://fw.example:4444"
+    assert _upstream_target_url(base, "webconsole/", "") == "https://fw.example:4444/webconsole/"
+    assert _upstream_target_url(base, "/", "") == "https://fw.example:4444/"
+    assert (
+        _upstream_target_url(base, "a", "x=1") == "https://fw.example:4444/a?x=1"
+    )
 
 
 def test_append_webadmin_proxy_record_writes_jsonl(tmp_path, monkeypatch):

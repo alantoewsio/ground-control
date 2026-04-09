@@ -588,6 +588,32 @@ def _migrate_postgres_ipam_pool_unmanaged() -> None:
         )
 
 
+def _migrate_postgres_ref_countries_code_width() -> None:
+    """Widen PK: backups from Sophos can contain country identifiers longer than varchar(8)."""
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("ref_countries"):
+        return
+    with _engine.begin() as conn:
+        cur = conn.execute(
+            text(
+                "SELECT character_maximum_length FROM information_schema.columns "
+                "WHERE table_schema = current_schema() AND table_name = 'ref_countries' "
+                "AND column_name = 'code'"
+            )
+        ).scalar()
+        if cur is None:
+            return
+        try:
+            n = int(cur)
+        except (TypeError, ValueError):
+            return
+        if n >= 64:
+            return
+        conn.execute(text("ALTER TABLE ref_countries ALTER COLUMN code TYPE VARCHAR(64)"))
+
+
 def _migrate_sqlite_ipam_prefix_name() -> None:
     url = config.database_url()
     if not url.startswith("sqlite"):
@@ -623,6 +649,7 @@ def init_db() -> None:
     _migrate_postgres_ipam_cidr_vrf_unique()
     _migrate_sqlite_ipam_pool_unmanaged()
     _migrate_postgres_ipam_pool_unmanaged()
+    _migrate_postgres_ref_countries_code_width()
     _seed_default_ipam_vrf()
 
 

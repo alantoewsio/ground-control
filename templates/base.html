@@ -14,7 +14,7 @@
       'app_name': 'Ground Control',
       'project_name': '',
       'description': '',
-      'app_version': '0.3.0',
+      'app_version': '0.3.3',
       'license': 'See the project repository for licensing information.',
     } %}
     {% if auth_client_state is defined %}
@@ -598,6 +598,27 @@
     </div>
 
     <div id="settings-modal" class="settings-modal" hidden aria-hidden="true">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="0"
+        height="0"
+        class="settings-modal__svg-sprite"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <symbol id="icon-settings-external-warning" viewBox="0 0 24 24">
+          <path
+            fill="#FACC15"
+            stroke="#EAB308"
+            stroke-width="2"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            d="M12 3.5 L20.75 18.9 H3.25 L12 3.5 z"
+          />
+          <path fill="none" stroke="#713F12" stroke-width="1.9" stroke-linecap="round" d="M12 9.35v5.55" />
+          <circle cx="12" cy="17.42" r="0.88" fill="#713F12" />
+        </symbol>
+      </svg>
       <div class="settings-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
       <div class="settings-modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
         <div class="settings-modal__layout">
@@ -640,6 +661,48 @@
                     />
                   </svg>
                   <span>Security</span>
+                </button>
+                <button
+                  type="button"
+                  class="settings-nav__item"
+                  id="settings-nav-letsencrypt"
+                  data-settings-section="letsencrypt"
+                >
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l6.9 3.06v4.15c0 3.83-2.69 7.43-6.9 8.87-4.21-1.44-6.9-5.04-6.9-8.87V6.24L12 3.18zM11 7h2v6h-2V7zm0 8h2v2h-2v-2z"
+                    />
+                  </svg>
+                  <span>Let’s Encrypt</span>
+                </button>
+                <button
+                  type="button"
+                  class="settings-nav__item"
+                  id="settings-nav-data-management"
+                  data-settings-section="data-management"
+                >
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2zm12 3v-4h2v2h2v2h-4zm-2-6c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"
+                    />
+                  </svg>
+                  <span>Data Management</span>
+                </button>
+                <button
+                  type="button"
+                  class="settings-nav__item"
+                  id="settings-nav-backup"
+                  data-settings-section="backup"
+                >
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05zM13 9V3H5v18h14v-8h-6zm-2-4h2v2h-2V5zm0 4h2v2h-2V9zm0 4h2v2h-2v-2z"
+                    />
+                  </svg>
+                  <span>Backup</span>
                 </button>
                 <button type="button" class="settings-nav__item" id="settings-nav-test" data-settings-section="test">
                   <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -777,10 +840,38 @@
                     <h4 class="settings-security__subhead">Server binding</h4>
                     <label class="settings-form__field settings-form__field--inline">
                       <input type="checkbox" name="http_enabled" id="settings-security-http-enabled" checked />
-                      <span class="settings-form__label settings-form__label--inline">Enable HTTP</span>
+                      <span class="settings-form__label settings-form__label--inline settings-form__label--with-warn">
+                        <span class="settings-form__label-text">Enable HTTP</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="http_enabled"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                     </label>
                     <label class="settings-form__field">
-                      <span class="settings-form__label">HTTP port</span>
+                      <span class="settings-form__label settings-form__label--with-warn">
+                        <span class="settings-form__label-text">HTTP port</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="http_port"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                       <input
                         type="number"
                         name="http_port"
@@ -798,7 +889,21 @@
                       <code class="settings-about__code">PORT</code>.
                     </span>
                     <label class="settings-form__field">
-                      <span class="settings-form__label">Listening interface</span>
+                      <span class="settings-form__label settings-form__label--with-warn">
+                        <span class="settings-form__label-text">Listening interface</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="listen_interface"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                       <select name="listen_interface" id="settings-security-listen-interface" class="settings-form__input">
                         <option value="0.0.0.0">All interfaces (0.0.0.0)</option>
                         <option value="::">All interfaces IPv6 (::)</option>
@@ -807,7 +912,21 @@
                       </select>
                     </label>
                     <label class="settings-form__field">
-                      <span class="settings-form__label">Allowed network ranges</span>
+                      <span class="settings-form__label settings-form__label--with-warn">
+                        <span class="settings-form__label-text">Allowed network ranges</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="allowed_ranges"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                       <textarea
                         name="allowed_ranges"
                         id="settings-security-allowed-ranges"
@@ -822,29 +941,81 @@
                   <div class="settings-security__section">
                     <h4 class="settings-security__subhead">HTTPS</h4>
                     <div id="settings-security-cert-summary-box" class="settings-security__cert-summary-box">
-                      <span class="settings-form__label">Current TLS certificate</span>
-                      <p class="settings-security__cert-summary-text muted" id="settings-security-cert-summary">
-                        Loading…
-                      </p>
-                      <button
-                        type="button"
-                        class="btn btn--secondary"
-                        id="settings-security-download-public-cert"
-                        disabled
-                      >
-                        Download public certificate (PEM)
-                      </button>
-                      <p class="settings-security__hint muted" id="settings-security-download-cert-hint" hidden>
-                        For a self-signed certificate, import this file as a trusted root (CA) in your operating system or
-                        browser so HTTPS connections are accepted without warnings.
-                      </p>
+                      <span class="settings-form__label">TLS certificates on disk</span>
+                      <p class="settings-security__hint muted settings-security__cert-active-hint" id="settings-security-active-cert-hint" hidden></p>
+                      <div class="settings-security__cert-split">
+                        <div class="settings-security__cert-split-col" id="settings-security-cert-col-self">
+                          <span class="settings-security__active-pill" id="settings-security-active-pill-self" hidden>ACTIVE</span>
+                          <span class="settings-security__cert-split-title">Self-signed</span>
+                          <p class="settings-security__cert-summary-text muted" id="settings-security-cert-self-summary">
+                            Loading…
+                          </p>
+                          <p class="settings-security__hint muted" id="settings-security-self-chain-hint" hidden></p>
+                          <button
+                            type="button"
+                            class="btn btn--secondary"
+                            id="settings-security-download-self-chain"
+                            disabled
+                          >
+                            Download PEM (full chain)
+                          </button>
+                          <p class="settings-security__hint muted" id="settings-security-self-trust-hint" hidden>
+                            Import the PEM as a trusted certificate (or root) in your OS or browser so clients accept this
+                            self-signed identity.
+                          </p>
+                        </div>
+                        <div class="settings-security__cert-split-col" id="settings-security-cert-col-le">
+                          <span class="settings-security__active-pill" id="settings-security-active-pill-le" hidden>ACTIVE</span>
+                          <span class="settings-security__cert-split-title">Let’s Encrypt</span>
+                          <p class="settings-security__cert-summary-text muted" id="settings-security-cert-le-summary">
+                            Loading…
+                          </p>
+                          <p class="settings-security__hint muted" id="settings-security-le-chain-hint" hidden></p>
+                          <button
+                            type="button"
+                            class="btn btn--secondary"
+                            id="settings-security-download-le-chain"
+                            disabled
+                          >
+                            Download PEM (full chain)
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <label class="settings-form__field settings-form__field--inline">
                       <input type="checkbox" name="https_enabled" id="settings-security-https-enabled" checked />
-                      <span class="settings-form__label settings-form__label--inline">Enable HTTPS</span>
+                      <span class="settings-form__label settings-form__label--inline settings-form__label--with-warn">
+                        <span class="settings-form__label-text">Enable HTTPS</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="https_enabled"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                     </label>
                     <label class="settings-form__field">
-                      <span class="settings-form__label">HTTPS port</span>
+                      <span class="settings-form__label settings-form__label--with-warn">
+                        <span class="settings-form__label-text">HTTPS port</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="https_port"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                       <input
                         type="number"
                         name="https_port"
@@ -861,91 +1032,169 @@
                     </span>
                     <label class="settings-form__field settings-form__field--inline">
                       <input type="checkbox" name="redirect_http" id="settings-security-redirect-http" checked />
-                      <span class="settings-form__label settings-form__label--inline">Redirect HTTP to HTTPS</span>
+                      <span class="settings-form__label settings-form__label--inline settings-form__label--with-warn">
+                        <span class="settings-form__label-text">Redirect HTTP to HTTPS</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="redirect_http_to_https"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
                     </label>
                     <div id="settings-security-tls-block" class="settings-security__tls-block" hidden>
                       <label class="settings-form__field">
-                        <span class="settings-form__label">TLS hostname</span>
-                        <input
-                          type="text"
-                          name="tls_hostname"
-                          id="settings-security-tls-hostname"
-                          class="settings-form__input"
-                          value="localhost"
-                          placeholder="e.g. localhost or groundcontrol.example.com"
+                        <span class="settings-form__label settings-form__label--with-warn">
+                          <span class="settings-form__label-text">Hostnames</span>
+                          <span
+                            class="settings-field-external-src"
+                            hidden
+                            data-security-field-source="tls_hostnames"
+                            role="img"
+                            tabindex="0"
+                            aria-label=""
+                          >
+                            <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                              <use href="#icon-settings-external-warning" />
+                            </svg>
+                          </span>
+                        </span>
+                        <textarea
+                          name="tls_hostnames"
+                          id="settings-security-tls-hostnames"
+                          class="settings-form__input settings-form__textarea"
+                          rows="5"
                           spellcheck="false"
-                        />
+                          placeholder="One domain per line. First name is the certificate primary name; others are added as subject alternative names.&#10;example.com&#10;www.example.com"
+                        >localhost</textarea>
                       </label>
-                      <p class="settings-security__hint muted">Certificate source</p>
+                      <p class="settings-security__hint muted settings-security__cert-source-row">
+                        <span>Certificate source</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="cert_source"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </p>
                       <div class="settings-security__cert-methods" role="radiogroup" aria-label="Certificate source">
                         <label class="settings-security__radio-line">
                           <input type="radio" name="cert_method" value="self_signed" checked />
                           <span>Self-signed (generate on this server)</span>
                         </label>
-                        <label class="settings-security__radio-line">
-                          <input type="radio" name="cert_method" value="letsencrypt_http" />
-                          <span>Let’s Encrypt (HTTP-01 validation)</span>
-                        </label>
-                        <label class="settings-security__radio-line">
-                          <input type="radio" name="cert_method" value="letsencrypt_dns" />
-                          <span>Let’s Encrypt (DNS validation)</span>
+                        <label class="settings-security__radio-line settings-security__radio-line--le">
+                          <input type="radio" name="cert_method" value="letsencrypt" id="settings-security-cert-le-radio" />
+                          <span>Let’s Encrypt (Certbot)</span>
                         </label>
                       </div>
+                      <p class="settings-security__hint muted" id="settings-security-le-hint" hidden>
+                        Configure Certbot on the
+                        <button type="button" class="link-btn" id="settings-security-goto-le">Let’s Encrypt</button>
+                        settings page first. HTTP or DNS validation is chosen there.
+                      </p>
                       <div id="settings-security-cert-self" class="settings-security__cert-panel">
                         <p class="settings-security__hint muted">
-                          Creates a local certificate for the hostname above. Browsers will show a warning until the
+                          Creates a local certificate for the hostnames above. Browsers will show a warning until the
                           certificate is trusted or replaced.
                         </p>
                         <button type="button" class="btn btn--secondary" id="settings-security-gen-self-signed">
                           Generate certificate
                         </button>
                       </div>
-                      <div id="settings-security-cert-lehttp" class="settings-security__cert-panel" hidden>
+                      <div id="settings-security-cert-le" class="settings-security__cert-panel" hidden>
                         <p class="settings-security__hint muted">
-                          Requests a certificate from Let’s Encrypt using HTTP-01. Port 80 must reach this host, or a
-                          reverse proxy must complete the challenge.
+                          Obtains a certificate with Certbot using the validation method configured on the Let’s Encrypt
+                          page. This host must be reachable for HTTP-01, or your DNS plugin must be able to publish
+                          TXT records.
                         </p>
-                        <button type="button" class="btn btn--secondary" id="settings-security-fetch-le-http">
-                          Fetch Let’s Encrypt certificate
+                        <button type="button" class="btn btn--secondary" id="settings-security-obtain-le">
+                          Obtain Let’s Encrypt certificate
                         </button>
                       </div>
-                      <div id="settings-security-cert-ledns" class="settings-security__cert-panel" hidden>
-                        <p class="settings-security__hint muted">
-                          Use when HTTP-01 is not possible. You will add a DNS TXT record at your provider, then confirm
-                          issuance here.
-                        </p>
-                        <ol class="settings-security__dns-steps">
-                          <li>
-                            <span class="settings-security__step-label">DNS provider API</span>
-                            <label class="settings-form__field">
-                              <span class="settings-form__label">Provider / credentials <span class="muted">(optional)</span></span>
-                              <input
-                                type="password"
-                                name="dns_api_token"
-                                id="settings-security-dns-api-token"
-                                class="settings-form__input"
-                                placeholder="API token or secret (stored securely when saved)"
-                                autocomplete="new-password"
-                              />
-                            </label>
-                          </li>
-                          <li>
-                            <span class="settings-security__step-label">Request challenge</span>
-                            <button type="button" class="btn btn--secondary" id="settings-security-dns-request">
-                              Start DNS challenge
-                            </button>
-                            <div id="settings-security-dns-txt-hint" class="settings-security__dns-record" hidden>
-                              <p class="settings-security__hint muted">Add this TXT record at your DNS host:</p>
-                              <pre class="settings-security__pre" id="settings-security-dns-txt-placeholder" aria-live="polite"></pre>
-                            </div>
-                          </li>
-                          <li>
-                            <span class="settings-security__step-label">Verify and issue</span>
-                            <button type="button" class="btn btn--secondary" id="settings-security-dns-verify">
-                              Verify DNS and issue certificate
-                            </button>
-                          </li>
-                        </ol>
+                    </div>
+                  </div>
+                </form>
+              </section>
+              <section id="settings-panel-letsencrypt" class="settings-panel" data-settings-panel="letsencrypt" hidden>
+                <h3 class="settings-panel__heading">Let’s Encrypt Settings</h3>
+                <form id="settings-le-form" class="settings-form settings-form--security" autocomplete="off">
+                  <p class="settings-form__status muted" id="settings-le-top-status" aria-live="polite"></p>
+                  <label class="settings-form__field">
+                    <span class="settings-form__label">Contact email</span>
+                    <input
+                      type="email"
+                      name="le_email"
+                      id="settings-le-email"
+                      class="settings-form__input"
+                      placeholder="admin@example.com"
+                      maxlength="320"
+                      autocomplete="email"
+                    />
+                    <span class="settings-security__hint muted">Used for Let’s Encrypt account registration and notices.</span>
+                  </label>
+                  <fieldset class="settings-form__field">
+                    <legend class="settings-form__label">Validation</legend>
+                    <label class="settings-security__radio-line">
+                      <input type="radio" name="le_validation" value="http" checked />
+                      <span>HTTP-01 (webroot on this app’s HTTP port)</span>
+                    </label>
+                    <label class="settings-security__radio-line">
+                      <input type="radio" name="le_validation" value="dns" />
+                      <span>DNS-01 (Certbot DNS plugin)</span>
+                    </label>
+                  </fieldset>
+                  <div id="settings-le-dns-block" class="settings-security__tls-block" hidden>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">DNS provider</span>
+                      <select id="settings-le-dns-plugin" class="settings-form__input" aria-label="DNS provider plugin"></select>
+                    </label>
+                    <div id="settings-le-dns-fields" class="settings-le-dns-fields"></div>
+                  </div>
+                  <div class="settings-security__section">
+                    <h4 class="settings-security__subhead">Dry run</h4>
+                    <p class="settings-panel__lead muted">
+                      Run
+                      <code class="settings-about__code">certbot certonly --dry-run</code>
+                      for a single test hostname to verify validation (HTTP or DNS) before issuing a real certificate on
+                      the Security tab.
+                    </p>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">Test domain</span>
+                      <input
+                        type="text"
+                        id="settings-le-test-domain"
+                        class="settings-form__input"
+                        placeholder="e.g. acme-test.example.com"
+                        spellcheck="false"
+                        maxlength="253"
+                      />
+                    </label>
+                    <button type="button" class="btn btn--secondary" id="settings-le-test-run">Run dry run test</button>
+                    <pre class="settings-security__pre settings-le-test-log" id="settings-le-test-log" hidden></pre>
+                  </div>
+                  <div class="settings-le-queue" id="settings-le-queue" aria-label="Certbot queue status">
+                    <h4 class="settings-security__subhead">Certbot queue</h4>
+                    <p class="muted settings-le-queue__idle" id="settings-le-queue-idle">No Certbot jobs are running or waiting.</p>
+                    <div id="settings-le-queue-detail" class="settings-le-queue__detail" hidden>
+                      <div id="settings-le-queue-running-block" class="settings-le-queue__running" hidden>
+                        <p class="settings-le-queue__label" id="settings-le-queue-running-label"></p>
+                        <p class="muted settings-le-queue__meta" id="settings-le-queue-running-meta"></p>
+                      </div>
+                      <div id="settings-le-queue-waiting-wrap" class="settings-le-queue__waiting" hidden>
+                        <p class="settings-security__hint muted">Waiting</p>
+                        <ul id="settings-le-queue-waiting" class="settings-le-queue__list"></ul>
                       </div>
                     </div>
                   </div>
@@ -979,6 +1228,278 @@
                     <dd class="settings-about__def">{{ about.license }}</dd>
                   </div>
                 </dl>
+                <p class="muted settings-about__runtime-note">
+                  {% if gc_running_in_docker %}Running in Docker{% else %}Running natively{% endif %}
+                </p>
+              </section>
+              <section
+                id="settings-panel-data-management"
+                class="settings-panel"
+                data-settings-panel="data-management"
+                hidden
+              >
+                <h3 class="settings-panel__heading">Data Management</h3>
+                <p class="settings-panel__lead muted">
+                  Review cached firewall configuration volume, history storage, and local retention limits. Sizes are
+                  estimates from text columns (excluding indexes). Retention limits are saved locally for future use.
+                </p>
+                <h4 class="settings-security__subhead">Firewall configuration cache</h4>
+                <p class="settings-panel__lead muted">
+                  Rows in <code class="settings-about__code">firewall_config_entries</code> grouped by object type.
+                  Managed rows reference a firewall that still exists; orphaned rows reference a deleted or missing
+                  firewall (e.g. after manual database edits).
+                </p>
+                <div class="settings-dm-cache-toolbar">
+                  <button type="button" class="btn btn--secondary" id="settings-dm-cleanup-orphaned-cache">
+                    Clean up orphaned data
+                  </button>
+                </div>
+                <div class="settings-dm-table-wrap table-wrap">
+                  <div class="table-scroll">
+                    <table class="data-table data-table--dense settings-dm-cache-table" id="settings-dm-firewall-cache-table">
+                      <colgroup>
+                        <col class="settings-dm-cache-col-type" />
+                        <col class="settings-dm-cache-col-metric" />
+                        <col class="settings-dm-cache-col-metric" />
+                        <col class="settings-dm-cache-col-metric" />
+                        <col class="settings-dm-cache-col-metric" />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col" rowspan="2" class="settings-dm-cache-col-type" title="Object type">Type</th>
+                          <th scope="colgroup" colspan="2" class="settings-dm-cache-group" title="Rows for an existing firewall">
+                            Managed
+                          </th>
+                          <th
+                            scope="colgroup"
+                            colspan="2"
+                            class="settings-dm-cache-group settings-dm-cache-group--orphan"
+                            title="Rows whose firewall no longer exists"
+                          >
+                            Orphan
+                          </th>
+                        </tr>
+                        <tr>
+                          <th scope="col" class="settings-dm-col-num" title="Record count">#</th>
+                          <th scope="col" title="Approximate storage">Size</th>
+                          <th scope="col" class="settings-dm-col-num" title="Record count">#</th>
+                          <th scope="col" title="Approximate storage">Size</th>
+                        </tr>
+                      </thead>
+                      <tbody id="settings-dm-firewall-cache-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+                <h4 class="settings-security__subhead">History data</h4>
+                <p class="settings-panel__lead muted">
+                  History tables for cache updates, completed tasks, firewall syncs, and access auditing. Set caps per
+                  category and Save limits below. A daily job (04:07 UTC) deletes rows older than the max age or over the
+                  max size (oldest first for size). You can run the same cleanup immediately with Run cleanup.
+                </p>
+                <div class="settings-dm-history-toolbar">
+                  <button type="button" class="btn btn--secondary" id="settings-dm-run-history-retention">
+                    Run cleanup
+                  </button>
+                </div>
+                <div class="settings-dm-table-wrap table-wrap">
+                  <div class="table-scroll">
+                    <table class="data-table data-table--dense settings-dm-table" id="settings-data-management-table">
+                      <colgroup>
+                        <col class="settings-dm-hist-col-name" />
+                        <col class="settings-dm-hist-col-n" />
+                        <col class="settings-dm-hist-col-size" />
+                        <col class="settings-dm-hist-col-n" />
+                        <col class="settings-dm-hist-col-cap" />
+                        <col class="settings-dm-hist-col-cap" />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col" title="History category">Category</th>
+                          <th scope="col" class="settings-dm-col-num" title="Record count">#</th>
+                          <th scope="col" title="Approximate storage">Size</th>
+                          <th scope="col" class="settings-dm-col-age" title="Age of oldest row in days">Oldest</th>
+                          <th scope="col" class="settings-dm-col-limit" title="Maximum storage (mebibytes)">Cap (MiB)</th>
+                          <th scope="col" class="settings-dm-col-limit" title="Maximum age in days">Age (d)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="settings-data-management-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+                <p id="settings-dm-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+              </section>
+              <section id="settings-panel-backup" class="settings-panel" data-settings-panel="backup" hidden>
+                <h3 class="settings-panel__heading">Backup &amp; restore</h3>
+                <p class="settings-panel__lead muted">
+                  Backups are encrypted with your backup password before download or server cache. Set that password below
+                  (at least 10 characters). You can change it anytime; after a change, create a new backup so the file on
+                  disk matches the new password. Contents include firewalls, configurations, IPAM, users, credentials, TLS /
+                  Let’s Encrypt material, retention settings, histories, and monitor data (not cached firewall object
+                  snapshots).
+                </p>
+                <h4 class="settings-security__subhead">Backup password</h4>
+                <p class="settings-panel__lead muted" id="settings-backup-pw-lead">
+                  Required before you can create a backup. Stored encrypted with the app key on this server.
+                </p>
+                <p
+                  id="settings-backup-pw-unreadable"
+                  class="settings-form__status is-error"
+                  role="alert"
+                  hidden
+                >
+                  The saved backup password on this server could not be read (for example after changing
+                  <code>GROUND_CONTROL_FERNET_KEY</code>). Set the backup password again—use the same value your backups
+                  were encrypted with—then you can restore or create new backups.
+                </p>
+                <p
+                  id="settings-backup-pw-summary"
+                  class="settings-backup-pw-summary muted"
+                  hidden
+                  role="status"
+                >
+                  <span class="settings-backup-pw-summary__text">Current backup password: **********</span>
+                  <button type="button" class="link-btn" id="settings-backup-pw-change">change</button>
+                </p>
+                <div class="settings-form settings-backup-pw-form" id="settings-backup-pw-edit" hidden>
+                  <label class="settings-form__field">
+                    <span class="settings-form__label" id="settings-backup-pw-new-label">Backup password</span>
+                    <input
+                      type="password"
+                      id="settings-backup-pw-new"
+                      class="settings-form__input"
+                      minlength="10"
+                      maxlength="256"
+                      autocomplete="new-password"
+                    />
+                  </label>
+                  <label class="settings-form__field">
+                    <span class="settings-form__label">Confirm backup password</span>
+                    <input
+                      type="password"
+                      id="settings-backup-pw-confirm"
+                      class="settings-form__input"
+                      minlength="10"
+                      maxlength="256"
+                      autocomplete="new-password"
+                    />
+                  </label>
+                  <div class="settings-form__actions settings-backup__actions">
+                    <button type="button" class="btn btn--primary" id="settings-backup-pw-save">Save backup password</button>
+                    <button type="button" class="btn btn--secondary" id="settings-backup-pw-cancel" hidden>
+                      Cancel
+                    </button>
+                  </div>
+                  <p id="settings-backup-pw-form-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+                </div>
+                <div class="settings-backup__toolbar">
+                  <button type="button" class="btn btn--primary" id="settings-backup-create">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
+                      />
+                    </svg>
+                    Create backup
+                  </button>
+                  <span class="settings-backup__toolbar-spacer" aria-hidden="true"></span>
+                  <div class="settings-backup__download-group">
+                    <button type="button" class="btn btn--secondary" id="settings-backup-download" disabled>
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+                        />
+                      </svg>
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--secondary"
+                      id="settings-backup-restore-last"
+                      hidden
+                      disabled
+                    >
+                      Restore last backup
+                    </button>
+                  </div>
+                </div>
+                <p id="settings-backup-last-line" class="muted settings-backup__last-line">Last backup: Never</p>
+                <div
+                  id="settings-backup-progress"
+                  class="settings-backup-progress"
+                  role="status"
+                  aria-live="polite"
+                  aria-busy="false"
+                >
+                  <span class="settings-backup-progress__spinner" aria-hidden="true"></span>
+                  <span id="settings-backup-progress-label">Generating backup…</span>
+                </div>
+                <h4 class="settings-security__subhead">Restore from backup</h4>
+                <p class="settings-panel__lead muted">
+                  Merges backup rows into the current databases: matching primary keys are replaced with the backup
+                  version; rows that exist only locally are kept. Then TLS / Let’s Encrypt / policy files from the archive
+                  are written on top of existing files. You may need to restart the app for certificate or listen changes
+                  to apply.
+                </p>
+                <div class="settings-form__field settings-backup__restore">
+                  <label class="settings-form__label" for="settings-backup-restore-password">Restore password</label>
+                  <div class="settings-backup__pw-field-wrap">
+                    <input
+                      type="password"
+                      id="settings-backup-restore-password"
+                      class="settings-form__input settings-backup__restore-password-input"
+                      placeholder="Leave blank to use saved backup password"
+                      autocomplete="off"
+                    />
+                    <button
+                      type="button"
+                      class="settings-backup__pw-toggle"
+                      id="settings-backup-restore-password-toggle"
+                      aria-label="Show password"
+                      aria-pressed="false"
+                    >
+                      <svg
+                        class="settings-backup__pw-toggle-icon settings-backup__pw-toggle-icon--show"
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fill="currentColor"
+                          d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                        />
+                      </svg>
+                      <svg
+                        class="settings-backup__pw-toggle-icon settings-backup__pw-toggle-icon--hide"
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        aria-hidden="true"
+                        hidden
+                      >
+                        <path
+                          fill="currentColor"
+                          d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <span class="muted settings-backup__hint">Required for encrypted .gcbak files if no password is saved.</span>
+                </div>
+                <div class="settings-form__field settings-backup__restore">
+                  <label class="settings-form__label" for="settings-backup-file">Or upload a backup file (.gcbak or legacy .zip)</label>
+                  <div class="settings-backup__restore-row">
+                    <input
+                      type="file"
+                      id="settings-backup-file"
+                      accept=".gcbak,.zip,application/octet-stream,application/zip"
+                      class="settings-form__input"
+                    />
+                    <button type="button" class="btn btn--secondary" id="settings-backup-restore">Restore merge</button>
+                  </div>
+                </div>
+                <p id="settings-backup-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
               </section>
               <section id="settings-panel-test" class="settings-panel" data-settings-panel="test" hidden>
                 <h3 class="settings-panel__heading">Test Firewalls</h3>
@@ -1110,6 +1631,24 @@
               <button type="submit" form="settings-security-form" class="btn btn--primary" id="settings-security-apply">
                 Apply
               </button>
+            </footer>
+            <footer
+              id="settings-modal-letsencrypt-footer"
+              class="settings-modal__security-footer"
+              hidden
+              aria-label="Let’s Encrypt settings actions"
+            >
+              <p class="settings-modal__security-footer-status" id="settings-le-footer-status" aria-live="polite"></p>
+              <button type="button" class="btn btn--primary" id="settings-le-save">Save Let’s Encrypt settings</button>
+            </footer>
+            <footer
+              id="settings-modal-data-management-footer"
+              class="settings-modal__security-footer"
+              hidden
+              aria-label="Data management actions"
+            >
+              <p class="settings-modal__security-footer-status" id="settings-dm-footer-status" aria-live="polite"></p>
+              <button type="button" class="btn btn--primary" id="settings-dm-save">Save limits</button>
             </footer>
           </div>
         </div>

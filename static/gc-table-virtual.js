@@ -2,7 +2,7 @@
  * Virtual scrolling for large tables: only render visible rows + a buffer.
  *
  * Usage:
- *   var vs = gcTableVirtual.attach(tbody, allRowNodes, { rowHeight: 36 });
+ *   let vs = gcTableVirtual.attach(tbody, allRowNodes, { rowHeight: 36 });
  *   // later, to update the row set:
  *   vs.setRows(filteredRowNodes);
  *   // clean up:
@@ -11,22 +11,22 @@
 (function (global) {
   "use strict";
 
-  var BUFFER_ROWS = 20;
-  var DEFAULT_ROW_HEIGHT = 36;
-  var SCROLL_DEBOUNCE_MS = 16;
-  var ACTIVATION_THRESHOLD = 500;
+  let BUFFER_ROWS = 20;
+  let DEFAULT_ROW_HEIGHT = 36;
+  let SCROLL_DEBOUNCE_MS = 16;
+  let ACTIVATION_THRESHOLD = 500;
 
   function attach(tbody, allRows, opts) {
     opts = opts || {};
-    var rowHeight = opts.rowHeight || DEFAULT_ROW_HEIGHT;
-    var onVisibleChange = opts.onVisibleChange || null;
-    var scrollContainer = opts.scrollContainer || _findScrollParent(tbody);
+    let rowHeight = opts.rowHeight || DEFAULT_ROW_HEIGHT;
+    let onVisibleChange = opts.onVisibleChange || null;
+    let scrollContainer = opts.scrollContainer || _findScrollParent(tbody);
 
-    var rows = allRows || [];
-    var spacerTop = document.createElement("tr");
-    var spacerBottom = document.createElement("tr");
-    var spacerTopTd = document.createElement("td");
-    var spacerBottomTd = document.createElement("td");
+    let rows = allRows || [];
+    let spacerTop = document.createElement("tr");
+    let spacerBottom = document.createElement("tr");
+    let spacerTopTd = document.createElement("td");
+    let spacerBottomTd = document.createElement("td");
     spacerTopTd.style.padding = "0";
     spacerTopTd.style.border = "none";
     spacerBottomTd.style.padding = "0";
@@ -40,16 +40,16 @@
     spacerTop.className = "gc-virtual-spacer";
     spacerBottom.className = "gc-virtual-spacer";
 
-    var renderedStart = 0;
-    var renderedEnd = 0;
-    var active = false;
-    var destroyed = false;
-    var rafId = null;
+    let renderedStart = 0;
+    let renderedEnd = 0;
+    let active = false;
+    let destroyed = false;
+    let rafId = null;
 
     function _findScrollParent(el) {
-      var p = el ? el.parentElement : null;
+      let p = el ? el.parentElement : null;
       while (p) {
-        var ov = getComputedStyle(p).overflowY;
+        let ov = getComputedStyle(p).overflowY;
         if (ov === "auto" || ov === "scroll") return p;
         p = p.parentElement;
       }
@@ -70,21 +70,21 @@
 
       if (!active) activate();
 
-      var scrollTop = scrollContainer.scrollTop || 0;
-      var viewportH = scrollContainer.clientHeight || window.innerHeight;
-      var tbodyOffset = tbody.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollTop;
+      let scrollTop = scrollContainer.scrollTop || 0;
+      let viewportH = scrollContainer.clientHeight || globalThis.innerHeight;
+      let tbodyOffset = tbody.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollTop;
 
-      var relativeScroll = Math.max(0, scrollTop - tbodyOffset);
-      var startIdx = Math.max(0, Math.floor(relativeScroll / rowHeight) - BUFFER_ROWS);
-      var visibleCount = Math.ceil(viewportH / rowHeight) + BUFFER_ROWS * 2;
-      var endIdx = Math.min(rows.length, startIdx + visibleCount);
+      let relativeScroll = Math.max(0, scrollTop - tbodyOffset);
+      let startIdx = Math.max(0, Math.floor(relativeScroll / rowHeight) - BUFFER_ROWS);
+      let visibleCount = Math.ceil(viewportH / rowHeight) + BUFFER_ROWS * 2;
+      let endIdx = Math.min(rows.length, startIdx + visibleCount);
 
       if (startIdx === renderedStart && endIdx === renderedEnd) return;
 
-      var colCount = 1;
-      var thead = tbody.parentElement ? tbody.parentElement.querySelector("thead") : null;
+      let colCount = 1;
+      let thead = tbody.parentElement ? tbody.parentElement.querySelector("thead") : null;
       if (thead) {
-        var ths = thead.querySelectorAll("th");
+        let ths = thead.querySelectorAll("th");
         if (ths.length) colCount = ths.length;
       }
       spacerTopTd.setAttribute("colspan", String(colCount));
@@ -93,9 +93,9 @@
       spacerTop.style.height = (startIdx * rowHeight) + "px";
       spacerBottom.style.height = ((rows.length - endIdx) * rowHeight) + "px";
 
-      var frag = document.createDocumentFragment();
+      let frag = document.createDocumentFragment();
       frag.appendChild(spacerTop);
-      for (var i = startIdx; i < endIdx; i++) {
+      for (let i = startIdx; i < endIdx; i++) {
         frag.appendChild(rows[i]);
       }
       frag.appendChild(spacerBottom);
@@ -121,18 +121,18 @@
       if (active) return;
       active = true;
       scrollContainer.addEventListener("scroll", onScroll, { passive: true });
-      window.addEventListener("resize", onScroll, { passive: true });
+      globalThis.addEventListener("resize", onScroll, { passive: true });
     }
 
     function deactivate() {
       if (!active) return;
       active = false;
       scrollContainer.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      globalThis.removeEventListener("resize", onScroll);
       spacerTop.remove();
       spacerBottom.remove();
       while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
-      for (var i = 0; i < rows.length; i++) {
+      for (let i = 0; i < rows.length; i++) {
         tbody.appendChild(rows[i]);
       }
       renderedStart = 0;
@@ -176,4 +176,4 @@
     attach: attach,
     ACTIVATION_THRESHOLD: ACTIVATION_THRESHOLD,
   };
-})(window);
+})(globalThis);

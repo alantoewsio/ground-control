@@ -11,12 +11,12 @@
 (function (global) {
   "use strict";
 
-  var MAX_ENUM_DISTINCT = 50;
-  var ENUM_INNER_SEARCH_MIN = 8;
-  var TEXT_MODE_MIN_MAXLEN = 80;
-  var TEXT_MODE_DISTINCT_OVER = 55;
-  var SS_PREFIX = "gc-facet-expanded:";
-  var FILTER_VALUES_PREFIX = "gc-facet-values:";
+  let MAX_ENUM_DISTINCT = 50;
+  let ENUM_INNER_SEARCH_MIN = 8;
+  let TEXT_MODE_MIN_MAXLEN = 80;
+  let TEXT_MODE_DISTINCT_OVER = 55;
+  let SS_PREFIX = "gc-facet-expanded:";
+  let FILTER_VALUES_PREFIX = "gc-facet-values:";
 
   function ssKey(storageKey, colId) {
     return SS_PREFIX + storageKey + ":" + colId;
@@ -25,13 +25,13 @@
   function groupHasActiveFilter(group) {
     if (!group) return false;
     if (group.querySelector("input[data-gc-facet-enum]:checked")) return true;
-    var ti = group.querySelector("input[data-gc-facet-text]");
+    let ti = group.querySelector("input[data-gc-facet-text]");
     return !!(ti && (ti.value || "").trim());
   }
 
   function setGroupOpen(group, open) {
     if (!group) return;
-    var head = group.querySelector(".filter-group__head");
+    let head = group.querySelector(".filter-group__head");
     if (open) {
       group.classList.add("is-open");
       if (head) head.setAttribute("aria-expanded", "true");
@@ -44,11 +44,11 @@
   function applyFacetGroupOpenState(drawerEl, storageKey) {
     if (!drawerEl) return;
     drawerEl.querySelectorAll(".filter-group[data-gc-facet-for-col]").forEach(function (g) {
-      var col = g.getAttribute("data-gc-facet-for-col");
+      let col = g.dataset.gcFacetForCol;
       if (!col) return;
-      var suppressAuto =
-        g.getAttribute("data-gc-facet-suppress-auto-open") === "1";
-      var wantOpen = !suppressAuto && groupHasActiveFilter(g);
+      let suppressAuto =
+        g.dataset.gcFacetSuppressAutoOpen === "1";
+      let wantOpen = !suppressAuto && groupHasActiveFilter(g);
       if (!wantOpen && storageKey) {
         try {
           wantOpen = sessionStorage.getItem(ssKey(storageKey, col)) === "1";
@@ -62,9 +62,9 @@
 
   function expandFacetGroupForElement(el, storageKey) {
     if (!storageKey) return;
-    var g = el.closest(".filter-group");
+    let g = el.closest(".filter-group");
     if (!g) return;
-    var col = g.getAttribute("data-gc-facet-for-col");
+    let col = g.dataset.gcFacetForCol;
     if (!col) return;
     setGroupOpen(g, true);
     try {
@@ -75,7 +75,7 @@
   function clearExpandedSessionForDrawer(drawerEl, storageKey) {
     if (!drawerEl || !storageKey) return;
     drawerEl.querySelectorAll(".filter-group[data-gc-facet-for-col]").forEach(function (g) {
-      var col = g.getAttribute("data-gc-facet-for-col");
+      let col = g.dataset.gcFacetForCol;
       if (!col) return;
       try {
         sessionStorage.removeItem(ssKey(storageKey, col));
@@ -115,26 +115,26 @@
   }
 
   function collectClassification(cellStrings) {
-    var seen = Object.create(null);
-    var distinctList = [];
-    var maxLen = 0;
-    for (var i = 0; i < cellStrings.length; i++) {
-      var raw = normCell(cellStrings[i]);
+    let seen = Object.create(null);
+    let distinctList = [];
+    let maxLen = 0;
+    for (let i = 0; i < cellStrings.length; i++) {
+      let raw = normCell(cellStrings[i]);
       if (raw.length > maxLen) maxLen = raw.length;
-      var t = raw.trim();
-      var key = t === "" ? "\u0000" : t;
+      let t = raw.trim();
+      let key = t === "" ? "\u0000" : t;
       if (!seen[key]) {
         seen[key] = true;
         distinctList.push(t);
       }
     }
-    var n = distinctList.length;
+    let n = distinctList.length;
     if (n === 0) return { kind: "empty" };
     if (maxLen >= TEXT_MODE_MIN_MAXLEN) return { kind: "text" };
     if (n > MAX_ENUM_DISTINCT || n > TEXT_MODE_DISTINCT_OVER) return { kind: "text" };
     distinctList.sort(function (a, b) {
-      var ae = a === "" ? 1 : 0;
-      var be = b === "" ? 1 : 0;
+      let ae = a === "" ? 1 : 0;
+      let be = b === "" ? 1 : 0;
       if (ae !== be) return ae - be;
       return a.toLowerCase().localeCompare(b.toLowerCase());
     });
@@ -142,9 +142,9 @@
   }
 
   function buildFilterGroup(colId, label, cls, suppressAutoOpen) {
-    var safeCol = escapeHtml(colId);
-    var safeLabel = escapeHtml(label);
-    var suppressAttr =
+    let safeCol = escapeHtml(colId);
+    let safeLabel = escapeHtml(label);
+    let suppressAttr =
       suppressAutoOpen ? ' data-gc-facet-suppress-auto-open="1"' : "";
     if (cls.kind === "empty") return "";
     if (cls.kind === "text") {
@@ -170,9 +170,9 @@
         "</div></div></div>"
       );
     }
-    var opts = cls.options;
-    var showSearch = opts.length >= ENUM_INNER_SEARCH_MIN;
-    var parts = [];
+    let opts = cls.options;
+    let showSearch = opts.length >= ENUM_INNER_SEARCH_MIN;
+    let parts = [];
     parts.push(
       '<div class="filter-group" data-gc-facet-group data-gc-facet-for-col="' +
         safeCol +
@@ -193,12 +193,12 @@
         safeCol +
         '" /></div>',
     );
-    for (var j = 0; j < opts.length; j++) {
-      var opt = opts[j];
-      var enc = facetEncodeValue(opt);
-      var display = opt.trim() === "" ? "(empty)" : opt;
+    for (let j = 0; j < opts.length; j++) {
+      let opt = opts[j];
+      let enc = facetEncodeValue(opt);
+      let display = opt.trim() === "" ? "(empty)" : opt;
       if (display.length > 72) display = display.slice(0, 69) + "…";
-      var nameSlug = String(j) + "_" + String(colId).replace(/[^a-zA-Z0-9_-]/g, "_");
+      let nameSlug = String(j) + "_" + String(colId).replace(/[^a-zA-Z0-9_-]/g, "_");
       parts.push(
         '<label class="filter-opt" data-gc-facet-opt title="' +
           escapeAttr(opt) +
@@ -222,21 +222,21 @@
   }
 
   function serializeFilterDrawer(drawerEl) {
-    var e = Object.create(null);
+    let e = Object.create(null);
     drawerEl.querySelectorAll("input[data-gc-facet-enum]:checked").forEach(function (cb) {
-      var cid = cb.getAttribute("data-gc-facet-enum");
+      let cid = cb.dataset.gcFacetEnum;
       if (!cid) return;
       if (!e[cid]) e[cid] = [];
       e[cid].push(cb.value);
     });
-    var t = Object.create(null);
+    let t = Object.create(null);
     drawerEl.querySelectorAll("input[data-gc-facet-text]").forEach(function (inp) {
-      var cid = inp.getAttribute("data-gc-facet-text");
+      let cid = inp.dataset.gcFacetText;
       if (!cid) return;
-      var v = (inp.value || "").trim();
+      let v = (inp.value || "").trim();
       if (v) t[cid] = v;
     });
-    var out = { v: 1 };
+    let out = { v: 1 };
     if (Object.keys(e).length) out.e = e;
     if (Object.keys(t).length) out.t = t;
     return out;
@@ -246,7 +246,7 @@
     if (!drawerEl || !storageKey) return;
     if (!drawerEl.querySelector(".filter-group[data-gc-facet-for-col]")) return;
     try {
-      var o = serializeFilterDrawer(drawerEl);
+      let o = serializeFilterDrawer(drawerEl);
       if (!o.e && !o.t) sessionStorage.removeItem(filterValuesKey(storageKey));
       else sessionStorage.setItem(filterValuesKey(storageKey), JSON.stringify(o));
     } catch (err) {}
@@ -255,7 +255,7 @@
   function readFilterState(storageKey) {
     if (!storageKey) return null;
     try {
-      var raw = sessionStorage.getItem(filterValuesKey(storageKey));
+      let raw = sessionStorage.getItem(filterValuesKey(storageKey));
       if (!raw) return null;
       return JSON.parse(raw);
     } catch (err) {
@@ -274,29 +274,29 @@
     if (!drawerEl || !state || state.v !== 1) return;
     if (state.e && typeof state.e === "object") {
       Object.keys(state.e).forEach(function (cid) {
-        var vals = state.e[cid];
+        let vals = state.e[cid];
         if (!Array.isArray(vals)) return;
-        var want = Object.create(null);
-        for (var i = 0; i < vals.length; i++) want[vals[i]] = true;
+        let want = Object.create(null);
+        for (let i = 0; i < vals.length; i++) want[vals[i]] = true;
         drawerEl.querySelectorAll("input[data-gc-facet-enum]").forEach(function (cb) {
-          if (cb.getAttribute("data-gc-facet-enum") !== cid) return;
+          if (cb.dataset.gcFacetEnum !== cid) return;
           if (want[cb.value]) cb.checked = true;
         });
       });
     }
     if (state.t && typeof state.t === "object") {
       Object.keys(state.t).forEach(function (cid) {
-        var v = state.t[cid];
+        let v = state.t[cid];
         if (v == null) return;
-        var s = String(v);
+        let s = String(v);
         drawerEl.querySelectorAll("input[data-gc-facet-text]").forEach(function (inp) {
-          if (inp.getAttribute("data-gc-facet-text") === cid) inp.value = s;
+          if (inp.dataset.gcFacetText === cid) inp.value = s;
         });
       });
     }
     drawerEl.querySelectorAll("input[data-gc-facet-search]").forEach(function (inp) {
       inp.value = "";
-      var group = inp.closest(".filter-group");
+      let group = inp.closest(".filter-group");
       if (!group) return;
       group.querySelectorAll("[data-gc-facet-opt]").forEach(function (lab) {
         lab.style.display = "";
@@ -310,11 +310,11 @@
       if (inp.dataset.gcFacetSearchBound === "1") return;
       inp.dataset.gcFacetSearchBound = "1";
       inp.addEventListener("input", function () {
-        var q = (inp.value || "").trim().toLowerCase();
-        var group = inp.closest(".filter-group");
+        let q = (inp.value || "").trim().toLowerCase();
+        let group = inp.closest(".filter-group");
         if (!group) return;
         group.querySelectorAll("[data-gc-facet-opt]").forEach(function (lab) {
-          var t = (lab.textContent || "").trim().toLowerCase();
+          let t = (lab.textContent || "").trim().toLowerCase();
           lab.style.display = !q || t.indexOf(q) !== -1 ? "" : "none";
         });
       });
@@ -323,11 +323,11 @@
       if (btn.dataset.gcFacetHeadBound === "1") return;
       btn.dataset.gcFacetHeadBound = "1";
       btn.addEventListener("click", function () {
-        var g = btn.closest(".filter-group");
+        let g = btn.closest(".filter-group");
         if (!g) return;
-        var open = g.classList.toggle("is-open");
+        let open = g.classList.toggle("is-open");
         btn.setAttribute("aria-expanded", open ? "true" : "false");
-        var col = g.getAttribute("data-gc-facet-for-col");
+        let col = g.dataset.gcFacetForCol;
         if (!storageKey || !col) return;
         try {
           if (open) sessionStorage.setItem(ssKey(storageKey, col), "1");
@@ -344,17 +344,17 @@
 
     rebuild: function (drawerEl, columns, rowCellMaps, storageKey) {
       if (!drawerEl) return;
-      var html = "";
-      for (var c = 0; c < columns.length; c++) {
-        var col = columns[c];
-        var id = col.id;
-        var lab = col.label || id;
-        var values = [];
-        for (var r = 0; r < rowCellMaps.length; r++) {
-          var m = rowCellMaps[r] || {};
+      let html = "";
+      for (let c = 0; c < columns.length; c++) {
+        let col = columns[c];
+        let id = col.id;
+        let lab = col.label || id;
+        let values = [];
+        for (let r = 0; r < rowCellMaps.length; r++) {
+          let m = rowCellMaps[r] || {};
           values.push(m[id] != null ? String(m[id]) : "");
         }
-        var cls = collectClassification(values);
+        let cls = collectClassification(values);
         if (cls.kind === "empty") continue;
         html += buildFilterGroup(id, lab, cls, col.facetSuppressAutoOpen === true);
       }
@@ -366,7 +366,7 @@
 
     appliedCount: function (drawerEl) {
       if (!drawerEl) return 0;
-      var n = 0;
+      let n = 0;
       drawerEl.querySelectorAll("input[data-gc-facet-enum]:checked").forEach(function () {
         n++;
       });
@@ -394,34 +394,34 @@
 
     rowMatches: function (tr, drawerEl) {
       if (!drawerEl) return true;
-      var raw = tr.getAttribute("data-gc-row-facets");
-      var map;
+      let raw = tr.dataset.gcRowFacets;
+      let map;
       try {
         map = raw ? JSON.parse(raw) : {};
       } catch (e) {
         map = {};
       }
-      var byColEnum = Object.create(null);
+      let byColEnum = Object.create(null);
       drawerEl.querySelectorAll("input[data-gc-facet-enum]:checked").forEach(function (cb) {
-        var cid = cb.getAttribute("data-gc-facet-enum");
+        let cid = cb.dataset.gcFacetEnum;
         if (!cid) return;
         if (!byColEnum[cid]) byColEnum[cid] = [];
         byColEnum[cid].push(facetDecodeValue(cb.value));
       });
-      var keys = Object.keys(byColEnum);
-      for (var i = 0; i < keys.length; i++) {
-        var col = keys[i];
-        var selected = byColEnum[col];
-        var cell = map[col] != null ? String(map[col]) : "";
+      let keys = Object.keys(byColEnum);
+      for (let i = 0; i < keys.length; i++) {
+        let col = keys[i];
+        let selected = byColEnum[col];
+        let cell = map[col] != null ? String(map[col]) : "";
         if (selected.indexOf(cell) === -1) return false;
       }
-      var textInputs = drawerEl.querySelectorAll("input[data-gc-facet-text]");
-      for (var t = 0; t < textInputs.length; t++) {
-        var inp = textInputs[t];
-        var q = (inp.value || "").trim().toLowerCase();
+      let textInputs = drawerEl.querySelectorAll("input[data-gc-facet-text]");
+      for (let t = 0; t < textInputs.length; t++) {
+        let inp = textInputs[t];
+        let q = (inp.value || "").trim().toLowerCase();
         if (!q) continue;
-        var colId = inp.getAttribute("data-gc-facet-text");
-        var hay = map[colId] != null ? String(map[colId]).toLowerCase() : "";
+        let colId = inp.dataset.gcFacetText;
+        let hay = map[colId] != null ? String(map[colId]).toLowerCase() : "";
         if (hay.indexOf(q) === -1) return false;
       }
       return true;
@@ -434,19 +434,19 @@
         return asideEl.querySelector(".filters__drawer");
       }
       function fire() {
-        var dr = drawerFromAside();
+        let dr = drawerFromAside();
         if (dr && storageKey) persistFilterState(dr, storageKey);
         if (typeof onChange === "function") onChange();
       }
       asideEl.addEventListener("change", function (e) {
-        var t = e.target;
+        let t = e.target;
         if (t && t.matches && t.matches("input[data-gc-facet-enum]")) {
           if (t.checked) expandFacetGroupForElement(t, storageKey);
           fire();
         }
       });
       asideEl.addEventListener("input", function (e) {
-        var t = e.target;
+        let t = e.target;
         if (t && t.matches && t.matches("input[data-gc-facet-text]")) {
           if ((t.value || "").trim()) expandFacetGroupForElement(t, storageKey);
           fire();
@@ -462,10 +462,10 @@
      */
     bindToolbarSearch: function (inputEl, storageKey, onApply) {
       if (!inputEl || !storageKey) return;
-      var k = "gc-toolbar-search:" + storageKey;
-      var hadStored = false;
+      let k = "gc-toolbar-search:" + storageKey;
+      let hadStored = false;
       try {
-        var v = sessionStorage.getItem(k);
+        let v = sessionStorage.getItem(k);
         if (v != null && v !== "") {
           inputEl.value = v;
           hadStored = true;
@@ -515,4 +515,4 @@
       return facetDecodeValue(enc);
     },
   };
-})(window);
+})(globalThis);

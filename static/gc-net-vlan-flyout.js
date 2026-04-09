@@ -4,14 +4,14 @@
 (function () {
   "use strict";
 
-  var initialFormSnapshot = "";
-  var currentNetRow = null;
-  var addMode = false;
+  let initialFormSnapshot = "";
+  let currentNetRow = null;
+  let addMode = false;
 
   function pick(flat, keys) {
     if (!flat) return "";
-    for (var i = 0; i < keys.length; i++) {
-      var v = flat[keys[i]];
+    for (let i = 0; i < keys.length; i++) {
+      let v = flat[keys[i]];
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
     return "";
@@ -22,18 +22,18 @@
   }
 
   function ifTbodyId() {
-    var p = (typeof window.gcNetVlanIfPrefix === "string" && window.gcNetVlanIfPrefix) || "gc-net-if";
+    let p = (typeof globalThis.gcNetVlanIfPrefix === "string" && globalThis.gcNetVlanIfPrefix) || "gc-net-if";
     return p + "-tbody";
   }
 
   function vlanTbodyId() {
-    var p = (typeof window.gcNetVlanVlanPrefix === "string" && window.gcNetVlanVlanPrefix) || "gc-net-vlan";
+    let p = (typeof globalThis.gcNetVlanVlanPrefix === "string" && globalThis.gcNetVlanVlanPrefix) || "gc-net-vlan";
     return p + "-tbody";
   }
 
   function rowMatchesNetScope(row, fwId, cfgId) {
-    var wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
-    var wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
+    let wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
+    let wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
     if (!wantFw && !wantCfg) return true;
     if (wantFw) {
       if (row.firewall_id == null || Number(row.firewall_id) !== Number(fwId)) return false;
@@ -49,20 +49,20 @@
   }
 
   function collectZonesFromNetworkTablesScoped(fwId, cfgId, opts) {
-    var require = opts && opts.requireScope;
-    var wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
-    var wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
+    let require = opts && opts.requireScope;
+    let wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
+    let wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
     if (require && !wantFw && !wantCfg) return [];
-    var set = {};
+    let set = {};
     zoneTbodyIds().forEach(function (tid) {
-      var tbody = document.getElementById(tid);
+      let tbody = document.getElementById(tid);
       if (!tbody) return;
       tbody.querySelectorAll("tr[data-search]").forEach(function (tr) {
-        var row = tr._gcNetRow;
+        let row = tr._gcNetRow;
         if (!row) return;
         if (!rowMatchesNetScope(row, fwId, cfgId)) return;
-        var td = tr.querySelector('td[data-gc-col="__zone"]');
-        var t = td ? (td.textContent || "").trim().replace(/\s+/g, " ") : "";
+        let td = tr.querySelector('td[data-gc-col="__zone"]');
+        let t = td ? (td.textContent || "").trim().replace(/\s+/g, " ") : "";
         if (t && normLower(t) !== "none") set[t] = true;
       });
     });
@@ -72,20 +72,20 @@
   }
 
   function collectParentInterfaceNamesScoped(fwId, cfgId, opts) {
-    var require = opts && opts.requireScope;
-    var wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
-    var wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
+    let require = opts && opts.requireScope;
+    let wantFw = fwId != null && fwId !== "" && !isNaN(Number(fwId));
+    let wantCfg = cfgId != null && cfgId !== "" && !isNaN(Number(cfgId));
     if (require && !wantFw && !wantCfg) return [];
-    var tbody = document.getElementById(ifTbodyId());
+    let tbody = document.getElementById(ifTbodyId());
     if (!tbody) return [];
-    var names = [];
-    var seen = {};
+    let names = [];
+    let seen = {};
     tbody.querySelectorAll("tr.gc-net-entity-row--clickable, tr[class*='-data-row']").forEach(function (tr) {
-      var row = tr._gcNetRow;
+      let row = tr._gcNetRow;
       if (!row || !row.cells) return;
       if (row.entity_type && row.entity_type !== "interface") return;
       if (!rowMatchesNetScope(row, fwId, cfgId)) return;
-      var n = String(row.cells.__name != null ? row.cells.__name : "").trim();
+      let n = String(row.cells.__name != null ? row.cells.__name : "").trim();
       if (!n || seen[n]) return;
       seen[n] = true;
       names.push(n);
@@ -98,30 +98,30 @@
 
   function vlanScopeForPickers() {
     if (!addMode) {
-      var r = currentNetRow;
+      let r = currentNetRow;
       return {
         fwId: r && r.firewall_id != null && r.firewall_id !== "" ? Number(r.firewall_id) : undefined,
         cfgId: r && r.configuration_id != null && r.configuration_id !== "" ? Number(r.configuration_id) : undefined,
         requireScope: false,
       };
     }
-    var target = typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
+    let target = typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
     if (target === "firewall") {
-      var fv = els.addFwSelect ? els.addFwSelect.value.trim() : "";
-      var fn = parseInt(fv, 10);
-      var fok = fv && !isNaN(fn) && fn > 0;
+      let fv = els.addFwSelect ? els.addFwSelect.value.trim() : "";
+      let fn = parseInt(fv, 10);
+      let fok = fv && !isNaN(fn) && fn > 0;
       return { fwId: fok ? fn : undefined, cfgId: undefined, requireScope: true };
     }
-    var cv = els.addCfgSelect ? els.addCfgSelect.value.trim() : "";
-    var cn = parseInt(cv, 10);
-    var cok = cv && !isNaN(cn) && cn > 0;
+    let cv = els.addCfgSelect ? els.addCfgSelect.value.trim() : "";
+    let cn = parseInt(cv, 10);
+    let cok = cv && !isNaN(cn) && cn > 0;
     return { fwId: undefined, cfgId: cok ? cn : undefined, requireScope: true };
   }
 
   function fillVlanAddTargetSelects() {
-    var target = typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
+    let target = typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
     if (target === "firewall" && els.addFwSelect) {
-      var inv = typeof window.gcGetFirewallNavInventory === "function" ? window.gcGetFirewallNavInventory() : [];
+      let inv = typeof globalThis.gcGetFirewallNavInventory === "function" ? globalThis.gcGetFirewallNavInventory() : [];
       els.addFwSelect.innerHTML =
         '<option value="">Select firewall…</option>' +
         inv
@@ -132,8 +132,8 @@
       els.addFwSelect.value = "";
     }
     if (target === "configuration" && els.addCfgSelect) {
-      var inv2 =
-        typeof window.gcGetConfigurationNavInventory === "function" ? window.gcGetConfigurationNavInventory() : [];
+      let inv2 =
+        typeof globalThis.gcGetConfigurationNavInventory === "function" ? globalThis.gcGetConfigurationNavInventory() : [];
       els.addCfgSelect.innerHTML =
         '<option value="">Select configuration…</option>' +
         inv2
@@ -146,8 +146,8 @@
   }
 
   function refreshVlanAddScopedPickers() {
-    var sc = vlanScopeForPickers();
-    var curZ = els.zone && els.zone.value ? els.zone.value : "LAN";
+    let sc = vlanScopeForPickers();
+    let curZ = els.zone && els.zone.value ? els.zone.value : "LAN";
     setZoneOptions(curZ, sc.fwId, sc.cfgId, { requireScope: sc.requireScope });
     fillParentInterfaceSelect();
     syncZoneBelow();
@@ -155,26 +155,26 @@
   }
 
   function netmaskToDisplay(nm) {
-    return window.gcNetIpv4FlyoutBlur.netmaskToDisplay(nm);
+    return globalThis.gcNetIpv4FlyoutBlur.netmaskToDisplay(nm);
   }
 
   function tryApplyIpv4CidrOnBlur() {
-    window.gcNetIpv4FlyoutBlur.applyCidrSplit(els, syncDirty);
+    globalThis.gcNetIpv4FlyoutBlur.applyCidrSplit(els, syncDirty);
   }
 
   function tryNormalizeIpv4NetmaskOnBlur() {
-    window.gcNetIpv4FlyoutBlur.applyNetmaskNormalize(els, syncDirty);
+    globalThis.gcNetIpv4FlyoutBlur.applyNetmaskNormalize(els, syncDirty);
   }
 
   function tryApplyIpv6CidrOnBlur() {
     if (!els.ipv6Ip || !els.ipv6Prefix) return;
     if (els.ipv6Ip.readOnly) return;
-    var raw = els.ipv6Ip.value.trim();
-    var slash = raw.lastIndexOf("/");
+    let raw = els.ipv6Ip.value.trim();
+    let slash = raw.lastIndexOf("/");
     if (slash < 0) return;
-    var addr = raw.slice(0, slash).trim();
-    var pstr = raw.slice(slash + 1).trim();
-    var prefix = parseInt(pstr, 10);
+    let addr = raw.slice(0, slash).trim();
+    let pstr = raw.slice(slash + 1).trim();
+    let prefix = parseInt(pstr, 10);
     if (pstr !== String(prefix) || prefix < 0 || prefix > 128) return;
     if (!addr || addr.indexOf(":") < 0) return;
     els.ipv6Ip.value = addr;
@@ -183,7 +183,7 @@
   }
 
   function guessIpv4Mode(flat) {
-    var v = normLower(
+    let v = normLower(
       pick(flat, [
         "IPv4Assignment",
         "IPv4_Assignment",
@@ -196,13 +196,13 @@
     if (v.indexOf("dhcp") !== -1) return "dhcp";
     if (v.indexOf("ppp") !== -1 || v.indexOf("pppoe") !== -1) return "pppoe";
     if (v.indexOf("static") !== -1) return "static";
-    var ip = pick(flat, ["IPAddress", "IPv4Address"]);
+    let ip = pick(flat, ["IPAddress", "IPv4Address"]);
     if (ip) return "static";
     return "dhcp";
   }
 
   function guessIpv6Mode(flat) {
-    var v = normLower(
+    let v = normLower(
       pick(flat, [
         "IPv6Assignment",
         "IPv6_Assignment",
@@ -213,25 +213,25 @@
     if (v.indexOf("delegat") !== -1) return "delegated";
     if (v.indexOf("dhcp") !== -1) return "dhcp";
     if (v.indexOf("static") !== -1) return "static";
-    var ip = pick(flat, ["IPv6Address", "IPv6_Address"]);
+    let ip = pick(flat, ["IPv6Address", "IPv6_Address"]);
     if (ip) return "static";
     return "static";
   }
 
   function truthyFlat(flat, keys) {
-    var s = normLower(pick(flat, keys));
+    let s = normLower(pick(flat, keys));
     if (s === "false" || s === "0" || s === "no" || s === "off" || s === "disabled") return false;
     if (s === "true" || s === "1" || s === "yes" || s === "on" || s === "enable" || s === "enabled") return true;
     return null;
   }
 
-  var els = {};
+  let els = {};
 
   function setZoneOptions(currentZone, fwId, cfgId, scopeOpts) {
-    var sel = els.zone;
+    let sel = els.zone;
     if (!sel) return;
-    var zones = collectZonesFromNetworkTablesScoped(fwId, cfgId, scopeOpts || {});
-    var cur = (currentZone || "").trim();
+    let zones = collectZonesFromNetworkTablesScoped(fwId, cfgId, scopeOpts || {});
+    let cur = (currentZone || "").trim();
     if (cur && normLower(cur) !== "none" && zones.indexOf(cur) === -1) zones.push(cur);
     zones.sort(function (a, b) {
       return a.localeCompare(b, undefined, { sensitivity: "base" });
@@ -243,10 +243,10 @@
           return '<option value="' + escapeAttr(z) + '">' + escapeHtml(z) + "</option>";
         })
         .join("");
-    var useVal = cur && normLower(cur) !== "none" ? cur : "None";
+    let useVal = cur && normLower(cur) !== "none" ? cur : "None";
     sel.value = zones.indexOf(useVal) !== -1 || useVal === "None" ? useVal : "";
     if (useVal && useVal !== "None" && !sel.value && cur) {
-      var opt = document.createElement("option");
+      let opt = document.createElement("option");
       opt.value = cur;
       opt.textContent = cur;
       sel.appendChild(opt);
@@ -255,10 +255,10 @@
   }
 
   function fillParentInterfaceSelect() {
-    var sel = els.ifSelect;
+    let sel = els.ifSelect;
     if (!sel) return;
-    var sc = vlanScopeForPickers();
-    var names = collectParentInterfaceNamesScoped(sc.fwId, sc.cfgId, { requireScope: sc.requireScope });
+    let sc = vlanScopeForPickers();
+    let names = collectParentInterfaceNamesScoped(sc.fwId, sc.cfgId, { requireScope: sc.requireScope });
     if (sc.requireScope && !names.length) {
       sel.innerHTML = '<option value="">Select firewall or configuration above…</option>';
       return;
@@ -284,28 +284,28 @@
   }
 
   function syncZoneBelow() {
-    var post = els.postZone;
+    let post = els.postZone;
     if (!post || !els.zone) return;
-    var empty = !els.zone.value || normLower(els.zone.value) === "none";
+    let empty = !els.zone.value || normLower(els.zone.value) === "none";
     post.hidden = empty;
     post.setAttribute("aria-hidden", empty ? "true" : "false");
   }
 
   function syncIpv4Body() {
     if (!els.ipv4Cb || !els.ipv4Body) return;
-    var on = els.ipv4Cb.checked;
+    let on = els.ipv4Cb.checked;
     els.ipv4Body.hidden = !on;
     els.ipv4Body.setAttribute("aria-hidden", on ? "false" : "true");
   }
 
   function syncIpv6Body() {
     if (!els.ipv6Cb || !els.ipv6Body) return;
-    var on = els.ipv6Cb.checked;
+    let on = els.ipv6Cb.checked;
     els.ipv6Body.hidden = !on;
     els.ipv6Body.setAttribute("aria-hidden", on ? "false" : "true");
   }
 
-  var lastZoneWasWan = false;
+  let lastZoneWasWan = false;
 
   function isWanNetworkZone() {
     if (!els.zone) return false;
@@ -332,7 +332,7 @@
   }
 
   function syncGatewayBlocksForZone() {
-    var show = isWanNetworkZone();
+    let show = isWanNetworkZone();
     if (els.ipv4GatewayWrap) {
       els.ipv4GatewayWrap.hidden = !show;
       els.ipv4GatewayWrap.setAttribute("aria-hidden", show ? "false" : "true");
@@ -345,11 +345,11 @@
 
   function syncIpv4ModeUi() {
     if (!els.ipv4ModeDhcp || !els.ipv4Ip) return;
-    var mode = "";
+    let mode = "";
     if (els.ipv4ModeStatic && els.ipv4ModeStatic.checked) mode = "static";
     else if (els.ipv4ModePppoe && els.ipv4ModePppoe.checked) mode = "pppoe";
     else if (els.ipv4ModeDhcp && els.ipv4ModeDhcp.checked) mode = "dhcp";
-    var ro = mode === "dhcp" || mode === "pppoe";
+    let ro = mode === "dhcp" || mode === "pppoe";
     [els.ipv4Ip, els.ipv4Nm, els.ipv4GwIp].forEach(function (inp) {
       if (!inp) return;
       inp.readOnly = ro;
@@ -360,11 +360,11 @@
 
   function syncIpv6ModeUi() {
     if (!els.ipv6ModeDhcp) return;
-    var mode = "";
+    let mode = "";
     if (els.ipv6ModeStatic && els.ipv6ModeStatic.checked) mode = "static";
     else if (els.ipv6ModeDhcp && els.ipv6ModeDhcp.checked) mode = "dhcp";
     else if (els.ipv6ModeDel && els.ipv6ModeDel.checked) mode = "delegated";
-    var ro = mode === "dhcp";
+    let ro = mode === "dhcp";
     [els.ipv6Ip, els.ipv6Prefix, els.ipv6GwName, els.ipv6GwIp].forEach(function (inp) {
       if (!inp) return;
       inp.readOnly = ro;
@@ -409,8 +409,8 @@
 
   function applyIpv4CheckboxOnLoad() {
     if (!els.ipv4Cb || !els.ipv4Ip) return;
-    var staticMode = ipv4ModeValue() === "static";
-    var blank = els.ipv4Ip.value.trim() === "";
+    let staticMode = ipv4ModeValue() === "static";
+    let blank = els.ipv4Ip.value.trim() === "";
     if (staticMode && blank) {
       clearIpv4Section();
       els.ipv4Cb.checked = false;
@@ -423,8 +423,8 @@
 
   function applyIpv6CheckboxOnLoad() {
     if (!els.ipv6Cb || !els.ipv6Ip) return;
-    var staticMode = ipv6ModeValue() === "static";
-    var blank = els.ipv6Ip.value.trim() === "";
+    let staticMode = ipv6ModeValue() === "static";
+    let blank = els.ipv6Ip.value.trim() === "";
     if (staticMode && blank) {
       clearIpv6Section();
       els.ipv6Cb.checked = false;
@@ -436,16 +436,16 @@
   }
 
   function getFormSnapshot() {
-    var form = els.form;
+    let form = els.form;
     if (!form) return "";
-    var nodes = form.querySelectorAll("input, select, textarea");
-    var parts = [];
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
+    let nodes = form.querySelectorAll("input, select, textarea");
+    let parts = [];
+    for (let i = 0; i < nodes.length; i++) {
+      let n = nodes[i];
       if (n.offsetParent === null && n.type !== "hidden") continue;
-      var t = n.type;
+      let t = n.type;
       if (t === "submit" || t === "button" || n.disabled) continue;
-      var key = n.name || n.id;
+      let key = n.name || n.id;
       if (!key) key = "i" + i;
       if (t === "checkbox") {
         parts.push(key + "=" + (n.checked ? "1" : "0"));
@@ -468,7 +468,7 @@
     els.saveBtn.disabled = getFormSnapshot() === initialFormSnapshot;
   }
 
-  var VLAN_COMBINE_COL_LABELS = {
+  let VLAN_COMBINE_COL_LABELS = {
     __type: "Type",
     __name: "Name",
     __zone: "Network zone",
@@ -507,15 +507,15 @@
 
   function collectFlyoutScopeIds(form) {
     if (!form) return [];
-    var isCfg =
-      typeof window.gcHsEntityTarget === "string" && window.gcHsEntityTarget === "configuration";
-    var ms = form.querySelector(isCfg ? "[data-gc-cfg-ms]" : "[data-gc-fw-ms]");
+    let isCfg =
+      typeof globalThis.gcHsEntityTarget === "string" && globalThis.gcHsEntityTarget === "configuration";
+    let ms = form.querySelector(isCfg ? "[data-gc-cfg-ms]" : "[data-gc-fw-ms]");
     if (!ms) return [];
-    var idAttr = isCfg ? "data-gc-cfg-id" : "data-gc-fw-id";
-    var out = [];
+    let idAttr = isCfg ? "data-gc-cfg-id" : "data-gc-fw-id";
+    let out = [];
     ms.querySelectorAll("input[type=\"checkbox\"]").forEach(function (cb) {
       if (!cb.checked || !cb.hasAttribute(idAttr)) return;
-      var n = parseInt(String(cb.getAttribute(idAttr) || ""), 10);
+      let n = parseInt(String(cb.getAttribute(idAttr) || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
@@ -524,11 +524,11 @@
   function scopeIdFromSource(src) {
     if (!src) return null;
     if (src.configuration_id != null && String(src.configuration_id).trim() !== "") {
-      var c = parseInt(String(src.configuration_id), 10);
+      let c = parseInt(String(src.configuration_id), 10);
       if (!isNaN(c) && c > 0) return c;
     }
     if (src.firewall_id != null && String(src.firewall_id).trim() !== "") {
-      var f = parseInt(String(src.firewall_id), 10);
+      let f = parseInt(String(src.firewall_id), 10);
       if (!isNaN(f) && f > 0) return f;
     }
     return null;
@@ -546,14 +546,14 @@
   }
 
   function vlanCombinedSync(x) {
-    if (typeof window.gcNetIfCombinedStaticSync !== "function" || !currentNetRow) return;
-    window.gcNetIfCombinedStaticSync(els, currentNetRow, Object.assign(vlanCmbOpts(), x || {}));
+    if (typeof globalThis.gcNetIfCombinedStaticSync !== "function" || !currentNetRow) return;
+    globalThis.gcNetIfCombinedStaticSync(els, currentNetRow, Object.assign(vlanCmbOpts(), x || {}));
   }
 
   function mountVlanFirewallPicker(row) {
-    if (!els.fwSlot || typeof window.gcHsBuildFirewallPickerSectionHtml !== "function") return;
-    var initial = [];
-    var assigned = [];
+    if (!els.fwSlot || typeof globalThis.gcHsBuildFirewallPickerSectionHtml !== "function") return;
+    let initial = [];
+    let assigned = [];
     if (row && row.configuration_ids && row.configuration_ids.length) {
       initial = row.configuration_ids.slice();
       assigned = row.configuration_ids.slice();
@@ -561,21 +561,21 @@
       initial = row.firewall_ids.slice();
       assigned = row.firewall_ids.slice();
     } else if (row) {
-      var cid = row.configuration_id;
-      var fid = row.firewall_id;
-      var cn = cid != null ? parseInt(String(cid), 10) : NaN;
-      var fn = fid != null ? parseInt(String(fid), 10) : NaN;
+      let cid = row.configuration_id;
+      let fid = row.firewall_id;
+      let cn = cid != null ? parseInt(String(cid), 10) : NaN;
+      let fn = fid != null ? parseInt(String(fid), 10) : NaN;
       if (!isNaN(cn) && cn > 0) initial = assigned = [cn];
       else if (!isNaN(fn) && fn > 0) initial = assigned = [fn];
     }
-    var mode = initial.length ? "edit" : "add";
-    els.fwSlot.innerHTML = window.gcHsBuildFirewallPickerSectionHtml(mode, initial, assigned);
-    if (typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
+    let mode = initial.length ? "edit" : "add";
+    els.fwSlot.innerHTML = globalThis.gcHsBuildFirewallPickerSectionHtml(mode, initial, assigned);
+    if (typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
       try {
-        window.gcHsHydrateFlyoutFirewallPicker(els.form, { row: row || {} });
+        globalThis.gcHsHydrateFlyoutFirewallPicker(els.form, { row: row || {} });
       } catch (e1) {}
     }
-    var ms = els.form && els.form.querySelector("[data-gc-fw-ms], [data-gc-cfg-ms]");
+    let ms = els.form && els.form.querySelector("[data-gc-fw-ms], [data-gc-cfg-ms]");
     if (ms) {
       ms.querySelectorAll("input[type=\"checkbox\"]").forEach(function (cb) {
         cb.addEventListener("change", syncDirty);
@@ -584,26 +584,26 @@
   }
 
   function applyVlanCombineChrome(root, row) {
-    if (typeof window.gcCombineFlyoutClearConflictChrome === "function") {
+    if (typeof globalThis.gcCombineFlyoutClearConflictChrome === "function") {
       try {
-        window.gcCombineFlyoutClearConflictChrome(root);
+        globalThis.gcCombineFlyoutClearConflictChrome(root);
       } catch (e0) {}
     }
     if (
       row &&
-      typeof window.gcCombineFlyoutApplyConflictChrome === "function" &&
-      window.gcExtractCombinePerFieldMap &&
-      window.gcExtractCombinePerFieldMap(row)
+      typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function" &&
+      globalThis.gcExtractCombinePerFieldMap &&
+      globalThis.gcExtractCombinePerFieldMap(row)
     ) {
       try {
-        window.gcCombineFlyoutApplyConflictChrome(root, row, { columnLabels: VLAN_COMBINE_COL_LABELS });
+        globalThis.gcCombineFlyoutApplyConflictChrome(root, row, { columnLabels: VLAN_COMBINE_COL_LABELS });
       } catch (e2) {}
     }
   }
 
   function collectVlanForm() {
-    var wan = isWanNetworkZone();
-    var out = {
+    let wan = isWanNetworkZone();
+    let out = {
       name: els.nameInp ? els.nameInp.value.trim() : "",
       network_zone: els.zone ? els.zone.value : "",
       ipv4_enabled: !!(els.ipv4Cb && els.ipv4Cb.checked),
@@ -628,16 +628,16 @@
   }
 
   function collectVlanFormWithCombinedRow(tr4, tr6) {
-    var base = collectVlanForm();
-    var wan = isWanNetworkZone();
+    let base = collectVlanForm();
+    let wan = isWanNetworkZone();
     if (tr4) {
-      var ip = tr4.querySelector(".gc-if-cmb-v4-ip");
-      var nm = tr4.querySelector(".gc-if-cmb-v4-nm");
+      let ip = tr4.querySelector(".gc-if-cmb-v4-ip");
+      let nm = tr4.querySelector(".gc-if-cmb-v4-nm");
       if (ip) base.ipv4_ip = ip.value.trim();
       if (nm) base.ipv4_netmask = nm.value.trim();
       if (wan) {
-        var gwn = tr4.querySelector(".gc-if-cmb-v4-gw-name");
-        var gwi = tr4.querySelector(".gc-if-cmb-v4-gw-ip");
+        let gwn = tr4.querySelector(".gc-if-cmb-v4-gw-name");
+        let gwi = tr4.querySelector(".gc-if-cmb-v4-gw-ip");
         base.ipv4_gateway_name = gwn ? gwn.value.trim() : "";
         base.ipv4_gateway_ip = gwi ? gwi.value.trim() : "";
       } else {
@@ -646,13 +646,13 @@
       }
     }
     if (tr6) {
-      var ip6 = tr6.querySelector(".gc-if-cmb-v6-ip");
-      var px = tr6.querySelector(".gc-if-cmb-v6-px");
+      let ip6 = tr6.querySelector(".gc-if-cmb-v6-ip");
+      let px = tr6.querySelector(".gc-if-cmb-v6-px");
       if (ip6) base.ipv6_ip = ip6.value.trim();
       if (px) base.ipv6_prefix = px.value.trim();
       if (wan) {
-        var g6n = tr6.querySelector(".gc-if-cmb-v6-gw-name");
-        var g6i = tr6.querySelector(".gc-if-cmb-v6-gw-ip");
+        let g6n = tr6.querySelector(".gc-if-cmb-v6-gw-name");
+        let g6i = tr6.querySelector(".gc-if-cmb-v6-gw-ip");
         base.ipv6_gateway_name = g6n ? g6n.value.trim() : "";
         base.ipv6_gateway_ip = g6i ? g6i.value.trim() : "";
       } else {
@@ -667,7 +667,7 @@
     root.hidden = false;
     root.setAttribute("aria-hidden", "false");
     document.body.classList.add("gc-if-flyout--open");
-    var panel = root.querySelector(".gc-if-flyout__panel");
+    let panel = root.querySelector(".gc-if-flyout__panel");
     if (panel) {
       try {
         panel.focus();
@@ -676,9 +676,9 @@
   }
 
   function close(root) {
-    if (typeof window.gcCombineFlyoutClearConflictChrome === "function") {
+    if (typeof globalThis.gcCombineFlyoutClearConflictChrome === "function") {
       try {
-        window.gcCombineFlyoutClearConflictChrome(root);
+        globalThis.gcCombineFlyoutClearConflictChrome(root);
       } catch (eC) {}
     }
     root.hidden = true;
@@ -688,31 +688,31 @@
   }
 
   function syncAddEditLayout() {
-    var edH = document.getElementById("gc-vlan-flyout-hardware-row-edit");
-    var adH = document.getElementById("gc-vlan-flyout-hardware-row-add");
-    var edI = document.getElementById("gc-vlan-flyout-interface-row-edit");
-    var adI = document.getElementById("gc-vlan-flyout-interface-row-add");
-    var vid = document.getElementById("gc-vlan-flyout-vlanid-row");
-    var tfw = document.getElementById("gc-vlan-flyout-target-fw-row");
-    var tcg = document.getElementById("gc-vlan-flyout-target-cfg-row");
-    var target = typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
+    let edH = document.getElementById("gc-vlan-flyout-hardware-row-edit");
+    let adH = document.getElementById("gc-vlan-flyout-hardware-row-add");
+    let edI = document.getElementById("gc-vlan-flyout-interface-row-edit");
+    let adI = document.getElementById("gc-vlan-flyout-interface-row-add");
+    let vid = document.getElementById("gc-vlan-flyout-vlanid-row");
+    let tfw = document.getElementById("gc-vlan-flyout-target-fw-row");
+    let tcg = document.getElementById("gc-vlan-flyout-target-cfg-row");
+    let target = typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
     if (edH) edH.hidden = addMode;
     if (adH) adH.hidden = !addMode;
     if (edI) edI.hidden = addMode;
     if (adI) adI.hidden = !addMode;
     if (vid) vid.hidden = !addMode;
     if (tfw) {
-      var showFw = !!(addMode && target === "firewall");
+      let showFw = !!(addMode && target === "firewall");
       tfw.hidden = !showFw;
       tfw.setAttribute("aria-hidden", showFw ? "false" : "true");
     }
     if (tcg) {
-      var showCfg = !!(addMode && target === "configuration");
+      let showCfg = !!(addMode && target === "configuration");
       tcg.hidden = !showCfg;
       tcg.setAttribute("aria-hidden", showCfg ? "false" : "true");
     }
     if (els.fwSlot) {
-      var showFwMs = !addMode;
+      let showFwMs = !addMode;
       els.fwSlot.hidden = !showFwMs;
       els.fwSlot.setAttribute("aria-hidden", showFwMs ? "false" : "true");
       if (addMode) els.fwSlot.innerHTML = "";
@@ -723,22 +723,22 @@
   function populateFromRow(row) {
     addMode = false;
     syncAddEditLayout();
-    var flat = (row && row.flat) || {};
-    var cells = (row && row.cells) || {};
+    let flat = (row && row.flat) || {};
+    let cells = (row && row.cells) || {};
 
-    var name = pick(flat, ["Name"]) || String(cells.__name != null ? cells.__name : "") || "";
-    var hw = pick(flat, ["Hardware"]) || String(cells.__hardware != null ? cells.__hardware : "") || "";
-    var zone = pick(flat, ["NetworkZone", "Zone", "ZoneName"]) || String(cells.__zone != null ? cells.__zone : "") || "";
-    var iface = pick(flat, ["Interface", "ParentInterface", "BoundTo", "PhysicalInterface"]);
+    let name = pick(flat, ["Name"]) || String(cells.__name != null ? cells.__name : "") || "";
+    let hw = pick(flat, ["Hardware"]) || String(cells.__hardware != null ? cells.__hardware : "") || "";
+    let zone = pick(flat, ["NetworkZone", "Zone", "ZoneName"]) || String(cells.__zone != null ? cells.__zone : "") || "";
+    let iface = pick(flat, ["Interface", "ParentInterface", "BoundTo", "PhysicalInterface"]);
 
     if (els.nameInp) els.nameInp.value = name;
     if (els.hwReadonly) els.hwReadonly.textContent = hw || "—";
     if (els.ifReadonly) els.ifReadonly.textContent = iface || hw || "—";
-    var fwId = row && row.firewall_id != null && row.firewall_id !== "" ? Number(row.firewall_id) : undefined;
-    var cfgId = row && row.configuration_id != null && row.configuration_id !== "" ? Number(row.configuration_id) : undefined;
+    let fwId = row && row.firewall_id != null && row.firewall_id !== "" ? Number(row.firewall_id) : undefined;
+    let cfgId = row && row.configuration_id != null && row.configuration_id !== "" ? Number(row.configuration_id) : undefined;
     setZoneOptions(zone, fwId, cfgId, { requireScope: false });
 
-    var v4 = guessIpv4Mode(flat);
+    let v4 = guessIpv4Mode(flat);
     if (els.ipv4ModeStatic) els.ipv4ModeStatic.checked = v4 === "static";
     if (els.ipv4ModePppoe) els.ipv4ModePppoe.checked = v4 === "pppoe";
     if (els.ipv4ModeDhcp) els.ipv4ModeDhcp.checked = v4 === "dhcp";
@@ -751,7 +751,7 @@
 
     applyIpv4CheckboxOnLoad();
 
-    var v6 = guessIpv6Mode(flat);
+    let v6 = guessIpv6Mode(flat);
     if (els.ipv6ModeStatic) els.ipv6ModeStatic.checked = v6 === "static";
     if (els.ipv6ModeDhcp) els.ipv6ModeDhcp.checked = v6 === "dhcp";
     if (els.ipv6ModeDel) els.ipv6ModeDel.checked = v6 === "delegated";
@@ -778,10 +778,10 @@
     currentNetRow = null;
     syncAddEditLayout();
     fillVlanAddTargetSelects();
-    var sc0 = vlanScopeForPickers();
+    let sc0 = vlanScopeForPickers();
     setZoneOptions("LAN", sc0.fwId, sc0.cfgId, { requireScope: sc0.requireScope });
     if (els.zone) {
-      var z = els.zone;
+      let z = els.zone;
       if (z.querySelector('option[value="LAN"]')) z.value = "LAN";
       else if (z.options.length) z.selectedIndex = Math.min(1, z.options.length - 1);
     }
@@ -874,17 +874,17 @@
   }
 
   function bindPanelResize(root) {
-    var panel = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let panel = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!panel || !handle || handle.dataset.gcVlanResizeBound === "1") return;
     handle.dataset.gcVlanResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = panel.getBoundingClientRect().width;
-      var maxW = Math.min(720, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = panel.getBoundingClientRect().width;
+      let maxW = Math.min(720, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(280, Math.min(maxW, w));
         panel.style.width = w + "px";
       }
@@ -904,7 +904,7 @@
     bindPanelResize(root);
 
     function onZoneChange() {
-      var wan = isWanNetworkZone();
+      let wan = isWanNetworkZone();
       syncZoneBelow();
       syncGatewayBlocksForZone();
       if (lastZoneWasWan && !wan) {
@@ -992,10 +992,10 @@
         e.preventDefault();
         if (els.saveBtn && els.saveBtn.disabled) return;
 
-        var target =
-          typeof window.gcNetVlanEntityTarget === "string" ? window.gcNetVlanEntityTarget : "firewall";
-        var rowEd = currentNetRow;
-        var isCfg =
+        let target =
+          typeof globalThis.gcNetVlanEntityTarget === "string" ? globalThis.gcNetVlanEntityTarget : "firewall";
+        let rowEd = currentNetRow;
+        let isCfg =
           target === "configuration" ||
           !!(
             rowEd &&
@@ -1009,24 +1009,24 @@
             );
             return;
           }
-          var createUrl =
-            typeof window.gcNetVlanApplyCreateUrl === "string" ? window.gcNetVlanApplyCreateUrl : "";
+          let createUrl =
+            typeof globalThis.gcNetVlanApplyCreateUrl === "string" ? globalThis.gcNetVlanApplyCreateUrl : "";
           if (!createUrl) {
             alert("VLAN create URL is not configured.");
             return;
           }
-          var cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
+          let cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
           if (!els.addCfgSelect || !els.addCfgSelect.value.trim() || isNaN(cfgIdSel) || cfgIdSel <= 0) {
             alert("Select a configuration.");
             return;
           }
-          var vid = els.vlanIdInp ? els.vlanIdInp.value.trim() : "";
-          var n = parseInt(vid, 10);
+          let vid = els.vlanIdInp ? els.vlanIdInp.value.trim() : "";
+          let n = parseInt(vid, 10);
           if (!vid || String(n) !== vid || n < 1 || n > 4094) {
             alert("VLAN ID must be a number from 1 to 4094.");
             return;
           }
-          var payload = JSON.stringify({
+          let payload = JSON.stringify({
             configuration_id: cfgIdSel,
             form: collectVlanForm(),
           });
@@ -1044,7 +1044,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var msg = (x.j && (x.j.detail || x.j.message)) || "Could not add VLAN.";
+                let msg = (x.j && (x.j.detail || x.j.message)) || "Could not add VLAN.";
                 alert(typeof msg === "string" ? msg : JSON.stringify(msg));
                 if (els.saveBtn) els.saveBtn.disabled = false;
                 syncDirty();
@@ -1061,12 +1061,12 @@
           return;
         }
 
-        var url = isCfg
-          ? typeof window.gcNetVlanApplyUpdateUrl === "string"
-            ? window.gcNetVlanApplyUpdateUrl
+        let url = isCfg
+          ? typeof globalThis.gcNetVlanApplyUpdateUrl === "string"
+            ? globalThis.gcNetVlanApplyUpdateUrl
             : ""
-          : typeof window.gcNetVlanEnqueueUrl === "string"
-            ? window.gcNetVlanEnqueueUrl
+          : typeof globalThis.gcNetVlanEnqueueUrl === "string"
+            ? globalThis.gcNetVlanEnqueueUrl
             : "";
         if (!url) {
           alert(
@@ -1077,53 +1077,53 @@
           return;
         }
 
-        var srcsMulti = rowEd && rowEd.if_combine_sources;
-        var cmbOptsSubmit = vlanCmbOpts();
-        var combinedMulti =
+        let srcsMulti = rowEd && rowEd.if_combine_sources;
+        let cmbOptsSubmit = vlanCmbOpts();
+        let combinedMulti =
           rowEd &&
           rowEd.interfaces_row_combined &&
           Array.isArray(srcsMulti) &&
           srcsMulti.length > 1 &&
-          ((typeof window.gcNetIfCombinedStaticUsesV4 === "function" &&
-            window.gcNetIfCombinedStaticUsesV4(els, rowEd, cmbOptsSubmit)) ||
-            (typeof window.gcNetIfCombinedStaticUsesV6 === "function" &&
-              window.gcNetIfCombinedStaticUsesV6(els, rowEd, cmbOptsSubmit)));
+          ((typeof globalThis.gcNetIfCombinedStaticUsesV4 === "function" &&
+            globalThis.gcNetIfCombinedStaticUsesV4(els, rowEd, cmbOptsSubmit)) ||
+            (typeof globalThis.gcNetIfCombinedStaticUsesV6 === "function" &&
+              globalThis.gcNetIfCombinedStaticUsesV6(els, rowEd, cmbOptsSubmit)));
 
         if (combinedMulti) {
-          var selectedScopes = collectFlyoutScopeIds(els.form);
+          let selectedScopes = collectFlyoutScopeIds(els.form);
           if (!selectedScopes.length) {
             alert("Select at least one firewall or configuration to update.");
             return;
           }
-          var tb4m = els.ipv4CombinedTbody;
-          var tb6m = els.ipv6CombinedTbody;
-          var r4m = tb4m ? tb4m.querySelectorAll("tr.gc-if-cmb-data-row") : [];
-          var r6m = tb6m ? tb6m.querySelectorAll("tr.gc-if-cmb-data-row") : [];
-          var idxM = 0;
+          let tb4m = els.ipv4CombinedTbody;
+          let tb6m = els.ipv6CombinedTbody;
+          let r4m = tb4m ? tb4m.querySelectorAll("tr.gc-if-cmb-data-row") : [];
+          let r6m = tb6m ? tb6m.querySelectorAll("tr.gc-if-cmb-data-row") : [];
+          let idxM = 0;
           if (els.saveBtn) els.saveBtn.disabled = true;
           function postOneVlan() {
             if (idxM >= srcsMulti.length) {
               document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-              if (typeof window.gcNetIfInvalidateIpamPoolsCache === "function") {
-                window.gcNetIfInvalidateIpamPoolsCache();
+              if (typeof globalThis.gcNetIfInvalidateIpamPoolsCache === "function") {
+                globalThis.gcNetIfInvalidateIpamPoolsCache();
               }
               close(root);
               return;
             }
-            var srcM = srcsMulti[idxM];
-            var tr4m = r4m[idxM];
-            var tr6m = r6m[idxM];
+            let srcM = srcsMulti[idxM];
+            let tr4m = r4m[idxM];
+            let tr6m = r6m[idxM];
             idxM++;
             if (srcM == null || srcM.config_entry_id == null) {
               postOneVlan();
               return;
             }
-            var scopeIdM = scopeIdFromSource(srcM);
+            let scopeIdM = scopeIdFromSource(srcM);
             if (scopeIdM != null && selectedScopes.indexOf(scopeIdM) === -1) {
               postOneVlan();
               return;
             }
-            var payloadM = JSON.stringify({
+            let payloadM = JSON.stringify({
               config_entry_id: srcM.config_entry_id,
               form: collectVlanFormWithCombinedRow(tr4m, tr6m),
             });
@@ -1140,7 +1140,7 @@
               })
               .then(function (x) {
                 if (!x.ok) {
-                  var msgM =
+                  let msgM =
                     (x.j && (x.j.detail || x.j.message)) ||
                     (isCfg ? "Could not save configuration." : "Could not save to task queue.");
                   alert(typeof msgM === "string" ? msgM : JSON.stringify(msgM));
@@ -1160,7 +1160,7 @@
           return;
         }
 
-        var cid = currentNetRow && currentNetRow.config_entry_id;
+        let cid = currentNetRow && currentNetRow.config_entry_id;
         if (cid == null) {
           alert(
             isCfg
@@ -1169,7 +1169,7 @@
           );
           return;
         }
-        var payload = JSON.stringify({
+        let payload = JSON.stringify({
           config_entry_id: cid,
           form: collectVlanForm(),
         });
@@ -1187,7 +1187,7 @@
           })
           .then(function (x) {
             if (!x.ok) {
-              var msg2 =
+              let msg2 =
                 (x.j && (x.j.detail || x.j.message)) ||
                 (isCfg ? "Could not save configuration." : "Could not save to task queue.");
               alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
@@ -1210,9 +1210,9 @@
   }
 
   function openFromTr(tr) {
-    var row = tr && tr._gcNetRow;
+    let row = tr && tr._gcNetRow;
     currentNetRow = row || null;
-    var root = document.getElementById("gc-net-vlan-flyout");
+    let root = document.getElementById("gc-net-vlan-flyout");
     if (!row || !root) return;
     if (row.entity_type && row.entity_type !== "vlan") return;
     if (root.dataset.gcVlanFlyoutBound !== "1") {
@@ -1222,18 +1222,18 @@
     populateFromRow(row);
   }
 
-  window.gcNetVlanFlyoutInit = function () {
-    var root = document.getElementById("gc-net-vlan-flyout");
+  globalThis.gcNetVlanFlyoutInit = function () {
+    let root = document.getElementById("gc-net-vlan-flyout");
     if (!root) return;
     bind(root);
   };
 
-  window.gcNetVlanFlyoutOpenFromTr = function (tr) {
+  globalThis.gcNetVlanFlyoutOpenFromTr = function (tr) {
     openFromTr(tr);
   };
 
-  window.gcNetVlanFlyoutOpenAdd = function () {
-    var root = document.getElementById("gc-net-vlan-flyout");
+  globalThis.gcNetVlanFlyoutOpenAdd = function () {
+    let root = document.getElementById("gc-net-vlan-flyout");
     if (!root) return;
     if (root.dataset.gcVlanFlyoutBound !== "1") {
       bind(root);

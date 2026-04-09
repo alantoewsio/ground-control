@@ -8,9 +8,10 @@ import re
 import time
 import uuid
 from typing import AsyncIterator
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response, StreamingResponse
 
@@ -275,19 +276,46 @@ def _client_request_log_fields(request: Request, body: bytes) -> dict[str, objec
     }
 
 
+def _normalized_proxy_path(full_path: str) -> str:
+    """Reject traversal and build a safe path segment for urljoin (Sonar S7044)."""
+    raw = (full_path or "").strip()
+    if "\x00" in raw:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    want_trailing_slash = raw.endswith("/")
+    s = raw.replace("\\", "/")
+    if s.startswith("/"):
+        s = s[1:]
+    segments: list[str] = []
+    for seg in s.split("/"):
+        if seg in ("", "."):
+            continue
+        if seg == "..":
+            raise HTTPException(status_code=400, detail="Invalid path")
+        segments.append(seg)
+    out = "/" + "/".join(segments) if segments else "/"
+    if want_trailing_slash and not out.endswith("/"):
+        out += "/"
+    return out
+
+
+def _upstream_target_url(upstream_base: str, full_path: str, query: str) -> str:
+    norm = _normalized_proxy_path(full_path)
+    base = upstream_base.rstrip("/") + "/"
+    tail = "" if norm == "/" else norm.lstrip("/")
+    path_url = urljoin(base, tail)
+    if query:
+        return f"{path_url}?{query}"
+    return path_url
+
+
 async def stream_firewall_webadmin(
     request: Request,
     row: Firewall,
     full_path: str,
 ) -> Response:
     upstream_base = https_admin_url_for_firewall(row.host, row.port).rstrip("/")
-    path = full_path if full_path.startswith("/") else f"/{full_path}"
-    if not path.startswith("/"):
-        path = "/" + path
     q = request.url.query
-    target = f"{upstream_base}{path}"
-    if q:
-        target = f"{target}?{q}"
+    target = _upstream_target_url(upstream_base, full_path, q)
 
     body = await request.body()
     send_headers = _client_headers_to_upstream(request, row)

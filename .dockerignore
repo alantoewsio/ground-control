@@ -14,7 +14,8 @@ build
 tests
 mocks
 xml-api-docs
-scripts
+scripts/*
+!scripts/docker_healthcheck.py
 
 *.db
 *.db-shm

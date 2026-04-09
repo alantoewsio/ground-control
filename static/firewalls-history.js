@@ -1,8 +1,10 @@
 (function () {
   "use strict";
 
-  var rootCfg = window.GC_FIREWALLS_HISTORY;
+  let rootCfg = globalThis.GC_FIREWALLS_HISTORY;
   if (!rootCfg || !rootCfg.tables || !rootCfg.tables.length) return;
+
+  let historyTableRefreshRowUi = [];
 
   function escapeHtml(s) {
     return String(s)
@@ -13,56 +15,56 @@
   }
 
   function initHistoryTable(cfg) {
-    var table = document.getElementById(cfg.tableId);
+    let table = document.getElementById(cfg.tableId);
     if (!table) return;
 
-    var COLS = cfg.cols;
-    var lsKey = cfg.lsKeyCols;
-    var facetKey = cfg.facetStorageKey;
-    var colInputSel = "input[" + cfg.colCheckboxAttr + "]";
+    let COLS = cfg.cols;
+    let lsKey = cfg.lsKeyCols;
+    let facetKey = cfg.facetStorageKey;
+    let colInputSel = "input[" + cfg.colCheckboxAttr + "]";
 
-    var filtersDrawer = document.getElementById(cfg.prefix + "-filters-drawer");
-    var filtersAside = document.getElementById(cfg.prefix + "-filters-aside");
-    var searchIn = document.getElementById(cfg.prefix + "-search");
-    var filterEmpty = document.getElementById(cfg.filterEmptyRowId);
-    var countEl = document.getElementById(cfg.countElId);
-    var tbody = table.querySelector("tbody");
-    var tableScroll = table.closest(".table-scroll");
-    var isOutgoingHistory = cfg.prefix === "gc-hist-out";
-    var outgoingListUrl = isOutgoingHistory ? (rootCfg.outgoingListUrl || "") : "";
-    var outgoingPageSize = Math.max(
+    let filtersDrawer = document.getElementById(cfg.prefix + "-filters-drawer");
+    let filtersAside = document.getElementById(cfg.prefix + "-filters-aside");
+    let searchIn = document.getElementById(cfg.prefix + "-search");
+    let filterEmpty = document.getElementById(cfg.filterEmptyRowId);
+    let countEl = document.getElementById(cfg.countElId);
+    let tbody = table.querySelector("tbody");
+    let tableScroll = table.closest(".table-scroll");
+    let isOutgoingHistory = cfg.prefix === "gc-hist-out";
+    let outgoingListUrl = isOutgoingHistory ? (rootCfg.outgoingListUrl || "") : "";
+    let outgoingPageSize = Math.max(
       1,
       parseInt(rootCfg.outgoingPageSize || 200, 10) || 200
     );
-    var outgoingHasMore = isOutgoingHistory
+    let outgoingHasMore = isOutgoingHistory
       ? !!rootCfg.outgoingHasMore
       : false;
-    var outgoingNextOffset = isOutgoingHistory
+    let outgoingNextOffset = isOutgoingHistory
       ? parseInt(
           rootCfg.outgoingInitialCount || tbody.querySelectorAll("tr." + cfg.rowClass).length,
           10
         ) || 0
       : 0;
-    var outgoingLoading = false;
-    var outgoingScrollTicking = false;
+    let outgoingLoading = false;
+    let outgoingScrollTicking = false;
 
-    var facetCols = COLS.map(function (c) {
-      var lab = c.label;
-      if (typeof window.gcTableColumnDisplayLabel === "function") {
-        lab = window.gcTableColumnDisplayLabel(lab);
+    let facetCols = COLS.map(function (c) {
+      let lab = c.label;
+      if (typeof globalThis.gcTableColumnDisplayLabel === "function") {
+        lab = globalThis.gcTableColumnDisplayLabel(lab);
       }
       return { id: c.id, label: lab };
     });
 
     function loadColVis() {
-      var d = {};
+      let d = {};
       COLS.forEach(function (c) {
         d[c.id] = c.defaultHidden ? false : true;
       });
       try {
-        var raw = localStorage.getItem(lsKey);
+        let raw = localStorage.getItem(lsKey);
         if (raw) {
-          var o = JSON.parse(raw);
+          let o = JSON.parse(raw);
           if (o && typeof o === "object") {
             COLS.forEach(function (c) {
               if (Object.prototype.hasOwnProperty.call(o, c.id)) d[c.id] = !!o[c.id];
@@ -70,7 +72,7 @@
           }
         }
       } catch (e) {}
-      var visible = 0;
+      let visible = 0;
       COLS.forEach(function (c) {
         if (d[c.id]) visible++;
       });
@@ -78,7 +80,7 @@
       return d;
     }
 
-    var colVis = loadColVis();
+    let colVis = loadColVis();
 
     function persistColVis(vis) {
       try {
@@ -88,7 +90,7 @@
 
     function applyColVis(vis) {
       COLS.forEach(function (c) {
-        var on = !!vis[c.id];
+        let on = !!vis[c.id];
         table.querySelectorAll('[data-gc-col="' + c.id + '"]').forEach(function (el) {
           el.classList.toggle("gc-col-hidden", !on);
         });
@@ -96,14 +98,14 @@
     }
 
     function syncFilterEmptyColspan() {
-      var n = table.querySelectorAll("thead th").length;
+      let n = table.querySelectorAll("thead th").length;
       if (filterEmpty) {
-        var td = filterEmpty.querySelector("td");
+        let td = filterEmpty.querySelector("td");
         if (td) td.setAttribute("colspan", String(n));
       }
-      var ph = tbody && tbody.querySelector("." + cfg.placeholderRowClass);
+      let ph = tbody && tbody.querySelector("." + cfg.placeholderRowClass);
       if (ph) {
-        var ptd = ph.querySelector("td");
+        let ptd = ph.querySelector("td");
         if (ptd) ptd.setAttribute("colspan", String(n));
       }
     }
@@ -112,9 +114,9 @@
     syncFilterEmptyColspan();
 
     function rowFacetMapFromTr(tr) {
-      var m = {};
+      let m = {};
       tr.querySelectorAll("td[data-gc-col]").forEach(function (td) {
-        var k = td.getAttribute("data-gc-col");
+        let k = td.dataset.gcCol;
         if (!k) return;
         m[k] = (td.textContent || "").trim().replace(/\s+/g, " ");
       });
@@ -122,22 +124,22 @@
     }
 
     function rebuildFacets(done) {
-      if (!filtersDrawer || !window.gcTableFacets) {
+      if (!filtersDrawer || !globalThis.gcTableFacets) {
         if (typeof done === "function") done();
         return;
       }
-      var rowEls = Array.prototype.slice.call(tbody.querySelectorAll("tr." + cfg.rowClass));
-      var maps = rowEls.map(function (tr) {
+      let rowEls = Array.prototype.slice.call(tbody.querySelectorAll("tr." + cfg.rowClass));
+      let maps = rowEls.map(function (tr) {
         return rowFacetMapFromTr(tr);
       });
       function rebuildHistoryDrawer() {
-        window.gcTableFacets.rebuild(filtersDrawer, facetCols, maps, facetKey);
+        globalThis.gcTableFacets.rebuild(filtersDrawer, facetCols, maps, facetKey);
         if (typeof done === "function") done();
       }
-      var lazy = window.gcTableLazy;
+      let lazy = globalThis.gcTableLazy;
       if (!lazy || typeof lazy.forEachChunked !== "function" || rowEls.length <= lazy.DEFAULT_THRESHOLD) {
         rowEls.forEach(function (tr, i) {
-          window.gcTableFacets.setRowFacets(tr, maps[i]);
+          globalThis.gcTableFacets.setRowFacets(tr, maps[i]);
         });
         rebuildHistoryDrawer();
         return;
@@ -146,22 +148,22 @@
         rowEls,
         lazy.DEFAULT_CHUNK,
         function (tr, i) {
-          window.gcTableFacets.setRowFacets(tr, maps[i]);
+          globalThis.gcTableFacets.setRowFacets(tr, maps[i]);
         },
         rebuildHistoryDrawer,
       );
     }
 
     function facetAppliedCount() {
-      if (!filtersDrawer || !window.gcTableFacets) return 0;
-      return window.gcTableFacets.appliedCount(filtersDrawer);
+      if (!filtersDrawer || !globalThis.gcTableFacets) return 0;
+      return globalThis.gcTableFacets.appliedCount(filtersDrawer);
     }
 
     function updateFacetChrome() {
-      var n = facetAppliedCount();
-      var head = document.getElementById(cfg.prefix + "-facet-head-actions");
-      var countElFacet = document.getElementById(cfg.prefix + "-facet-count");
-      var resetBtn = document.getElementById(cfg.prefix + "-facet-reset");
+      let n = facetAppliedCount();
+      let head = document.getElementById(cfg.prefix + "-facet-head-actions");
+      let countElFacet = document.getElementById(cfg.prefix + "-facet-count");
+      let resetBtn = document.getElementById(cfg.prefix + "-facet-reset");
       if (!head || !countElFacet || !resetBtn) return;
       if (n > 0) {
         head.hidden = false;
@@ -176,7 +178,7 @@
 
     function setFiltersAsideCollapsed(collapsed) {
       if (!filtersAside || !filtersDrawer) return;
-      var btn = document.getElementById(cfg.prefix + "-filters-toggle");
+      let btn = document.getElementById(cfg.prefix + "-filters-toggle");
       filtersAside.classList.toggle("filters--collapsed", collapsed);
       if (btn) btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
       if (collapsed) filtersDrawer.setAttribute("hidden", "");
@@ -185,38 +187,38 @@
 
     function globalFwRowOk(tr) {
       if (
-        typeof window.gcSkipGlobalFirewallTableFilter === "function" &&
-        window.gcSkipGlobalFirewallTableFilter()
+        typeof globalThis.gcSkipGlobalFirewallTableFilter === "function" &&
+        globalThis.gcSkipGlobalFirewallTableFilter()
       ) {
         return true;
       }
-      if (typeof window.gcGetSelectedFirewallIds !== "function") return true;
-      var ids = window.gcGetSelectedFirewallIds();
-      if (ids.length === 0) return false;
-      var fid = tr.getAttribute("data-firewall-id");
-      if (fid == null || fid === "") return false;
-      var n = parseInt(fid, 10);
-      if (isNaN(n)) return false;
+      if (typeof globalThis.gcGetSelectedFirewallIds !== "function") return true;
+      let ids = globalThis.gcGetSelectedFirewallIds();
+      if (ids.length === 0) return true;
+      let fid = tr.dataset.firewallId;
+      if (fid == null || fid === "") return true;
+      let n = parseInt(fid, 10);
+      if (isNaN(n) || n <= 0) return true;
       return ids.indexOf(n) !== -1;
     }
 
     function applyRowFilter() {
-      var q = (searchIn && searchIn.value ? searchIn.value : "").trim().toLowerCase();
-      var rows = tbody.querySelectorAll("tr." + cfg.rowClass);
-      var visible = 0;
-      var total = rows.length;
+      let q = (searchIn && searchIn.value ? searchIn.value : "").trim().toLowerCase();
+      let rows = tbody.querySelectorAll("tr." + cfg.rowClass);
+      let visible = 0;
+      let total = rows.length;
       rows.forEach(function (tr) {
-        var s = tr.getAttribute("data-search") || "";
-        var facetOk =
+        let s = tr.dataset.search || "";
+        let facetOk =
           !filtersDrawer ||
-          !window.gcTableFacets ||
-          window.gcTableFacets.rowMatches(tr, filtersDrawer);
-        var ok = (!q || s.indexOf(q) !== -1) && facetOk && globalFwRowOk(tr);
+          !globalThis.gcTableFacets ||
+          globalThis.gcTableFacets.rowMatches(tr, filtersDrawer);
+        let ok = (!q || s.indexOf(q) !== -1) && facetOk && globalFwRowOk(tr);
         tr.hidden = !ok;
         if (ok) visible++;
       });
       if (filterEmpty) filterEmpty.hidden = !(total > 0 && visible === 0);
-      var ph = tbody.querySelector("." + cfg.placeholderRowClass);
+      let ph = tbody.querySelector("." + cfg.placeholderRowClass);
       if (ph) ph.hidden = total > 0;
       if (countEl) {
         if (total === 0) countEl.textContent = "";
@@ -248,9 +250,9 @@
     }
 
     function historyFirewallCellHtml(row) {
-      var label = row && row.firewall_label != null ? String(row.firewall_label) : "—";
+      let label = row && row.firewall_label != null ? String(row.firewall_label) : "—";
       if (row && row.firewall_id != null && row.firewall_id !== "") {
-        var online = !!row.firewall_online;
+        let online = !!row.firewall_online;
         return (
           '<span class="gc-zone-pill gc-firewall-pill">' +
           '<span class="gc-firewall-pill-status gc-firewall-pill-status--' +
@@ -269,22 +271,22 @@
     }
 
     function historyOutgoingRowHtml(row) {
-      var rid = row && row.id != null ? String(row.id) : "";
-      var sourceTask = row && row.source_task_id != null ? String(row.source_task_id) : "—";
-      var sourceSort = row && row.source_task_id != null ? String(row.source_task_id) : "0";
-      var firewallId =
+      let rid = row && row.id != null ? String(row.id) : "";
+      let sourceTask = row && row.source_task_id != null ? String(row.source_task_id) : "—";
+      let sourceSort = row && row.source_task_id != null ? String(row.source_task_id) : "0";
+      let firewallId =
         row && row.firewall_id != null && row.firewall_id !== "" ? String(row.firewall_id) : "";
-      var outcome = row && row.outcome ? String(row.outcome) : "sent";
-      var searchBlob = row && row.search_blob != null ? String(row.search_blob) : "";
-      var entityType = row && row.entity_type != null ? String(row.entity_type) : "";
-      var externalName = row && row.external_name != null ? String(row.external_name) : "";
-      var queuedBy = row && row.created_by_username != null ? String(row.created_by_username) : "—";
-      var completedBy =
+      let outcome = row && row.outcome ? String(row.outcome) : "sent";
+      let searchBlob = row && row.search_blob != null ? String(row.search_blob) : "";
+      let entityType = row && row.entity_type != null ? String(row.entity_type) : "";
+      let externalName = row && row.external_name != null ? String(row.external_name) : "";
+      let queuedBy = row && row.created_by_username != null ? String(row.created_by_username) : "—";
+      let completedBy =
         row && row.completed_by_username != null ? String(row.completed_by_username) : "—";
-      var createdAt = row && row.created_at != null ? String(row.created_at) : "";
-      var completedAt = row && row.completed_at != null ? String(row.completed_at) : "";
-      var statusLabel = historyOutcomeLabel(outcome);
-      var firewallHtml = historyFirewallCellHtml(row || {});
+      let createdAt = row && row.created_at != null ? String(row.created_at) : "";
+      let completedAt = row && row.completed_at != null ? String(row.completed_at) : "";
+      let statusLabel = historyOutcomeLabel(outcome);
+      let firewallHtml = historyFirewallCellHtml(row || {});
       return (
         '<tr class="gc-hist-out-row" data-firewall-id="' +
         escapeHtml(firewallId) +
@@ -329,10 +331,10 @@
 
     function appendOutgoingRows(rows) {
       if (!rows || !rows.length || !tbody) return;
-      var html = rows.map(historyOutgoingRowHtml).join("");
-      var wrap = document.createElement("tbody");
+      let html = rows.map(historyOutgoingRowHtml).join("");
+      let wrap = document.createElement("tbody");
       wrap.innerHTML = html;
-      var nodes = Array.prototype.slice.call(wrap.children);
+      let nodes = Array.prototype.slice.call(wrap.children);
       nodes.forEach(function (tr) {
         if (filterEmpty && filterEmpty.parentElement === tbody) {
           tbody.insertBefore(tr, filterEmpty);
@@ -340,7 +342,7 @@
           tbody.appendChild(tr);
         }
       });
-      var ph = tbody.querySelector("." + cfg.placeholderRowClass);
+      let ph = tbody.querySelector("." + cfg.placeholderRowClass);
       if (ph) ph.remove();
       applyColVis(colVis);
       syncFilterEmptyColspan();
@@ -372,8 +374,8 @@
         return;
       }
       outgoingLoading = true;
-      var sep = outgoingListUrl.indexOf("?") === -1 ? "?" : "&";
-      var url =
+      let sep = outgoingListUrl.indexOf("?") === -1 ? "?" : "&";
+      let url =
         outgoingListUrl +
         sep +
         "offset=" +
@@ -385,7 +387,7 @@
           return r.json();
         })
         .then(function (payload) {
-          var rows = (payload && payload.rows) || [];
+          let rows = (payload && payload.rows) || [];
           appendOutgoingRows(rows);
           outgoingNextOffset += rows.length;
           outgoingHasMore = !!(payload && payload.has_more);
@@ -424,7 +426,7 @@
         ) {
           return;
         }
-        var remaining =
+        let remaining =
           tableScroll.scrollHeight - (tableScroll.scrollTop + tableScroll.clientHeight);
         if (remaining <= 240) {
           loadMoreOutgoingRows();
@@ -432,25 +434,25 @@
       });
     }
 
-    var toggleBtn = document.getElementById(cfg.prefix + "-filters-toggle");
+    let toggleBtn = document.getElementById(cfg.prefix + "-filters-toggle");
     if (toggleBtn) {
       toggleBtn.addEventListener("click", function () {
-        var collapsed = filtersAside && filtersAside.classList.contains("filters--collapsed");
+        let collapsed = filtersAside && filtersAside.classList.contains("filters--collapsed");
         setFiltersAsideCollapsed(!collapsed);
       });
     }
 
-    var resetBtn = document.getElementById(cfg.prefix + "-facet-reset");
+    let resetBtn = document.getElementById(cfg.prefix + "-facet-reset");
     if (resetBtn) {
       resetBtn.addEventListener("click", function () {
-        if (filtersDrawer && window.gcTableFacets) window.gcTableFacets.reset(filtersDrawer, facetKey);
+        if (filtersDrawer && globalThis.gcTableFacets) globalThis.gcTableFacets.reset(filtersDrawer, facetKey);
         updateFacetChrome();
         applyRowFilter();
       });
     }
 
-    if (filtersAside && window.gcTableFacets) {
-      window.gcTableFacets.bindAside(
+    if (filtersAside && globalThis.gcTableFacets) {
+      globalThis.gcTableFacets.bindAside(
         filtersAside,
         function () {
           updateFacetChrome();
@@ -461,25 +463,25 @@
     }
 
     if (searchIn) {
-      if (window.gcTableFacets && window.gcTableFacets.bindToolbarSearch) {
-        window.gcTableFacets.bindToolbarSearch(searchIn, facetKey, applyRowFilter);
+      if (globalThis.gcTableFacets && globalThis.gcTableFacets.bindToolbarSearch) {
+        globalThis.gcTableFacets.bindToolbarSearch(searchIn, facetKey, applyRowFilter);
       } else {
         searchIn.addEventListener("input", applyRowFilter);
       }
     }
 
-    var modal = document.getElementById(cfg.prefix + "-cols-modal");
-    var colsTrigger = document.getElementById(cfg.prefix + "-cols-trigger");
-    var colsPanel = document.getElementById(cfg.prefix + "-cols-panel");
-    var colsFilter = document.getElementById(cfg.prefix + "-cols-filter");
-    var colsList = document.getElementById(cfg.prefix + "-cols-list");
-    var colsClose = document.getElementById(cfg.prefix + "-cols-close");
+    let modal = document.getElementById(cfg.prefix + "-cols-modal");
+    let colsTrigger = document.getElementById(cfg.prefix + "-cols-trigger");
+    let colsPanel = document.getElementById(cfg.prefix + "-cols-panel");
+    let colsFilter = document.getElementById(cfg.prefix + "-cols-filter");
+    let colsList = document.getElementById(cfg.prefix + "-cols-list");
+    let colsClose = document.getElementById(cfg.prefix + "-cols-close");
 
     function filterColMenuList() {
-      var q = (colsFilter && colsFilter.value ? colsFilter.value : "").trim().toLowerCase();
+      let q = (colsFilter && colsFilter.value ? colsFilter.value : "").trim().toLowerCase();
       if (!colsList) return;
       colsList.querySelectorAll("li[data-col-label]").forEach(function (li) {
-        var lab = (li.dataset.colLabel || "").toLowerCase();
+        let lab = (li.dataset.colLabel || "").toLowerCase();
         li.hidden = q !== "" && lab.indexOf(q) === -1;
       });
     }
@@ -514,23 +516,23 @@
     function positionColsDropdown() {
       if (!colsTrigger || !colsPanel || !modal || modal.hidden) return;
       colsPanel.style.maxHeight = "";
-      var r = colsTrigger.getBoundingClientRect();
-      var gap = 6;
-      var margin = 8;
-      var pw = colsPanel.offsetWidth || Math.min(380, window.innerWidth - 2 * margin);
-      var left = r.left;
-      if (left + pw > window.innerWidth - margin) left = window.innerWidth - margin - pw;
+      let r = colsTrigger.getBoundingClientRect();
+      let gap = 6;
+      let margin = 8;
+      let pw = colsPanel.offsetWidth || Math.min(380, globalThis.innerWidth - 2 * margin);
+      let left = r.left;
+      if (left + pw > globalThis.innerWidth - margin) left = globalThis.innerWidth - margin - pw;
       left = Math.max(margin, left);
-      var topBelow = r.bottom + gap;
+      let topBelow = r.bottom + gap;
       colsPanel.style.left = left + "px";
       colsPanel.style.top = topBelow + "px";
-      var after = colsPanel.getBoundingClientRect();
-      if (after.bottom > window.innerHeight - margin) {
-        var aboveTop = r.top - gap - after.height;
+      let after = colsPanel.getBoundingClientRect();
+      if (after.bottom > globalThis.innerHeight - margin) {
+        let aboveTop = r.top - gap - after.height;
         if (aboveTop >= margin) colsPanel.style.top = aboveTop + "px";
         else {
           colsPanel.style.top = margin + "px";
-          colsPanel.style.maxHeight = Math.max(120, window.innerHeight - 2 * margin) + "px";
+          colsPanel.style.maxHeight = Math.max(120, globalThis.innerHeight - 2 * margin) + "px";
         }
       }
     }
@@ -553,7 +555,7 @@
     }
 
     function openColsFromTrigger() {
-      var willOpen = modal.hidden;
+      let willOpen = modal.hidden;
       setColPanelOpen(willOpen);
       if (willOpen) {
         buildColMenuList();
@@ -581,7 +583,7 @@
       });
     }
     if (modal) {
-      var bd = modal.querySelector(".fw-cols-modal__backdrop");
+      let bd = modal.querySelector(".fw-cols-modal__backdrop");
       if (bd) {
         bd.addEventListener("click", function () {
           setColPanelOpen(false);
@@ -591,12 +593,12 @@
     }
     if (colsList) {
       colsList.addEventListener("change", function (e) {
-        var cb = e.target.closest(colInputSel);
+        let cb = e.target.closest(colInputSel);
         if (!cb || cb.type !== "checkbox") return;
-        var id = cb.getAttribute(cfg.colCheckboxAttr);
+        let id = cb.getAttribute(cfg.colCheckboxAttr);
         if (!id || !Object.prototype.hasOwnProperty.call(colVis, id)) return;
         colVis[id] = cb.checked;
-        var nOn = 0;
+        let nOn = 0;
         COLS.forEach(function (c) {
           if (colVis[c.id]) nOn++;
         });
@@ -623,15 +625,20 @@
         if (colsTrigger) colsTrigger.focus();
       }
     });
-    window.addEventListener("resize", function () {
+    globalThis.addEventListener("resize", function () {
       if (modal && !modal.hidden) positionColsDropdown();
+    });
+
+    historyTableRefreshRowUi.push(function () {
+      applyRowFilter();
+      updateFacetChrome();
     });
 
     rebuildFacets(function () {
       applyRowFilter();
       updateFacetChrome();
-      if (window.gcTableSort && typeof window.gcTableSort.bindTable === "function") {
-        window.gcTableSort.bindTable(table);
+      if (globalThis.gcTableSort && typeof globalThis.gcTableSort.bindTable === "function") {
+        globalThis.gcTableSort.bindTable(table);
       }
       maybeLoadOutgoingUntilScrollable();
     });
@@ -642,59 +649,88 @@
     }
   }
 
-  rootCfg.tables.forEach(initHistoryTable);
-
-  var TAB_LS = rootCfg.tabLsKey || "ground-control-firewalls-history-tab";
-  var FILTER_ASIDE_IDS = rootCfg.filterAsideIds || [];
+  let TAB_LS = rootCfg.tabLsKey || "ground-control-firewalls-history-tab";
+  let FILTER_ASIDE_IDS = rootCfg.filterAsideIds || [];
 
   function readSavedTab() {
     try {
-      var raw = localStorage.getItem(TAB_LS);
-      if (raw === "incoming" || raw === "outgoing" || raw === "sync" || raw === "access") return raw;
+      let raw = localStorage.getItem(TAB_LS);
+      if (
+        raw === "incoming" ||
+        raw === "outgoing" ||
+        raw === "sync" ||
+        raw === "access" ||
+        raw === "letsencrypt"
+      )
+        return raw;
       if (raw === "changes") return "incoming";
     } catch (e) {}
     return "incoming";
   }
 
   function readTabFromHash() {
-    var h = (window.location.hash || "").replace(/^#/, "").toLowerCase();
-    if (h === "outgoing" || h === "incoming" || h === "sync" || h === "access") return h;
+    let h = (globalThis.location.hash || "").replace(/^#/, "").toLowerCase();
+    if (
+      h === "outgoing" ||
+      h === "incoming" ||
+      h === "sync" ||
+      h === "access" ||
+      h === "letsencrypt"
+    )
+      return h;
     return null;
   }
 
-  var hashTab = readTabFromHash();
-  var activeTab = hashTab || readSavedTab();
-  if (activeTab !== "incoming" && activeTab !== "outgoing" && activeTab !== "sync" && activeTab !== "access") {
+  let hashTab = readTabFromHash();
+  let activeTab = hashTab || readSavedTab();
+  if (
+    activeTab !== "incoming" &&
+    activeTab !== "outgoing" &&
+    activeTab !== "sync" &&
+    activeTab !== "access" &&
+    activeTab !== "letsencrypt"
+  ) {
     activeTab = "incoming";
   }
-  if (hashTab) {
-    try {
-      localStorage.setItem(TAB_LS, hashTab);
-    } catch (e) {}
-  }
+  try {
+    localStorage.setItem(TAB_LS, activeTab);
+  } catch (e) {}
+  try {
+    let curHash = (globalThis.location.hash || "").replace(/^#/, "").toLowerCase();
+    if (curHash !== activeTab) {
+      if (!(activeTab === "incoming" && !curHash)) {
+        history.replaceState(
+          null,
+          "",
+          globalThis.location.pathname + globalThis.location.search + "#" + activeTab,
+        );
+      }
+    }
+  } catch (e2) {}
 
   function syncFilterAsidesVisibility() {
     FILTER_ASIDE_IDS.forEach(function (item) {
-      var el = document.getElementById(item.id);
+      let el = document.getElementById(item.id);
       if (!el) return;
       el.hidden = item.tab !== activeTab;
     });
   }
 
-  var tablist = document.getElementById("gc-fw-hist-tablist");
-  var tabs = tablist ? tablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-tab]") : [];
-  var panels = {
+  let tablist = document.getElementById("gc-fw-hist-tablist");
+  let tabs = tablist ? tablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-tab]") : [];
+  let panels = {
     incoming: document.getElementById("gc-fw-hist-panel-incoming"),
     outgoing: document.getElementById("gc-fw-hist-panel-outgoing"),
     sync: document.getElementById("gc-fw-hist-panel-sync"),
     access: document.getElementById("gc-fw-hist-panel-access"),
+    letsencrypt: document.getElementById("gc-fw-hist-panel-letsencrypt"),
   };
 
   function applyTabPanels() {
     Object.keys(panels).forEach(function (key) {
-      var p = panels[key];
+      let p = panels[key];
       if (!p) return;
-      var show = key === activeTab;
+      let show = key === activeTab;
       p.classList.toggle("is-active", show);
       p.hidden = !show;
     });
@@ -702,38 +738,43 @@
 
   function syncTabButtons() {
     tabs.forEach(function (t) {
-      var tid = t.getAttribute("data-gc-tab");
-      var on = tid === activeTab;
+      let tid = t.dataset.gcTab;
+      let on = tid === activeTab;
       t.classList.toggle("is-active", on);
       t.setAttribute("aria-selected", on ? "true" : "false");
     });
   }
 
+  syncTabButtons();
+  applyTabPanels();
+  syncFilterAsidesVisibility();
+
+  rootCfg.tables.forEach(initHistoryTable);
+
   tabs.forEach(function (tab) {
     tab.addEventListener("click", function () {
-      var id = tab.getAttribute("data-gc-tab");
+      let id = tab.dataset.gcTab;
       if (!id) return;
       activeTab = id;
       syncTabButtons();
       applyTabPanels();
       syncFilterAsidesVisibility();
+      historyTableRefreshRowUi.forEach(function (fn) {
+        fn();
+      });
       try {
         localStorage.setItem(TAB_LS, id);
       } catch (e) {}
       try {
-        var tail = "#" + id;
-        if (window.location.hash !== tail) {
-          history.replaceState(null, "", window.location.pathname + window.location.search + tail);
+        let tail = "#" + id;
+        if (globalThis.location.hash !== tail) {
+          history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search + tail);
         }
       } catch (e2) {}
     });
   });
 
-  syncTabButtons();
-  applyTabPanels();
-  syncFilterAsidesVisibility();
-
-  var chgCompareTpl = rootCfg.changelogCompareUrlTpl;
+  let chgCompareTpl = rootCfg.changelogCompareUrlTpl;
   if (chgCompareTpl) {
     function escChg(s) {
       return String(s)
@@ -751,15 +792,15 @@
       return "";
     }
 
-    var chgTableBody = document.querySelector("#gc-hist-chg-table tbody");
-    var compareModal = document.getElementById("gc-hist-chg-compare-modal");
-    var compareClose = document.getElementById("gc-hist-chg-compare-close");
-    var compareBackdrop = compareModal && compareModal.querySelector(".task-queue-compare-modal__backdrop");
-    var compareMeta = document.getElementById("gc-hist-chg-compare-meta");
-    var compareMissing = document.getElementById("gc-hist-chg-compare-missing");
-    var compareTbody = document.getElementById("gc-hist-chg-diff-tbody");
-    var compareOpen = false;
-    var compareLoadSeq = 0;
+    let chgTableBody = document.querySelector("#gc-hist-chg-table tbody");
+    let compareModal = document.getElementById("gc-hist-chg-compare-modal");
+    let compareClose = document.getElementById("gc-hist-chg-compare-close");
+    let compareBackdrop = compareModal && compareModal.querySelector(".task-queue-compare-modal__backdrop");
+    let compareMeta = document.getElementById("gc-hist-chg-compare-meta");
+    let compareMissing = document.getElementById("gc-hist-chg-compare-missing");
+    let compareTbody = document.getElementById("gc-hist-chg-diff-tbody");
+    let compareOpen = false;
+    let compareLoadSeq = 0;
 
     function changelogCompareUrl(id) {
       return chgCompareTpl.split("__ID__").join(String(parseInt(id, 10)));
@@ -776,7 +817,7 @@
     function openChgCompareModal(entryId) {
       if (!compareModal || !compareTbody || !compareMeta) return;
       compareOpen = true;
-      var seq = ++compareLoadSeq;
+      let seq = ++compareLoadSeq;
       compareModal.hidden = false;
       compareModal.setAttribute("aria-hidden", "false");
       compareTbody.innerHTML = "";
@@ -799,7 +840,7 @@
             compareMeta.textContent = (x.j && x.j.detail) || "Could not load comparison.";
             return;
           }
-          var j = x.j || {};
+          let j = x.j || {};
           compareMeta.textContent =
             (j.entity_type || "") +
             " · " +
@@ -809,8 +850,8 @@
             " · changelog #" +
             (j.changelog_id != null ? j.changelog_id : entryId);
           if (compareMissing) {
-            var lm = !!j.left_missing;
-            var rm = !!j.right_missing;
+            let lm = !!j.left_missing;
+            let rm = !!j.right_missing;
             if (lm && rm) {
               compareMissing.textContent =
                 "Neither a previous nor a new payload was recorded for this row.";
@@ -825,11 +866,11 @@
               compareMissing.hidden = true;
             }
           }
-          var rows = j.rows || [];
-          var histDiffHtml = rows
+          let rows = j.rows || [];
+          let histDiffHtml = rows
             .map(function (row) {
-              var lc = row.left_class || "eq";
-              var rc = row.right_class || "eq";
+              let lc = row.left_class || "eq";
+              let rc = row.right_class || "eq";
               return (
                 "<tr><td class=\"task-queue-diff__cell task-queue-diff__cell--" +
                 escChg(lc) +
@@ -844,17 +885,17 @@
             })
             .join("");
           function finishHistCompareDiffMount() {
-            if (window.gcTableSort && compareTbody) {
-              var diffTable = compareTbody.closest("table");
-              if (diffTable) window.gcTableSort.bindTable(diffTable);
+            if (globalThis.gcTableSort && compareTbody) {
+              let diffTable = compareTbody.closest("table");
+              if (diffTable) globalThis.gcTableSort.bindTable(diffTable);
             }
             if (compareClose) compareClose.focus();
           }
-          var wrapHistDiff = document.createElement("tbody");
+          let wrapHistDiff = document.createElement("tbody");
           wrapHistDiff.innerHTML = histDiffHtml;
-          var histDiffNodes = Array.prototype.slice.call(wrapHistDiff.children);
+          let histDiffNodes = Array.prototype.slice.call(wrapHistDiff.children);
           compareTbody.innerHTML = "";
-          var lazyHistDiff = window.gcTableLazy;
+          let lazyHistDiff = globalThis.gcTableLazy;
           if (!lazyHistDiff || typeof lazyHistDiff.appendBefore !== "function" || histDiffNodes.length <= lazyHistDiff.DEFAULT_THRESHOLD) {
             compareTbody.innerHTML = histDiffHtml;
             finishHistCompareDiffMount();
@@ -877,33 +918,33 @@
     if (chgTableBody) {
       chgTableBody.addEventListener("click", function (e) {
         if (e.target.closest("input, button, a, label")) return;
-        var tr = e.target.closest("tr[data-changelog-id]");
+        let tr = e.target.closest("tr[data-changelog-id]");
         if (!tr) return;
-        var id = parseInt(tr.getAttribute("data-changelog-id"), 10);
+        let id = parseInt(tr.dataset.changelogId, 10);
         if (isNaN(id)) return;
         openChgCompareModal(id);
       });
     }
   }
 
-  var outCompareTpl = rootCfg.completedCompareUrlTpl;
+  let outCompareTpl = rootCfg.completedCompareUrlTpl;
   if (outCompareTpl) {
-    var outTableBody = document.querySelector("#gc-hist-out-table tbody");
-    var outCompareModal = document.getElementById("gc-hist-out-compare-modal");
-    var outCompareClose = document.getElementById("gc-hist-out-compare-close");
-    var outCompareBackdrop =
+    let outTableBody = document.querySelector("#gc-hist-out-table tbody");
+    let outCompareModal = document.getElementById("gc-hist-out-compare-modal");
+    let outCompareClose = document.getElementById("gc-hist-out-compare-close");
+    let outCompareBackdrop =
       outCompareModal && outCompareModal.querySelector(".task-queue-compare-modal__backdrop");
-    var outCompareMeta = document.getElementById("gc-hist-out-compare-meta");
-    var outCompareMissing = document.getElementById("gc-hist-out-compare-missing");
-    var outCompareOutcomeBanner = document.getElementById(
+    let outCompareMeta = document.getElementById("gc-hist-out-compare-meta");
+    let outCompareMissing = document.getElementById("gc-hist-out-compare-missing");
+    let outCompareOutcomeBanner = document.getElementById(
       "gc-hist-out-compare-outcome-banner"
     );
-    var outCompareTbody = document.getElementById("gc-hist-out-diff-tbody");
-    var outCompareTitle = document.getElementById("gc-hist-out-compare-title");
-    var outDiffThLeft = document.getElementById("gc-hist-out-diff-th-left");
-    var outDiffThRight = document.getElementById("gc-hist-out-diff-th-right");
-    var outCompareOpen = false;
-    var outCompareLoadSeq = 0;
+    let outCompareTbody = document.getElementById("gc-hist-out-diff-tbody");
+    let outCompareTitle = document.getElementById("gc-hist-out-compare-title");
+    let outDiffThLeft = document.getElementById("gc-hist-out-diff-th-left");
+    let outDiffThRight = document.getElementById("gc-hist-out-diff-th-right");
+    let outCompareOpen = false;
+    let outCompareLoadSeq = 0;
 
     function escOut(s) {
       return String(s)
@@ -936,7 +977,7 @@
     function openOutCompareModal(completedId) {
       if (!outCompareModal || !outCompareTbody || !outCompareMeta) return;
       outCompareOpen = true;
-      var seq = ++outCompareLoadSeq;
+      let seq = ++outCompareLoadSeq;
       outCompareModal.hidden = false;
       outCompareModal.setAttribute("aria-hidden", "false");
       outCompareTbody.innerHTML = "";
@@ -963,8 +1004,8 @@
             outCompareMeta.textContent = (x.j && x.j.detail) || "Could not load comparison.";
             return;
           }
-          var j = x.j || {};
-          var meta =
+          let j = x.j || {};
+          let meta =
             (j.entity_type || "") +
             " · " +
             (j.external_name || "") +
@@ -999,11 +1040,11 @@
               outCompareMissing.hidden = true;
             }
           }
-          var rows = j.rows || [];
-          var diffHtml = rows
+          let rows = j.rows || [];
+          let diffHtml = rows
             .map(function (row) {
-              var lc = row.left_class || "eq";
-              var rc = row.right_class || "eq";
+              let lc = row.left_class || "eq";
+              let rc = row.right_class || "eq";
               return (
                 "<tr><td class=\"task-queue-diff__cell task-queue-diff__cell--" +
                 escOut(lc) +
@@ -1018,17 +1059,17 @@
             })
             .join("");
           function finishOutCompareMount() {
-            if (window.gcTableSort && outCompareTbody) {
-              var diffTable = outCompareTbody.closest("table");
-              if (diffTable) window.gcTableSort.bindTable(diffTable);
+            if (globalThis.gcTableSort && outCompareTbody) {
+              let diffTable = outCompareTbody.closest("table");
+              if (diffTable) globalThis.gcTableSort.bindTable(diffTable);
             }
             if (outCompareClose) outCompareClose.focus();
           }
-          var wrapOut = document.createElement("tbody");
+          let wrapOut = document.createElement("tbody");
           wrapOut.innerHTML = diffHtml;
-          var outNodes = Array.prototype.slice.call(wrapOut.children);
+          let outNodes = Array.prototype.slice.call(wrapOut.children);
           outCompareTbody.innerHTML = "";
-          var lazyOut = window.gcTableLazy;
+          let lazyOut = globalThis.gcTableLazy;
           if (!lazyOut || typeof lazyOut.appendBefore !== "function" || outNodes.length <= lazyOut.DEFAULT_THRESHOLD) {
             outCompareTbody.innerHTML = diffHtml;
             finishOutCompareMount();
@@ -1051,27 +1092,27 @@
     if (outTableBody) {
       outTableBody.addEventListener("click", function (e) {
         if (e.target.closest("input, button, a, label")) return;
-        var tr = e.target.closest("tr[data-completed-id]");
+        let tr = e.target.closest("tr[data-completed-id]");
         if (!tr) return;
-        var id = parseInt(tr.getAttribute("data-completed-id"), 10);
+        let id = parseInt(tr.dataset.completedId, 10);
         if (isNaN(id)) return;
         openOutCompareModal(id);
       });
     }
   }
 
-  var syncDetailsTpl = rootCfg.syncRunDetailsUrlTpl;
+  let syncDetailsTpl = rootCfg.syncRunDetailsUrlTpl;
   if (syncDetailsTpl) {
     function syncRunDetailsUrl(runId) {
       return syncDetailsTpl.split("__RUN_ID__").join(String(runId));
     }
 
     function groupSyncDetailByFirewall(items) {
-      var buckets = [];
-      var indexByFw = {};
+      let buckets = [];
+      let indexByFw = {};
       (items || []).forEach(function (it) {
-        var fid = it.firewall_id;
-        var k = String(fid);
+        let fid = it.firewall_id;
+        let k = String(fid);
         if (!Object.prototype.hasOwnProperty.call(indexByFw, k)) {
           indexByFw[k] = buckets.length;
           buckets.push({
@@ -1084,15 +1125,15 @@
       return buckets;
     }
 
-    var syncTableBody = document.querySelector("#gc-hist-sync-table tbody");
-    var syncDetailModal = document.getElementById("gc-hist-sync-detail-modal");
-    var syncDetailClose = document.getElementById("gc-hist-sync-detail-close");
-    var syncDetailBackdrop =
+    let syncTableBody = document.querySelector("#gc-hist-sync-table tbody");
+    let syncDetailModal = document.getElementById("gc-hist-sync-detail-modal");
+    let syncDetailClose = document.getElementById("gc-hist-sync-detail-close");
+    let syncDetailBackdrop =
       syncDetailModal && syncDetailModal.querySelector(".task-queue-compare-modal__backdrop");
-    var syncDetailMeta = document.getElementById("gc-hist-sync-detail-meta");
-    var syncDetailBody = document.getElementById("gc-hist-sync-detail-body");
-    var syncDetailOpen = false;
-    var syncDetailLoadSeq = 0;
+    let syncDetailMeta = document.getElementById("gc-hist-sync-detail-meta");
+    let syncDetailBody = document.getElementById("gc-hist-sync-detail-body");
+    let syncDetailOpen = false;
+    let syncDetailLoadSeq = 0;
 
     function closeSyncDetailModal() {
       if (!syncDetailModal || !syncDetailOpen) return;
@@ -1104,14 +1145,14 @@
 
     function renderSyncDetailSections(byAction) {
       if (!syncDetailBody) return;
-      var order = [
+      let order = [
         { key: "added", title: "Added" },
         { key: "changed", title: "Changed" },
         { key: "deleted", title: "Deleted" },
       ];
-      var parts = [];
+      let parts = [];
       order.forEach(function (sec) {
-        var items = (byAction && byAction[sec.key]) || [];
+        let items = (byAction && byAction[sec.key]) || [];
         parts.push('<section class="gc-sync-run-detail-section">');
         parts.push(
           "<h3 class=\"gc-sync-run-detail-heading\">" +
@@ -1148,7 +1189,7 @@
     function openSyncDetailModal(runId) {
       if (!syncDetailModal || !syncDetailBody || !syncDetailMeta) return;
       syncDetailOpen = true;
-      var seq = ++syncDetailLoadSeq;
+      let seq = ++syncDetailLoadSeq;
       syncDetailModal.hidden = false;
       syncDetailModal.setAttribute("aria-hidden", "false");
       syncDetailBody.innerHTML = "";
@@ -1167,9 +1208,9 @@
             syncDetailMeta.textContent = (x.j && x.j.detail) || "Could not load sync details.";
             return;
           }
-          var j = x.j || {};
-          var r0 = j.run || {};
-          var bits = [];
+          let j = x.j || {};
+          let r0 = j.run || {};
+          let bits = [];
           if (r0.firewall_label) bits.push(r0.firewall_label);
           if (r0.started_at) bits.push("started " + r0.started_at);
           if (r0.finished_at) bits.push("finished " + r0.finished_at);
@@ -1184,11 +1225,11 @@
               (r0.deleted_count != null ? r0.deleted_count : "—"),
           );
           syncDetailMeta.textContent = bits.join(" · ");
-          var fws = j.firewalls || [];
-          var ba = j.by_action || {};
-          var detailTotal =
+          let fws = j.firewalls || [];
+          let ba = j.by_action || {};
+          let detailTotal =
             (ba.added || []).length + (ba.changed || []).length + (ba.deleted || []).length;
-          var note = "";
+          let note = "";
           if (detailTotal === 0) {
             note =
               '<p class="gc-sync-run-detail-firewalls-note muted">No per-object changelog rows were recorded for this run.</p>';
@@ -1222,9 +1263,9 @@
     if (syncTableBody) {
       syncTableBody.addEventListener("click", function (e) {
         if (e.target.closest("input, button, a, label")) return;
-        var tr = e.target.closest("tr[data-sync-run-id]");
+        let tr = e.target.closest("tr[data-sync-run-id]");
         if (!tr) return;
-        var rid = (tr.getAttribute("data-sync-run-id") || "").trim();
+        let rid = (tr.dataset.syncRunId || "").trim();
         if (!rid) return;
         openSyncDetailModal(rid);
       });

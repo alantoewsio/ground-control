@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var PREFLIGHT = "1";
-  var HDR = "X-GC-Navigation-Preflight";
-  var FETCH_HEADERS = {
+  let PREFLIGHT = "1";
+  let HDR = "X-GC-Navigation-Preflight";
+  let FETCH_HEADERS = {
     Accept: "application/json, text/html;q=0.5",
     "X-Requested-With": "Ground-Control",
   };
@@ -11,7 +11,7 @@
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
-      var map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+      let map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
       return map[c] || c;
     });
   }
@@ -23,8 +23,8 @@
       return detail
         .map(function (item) {
           if (item && typeof item === "object" && item.msg != null) {
-            var loc = item.loc;
-            var prefix =
+            let loc = item.loc;
+            let prefix =
               Array.isArray(loc) && loc.length
                 ? String(loc.join(".")) + ": "
                 : "";
@@ -58,29 +58,29 @@
   }
 
   async function bodyMessage(response) {
-    var ct = (response.headers.get("content-type") || "").toLowerCase();
+    let ct = (response.headers.get("content-type") || "").toLowerCase();
     if (ct.indexOf("application/json") !== -1) {
       try {
-        var j = await response.json();
+        let j = await response.json();
         if (j && j.detail !== undefined) return formatDetail(j.detail);
         return JSON.stringify(j, null, 2);
       } catch (e) {
         /* fall through */
       }
     }
-    var text = await response.text();
-    var t = text.replace(/\s+/g, " ").trim();
+    let text = await response.text();
+    let t = text.replace(/\s+/g, " ").trim();
     if (t.length > 12000) t = t.slice(0, 12000) + "\n…";
     return t || response.statusText || "Unknown error";
   }
 
-  var modal = null;
-  var titleEl = null;
-  var statusEl = null;
-  var bodyEl = null;
-  var closeBtn = null;
-  var dismissBtn = null;
-  var backdrop = null;
+  let modal = null;
+  let titleEl = null;
+  let statusEl = null;
+  let bodyEl = null;
+  let closeBtn = null;
+  let dismissBtn = null;
+  let backdrop = null;
 
   function ensureDom() {
     if (modal) return;
@@ -107,7 +107,7 @@
   function showNavErrorModal(status, title, message) {
     ensureDom();
     if (!modal || !bodyEl) {
-      window.alert([title, message].filter(Boolean).join("\n\n"));
+      globalThis.alert([title, message].filter(Boolean).join("\n\n"));
       return;
     }
     if (titleEl) titleEl.textContent = title || "Something went wrong";
@@ -126,14 +126,14 @@
     } catch (e) {}
   }
 
-  window.gcShowNavErrorModal = function (opts) {
-    var o = opts || {};
+  globalThis.gcShowNavErrorModal = function (opts) {
+    let o = opts || {};
     showNavErrorModal(o.status || 0, o.title || "Error", o.message || "");
   };
 
   function sameOriginUrl(hrefAttr, base) {
     try {
-      return new URL(hrefAttr, base || window.location.href);
+      return new URL(hrefAttr, base || globalThis.location.href);
     } catch (e) {
       return null;
     }
@@ -143,22 +143,22 @@
     if (!a || a.tagName !== "A") return true;
     if (ev.defaultPrevented) return true;
     if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return true;
-    var t = (a.getAttribute("target") || "").toLowerCase();
+    let t = (a.getAttribute("target") || "").toLowerCase();
     if (t && t !== "_self") return true;
     if (a.hasAttribute("download")) return true;
     if (a.closest("[data-gc-skip-nav-check]")) return true;
     if (a.getAttribute("aria-disabled") === "true") return true;
-    var href = a.getAttribute("href");
+    let href = a.getAttribute("href");
     if (!href || href === "#" || href.charAt(0) === "#") return true;
     if (/^(mailto:|tel:|javascript:)/i.test(href)) return true;
-    var u = sameOriginUrl(href);
-    if (!u || u.origin !== window.location.origin) return true;
+    let u = sameOriginUrl(href);
+    if (!u || u.origin !== globalThis.location.origin) return true;
     return false;
   }
 
   function hasFileInput(form) {
-    var files = form.querySelectorAll('input[type="file"]');
-    for (var i = 0; i < files.length; i++) {
+    let files = form.querySelectorAll('input[type="file"]');
+    for (let i = 0; i < files.length; i++) {
       if (files[i].files && files[i].files.length) return true;
     }
     return false;
@@ -168,21 +168,21 @@
     if (!form || form.tagName !== "FORM") return true;
     if (ev.defaultPrevented) return true;
     if (form.closest("[data-gc-skip-nav-check]")) return true;
-    var method = (form.getAttribute("method") || "get").toLowerCase();
+    let method = (form.getAttribute("method") || "get").toLowerCase();
     if (method !== "get" && method !== "post") return true;
-    var act = form.getAttribute("action");
-    var actionUrl = sameOriginUrl(
-      act != null && act !== "" ? act : window.location.pathname + window.location.search
+    let act = form.getAttribute("action");
+    let actionUrl = sameOriginUrl(
+      act != null && act !== "" ? act : globalThis.location.pathname + globalThis.location.search
     );
-    if (!actionUrl || actionUrl.origin !== window.location.origin) return true;
+    if (!actionUrl || actionUrl.origin !== globalThis.location.origin) return true;
     if (method === "post" && hasFileInput(form)) return true;
     return false;
   }
 
   async function preflightNavigate(url, init) {
-    var reqUrl = typeof url === "string" ? url : url.toString();
+    let reqUrl = typeof url === "string" ? url : url.toString();
     try {
-      var response = await fetch(reqUrl, {
+      let response = await fetch(reqUrl, {
         credentials: "same-origin",
         redirect: "follow",
         headers: FETCH_HEADERS,
@@ -190,10 +190,10 @@
         ...(init || {}),
       });
       if (response.ok) {
-        window.location.assign(response.url);
+        globalThis.location.assign(response.url);
         return;
       }
-      var msg = await bodyMessage(response);
+      let msg = await bodyMessage(response);
       showNavErrorModal(
         response.status,
         parseStatusTitle(response.status),
@@ -211,10 +211,10 @@
   document.addEventListener(
     "click",
     function (ev) {
-      var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
+      let a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
       if (!a || shouldSkipAnchor(a, ev)) return;
-      var u = sameOriginUrl(a.getAttribute("href"));
-      if (!u || u.origin !== window.location.origin) return;
+      let u = sameOriginUrl(a.getAttribute("href"));
+      if (!u || u.origin !== globalThis.location.origin) return;
       ev.preventDefault();
       preflightNavigate(u.toString(), { method: "GET" });
     },
@@ -224,19 +224,19 @@
   document.addEventListener(
     "submit",
     function (ev) {
-      var form = ev.target;
+      let form = ev.target;
       if (!form || form.tagName !== "FORM" || shouldSkipForm(form, ev)) return;
-      var method = (form.getAttribute("method") || "get").toLowerCase();
+      let method = (form.getAttribute("method") || "get").toLowerCase();
       ev.preventDefault();
-      var actionUrl = sameOriginUrl(
+      let actionUrl = sameOriginUrl(
         form.getAttribute("action") != null && form.getAttribute("action") !== ""
           ? form.getAttribute("action")
-          : window.location.pathname + window.location.search
+          : globalThis.location.pathname + globalThis.location.search
       );
       if (!actionUrl) return;
       if (method === "get") {
         try {
-          var params = new URLSearchParams(new FormData(form));
+          let params = new URLSearchParams(new FormData(form));
           actionUrl.search = params.toString();
         } catch (e) {
           showNavErrorModal(0, "Navigation error", "Could not read form data.");

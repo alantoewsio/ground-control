@@ -3,7 +3,7 @@ FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000 \
+    GROUND_CONTROL_DOCKER=1 \
     GROUND_CONTROL_BIND_ADDRESS=0.0.0.0
 
 WORKDIR /app
@@ -16,6 +16,7 @@ RUN apt-get update \
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
 COPY main.py ./
+COPY scripts/docker_healthcheck.py ./scripts/docker_healthcheck.py
 COPY templates ./templates
 COPY static ./static
 
@@ -26,6 +27,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000 8443
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD python -c "import os,urllib.request; p=os.environ.get('PORT','8000'); urllib.request.urlopen('http://127.0.0.1:%s/api/health' % p, timeout=4)"
+    CMD python scripts/docker_healthcheck.py
 
 CMD ["python", "main.py"]

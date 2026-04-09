@@ -39,12 +39,14 @@ def get_session_secret() -> str:
     env = os.environ.get(config.SESSION_SECRET_ENV)
     if env and str(env).strip():
         return str(env).strip()
-    if config.SESSION_SECRET_FILE.exists():
-        return config.SESSION_SECRET_FILE.read_text(encoding="utf-8").strip()
+    path = config.session_secret_file()
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
     raw = secrets.token_hex(32)
-    config.SESSION_SECRET_FILE.write_text(raw, encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(raw, encoding="utf-8")
     try:
-        os.chmod(config.SESSION_SECRET_FILE, 0o600)
+        os.chmod(path, 0o600)
     except (NotImplementedError, OSError, AttributeError):
         pass
     return raw

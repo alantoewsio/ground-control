@@ -6,7 +6,9 @@ dist/
 wheels/
 *.egg-info
 .coverage
-
+coverage.xml
+htmlcov/
+mocks/
 # Editor / local tooling
 .cursor/
 
@@ -24,6 +26,20 @@ ground_control_secrets.db
 .fernet_key
 .session_secret
 .gc_security_state.json
+.gc_data_management.json
+.gc_tray_settings.json
+.gc_docker_secrets/
 .gc_tls/
+.gc_letsencrypt/
+.gc_acme_webroot/
+.gc_backup_cache/
+.gc_backup_settings.json
 sophos-central-gui/
 Design.png
+
+# Local scratch / secrets (never commit)
+_curl_cookies.txt
+*.gcbak
+.gc_letsencrypt_settings.json
+launcher.exe
+.VSCodeCounter/

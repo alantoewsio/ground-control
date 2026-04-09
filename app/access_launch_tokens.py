@@ -65,6 +65,16 @@ def issue_launch_token(
     return tok
 
 
+def _launch_token_session_mismatch_reason(
+    row: LaunchToken, *, uid: str, tracking_id: str
+) -> str | None:
+    if not uid or uid != row.user_id:
+        return "Launch token user mismatch."
+    if not tracking_id or tracking_id != row.session_tracking_id:
+        return "Launch token session mismatch."
+    return None
+
+
 def validate_and_consume_launch_token(
     conn: HTTPConnection,
     *,
@@ -90,8 +100,9 @@ def validate_and_consume_launch_token(
     if row.firewall_id != int(firewall_id) or row.access_type != expected_type:
         return False, "Launch token target mismatch."
     if require_session_match:
-        if not uid or uid != row.user_id:
-            return False, "Launch token user mismatch."
-        if not tracking_id or tracking_id != row.session_tracking_id:
-            return False, "Launch token session mismatch."
+        reason = _launch_token_session_mismatch_reason(
+            row, uid=uid, tracking_id=tracking_id
+        )
+        if reason:
+            return False, reason
     return True, None

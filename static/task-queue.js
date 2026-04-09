@@ -1,40 +1,40 @@
 (function () {
   "use strict";
 
-  var cfg = window.GC_TASK_QUEUE;
+  let cfg = globalThis.GC_TASK_QUEUE;
   if (!cfg) return;
 
-  var tbody = document.getElementById("task-queue-tbody");
-  var delBtn = document.getElementById("task-queue-delete-selected");
-  var approveAllBtn = document.getElementById("task-queue-approve-all");
-  var approveSelectedBtn = document.getElementById("task-queue-approve-selected");
-  var selectAll = document.getElementById("task-queue-select-all");
-  var compareRejectBtn = document.getElementById("task-queue-compare-reject");
-  var compareApproveBtn = document.getElementById("task-queue-compare-approve");
+  let tbody = document.getElementById("task-queue-tbody");
+  let delBtn = document.getElementById("task-queue-delete-selected");
+  let approveAllBtn = document.getElementById("task-queue-approve-all");
+  let approveSelectedBtn = document.getElementById("task-queue-approve-selected");
+  let selectAll = document.getElementById("task-queue-select-all");
+  let compareRejectBtn = document.getElementById("task-queue-compare-reject");
+  let compareApproveBtn = document.getElementById("task-queue-compare-approve");
 
   function bannerProgress(msg) {
     try {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
+      if (globalThis.parent && globalThis.parent !== globalThis) {
+        globalThis.parent.postMessage(
           {
             source: "ground-control",
             type: "gc-global-banner",
             phase: "progress",
             message: msg || "",
           },
-          window.location.origin,
+          globalThis.location.origin,
         );
       }
     } catch (e) {}
-    if (typeof window.gcGlobalBannerShowProgress === "function") {
-      window.gcGlobalBannerShowProgress(msg);
+    if (typeof globalThis.gcGlobalBannerShowProgress === "function") {
+      globalThis.gcGlobalBannerShowProgress(msg);
     }
   }
 
   function bannerResult(ok, msg) {
     try {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
+      if (globalThis.parent && globalThis.parent !== globalThis) {
+        globalThis.parent.postMessage(
           {
             source: "ground-control",
             type: "gc-global-banner",
@@ -42,43 +42,43 @@
             ok: ok,
             message: msg || "",
           },
-          window.location.origin,
+          globalThis.location.origin,
         );
       }
     } catch (e) {}
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     }
   }
 
   /** Persists across navigation via parent banner + server poll (embed posts to parent). */
   function bannerBackgroundTrack(msg) {
     try {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
+      if (globalThis.parent && globalThis.parent !== globalThis) {
+        globalThis.parent.postMessage(
           {
             source: "ground-control",
             type: "gc-global-banner",
             phase: "background",
             message: msg || "",
           },
-          window.location.origin,
+          globalThis.location.origin,
         );
         return;
       }
     } catch (e) {}
-    if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
-      window.gcGlobalBannerTrackBackgroundSync(msg);
+    if (typeof globalThis.gcGlobalBannerTrackBackgroundSync === "function") {
+      globalThis.gcGlobalBannerTrackBackgroundSync(msg);
     }
   }
 
   /** Always use this window's `confirm`. `parent.confirm` opens behind the task-queue dock (high z-index) and looks like a no-op. */
   function taskQueueConfirm(message) {
-    return window.confirm(message);
+    return globalThis.confirm(message);
   }
 
   function taskQueueDeleteUrl() {
-    var u = cfg && cfg.deleteUrl;
+    let u = cfg && cfg.deleteUrl;
     return u ? String(u) : "/api/task-queue/delete";
   }
 
@@ -86,11 +86,11 @@
     document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
     try {
       if (
-        window.parent &&
-        window.parent !== window &&
-        typeof window.parent.gcRefreshTaskQueueBadge === "function"
+        globalThis.parent &&
+        globalThis.parent !== globalThis &&
+        typeof globalThis.parent.gcRefreshTaskQueueBadge === "function"
       ) {
-        window.parent.gcRefreshTaskQueueBadge();
+        globalThis.parent.gcRefreshTaskQueueBadge();
       }
     } catch (e1) {}
   }
@@ -98,22 +98,22 @@
   /** Update the row as soon as Approve is clicked so errored tasks do not look stuck during a long sync. */
   function patchTaskRowSyncStarted(row) {
     if (!row) return;
-    var badge = row.querySelector(".task-queue-status-badge");
+    let badge = row.querySelector(".task-queue-status-badge");
     if (badge) {
       badge.setAttribute("data-status", "sending");
       badge.textContent = "sending";
     }
-    var errCell = row.querySelector('td[data-gc-col="error_message"]');
+    let errCell = row.querySelector('td[data-gc-col="error_message"]');
     if (errCell) errCell.textContent = "";
   }
 
   /** Summarize post-approval config sync (single-task object or batch array). */
   function postSyncStatusSuffix(j) {
-    var ps = j && j.post_sync;
+    let ps = j && j.post_sync;
     if (ps == null) return "";
-    var list = Array.isArray(ps) ? ps : [ps];
+    let list = Array.isArray(ps) ? ps : [ps];
     if (!list.length) return "";
-    var bad = list.filter(function (p) {
+    let bad = list.filter(function (p) {
       return p && p.ok === false;
     });
     if (bad.length) return " Config cache refresh had errors.";
@@ -122,13 +122,13 @@
 
   function firewallIdsFromPostSync(ps) {
     if (ps == null) return [];
-    var list = Array.isArray(ps) ? ps : [ps];
-    var out = [];
-    for (var i = 0; i < list.length; i++) {
-      var p = list[i];
+    let list = Array.isArray(ps) ? ps : [ps];
+    let out = [];
+    for (let i = 0; i < list.length; i++) {
+      let p = list[i];
       if (!p || p.firewall_id == null) continue;
       if (p.ok !== true) continue;
-      var n = parseInt(p.firewall_id, 10);
+      let n = parseInt(p.firewall_id, 10);
       if (!isNaN(n) && n > 0 && out.indexOf(n) === -1) out.push(n);
     }
     return out;
@@ -143,23 +143,23 @@
   }
 
   function notifyConfigCacheSynced(j) {
-    var ps = j && j.post_sync;
+    let ps = j && j.post_sync;
     if (ps == null) return;
-    var list = Array.isArray(ps) ? ps : [ps];
-    var anyOk = list.some(function (p) {
+    let list = Array.isArray(ps) ? ps : [ps];
+    let anyOk = list.some(function (p) {
       return p && p.ok === true;
     });
     if (!anyOk) return;
-    var fwIds = firewallIdsFromPostSync(ps);
+    let fwIds = firewallIdsFromPostSync(ps);
     try {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
+      if (globalThis.parent && globalThis.parent !== globalThis) {
+        globalThis.parent.postMessage(
           {
             source: "ground-control",
             type: "gc-config-cache-synced",
             firewall_ids: fwIds,
           },
-          window.location.origin,
+          globalThis.location.origin,
         );
       }
     } catch (e1) {}
@@ -173,9 +173,9 @@
   }
 
   function selectedIds() {
-    var ids = [];
+    let ids = [];
     document.querySelectorAll(".task-queue-row-cb:checked").forEach(function (cb) {
-      var v = parseInt(cb.value, 10);
+      let v = parseInt(cb.value, 10);
       if (!isNaN(v)) ids.push(v);
     });
     return ids;
@@ -196,7 +196,7 @@
   }
 
   function syncSelectionActionBtns() {
-    var empty = selectedIds().length === 0;
+    let empty = selectedIds().length === 0;
     if (delBtn) delBtn.disabled = empty;
     if (approveSelectedBtn) approveSelectedBtn.disabled = empty;
   }
@@ -216,20 +216,20 @@
   }
 
   function firewallPillHtml(label) {
-    var txt = String(label == null ? "" : label).trim();
+    let txt = String(label == null ? "" : label).trim();
     if (!txt) return "<span class=\"muted\">—</span>";
-    if (typeof window.gcFirewallScopePillHtml === "function") {
-      return window.gcFirewallScopePillHtml(txt);
+    if (typeof globalThis.gcFirewallScopePillHtml === "function") {
+      return globalThis.gcFirewallScopePillHtml(txt);
     }
     return esc(txt);
   }
 
   function rowSearchText(t) {
-    var st = t.status;
-    var statusForSearch =
+    let st = t.status;
+    let statusForSearch =
       st === "pending" ? "pending approval " + st + " unapproved" : st;
-    var ra = t.record_action;
-    var raLabel = recordActionLabel(ra);
+    let ra = t.record_action;
+    let raLabel = recordActionLabel(ra);
     return [
       t.id,
       t.firewall_label,
@@ -252,8 +252,8 @@
 
   /** Facet map from API task; must stay aligned with `taskRowFacetMapFromTr` / `rowHtml`. */
   function taskFacetMapFromTask(t) {
-    var statusDisp = statusDisplay(t.status);
-    var userRaw = t.created_by_username != null ? String(t.created_by_username).trim() : "";
+    let statusDisp = statusDisplay(t.status);
+    let userRaw = t.created_by_username != null ? String(t.created_by_username).trim() : "";
     return {
       id: String(t.id != null ? t.id : "").trim().replace(/\s+/g, " "),
       firewall_label: String(t.firewall_label != null ? t.firewall_label : "")
@@ -322,11 +322,11 @@
     );
   }
 
-  var searchIn = document.getElementById("task-queue-search");
-  var filtersDrawer = document.getElementById("task-queue-filters-drawer");
-  var filtersAside = document.getElementById("task-queue-filters-aside");
+  let searchIn = document.getElementById("task-queue-search");
+  let filtersDrawer = document.getElementById("task-queue-filters-drawer");
+  let filtersAside = document.getElementById("task-queue-filters-aside");
 
-  var TASK_FACET_COLS = [
+  let TASK_FACET_COLS = [
     { id: "id", label: "ID" },
     { id: "firewall_label", label: "Firewall" },
     { id: "entity_type", label: "Type" },
@@ -340,18 +340,18 @@
 
   function taskFacetColsForRebuild() {
     return TASK_FACET_COLS.map(function (c) {
-      var lab = c.label;
-      if (typeof window.gcTableColumnDisplayLabel === "function") {
-        lab = window.gcTableColumnDisplayLabel(lab);
+      let lab = c.label;
+      if (typeof globalThis.gcTableColumnDisplayLabel === "function") {
+        lab = globalThis.gcTableColumnDisplayLabel(lab);
       }
       return { id: c.id, label: lab };
     });
   }
 
   function taskRowFacetMapFromTr(tr) {
-    var m = {};
+    let m = {};
     tr.querySelectorAll("td[data-gc-col]").forEach(function (td) {
-      var k = td.getAttribute("data-gc-col");
+      let k = td.dataset.gcCol;
       if (!k) return;
       m[k] = (td.textContent || "").trim().replace(/\s+/g, " ");
     });
@@ -359,22 +359,22 @@
   }
 
   function rebuildTaskQueueFacets(done) {
-    if (!filtersDrawer || !window.gcTableFacets) {
+    if (!filtersDrawer || !globalThis.gcTableFacets) {
       if (typeof done === "function") done();
       return;
     }
-    var rowEls = Array.prototype.slice.call(document.querySelectorAll("#task-queue-tbody tr.task-queue-row"));
-    var maps = rowEls.map(function (tr) {
+    let rowEls = Array.prototype.slice.call(document.querySelectorAll("#task-queue-tbody tr.task-queue-row"));
+    let maps = rowEls.map(function (tr) {
       return taskRowFacetMapFromTr(tr);
     });
     function rebuildDrawer() {
-      window.gcTableFacets.rebuild(filtersDrawer, taskFacetColsForRebuild(), maps, "task-queue");
+      globalThis.gcTableFacets.rebuild(filtersDrawer, taskFacetColsForRebuild(), maps, "task-queue");
       if (typeof done === "function") done();
     }
-    var lazy = window.gcTableLazy;
+    let lazy = globalThis.gcTableLazy;
     if (!lazy || typeof lazy.forEachChunked !== "function" || rowEls.length <= lazy.DEFAULT_THRESHOLD) {
       rowEls.forEach(function (tr, i) {
-        window.gcTableFacets.setRowFacets(tr, maps[i]);
+        globalThis.gcTableFacets.setRowFacets(tr, maps[i]);
       });
       rebuildDrawer();
       return;
@@ -383,22 +383,22 @@
       rowEls,
       lazy.DEFAULT_CHUNK,
       function (tr, i) {
-        window.gcTableFacets.setRowFacets(tr, maps[i]);
+        globalThis.gcTableFacets.setRowFacets(tr, maps[i]);
       },
       rebuildDrawer,
     );
   }
 
   function taskFacetAppliedCount() {
-    if (!filtersDrawer || !window.gcTableFacets) return 0;
-    return window.gcTableFacets.appliedCount(filtersDrawer);
+    if (!filtersDrawer || !globalThis.gcTableFacets) return 0;
+    return globalThis.gcTableFacets.appliedCount(filtersDrawer);
   }
 
   function updateTaskFacetChrome() {
-    var n = taskFacetAppliedCount();
-    var head = document.getElementById("task-queue-facet-head-actions");
-    var countEl = document.getElementById("task-queue-facet-count");
-    var resetBtn = document.getElementById("task-queue-facet-reset");
+    let n = taskFacetAppliedCount();
+    let head = document.getElementById("task-queue-facet-head-actions");
+    let countEl = document.getElementById("task-queue-facet-count");
+    let resetBtn = document.getElementById("task-queue-facet-reset");
     if (!head || !countEl || !resetBtn) return;
     if (n > 0) {
       head.hidden = false;
@@ -412,9 +412,9 @@
   }
 
   function setTaskFiltersAsideCollapsed(collapsed) {
-    var aside = document.getElementById("task-queue-filters-aside");
-    var drawer = document.getElementById("task-queue-filters-drawer");
-    var btn = document.getElementById("task-queue-filters-toggle");
+    let aside = document.getElementById("task-queue-filters-aside");
+    let drawer = document.getElementById("task-queue-filters-drawer");
+    let btn = document.getElementById("task-queue-filters-toggle");
     if (!aside || !drawer || !btn) return;
     aside.classList.toggle("filters--collapsed", collapsed);
     btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
@@ -433,42 +433,42 @@
 
   function globalFwRowOk(tr) {
     if (
-      typeof window.gcSkipGlobalFirewallTableFilter === "function" &&
-      window.gcSkipGlobalFirewallTableFilter()
+      typeof globalThis.gcSkipGlobalFirewallTableFilter === "function" &&
+      globalThis.gcSkipGlobalFirewallTableFilter()
     ) {
       return true;
     }
-    if (typeof window.gcGetSelectedFirewallIds !== "function") return true;
-    var ids = window.gcGetSelectedFirewallIds();
+    if (typeof globalThis.gcGetSelectedFirewallIds !== "function") return true;
+    let ids = globalThis.gcGetSelectedFirewallIds();
     if (ids.length === 0) return true;
-    var fid = tr.getAttribute("data-firewall-id");
+    let fid = tr.dataset.firewallId;
     if (fid == null || fid === "") return false;
-    var n = parseInt(fid, 10);
+    let n = parseInt(fid, 10);
     if (isNaN(n)) return false;
     return ids.indexOf(n) !== -1;
   }
 
   function applyTaskQueueFilter() {
-    var q = (searchIn && searchIn.value ? searchIn.value : "").trim().toLowerCase();
-    var rows = document.querySelectorAll("#task-queue-tbody tr.task-queue-row");
-    var visible = 0;
-    var total = rows.length;
+    let q = (searchIn && searchIn.value ? searchIn.value : "").trim().toLowerCase();
+    let rows = document.querySelectorAll("#task-queue-tbody tr.task-queue-row");
+    let visible = 0;
+    let total = rows.length;
     rows.forEach(function (tr) {
-      var s = tr.getAttribute("data-search") || "";
-      var facetOk =
+      let s = tr.dataset.search || "";
+      let facetOk =
         !filtersDrawer ||
-        !window.gcTableFacets ||
-        window.gcTableFacets.rowMatches(tr, filtersDrawer);
-      var ok = (!q || s.indexOf(q) !== -1) && facetOk && globalFwRowOk(tr);
+        !globalThis.gcTableFacets ||
+        globalThis.gcTableFacets.rowMatches(tr, filtersDrawer);
+      let ok = (!q || s.indexOf(q) !== -1) && facetOk && globalFwRowOk(tr);
       tr.hidden = !ok;
       if (ok) visible++;
     });
-    var fe = document.getElementById("task-queue-filter-empty");
+    let fe = document.getElementById("task-queue-filter-empty");
     if (fe) fe.hidden = !(total > 0 && visible === 0);
     if (selectAll) {
-      var vis = visibleTaskRows();
-      var visChecked = vis.filter(function (tr) {
-        var cb = tr.querySelector(".task-queue-row-cb");
+      let vis = visibleTaskRows();
+      let visChecked = vis.filter(function (tr) {
+        let cb = tr.querySelector(".task-queue-row-cb");
         return cb && cb.checked;
       }).length;
       if (vis.length === 0) {
@@ -489,17 +489,17 @@
   }
 
   function taskListUrl() {
-    var base = cfg.listUrl || "";
-    if (typeof window.gcGetSelectedFirewallIds !== "function") return base;
-    var ids = window.gcGetSelectedFirewallIds();
+    let base = cfg.listUrl || "";
+    if (typeof globalThis.gcGetSelectedFirewallIds !== "function") return base;
+    let ids = globalThis.gcGetSelectedFirewallIds();
     if (!ids || ids.length === 0) return base;
-    var sep = base.indexOf("?") === -1 ? "?" : "&";
+    let sep = base.indexOf("?") === -1 ? "?" : "&";
     return base + sep + "firewall_ids=" + encodeURIComponent(ids.join(","));
   }
 
   function taskListUrlPaged(offset, limit) {
-    var base = taskListUrl();
-    var sep = base.indexOf("?") === -1 ? "?" : "&";
+    let base = taskListUrl();
+    let sep = base.indexOf("?") === -1 ? "?" : "&";
     return (
       base +
       sep +
@@ -512,7 +512,7 @@
 
   function ensureTaskQueueFilterEmptyRow() {
     if (!tbody) return null;
-    var fe = document.getElementById("task-queue-filter-empty");
+    let fe = document.getElementById("task-queue-filter-empty");
     if (fe && fe.parentElement === tbody) return fe;
     fe = document.createElement("tr");
     fe.id = "task-queue-filter-empty";
@@ -528,13 +528,13 @@
       if (typeof done === "function") done();
       return;
     }
-    var feTr = ensureTaskQueueFilterEmptyRow();
-    var facetMaps = tasks.map(taskFacetMapFromTask);
-    var wrap = document.createElement("tbody");
+    let feTr = ensureTaskQueueFilterEmptyRow();
+    let facetMaps = tasks.map(taskFacetMapFromTask);
+    let wrap = document.createElement("tbody");
     wrap.innerHTML = tasks.map(rowHtml).join("");
-    var dataRows = Array.prototype.slice.call(wrap.children);
-    for (var ri = 0; ri < dataRows.length; ri++) {
-      if (window.gcTableFacets) window.gcTableFacets.setRowFacets(dataRows[ri], facetMaps[ri]);
+    let dataRows = Array.prototype.slice.call(wrap.children);
+    for (let ri = 0; ri < dataRows.length; ri++) {
+      if (globalThis.gcTableFacets) globalThis.gcTableFacets.setRowFacets(dataRows[ri], facetMaps[ri]);
     }
 
     function mounted() {
@@ -542,7 +542,7 @@
       if (typeof done === "function") done();
     }
 
-    var lazy = window.gcTableLazy;
+    let lazy = globalThis.gcTableLazy;
     if (!lazy || typeof lazy.appendBefore !== "function" || dataRows.length <= lazy.DEFAULT_THRESHOLD) {
       dataRows.forEach(function (tr) {
         tbody.insertBefore(tr, feTr);
@@ -562,20 +562,20 @@
     });
   }
 
-  var taskQueueRefreshGen = 0;
-  var taskQueueNextOffset = 0;
-  var taskQueueHasMore = false;
-  var taskQueueLoading = false;
-  var taskQueueScrollTicking = false;
-  var taskQueuePageSize = 200;
-  var taskQueueScrollEl = document.getElementById("task-queue-scroll");
+  let taskQueueRefreshGen = 0;
+  let taskQueueNextOffset = 0;
+  let taskQueueHasMore = false;
+  let taskQueueLoading = false;
+  let taskQueueScrollTicking = false;
+  let taskQueuePageSize = 200;
+  let taskQueueScrollEl = document.getElementById("task-queue-scroll");
   if (!taskQueueScrollEl && tbody && typeof tbody.closest === "function") {
     taskQueueScrollEl = tbody.closest(".table-scroll");
   }
 
   function finishTaskQueueRefresh(tasksLoaded, gen) {
     if (gen !== taskQueueRefreshGen) return;
-    var empty = document.getElementById("task-queue-empty");
+    let empty = document.getElementById("task-queue-empty");
     if (empty) empty.hidden = tasksLoaded > 0;
     if (selectAll) {
       selectAll.checked = false;
@@ -584,7 +584,7 @@
     updateTaskFacetChrome();
     applyTaskQueueFilter();
     notifyTaskQueueChanged();
-    if (window.gcTableSort) window.gcTableSort.bindTable(document.getElementById("task-queue-table"));
+    if (globalThis.gcTableSort) globalThis.gcTableSort.bindTable(document.getElementById("task-queue-table"));
   }
 
   function maybeLoadTaskQueueUntilScrollable(gen) {
@@ -603,14 +603,14 @@
       })
       .then(function (data) {
         if (gen !== taskQueueRefreshGen) return;
-        var tasks = (data && data.tasks) || [];
-        var hasMore = !!(data && data.has_more);
+        let tasks = (data && data.tasks) || [];
+        let hasMore = !!(data && data.has_more);
 
         if (offset === 0) {
           tbody.innerHTML = "";
           ensureTaskQueueFilterEmptyRow();
-          if (filtersDrawer && window.gcTableFacets) {
-            window.gcTableFacets.rebuild(filtersDrawer, taskFacetColsForRebuild(), [], "task-queue");
+          if (filtersDrawer && globalThis.gcTableFacets) {
+            globalThis.gcTableFacets.rebuild(filtersDrawer, taskFacetColsForRebuild(), [], "task-queue");
           }
         }
 
@@ -645,7 +645,7 @@
   }
 
   function loadMoreTaskQueueRows(gen) {
-    var g = gen == null ? taskQueueRefreshGen : gen;
+    let g = gen == null ? taskQueueRefreshGen : gen;
     if (g !== taskQueueRefreshGen || !taskQueueHasMore || taskQueueLoading) return;
     loadTaskQueueRows(g, taskQueueNextOffset);
   }
@@ -657,7 +657,7 @@
     requestAnimationFrame(function () {
       taskQueueScrollTicking = false;
       if (!taskQueueHasMore || taskQueueLoading || !taskQueueScrollEl) return;
-      var remaining =
+      let remaining =
         taskQueueScrollEl.scrollHeight -
         (taskQueueScrollEl.scrollTop + taskQueueScrollEl.clientHeight);
       if (remaining <= 240) {
@@ -667,7 +667,7 @@
   }
 
   function refreshTable() {
-    var gen = ++taskQueueRefreshGen;
+    let gen = ++taskQueueRefreshGen;
     taskQueueNextOffset = 0;
     taskQueueHasMore = true;
     taskQueueLoading = false;
@@ -678,36 +678,36 @@
     loadTaskQueueRows(gen, 0);
   }
 
-  var compareModal = document.getElementById("task-queue-compare-modal");
-  var compareOpen = false;
-  var compareLoadSeq = 0;
-  var compareModalTaskId = null;
+  let compareModal = document.getElementById("task-queue-compare-modal");
+  let compareOpen = false;
+  let compareLoadSeq = 0;
+  let compareModalTaskId = null;
 
   /* Modal lives inside .app-main (overflow-y: auto) on the full task-queue page; fixed descendants can fail hit-testing. Host under document.body instead. */
   if (compareModal && compareModal.parentElement !== document.body) {
     document.body.appendChild(compareModal);
   }
 
-  var comparePanel = document.getElementById("task-queue-compare-panel");
-  var compareClose = document.getElementById("task-queue-compare-close");
-  var compareBackdrop = compareModal && compareModal.querySelector(".task-queue-compare-modal__backdrop");
-  var compareMeta = document.getElementById("task-queue-compare-meta");
-  var compareMissing = document.getElementById("task-queue-compare-missing");
-  var compareTbody = document.getElementById("task-queue-diff-tbody");
-  var compareStatusWrap = document.getElementById("task-queue-compare-status-wrap");
-  var compareStatusBadge = document.getElementById("task-queue-compare-status-badge");
-  var compareErrorEl = document.getElementById("task-queue-compare-error");
+  let comparePanel = document.getElementById("task-queue-compare-panel");
+  let compareClose = document.getElementById("task-queue-compare-close");
+  let compareBackdrop = compareModal && compareModal.querySelector(".task-queue-compare-modal__backdrop");
+  let compareMeta = document.getElementById("task-queue-compare-meta");
+  let compareMissing = document.getElementById("task-queue-compare-missing");
+  let compareTbody = document.getElementById("task-queue-diff-tbody");
+  let compareStatusWrap = document.getElementById("task-queue-compare-status-wrap");
+  let compareStatusBadge = document.getElementById("task-queue-compare-status-badge");
+  let compareErrorEl = document.getElementById("task-queue-compare-error");
 
   /* Match modal Approve: prefer live JS id (same as compareModalTaskId), then panel data attribute. */
   function compareModalResolvedTaskId() {
     if (compareModalTaskId != null && compareModalTaskId !== "") {
-      var m = parseInt(String(compareModalTaskId), 10);
+      let m = parseInt(String(compareModalTaskId), 10);
       if (!isNaN(m) && m > 0) return m;
     }
     if (comparePanel) {
-      var raw = comparePanel.getAttribute("data-gc-task-id");
+      let raw = comparePanel.dataset.gcTaskId;
       if (raw != null && String(raw).trim() !== "") {
-        var n = parseInt(String(raw), 10);
+        let n = parseInt(String(raw), 10);
         if (!isNaN(n) && n > 0) return n;
       }
     }
@@ -734,12 +734,12 @@
   }
 
   function setCompareModalStatusUi(j) {
-    var st = j && j.status != null ? String(j.status) : "";
+    let st = j && j.status != null ? String(j.status) : "";
     if (compareStatusWrap && compareStatusBadge) {
       compareStatusBadge.setAttribute("data-status", st);
       compareStatusBadge.textContent = statusDisplay(st);
       if (compareErrorEl) {
-        var err = j && j.error_message != null ? String(j.error_message).trim() : "";
+        let err = j && j.error_message != null ? String(j.error_message).trim() : "";
         if (err) {
           compareErrorEl.textContent = err;
           compareErrorEl.hidden = false;
@@ -765,8 +765,8 @@
 
   function sendTaskToFirewall(id, options) {
     options = options || {};
-    var row = options.row;
-    var approveBtnEls = options.approveBtnEls;
+    let row = options.row;
+    let approveBtnEls = options.approveBtnEls;
     if (row) patchTaskRowSyncStarted(row);
     if (approveBtnEls) {
       approveBtnEls.forEach(function (b) {
@@ -785,7 +785,7 @@
         });
       })
       .then(function (x) {
-        var j = x.j || {};
+        let j = x.j || {};
         if (x.status === 202 && j.accepted) {
           bannerBackgroundTrack(
             "Task " +
@@ -822,9 +822,9 @@
   /* Same shape as sendTaskToFirewall: in-flight UI, success closes modal via onOk, failure runs onCatch like Approve. */
   function rejectTaskFromQueue(id, options) {
     options = options || {};
-    var affectModal = options.affectCompareModal !== false;
-    var extraEls = options.disableElements;
-    var toDisable = Array.isArray(extraEls)
+    let affectModal = options.affectCompareModal !== false;
+    let extraEls = options.disableElements;
+    let toDisable = Array.isArray(extraEls)
       ? extraEls.filter(function (b) {
           return b;
         })
@@ -880,11 +880,11 @@
       (j.task_id != null ? j.task_id : taskId);
     setCompareModalStatusUi(j);
     if (compareMissing) compareMissing.hidden = !j.stored_missing;
-    var rows = j.rows || [];
-    var diffHtml = rows
+    let rows = j.rows || [];
+    let diffHtml = rows
       .map(function (row) {
-        var lc = row.left_class || "eq";
-        var rc = row.right_class || "eq";
+        let lc = row.left_class || "eq";
+        let rc = row.right_class || "eq";
         return (
           "<tr><td class=\"task-queue-diff__cell task-queue-diff__cell--" +
           esc(lc) +
@@ -900,16 +900,16 @@
       .join("");
     function finishCompareDiffMount() {
       if (seq !== compareLoadSeq) return;
-      if (window.gcTableSort && compareTbody) {
-        var diffTable = compareTbody.closest("table");
-        if (diffTable) window.gcTableSort.bindTable(diffTable);
+      if (globalThis.gcTableSort && compareTbody) {
+        let diffTable = compareTbody.closest("table");
+        if (diffTable) globalThis.gcTableSort.bindTable(diffTable);
       }
     }
-    var wrapDiff = document.createElement("tbody");
+    let wrapDiff = document.createElement("tbody");
     wrapDiff.innerHTML = diffHtml;
-    var diffNodes = Array.prototype.slice.call(wrapDiff.children);
+    let diffNodes = Array.prototype.slice.call(wrapDiff.children);
     compareTbody.innerHTML = "";
-    var lazyDiff = window.gcTableLazy;
+    let lazyDiff = globalThis.gcTableLazy;
     if (!lazyDiff || typeof lazyDiff.appendBefore !== "function" || diffNodes.length <= lazyDiff.DEFAULT_THRESHOLD) {
       compareTbody.innerHTML = diffHtml;
       finishCompareDiffMount();
@@ -919,7 +919,7 @@
   }
 
   function refetchCompareModal(taskId) {
-    var seq = ++compareLoadSeq;
+    let seq = ++compareLoadSeq;
     fetch("/api/task-queue/" + taskId + "/compare", { credentials: "same-origin" })
       .then(function (r) {
         return r.json().then(function (j) {
@@ -967,11 +967,11 @@
 
   function openCompareModal(taskId) {
     if (
-      window.parent &&
-      window.parent !== window &&
-      typeof window.parent.gcTaskQueueDockOpenCompareModal === "function"
+      globalThis.parent &&
+      globalThis.parent !== globalThis &&
+      typeof globalThis.parent.gcTaskQueueDockOpenCompareModal === "function"
     ) {
-      window.parent.gcTaskQueueDockOpenCompareModal(taskId);
+      globalThis.parent.gcTaskQueueDockOpenCompareModal(taskId);
       return;
     }
     if (!compareModal || !compareTbody || !compareMeta) return;
@@ -979,7 +979,7 @@
     compareModalTaskId = taskId;
     if (comparePanel) comparePanel.setAttribute("data-gc-task-id", String(taskId));
     if (compareRejectBtn) compareRejectBtn.setAttribute("data-task-id", String(taskId));
-    var seq = ++compareLoadSeq;
+    let seq = ++compareLoadSeq;
     compareModal.hidden = false;
     compareModal.setAttribute("aria-hidden", "false");
     compareTbody.innerHTML = "";
@@ -1014,9 +1014,9 @@
 
   if (compareApproveBtn) {
     compareApproveBtn.addEventListener("click", function () {
-      var id = compareModalResolvedTaskId();
+      let id = compareModalResolvedTaskId();
       if (isNaN(id)) return;
-      var row = document.querySelector('tr.task-queue-row[data-task-id="' + id + '"]');
+      let row = document.querySelector('tr.task-queue-row[data-task-id="' + id + '"]');
       sendTaskToFirewall(id, {
         row: row,
         onOk: function () {
@@ -1044,17 +1044,17 @@
   if (tbody) {
     tbody.addEventListener("click", function (e) {
       if (e.target.closest("input, button, a, label")) return;
-      var tr = e.target.closest("tr[data-task-id]");
+      let tr = e.target.closest("tr[data-task-id]");
       if (!tr) return;
-      var id = parseInt(tr.getAttribute("data-task-id"), 10);
+      let id = parseInt(tr.dataset.taskId, 10);
       if (isNaN(id)) return;
       openCompareModal(id);
     });
   }
 
   if (searchIn) {
-    if (window.gcTableFacets && window.gcTableFacets.bindToolbarSearch) {
-      window.gcTableFacets.bindToolbarSearch(searchIn, "task-queue", applyTaskQueueFilter);
+    if (globalThis.gcTableFacets && globalThis.gcTableFacets.bindToolbarSearch) {
+      globalThis.gcTableFacets.bindToolbarSearch(searchIn, "task-queue", applyTaskQueueFilter);
     } else {
       searchIn.addEventListener("input", applyTaskQueueFilter);
     }
@@ -1063,7 +1063,7 @@
   document.addEventListener("change", function (e) {
     if (e.target === selectAll) {
       visibleTaskRows().forEach(function (tr) {
-        var cb = tr.querySelector(".task-queue-row-cb");
+        let cb = tr.querySelector(".task-queue-row-cb");
         if (cb) cb.checked = selectAll.checked;
       });
       syncSelectionActionBtns();
@@ -1074,9 +1074,9 @@
     ) {
       syncSelectionActionBtns();
       if (selectAll) {
-        var vis = visibleTaskRows();
-        var visChecked = vis.filter(function (tr) {
-          var cb = tr.querySelector(".task-queue-row-cb");
+        let vis = visibleTaskRows();
+        let visChecked = vis.filter(function (tr) {
+          let cb = tr.querySelector(".task-queue-row-cb");
           return cb && cb.checked;
         }).length;
         if (vis.length === 0) {
@@ -1098,7 +1098,7 @@
 
   if (delBtn) {
     delBtn.addEventListener("click", function () {
-      var ids = selectedIds();
+      let ids = selectedIds();
       if (!ids.length) return;
       if (!taskQueueConfirm("Reject " + ids.length + " task(s) and remove them from the queue?")) return;
       delBtn.disabled = true;
@@ -1134,7 +1134,7 @@
   /* Same wiring as Reject Selected (delBtn): direct id + listener here, not with the compare modal block. */
   if (compareRejectBtn) {
     compareRejectBtn.addEventListener("click", function () {
-      var id = parseInt(compareRejectBtn.getAttribute("data-task-id"), 10);
+      let id = parseInt(compareRejectBtn.dataset.taskId, 10);
       if (isNaN(id)) return;
       /* No confirm here: same delete API as Reject Selected, but the user already opened this diff; confirm() also blocks headless/embedded tests. */
       compareRejectBtn.disabled = true;
@@ -1182,9 +1182,9 @@
       if (approveSelectedBtn) approveSelectedBtn.disabled = true;
       if (delBtn) delBtn.disabled = true;
       bannerProgress("Approving all tasks and syncing to firewalls…");
-      var sendBody = "{}";
-      if (typeof window.gcGetSelectedFirewallIds === "function") {
-        var fwIds = window.gcGetSelectedFirewallIds() || [];
+      let sendBody = "{}";
+      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        let fwIds = globalThis.gcGetSelectedFirewallIds() || [];
         if (fwIds.length) {
           sendBody = JSON.stringify({ firewall_ids: fwIds });
         }
@@ -1202,9 +1202,9 @@
         })
         .then(function (x) {
           if (!x.ok) throw new Error((x.j && x.j.detail) || "Approve all failed");
-          var j = x.j || {};
+          let j = x.j || {};
           if (x.status === 202 && j.accepted) {
-            var q = j.queued != null ? j.queued : 0;
+            let q = j.queued != null ? j.queued : 0;
             if (q < 1) {
               bannerResult(true, "No tasks were queued.");
             } else {
@@ -1219,7 +1219,7 @@
             scheduleTaskQueueBackgroundRefreshes();
             return;
           }
-          var msg =
+          let msg =
             "Processed " +
             (j.processed != null ? j.processed : 0) +
             ": " +
@@ -1227,7 +1227,7 @@
             " synced";
           if (j.failed) msg += ", " + j.failed + " failed";
           msg += "." + postSyncStatusSuffix(j);
-          var failedN = j.failed != null ? j.failed : 0;
+          let failedN = j.failed != null ? j.failed : 0;
           bannerResult(failedN === 0, msg);
           notifyConfigCacheSynced(j);
           refreshTable();
@@ -1246,7 +1246,7 @@
 
   if (approveSelectedBtn && cfg.sendSelectedUrl) {
     approveSelectedBtn.addEventListener("click", function () {
-      var ids = selectedIds();
+      let ids = selectedIds();
       if (!ids.length) return;
       if (
         !confirm(
@@ -1274,9 +1274,9 @@
         })
         .then(function (x) {
           if (!x.ok) throw new Error((x.j && x.j.detail) || "Approve selected failed");
-          var j = x.j || {};
+          let j = x.j || {};
           if (x.status === 202 && j.accepted) {
-            var q = j.queued != null ? j.queued : 0;
+            let q = j.queued != null ? j.queued : 0;
             if (q < 1) {
               bannerResult(true, "No selected tasks could be queued.");
             } else {
@@ -1291,8 +1291,8 @@
             scheduleTaskQueueBackgroundRefreshes();
             return;
           }
-          var proc = j.processed != null ? j.processed : 0;
-          var msg =
+          let proc = j.processed != null ? j.processed : 0;
+          let msg =
             proc === 0
               ? "No selected tasks could be approved (already syncing or removed)."
               : "Processed " +
@@ -1302,7 +1302,7 @@
                 " synced";
           if (proc > 0 && j.failed) msg += ", " + j.failed + " failed";
           msg += proc === 0 ? "" : "." + postSyncStatusSuffix(j);
-          var failedN = j.failed != null ? j.failed : 0;
+          let failedN = j.failed != null ? j.failed : 0;
           bannerResult(proc > 0 && failedN === 0, msg);
           notifyConfigCacheSynced(j);
           refreshTable();
@@ -1320,13 +1320,13 @@
   }
 
   document.addEventListener("click", function (e) {
-    var rej = e.target.closest(".task-queue-reject");
+    let rej = e.target.closest(".task-queue-reject");
     if (rej) {
-      var rid = parseInt(rej.getAttribute("data-task-id"), 10);
+      let rid = parseInt(rej.dataset.taskId, 10);
       if (isNaN(rid)) return;
       if (!taskQueueConfirm("Reject task " + rid + " and remove it from the queue?")) return;
-      var rrow = rej.closest("tr.task-queue-row");
-      var rApprove = rrow && rrow.querySelector(".task-queue-approve");
+      let rrow = rej.closest("tr.task-queue-row");
+      let rApprove = rrow && rrow.querySelector(".task-queue-approve");
       rejectTaskFromQueue(rid, {
         affectCompareModal: false,
         disableElements: [rej, rApprove],
@@ -1339,13 +1339,13 @@
       });
       return;
     }
-    var btn = e.target.closest(".task-queue-approve");
+    let btn = e.target.closest(".task-queue-approve");
     if (!btn) return;
-    var id = parseInt(btn.getAttribute("data-task-id"), 10);
+    let id = parseInt(btn.dataset.taskId, 10);
     if (isNaN(id)) return;
     if (!taskQueueConfirm("Approve task " + id + " and sync it to the firewall?")) return;
-    var row = btn.closest("tr.task-queue-row");
-    var rowReject = row && row.querySelector(".task-queue-reject");
+    let row = btn.closest("tr.task-queue-row");
+    let rowReject = row && row.querySelector(".task-queue-reject");
     sendTaskToFirewall(id, {
       row: row,
       approveBtnEls: rowReject ? [btn, rowReject] : [btn],
@@ -1357,20 +1357,20 @@
 
   document.getElementById("task-queue-filters-toggle") &&
     document.getElementById("task-queue-filters-toggle").addEventListener("click", function () {
-      var aside = document.getElementById("task-queue-filters-aside");
-      var collapsed = aside && aside.classList.contains("filters--collapsed");
+      let aside = document.getElementById("task-queue-filters-aside");
+      let collapsed = aside && aside.classList.contains("filters--collapsed");
       setTaskFiltersAsideCollapsed(!collapsed);
     });
 
   document.getElementById("task-queue-facet-reset") &&
     document.getElementById("task-queue-facet-reset").addEventListener("click", function () {
-      if (filtersDrawer && window.gcTableFacets) window.gcTableFacets.reset(filtersDrawer, "task-queue");
+      if (filtersDrawer && globalThis.gcTableFacets) globalThis.gcTableFacets.reset(filtersDrawer, "task-queue");
       updateTaskFacetChrome();
       applyTaskQueueFilter();
     });
 
-  if (filtersAside && window.gcTableFacets) {
-    window.gcTableFacets.bindAside(
+  if (filtersAside && globalThis.gcTableFacets) {
+    globalThis.gcTableFacets.bindAside(
       filtersAside,
       function () {
         updateTaskFacetChrome();

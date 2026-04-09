@@ -1,15 +1,15 @@
 (function () {
   "use strict";
 
-  var refreshers = [];
+  let refreshers = [];
 
   function normalizeIdList(raw) {
     if (!raw) return [];
-    var arr = Array.isArray(raw) ? raw : [raw];
-    var out = [];
-    for (var i = 0; i < arr.length; i++) {
-      var v = arr[i];
-      var n = typeof v === "number" ? v : parseInt(v, 10);
+    let arr = Array.isArray(raw) ? raw : [raw];
+    let out = [];
+    for (let i = 0; i < arr.length; i++) {
+      let v = arr[i];
+      let n = typeof v === "number" ? v : parseInt(v, 10);
       if (!isNaN(n) && n > 0 && out.indexOf(n) === -1) out.push(n);
     }
     return out;
@@ -17,13 +17,13 @@
 
   function idsFromPostSync(ps) {
     if (ps == null) return [];
-    var list = Array.isArray(ps) ? ps : [ps];
-    var out = [];
-    for (var i = 0; i < list.length; i++) {
-      var p = list[i];
+    let list = Array.isArray(ps) ? ps : [ps];
+    let out = [];
+    for (let i = 0; i < list.length; i++) {
+      let p = list[i];
       if (!p || p.firewall_id == null) continue;
       if (p.ok !== true) continue;
-      var n = parseInt(p.firewall_id, 10);
+      let n = parseInt(p.firewall_id, 10);
       if (!isNaN(n) && n > 0 && out.indexOf(n) === -1) out.push(n);
     }
     return out;
@@ -36,8 +36,8 @@
   }
 
   function runRefreshers(ids, detail) {
-    var d = detail || {};
-    for (var i = 0; i < refreshers.length; i++) {
+    let d = detail || {};
+    for (let i = 0; i < refreshers.length; i++) {
       try {
         refreshers[i](ids, d);
       } catch (e) {}
@@ -45,8 +45,8 @@
   }
 
   function handleConfigCacheSynced(detail) {
-    var d = detail || {};
-    var ids = normalizeDetail(d);
+    let d = detail || {};
+    let ids = normalizeDetail(d);
     if (!ids.length) return;
     runRefreshers(ids, d);
   }
@@ -57,13 +57,13 @@
    * @param {function(number[], object): void} fn
    * @returns {function(): void} unregister
    */
-  window.gcRegisterConfigCacheTableRefresher = function (fn) {
+  globalThis.gcRegisterConfigCacheTableRefresher = function (fn) {
     if (typeof fn !== "function") {
       return function () {};
     }
     refreshers.push(fn);
     return function unregister() {
-      var j = refreshers.indexOf(fn);
+      let j = refreshers.indexOf(fn);
       if (j !== -1) refreshers.splice(j, 1);
     };
   };
@@ -72,9 +72,9 @@
     handleConfigCacheSynced(ev.detail);
   });
 
-  window.addEventListener("message", function (ev) {
-    if (ev.origin !== window.location.origin) return;
-    var d = ev.data;
+  globalThis.addEventListener("message", function (ev) {
+    if (ev.origin !== globalThis.location.origin) return;
+    let d = ev.data;
     if (!d || d.source !== "ground-control" || d.type !== "gc-config-cache-synced") return;
     handleConfigCacheSynced({ firewall_ids: d.firewall_ids });
   });

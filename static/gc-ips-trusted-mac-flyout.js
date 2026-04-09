@@ -4,16 +4,16 @@
 (function () {
   "use strict";
 
-  var root = null;
-  var els = {};
-  var mode = "edit";
-  var currentRow = null;
-  var CREATE_BATCH_URL = "";
-  var UPDATE_URL = "";
+  let root = null;
+  let els = {};
+  let mode = "edit";
+  let currentRow = null;
+  let CREATE_BATCH_URL = "";
+  let UPDATE_URL = "";
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -38,10 +38,10 @@
   }
 
   function collectIpsTrustedMacEditTargets(row) {
-    var t = row && row.ips_trusted_mac_edit_targets;
+    let t = row && row.ips_trusted_mac_edit_targets;
     if (Array.isArray(t) && t.length) return t.slice();
     if (row && row.config_entry_id != null) {
-      var one = { config_entry_id: row.config_entry_id };
+      let one = { config_entry_id: row.config_entry_id };
       if (row.firewall_id != null) one.firewall_id = row.firewall_id;
       return [one];
     }
@@ -49,20 +49,20 @@
   }
 
   function mountFwPicker(pickerMode, row) {
-    var slot = root.querySelector("#gc-ips-tmac-fw-slot");
-    var tmpl = root.querySelector("#gc-ips-tmac-fw-ms-template");
+    let slot = root.querySelector("#gc-ips-tmac-fw-slot");
+    let tmpl = root.querySelector("#gc-ips-tmac-fw-ms-template");
     if (!slot || !tmpl) return;
     slot.innerHTML = "";
     slot.appendChild(tmpl.content.cloneNode(true));
-    var ms = slot.querySelector("[data-gc-fw-ms]");
+    let ms = slot.querySelector("[data-gc-fw-ms]");
     if (!ms) return;
-    var initial = [];
-    var assigned = [];
+    let initial = [];
+    let assigned = [];
     if (pickerMode === "create") {
       ms.setAttribute("data-fw-picker-mode", "add");
-      if (typeof window.gcGetSelectedFirewallIds === "function") {
-        (window.gcGetSelectedFirewallIds() || []).forEach(function (x) {
-          var n = parseInt(String(x), 10);
+      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        (globalThis.gcGetSelectedFirewallIds() || []).forEach(function (x) {
+          let n = parseInt(String(x), 10);
           if (!isNaN(n) && n > 0) initial.push(n);
         });
       }
@@ -70,7 +70,7 @@
       ms.setAttribute("data-fw-picker-mode", "edit");
       collectIpsTrustedMacEditTargets(row || {}).forEach(function (t) {
         if (t && t.firewall_id != null) {
-          var fid = parseInt(String(t.firewall_id), 10);
+          let fid = parseInt(String(t.firewall_id), 10);
           if (!isNaN(fid) && fid > 0) initial.push(fid);
         }
       });
@@ -78,11 +78,11 @@
     }
     ms.setAttribute("data-fw-initial-selected", JSON.stringify(initial));
     ms.setAttribute("data-fw-assigned-ids", JSON.stringify(assigned));
-    var body = formBodyEl();
-    if (body && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-      window.gcHsHydrateFlyoutFirewallPicker(body, { row: row || {} });
+    let body = formBodyEl();
+    if (body && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+      globalThis.gcHsHydrateFlyoutFirewallPicker(body, { row: row || {} });
     }
-    var mh = root.querySelector("#gc-ips-tmac-fw-ms-hint");
+    let mh = root.querySelector("#gc-ips-tmac-fw-ms-hint");
     if (mh) {
       mh.textContent =
         pickerMode === "create"
@@ -92,14 +92,14 @@
   }
 
   function collectCreateFirewallIds() {
-    var slot = root.querySelector("#gc-ips-tmac-fw-slot");
+    let slot = root.querySelector("#gc-ips-tmac-fw-slot");
     if (!slot) return [];
-    var ms = slot.querySelector("[data-gc-fw-ms]");
+    let ms = slot.querySelector("[data-gc-fw-ms]");
     if (!ms) return [];
-    var out = [];
+    let out = [];
     ms.querySelectorAll('input[type="checkbox"][data-gc-fw-id]').forEach(function (cb) {
       if (!cb.checked) return;
-      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      let n = parseInt(String(cb.dataset.gcFwId || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
@@ -110,7 +110,7 @@
     root.hidden = false;
     root.setAttribute("aria-hidden", "false");
     document.body.classList.add("gc-if-flyout--open");
-    var panel = root.querySelector(".gc-if-flyout__panel");
+    let panel = root.querySelector(".gc-if-flyout__panel");
     if (panel) {
       try {
         panel.focus();
@@ -126,28 +126,28 @@
   }
 
   function getCheckedAssoc(name) {
-    var q = root.querySelector('input[name="' + name + '"]:checked');
+    let q = root.querySelector('input[name="' + name + '"]:checked');
     return q ? String(q.value || "None") : "None";
   }
 
   function setAssoc(name, val) {
-    var v = String(val || "None").trim();
+    let v = String(val || "None").trim();
     if (v !== "Static" && v !== "DHCP") v = "None";
-    var inp = root.querySelector('input[name="' + name + '"][value="' + v + '"]');
+    let inp = root.querySelector('input[name="' + name + '"][value="' + v + '"]');
     if (inp) {
       inp.checked = true;
     } else {
-      var none = root.querySelector('input[name="' + name + '"][value="None"]');
+      let none = root.querySelector('input[name="' + name + '"][value="None"]');
       if (none) none.checked = true;
     }
     syncStaticAddrVisibility();
   }
 
   function syncStaticAddrVisibility() {
-    var v4 = getCheckedAssoc("gc-ips-tmac-ipv4-assoc");
-    var v6 = getCheckedAssoc("gc-ips-tmac-ipv6-assoc");
-    var w4 = root.querySelector("#gc-ips-tmac-ipv4-static-only");
-    var w6 = root.querySelector("#gc-ips-tmac-ipv6-static-only");
+    let v4 = getCheckedAssoc("gc-ips-tmac-ipv4-assoc");
+    let v6 = getCheckedAssoc("gc-ips-tmac-ipv6-assoc");
+    let w4 = root.querySelector("#gc-ips-tmac-ipv4-static-only");
+    let w6 = root.querySelector("#gc-ips-tmac-ipv6-static-only");
     if (w4) w4.hidden = v4 !== "Static";
     if (w6) w6.hidden = v6 !== "Static";
   }
@@ -172,8 +172,8 @@
   }
 
   function collectTrustedMac() {
-    var v4s = getCheckedAssoc("gc-ips-tmac-ipv4-assoc") === "Static";
-    var v6s = getCheckedAssoc("gc-ips-tmac-ipv6-assoc") === "Static";
+    let v4s = getCheckedAssoc("gc-ips-tmac-ipv4-assoc") === "Static";
+    let v6s = getCheckedAssoc("gc-ips-tmac-ipv6-assoc") === "Static";
     return {
       MACAddress: (els.macInp && els.macInp.value) || "",
       IPV4Association: getCheckedAssoc("gc-ips-tmac-ipv4-assoc"),
@@ -184,17 +184,17 @@
   }
 
   function bindPanelResize() {
-    var panel = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let panel = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!panel || !handle || handle.dataset.gcIpsTmacResizeBound === "1") return;
     handle.dataset.gcIpsTmacResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = panel.getBoundingClientRect().width;
-      var maxW = Math.min(560, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = panel.getBoundingClientRect().width;
+      let maxW = Math.min(560, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(320, Math.min(maxW, w));
         panel.style.width = w + "px";
       }
@@ -235,7 +235,7 @@
       els.form.addEventListener("click", function (e) {
         if (!root || root.hidden) return;
         if (e.target.closest("[data-gc-fw-ms]")) return;
-        var body = formBodyEl();
+        let body = formBodyEl();
         if (!body) return;
         body.querySelectorAll(".gc-hs-ip-host-flyout__fw-dropdown").forEach(function (d) {
           d.hidden = true;
@@ -249,7 +249,7 @@
     if (els.cancelBtn) {
       els.cancelBtn.addEventListener("click", closeFlyout);
     }
-    var backdrop = root.querySelector(".gc-if-flyout__backdrop");
+    let backdrop = root.querySelector(".gc-if-flyout__backdrop");
     if (backdrop) {
       backdrop.addEventListener("click", closeFlyout);
     }
@@ -257,13 +257,13 @@
     if (els.form) {
       els.form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var body = collectTrustedMac();
+        let body = collectTrustedMac();
         if (!body.MACAddress || !body.MACAddress.trim()) {
           bannerResult(false, "MAC address is required.");
           return;
         }
         if (mode === "create") {
-          var fwIds = collectCreateFirewallIds();
+          let fwIds = collectCreateFirewallIds();
           if (!fwIds.length) {
             bannerResult(false, "Select at least one firewall in the flyout.");
             return;
@@ -291,11 +291,11 @@
             .then(function (x) {
               if (els.saveBtn) els.saveBtn.disabled = false;
               if (!x.ok) {
-                var em = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
                 return;
               }
-              var n = (x.j && x.j.count) || 0;
+              let n = (x.j && x.j.count) || 0;
               bannerResult(
                 true,
                 n === 1
@@ -304,8 +304,8 @@
               );
               dispatchTaskQueueUpdated();
               closeFlyout();
-              if (typeof window.gcIpsTrustedMacTableRefresh === "function") {
-                window.gcIpsTrustedMacTableRefresh();
+              if (typeof globalThis.gcIpsTrustedMacTableRefresh === "function") {
+                globalThis.gcIpsTrustedMacTableRefresh();
               }
             })
             .catch(function () {
@@ -314,14 +314,14 @@
             });
           return;
         }
-        var allTmacTargets = collectIpsTrustedMacEditTargets(currentRow);
-        var byFw = {};
+        let allTmacTargets = collectIpsTrustedMacEditTargets(currentRow);
+        let byFw = {};
         allTmacTargets.forEach(function (t) {
           if (t && t.firewall_id != null) byFw[t.firewall_id] = t;
         });
-        var selectedFw = collectCreateFirewallIds();
-        var toUpdate = [];
-        var toCreateFw = [];
+        let selectedFw = collectCreateFirewallIds();
+        let toUpdate = [];
+        let toCreateFw = [];
         selectedFw.forEach(function (fid) {
           if (byFw[fid]) toUpdate.push(byFw[fid]);
           else toCreateFw.push(fid);
@@ -339,8 +339,8 @@
           return;
         }
         if (els.saveBtn) els.saveBtn.disabled = true;
-        var uIdx = 0;
-        var queued = 0;
+        let uIdx = 0;
+        let queued = 0;
         function finishTmacSave(errMsg) {
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (errMsg) {
@@ -359,8 +359,8 @@
             dispatchTaskQueueUpdated();
           }
           closeFlyout();
-          if (typeof window.gcIpsTrustedMacTableRefresh === "function") {
-            window.gcIpsTrustedMacTableRefresh();
+          if (typeof globalThis.gcIpsTrustedMacTableRefresh === "function") {
+            globalThis.gcIpsTrustedMacTableRefresh();
           }
         }
         function runBatchCreateForNew() {
@@ -385,11 +385,11 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var em3 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em3 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 finishTmacSave(typeof em3 === "string" ? em3 : JSON.stringify(em3));
                 return;
               }
-              var n = (x.j && x.j.count) || 0;
+              let n = (x.j && x.j.count) || 0;
               queued += n;
               finishTmacSave(null);
             })
@@ -402,7 +402,7 @@
             runBatchCreateForNew();
             return;
           }
-          var tid = toUpdate[uIdx].config_entry_id;
+          let tid = toUpdate[uIdx].config_entry_id;
           uIdx++;
           fetch(UPDATE_URL, {
             method: "POST",
@@ -421,7 +421,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var em2 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em2 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 finishTmacSave(typeof em2 === "string" ? em2 : JSON.stringify(em2));
                 return;
               }
@@ -443,21 +443,21 @@
     });
   }
 
-  window.gcIpsTrustedMacFlyoutInit = function () {
+  globalThis.gcIpsTrustedMacFlyoutInit = function () {
     root = document.getElementById("gc-ips-tmac-flyout");
     CREATE_BATCH_URL =
-      typeof window.GC_IPS_TRUSTED_MAC_CREATE_BATCH_URL === "string"
-        ? window.GC_IPS_TRUSTED_MAC_CREATE_BATCH_URL
+      typeof globalThis.GC_IPS_TRUSTED_MAC_CREATE_BATCH_URL === "string"
+        ? globalThis.GC_IPS_TRUSTED_MAC_CREATE_BATCH_URL
         : "";
     UPDATE_URL =
-      typeof window.GC_IPS_TRUSTED_MAC_UPDATE_URL === "string"
-        ? window.GC_IPS_TRUSTED_MAC_UPDATE_URL
+      typeof globalThis.GC_IPS_TRUSTED_MAC_UPDATE_URL === "string"
+        ? globalThis.GC_IPS_TRUSTED_MAC_UPDATE_URL
         : "";
     bindOnce();
   };
 
-  window.gcIpsTrustedMacFlyoutOpenCreate = function () {
-    if (!root) window.gcIpsTrustedMacFlyoutInit();
+  globalThis.gcIpsTrustedMacFlyoutOpenCreate = function () {
+    if (!root) globalThis.gcIpsTrustedMacFlyoutInit();
     mode = "create";
     currentRow = null;
     populateFromPayload({}, null);
@@ -469,17 +469,17 @@
     }
   };
 
-  window.gcIpsTrustedMacFlyoutOpenFromTr = function (tr) {
-    if (!root) window.gcIpsTrustedMacFlyoutInit();
+  globalThis.gcIpsTrustedMacFlyoutOpenFromTr = function (tr) {
+    if (!root) globalThis.gcIpsTrustedMacFlyoutInit();
     if (!tr || !tr._gcNetRow) return;
     mode = "edit";
     currentRow = tr._gcNetRow;
-    var tm = currentRow.trusted_mac;
+    let tm = currentRow.trusted_mac;
     populateFromPayload(tm, currentRow);
     openFlyout();
-    var btm = formBodyEl();
-    if (btm && typeof window.gcCombineFlyoutApplyConflictChrome === "function") {
-      window.gcCombineFlyoutApplyConflictChrome(btm, currentRow, {
+    let btm = formBodyEl();
+    if (btm && typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function") {
+      globalThis.gcCombineFlyoutApplyConflictChrome(btm, currentRow, {
         columnLabels: {
           __ipv4_assoc: "IPv4 association",
           __ipv4_addr: "IPv4 address",

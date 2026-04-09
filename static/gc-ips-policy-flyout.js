@@ -4,9 +4,9 @@
 (function () {
   "use strict";
 
-  var root = null;
-  var els = {};
-  var DD = {
+  let root = null;
+  let els = {};
+  let DD = {
     categories: [],
     severities: [],
     platforms: [],
@@ -15,19 +15,19 @@
     signature_selection: [],
     actions: [],
   };
-  var mode = "edit";
-  var currentRow = null;
-  var rulesModel = [];
-  var editingRuleIndex = -1;
-  var CREATE_URL = "";
-  var UPDATE_URL = "";
-  var ruleEditorSnapshot = null;
-  var RULE_PANEL_MS = 280;
-  var rulePanelTransitionTimer = null;
+  let mode = "edit";
+  let currentRow = null;
+  let rulesModel = [];
+  let editingRuleIndex = -1;
+  let CREATE_URL = "";
+  let UPDATE_URL = "";
+  let ruleEditorSnapshot = null;
+  let RULE_PANEL_MS = 280;
+  let rulePanelTransitionTimer = null;
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -49,14 +49,14 @@
 
   function listValues(obj, key) {
     if (!obj || typeof obj !== "object") return [];
-    var v = obj[key];
+    let v = obj[key];
     if (v == null) return [];
     if (Array.isArray(v)) {
       return v.map(textScalar).filter(function (s) {
         return s !== "";
       });
     }
-    var one = textScalar(v);
+    let one = textScalar(v);
     return one ? [one] : [];
   }
 
@@ -70,11 +70,11 @@
 
   function parseRuleFromCache(r) {
     if (!r || typeof r !== "object") r = {};
-    var cats = dimState(listValues(r.CategoryList, "Category"));
-    var sevs = dimState(listValues(r.SeverityList, "Severity"));
-    var plats = dimState(listValues(r.PlatformList, "Platform"));
-    var tgts = dimState(listValues(r.TargetList, "Target"));
-    var sigs = listValues(r.SignatureList, "Signature");
+    let cats = dimState(listValues(r.CategoryList, "Category"));
+    let sevs = dimState(listValues(r.SeverityList, "Severity"));
+    let plats = dimState(listValues(r.PlatformList, "Platform"));
+    let tgts = dimState(listValues(r.TargetList, "Target"));
+    let sigs = listValues(r.SignatureList, "Signature");
     return {
       RuleName: textScalar(r.RuleName) || "",
       RuleType: textScalar(r.RuleType) || "Default Signature",
@@ -114,10 +114,10 @@
 
   function fillSelect(sel, options, current) {
     if (!sel) return;
-    var cur = String(current || "").trim();
+    let cur = String(current || "").trim();
     sel.innerHTML = "";
     (options || []).forEach(function (opt) {
-      var o = document.createElement("option");
+      let o = document.createElement("option");
       o.value = opt;
       o.textContent = opt;
       sel.appendChild(o);
@@ -143,19 +143,19 @@
 
   function fillChecklist(ul, options, selectedArr) {
     if (!ul) return;
-    var set = {};
+    let set = {};
     (selectedArr || []).forEach(function (s) {
       set[String(s).trim()] = true;
     });
     ul.innerHTML = "";
     (options || []).forEach(function (opt) {
-      var li = document.createElement("li");
-      var lab = document.createElement("label");
-      var cb = document.createElement("input");
+      let li = document.createElement("li");
+      let lab = document.createElement("label");
+      let cb = document.createElement("input");
       cb.type = "checkbox";
       cb.value = opt;
       cb.checked = !!set[opt];
-      var span = document.createElement("span");
+      let span = document.createElement("span");
       span.textContent = opt;
       lab.appendChild(cb);
       lab.appendChild(span);
@@ -176,14 +176,14 @@
   function onAllCheckboxChange(rule, spec) {
     if (!spec.allCb || !spec.wrap || !spec.ul || !rule) return;
     if (spec.allCb.checked) {
-      var cur = readChecklist(spec.ul);
-      var sk = stashPropForDim(spec.dim);
+      let cur = readChecklist(spec.ul);
+      let sk = stashPropForDim(spec.dim);
       if (sk) rule[sk] = cur.slice();
       spec.wrap.hidden = true;
       spec.wrap.setAttribute("aria-hidden", "true");
     } else {
-      var sk2 = stashPropForDim(spec.dim);
-      var restore =
+      let sk2 = stashPropForDim(spec.dim);
+      let restore =
         sk2 && rule[sk2] && rule[sk2].length
           ? rule[sk2].slice()
           : (rule[spec.selKey] || []).slice();
@@ -195,14 +195,14 @@
   }
 
   function applySmartFilter() {
-    var q = (els.smartFilter && els.smartFilter.value || "").trim().toLowerCase();
+    let q = (els.smartFilter && els.smartFilter.value || "").trim().toLowerCase();
     getDimSpecs().forEach(function (spec) {
       if (!spec.wrap || spec.wrap.hidden || !spec.ul || !spec.emptyEl) return;
-      var vis = 0;
+      let vis = 0;
       spec.ul.querySelectorAll("li").forEach(function (li) {
-        var inp = li.querySelector("input");
-        var v = (inp && inp.value ? String(inp.value) : "").toLowerCase();
-        var match = !q || v.indexOf(q) >= 0;
+        let inp = li.querySelector("input");
+        let v = (inp && inp.value ? String(inp.value) : "").toLowerCase();
+        let match = !q || v.indexOf(q) >= 0;
         li.hidden = !match;
         if (match) vis++;
       });
@@ -268,7 +268,7 @@
       if (!spec.allCb || spec.allCb.dataset.gcIpsDimBound === "1") return;
       spec.allCb.dataset.gcIpsDimBound = "1";
       spec.allCb.addEventListener("change", function () {
-        var rule = rulesModel[editingRuleIndex];
+        let rule = rulesModel[editingRuleIndex];
         if (!rule) return;
         onAllCheckboxChange(rule, spec);
       });
@@ -279,7 +279,7 @@
     if (!rule) return;
     getDimSpecs().forEach(function (spec) {
       if (!spec.allCb || !spec.wrap || !spec.ul) return;
-      var allOn = !!rule[spec.allKey];
+      let allOn = !!rule[spec.allKey];
       spec.allCb.checked = allOn;
       if (allOn) {
         spec.wrap.hidden = true;
@@ -289,7 +289,7 @@
         spec.wrap.hidden = false;
         spec.wrap.setAttribute("aria-hidden", "false");
         fillChecklist(spec.ul, spec.getOptions(), rule[spec.selKey] || []);
-        var sk = stashPropForDim(spec.dim);
+        let sk = stashPropForDim(spec.dim);
         if (sk) rule[sk] = (rule[spec.selKey] || []).slice();
       }
     });
@@ -297,29 +297,29 @@
   }
 
   function ruleEditorSigSelection() {
-    var r = root && root.querySelector('input[name="gc-ips-pol-sigsel"]:checked');
+    let r = root && root.querySelector('input[name="gc-ips-pol-sigsel"]:checked');
     return r ? String(r.value) : "All Application";
   }
 
   function syncSigSection() {
-    var sec = els.sigSection;
-    var ul = els.sigReadonly;
-    var ta = els.sigTa;
+    let sec = els.sigSection;
+    let ul = els.sigReadonly;
+    let ta = els.sigTa;
     if (!sec) return;
-    var indiv = ruleEditorSigSelection() === "Individual Application";
+    let indiv = ruleEditorSigSelection() === "Individual Application";
     sec.hidden = !indiv;
     sec.setAttribute("aria-hidden", indiv ? "false" : "true");
     if (!indiv) return;
-    var rule = rulesModel[editingRuleIndex];
-    var cached = rule && rule._cachedSigs && rule._cachedSigs.length ? rule._cachedSigs : [];
-    var hint = root.querySelector("#gc-ips-pol-sig-cache-hint");
+    let rule = rulesModel[editingRuleIndex];
+    let cached = rule && rule._cachedSigs && rule._cachedSigs.length ? rule._cachedSigs : [];
+    let hint = root.querySelector("#gc-ips-pol-sig-cache-hint");
     if (ul) {
       ul.innerHTML = "";
       if (cached.length) {
         ul.hidden = false;
         if (hint) hint.hidden = false;
         cached.forEach(function (s) {
-          var li = document.createElement("li");
+          let li = document.createElement("li");
           li.textContent = s;
           ul.appendChild(li);
         });
@@ -329,7 +329,7 @@
       }
     }
     if (ta && rule) {
-      var lines = (rule.signatures && rule.signatures.length ? rule.signatures : cached).join("\n");
+      let lines = (rule.signatures && rule.signatures.length ? rule.signatures : cached).join("\n");
       ta.value = lines;
     }
   }
@@ -363,7 +363,7 @@
 
   function openRulePanel(on, animated) {
     if (!root) return;
-    var useAnim = animated !== false;
+    let useAnim = animated !== false;
     if (on) {
       if (rulePanelTransitionTimer) {
         clearTimeout(rulePanelTransitionTimer);
@@ -374,7 +374,7 @@
         els.collapsedStrip.hidden = false;
         els.collapsedStrip.setAttribute("aria-hidden", "false");
       }
-      var policyName = (els.nameInp && els.nameInp.value.trim()) || "Policy";
+      let policyName = (els.nameInp && els.nameInp.value.trim()) || "Policy";
       if (els.collapsedLabel) {
         els.collapsedLabel.textContent =
           policyName.length > 48 ? policyName.slice(0, 46) + "…" : policyName;
@@ -410,7 +410,7 @@
 
   function openRuleEditor(index) {
     editingRuleIndex = index;
-    var rule = rulesModel[index];
+    let rule = rulesModel[index];
     if (!rule) return;
     ruleEditorSnapshot = cloneRuleSnapshot(rule);
     if (els.smartFilter) els.smartFilter.value = "";
@@ -423,7 +423,7 @@
     syncAllDimensionsFromRule(rule);
     syncSigSection();
     if (els.rulePanelTitle) {
-      var rn = rule.RuleName || "Rule " + (index + 1);
+      let rn = rule.RuleName || "Rule " + (index + 1);
       els.rulePanelTitle.textContent = "Edit rule · " + rn;
     }
     openRulePanel(true, true);
@@ -435,7 +435,7 @@
   }
 
   function cancelRuleEditor() {
-    var idx = editingRuleIndex;
+    let idx = editingRuleIndex;
     if (idx >= 0 && ruleEditorSnapshot && rulesModel[idx]) {
       rulesModel[idx] = ruleEditorSnapshot;
     }
@@ -445,9 +445,9 @@
   }
 
   function applyRuleFromForm() {
-    var idx = editingRuleIndex;
+    let idx = editingRuleIndex;
     if (idx < 0 || !rulesModel[idx]) return;
-    var r = rulesModel[idx];
+    let r = rulesModel[idx];
     r.RuleName = els.ruleNameInp ? els.ruleNameInp.value.trim() : "";
     r.RuleType = els.ruleTypeSel ? els.ruleTypeSel.value : "Default Signature";
     r.Action = els.actionSel ? els.actionSel.value : "Recommended";
@@ -456,13 +456,13 @@
     r.severities_all = !!(els.sevAll && els.sevAll.checked);
     r.platforms_all = !!(els.platAll && els.platAll.checked);
     r.targets_all = !!(els.tgtAll && els.tgtAll.checked);
-    var chk = readMultiValuesFromChecklists();
+    let chk = readMultiValuesFromChecklists();
     r.categories = r.categories_all ? [] : chk.categories;
     r.severities = r.severities_all ? [] : chk.severities;
     r.platforms = r.platforms_all ? [] : chk.platforms;
     r.targets = r.targets_all ? [] : chk.targets;
     if (r.SignaturSelectionType === "Individual Application") {
-      var raw = els.sigTa ? els.sigTa.value : "";
+      let raw = els.sigTa ? els.sigTa.value : "";
       r.signatures = raw
         .split(/\r?\n/)
         .map(function (l) {
@@ -479,9 +479,9 @@
   }
 
   function signaturesCellSummary(rule) {
-    var st = rule.SignaturSelectionType || "All Application";
+    let st = rule.SignaturSelectionType || "All Application";
     if (st === "Individual Application") {
-      var n = 0;
+      let n = 0;
       if (rule.signatures && rule.signatures.length) n = rule.signatures.length;
       else if (rule._cachedSigs && rule._cachedSigs.length) n = rule._cachedSigs.length;
       return n ? "Individual (" + n + ")" : "Individual";
@@ -490,12 +490,12 @@
   }
 
   function renderRuleTable() {
-    var tb = els.ruleTbody;
+    let tb = els.ruleTbody;
     if (!tb) return;
     tb.innerHTML = "";
     if (!rulesModel.length) {
-      var tr0 = document.createElement("tr");
-      var td0 = document.createElement("td");
+      let tr0 = document.createElement("tr");
+      let td0 = document.createElement("td");
       td0.colSpan = 4;
       td0.className = "muted";
       td0.textContent = "No rules yet. Use Add rule.";
@@ -504,18 +504,18 @@
       return;
     }
     rulesModel.forEach(function (rule, i) {
-      var tr = document.createElement("tr");
+      let tr = document.createElement("tr");
       tr.className = "gc-ips-pol-rules-table__row";
       tr.setAttribute("data-rule-index", String(i));
       tr.setAttribute("role", "button");
       tr.setAttribute("tabindex", "0");
-      var name = rule.RuleName || "Rule " + (i + 1);
+      let name = rule.RuleName || "Rule " + (i + 1);
       tr.setAttribute(
         "aria-label",
         "Edit rule " + name + ", " + (rule.RuleType || "") + ", " + signaturesCellSummary(rule),
       );
       function addCell(text) {
-        var td = document.createElement("td");
+        let td = document.createElement("td");
         td.textContent = text;
         tr.appendChild(td);
       }
@@ -528,7 +528,7 @@
   }
 
   function ruleToClientPayload(r) {
-    var o = {
+    let o = {
       RuleName: r.RuleName || "Rule 1",
       RuleType: r.RuleType || "Default Signature",
       SignaturSelectionType: r.SignaturSelectionType || "All Application",
@@ -562,7 +562,7 @@
     root.hidden = false;
     root.setAttribute("aria-hidden", "false");
     document.body.classList.add("gc-if-flyout--open");
-    var panel = root.querySelector(".gc-if-flyout__panel");
+    let panel = root.querySelector(".gc-if-flyout__panel");
     if (panel) {
       try {
         panel.focus();
@@ -581,20 +581,20 @@
   }
 
   function bindPanelResize() {
-    var panel = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let panel = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!panel || !handle || handle.dataset.gcIpsPolResizeBound === "1") return;
     handle.dataset.gcIpsPolResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = panel.getBoundingClientRect().width;
-      var ruleOpen = root && root.classList.contains("gc-ips-pol-flyout--rule-open");
-      var maxW = ruleOpen
-        ? Math.min(1200, window.innerWidth - 24)
-        : Math.min(720, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = panel.getBoundingClientRect().width;
+      let ruleOpen = root && root.classList.contains("gc-ips-pol-flyout--rule-open");
+      let maxW = ruleOpen
+        ? Math.min(1200, globalThis.innerWidth - 24)
+        : Math.min(720, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(320, Math.min(maxW, w));
         panel.style.width = w + "px";
       }
@@ -612,21 +612,21 @@
   }
 
   function collectPolFlyoutFirewallIds() {
-    var slot = root.querySelector("#gc-ips-pol-fw-slot");
+    let slot = root.querySelector("#gc-ips-pol-fw-slot");
     if (!slot) return [];
-    var ms = slot.querySelector("[data-gc-fw-ms]");
+    let ms = slot.querySelector("[data-gc-fw-ms]");
     if (!ms) return [];
-    var out = [];
+    let out = [];
     ms.querySelectorAll('input[type="checkbox"][data-gc-fw-id]').forEach(function (cb) {
       if (!cb.checked) return;
-      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      let n = parseInt(String(cb.dataset.gcFwId || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
   }
 
   function setPolFwHint(mode) {
-    var h = root && root.querySelector("#gc-ips-pol-fw-ms-hint");
+    let h = root && root.querySelector("#gc-ips-pol-fw-ms-hint");
     if (!h) return;
     h.textContent =
       mode === "create"
@@ -635,20 +635,20 @@
   }
 
   function mountPolFwPicker(mode, row) {
-    var slot = root.querySelector("#gc-ips-pol-fw-slot");
-    var tmpl = root.querySelector("#gc-ips-pol-fw-ms-template");
+    let slot = root.querySelector("#gc-ips-pol-fw-slot");
+    let tmpl = root.querySelector("#gc-ips-pol-fw-ms-template");
     if (!slot || !tmpl) return;
     slot.innerHTML = "";
     slot.appendChild(tmpl.content.cloneNode(true));
-    var ms = slot.querySelector("[data-gc-fw-ms]");
+    let ms = slot.querySelector("[data-gc-fw-ms]");
     if (!ms) return;
-    var initial = [];
-    var assigned = [];
+    let initial = [];
+    let assigned = [];
     if (mode === "create") {
       ms.setAttribute("data-fw-picker-mode", "add");
-      if (typeof window.gcGetSelectedFirewallIds === "function") {
-        (window.gcGetSelectedFirewallIds() || []).forEach(function (x) {
-          var n = parseInt(String(x), 10);
+      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        (globalThis.gcGetSelectedFirewallIds() || []).forEach(function (x) {
+          let n = parseInt(String(x), 10);
           if (!isNaN(n) && n > 0) initial.push(n);
         });
       }
@@ -656,7 +656,7 @@
       ms.setAttribute("data-fw-picker-mode", "edit");
       collectIpsPolicyUpdateTargets(row || {}).forEach(function (t) {
         if (t && t.firewall_id != null) {
-          var fid = parseInt(String(t.firewall_id), 10);
+          let fid = parseInt(String(t.firewall_id), 10);
           if (!isNaN(fid) && fid > 0) initial.push(fid);
         }
       });
@@ -664,17 +664,17 @@
     }
     ms.setAttribute("data-fw-initial-selected", JSON.stringify(initial));
     ms.setAttribute("data-fw-assigned-ids", JSON.stringify(assigned));
-    var body = polMainFormBody();
-    if (body && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-      window.gcHsHydrateFlyoutFirewallPicker(body, { row: row || {} });
+    let body = polMainFormBody();
+    if (body && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+      globalThis.gcHsHydrateFlyoutFirewallPicker(body, { row: row || {} });
     }
   }
 
   function collectIpsPolicyUpdateTargets(row) {
-    var t = row && row.ips_policy_edit_targets;
+    let t = row && row.ips_policy_edit_targets;
     if (Array.isArray(t) && t.length) return t.slice();
     if (row && row.config_entry_id != null) {
-      var one = { config_entry_id: row.config_entry_id };
+      let one = { config_entry_id: row.config_entry_id };
       if (row.firewall_id != null) one.firewall_id = row.firewall_id;
       return [one];
     }
@@ -683,8 +683,8 @@
 
   function populateFromPolicy(pol, row) {
     pol = pol && typeof pol === "object" ? pol : {};
-    var rl = pol.RuleList && pol.RuleList.Rule;
-    var rawRules = Array.isArray(rl) ? rl : rl && typeof rl === "object" ? [rl] : [];
+    let rl = pol.RuleList && pol.RuleList.Rule;
+    let rawRules = Array.isArray(rl) ? rl : rl && typeof rl === "object" ? [rl] : [];
     rulesModel = rawRules.length ? rawRules.map(parseRuleFromCache) : [defaultRule()];
     if (els.nameInp) {
       els.nameInp.value = textScalar(pol.Name) || (row && row.cells && row.cells.__name) || "";
@@ -776,7 +776,7 @@
     }
     if (els.addRuleBtn) {
       els.addRuleBtn.addEventListener("click", function () {
-        var next = rulesModel.length + 1;
+        let next = rulesModel.length + 1;
         rulesModel.push(defaultRule());
         rulesModel[rulesModel.length - 1].RuleName = "Rule " + next;
         renderRuleTable();
@@ -784,29 +784,29 @@
       });
     }
 
-    var rulesTable = root.querySelector("#gc-ips-pol-rules-table");
+    let rulesTable = root.querySelector("#gc-ips-pol-rules-table");
     if (rulesTable && rulesTable.dataset.gcIpsPolRuleClickBound !== "1") {
       rulesTable.dataset.gcIpsPolRuleClickBound = "1";
       rulesTable.addEventListener("click", function (ev) {
-        var tr = ev.target.closest("tr[data-rule-index]");
+        let tr = ev.target.closest("tr[data-rule-index]");
         if (!tr || !rulesTable.contains(tr)) return;
         if (ev.target.closest("button, a, input")) return;
-        var idx = parseInt(tr.getAttribute("data-rule-index"), 10);
+        let idx = parseInt(tr.dataset.ruleIndex, 10);
         if (!isNaN(idx)) openRuleEditor(idx);
       });
       rulesTable.addEventListener("keydown", function (ev) {
-        var tr = ev.target.closest("tr[data-rule-index]");
+        let tr = ev.target.closest("tr[data-rule-index]");
         if (!tr || !rulesTable.contains(tr)) return;
         if (ev.key !== "Enter" && ev.key !== " ") return;
         ev.preventDefault();
-        var idx = parseInt(tr.getAttribute("data-rule-index"), 10);
+        let idx = parseInt(tr.dataset.ruleIndex, 10);
         if (!isNaN(idx)) openRuleEditor(idx);
       });
     }
     if (els.nameInp) {
       els.nameInp.addEventListener("input", function () {
         if (!root.classList.contains("gc-ips-pol-flyout--rule-open")) return;
-        var policyName = (els.nameInp.value || "").trim() || "Policy";
+        let policyName = (els.nameInp.value || "").trim() || "Policy";
         if (els.collapsedLabel) {
           els.collapsedLabel.textContent =
             policyName.length > 48 ? policyName.slice(0, 46) + "…" : policyName;
@@ -817,7 +817,7 @@
     if (els.cancelBtn) {
       els.cancelBtn.addEventListener("click", closeFlyout);
     }
-    var backdrop = root.querySelector(".gc-if-flyout__backdrop");
+    let backdrop = root.querySelector(".gc-if-flyout__backdrop");
     if (backdrop) {
       backdrop.addEventListener("click", closeFlyout);
     }
@@ -827,7 +827,7 @@
       els.form.addEventListener("click", function (e) {
         if (!root || root.hidden) return;
         if (e.target.closest("[data-gc-fw-ms]")) return;
-        var body = polMainFormBody();
+        let body = polMainFormBody();
         if (!body) return;
         body.querySelectorAll(".gc-hs-ip-host-flyout__fw-dropdown").forEach(function (d) {
           d.hidden = true;
@@ -841,13 +841,13 @@
     if (els.form) {
       els.form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var body = collectPolicyForSave();
+        let body = collectPolicyForSave();
         if (!body.Name) {
           bannerResult(false, "Policy name is required.");
           return;
         }
         if (mode === "create") {
-          var createFwIds = collectPolFlyoutFirewallIds();
+          let createFwIds = collectPolFlyoutFirewallIds();
           if (!createFwIds.length) {
             bannerResult(false, "Select at least one firewall in the flyout.");
             return;
@@ -857,8 +857,8 @@
             return;
           }
           if (els.saveBtn) els.saveBtn.disabled = true;
-          var cIdx = 0;
-          var cQueued = 0;
+          let cIdx = 0;
+          let cQueued = 0;
           function finishPolCreate(errMsg) {
             if (els.saveBtn) els.saveBtn.disabled = false;
             if (errMsg) {
@@ -880,8 +880,8 @@
               dispatchTaskQueueUpdated();
             }
             closeFlyout();
-            if (typeof window.gcIpsPolicyTableRefresh === "function") {
-              window.gcIpsPolicyTableRefresh();
+            if (typeof globalThis.gcIpsPolicyTableRefresh === "function") {
+              globalThis.gcIpsPolicyTableRefresh();
             }
           }
           function stepPolCreate() {
@@ -889,7 +889,7 @@
               finishPolCreate(null);
               return;
             }
-            var fwId = createFwIds[cIdx];
+            let fwId = createFwIds[cIdx];
             cIdx++;
             fetch(CREATE_URL, {
               method: "POST",
@@ -908,7 +908,7 @@
               })
               .then(function (x) {
                 if (!x.ok) {
-                  var em = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                  let em = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                   finishPolCreate(typeof em === "string" ? em : JSON.stringify(em));
                   return;
                 }
@@ -922,14 +922,14 @@
           stepPolCreate();
           return;
         }
-        var allTargets = collectIpsPolicyUpdateTargets(currentRow);
-        var byFw = {};
+        let allTargets = collectIpsPolicyUpdateTargets(currentRow);
+        let byFw = {};
         allTargets.forEach(function (t) {
           if (t && t.firewall_id != null) byFw[t.firewall_id] = t;
         });
-        var selectedFw = collectPolFlyoutFirewallIds();
-        var toUpdate = [];
-        var toCreateFw = [];
+        let selectedFw = collectPolFlyoutFirewallIds();
+        let toUpdate = [];
+        let toCreateFw = [];
         selectedFw.forEach(function (fid) {
           if (byFw[fid]) toUpdate.push(byFw[fid]);
           else toCreateFw.push(fid);
@@ -947,8 +947,8 @@
           return;
         }
         if (els.saveBtn) els.saveBtn.disabled = true;
-        var uIdx = 0;
-        var queued = 0;
+        let uIdx = 0;
+        let queued = 0;
         function finishPolSave(errMsg) {
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (errMsg) {
@@ -967,8 +967,8 @@
             dispatchTaskQueueUpdated();
           }
           closeFlyout();
-          if (typeof window.gcIpsPolicyTableRefresh === "function") {
-            window.gcIpsPolicyTableRefresh();
+          if (typeof globalThis.gcIpsPolicyTableRefresh === "function") {
+            globalThis.gcIpsPolicyTableRefresh();
           }
         }
         function stepPolUpdate() {
@@ -976,7 +976,7 @@
             stepPolCreateAfterUpdates();
             return;
           }
-          var tid = toUpdate[uIdx].config_entry_id;
+          let tid = toUpdate[uIdx].config_entry_id;
           uIdx++;
           fetch(UPDATE_URL, {
             method: "POST",
@@ -995,7 +995,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var em2 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em2 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 finishPolSave(typeof em2 === "string" ? em2 : JSON.stringify(em2));
                 return;
               }
@@ -1006,13 +1006,13 @@
               finishPolSave("Network error.");
             });
         }
-        var crIdx = 0;
+        let crIdx = 0;
         function stepPolCreateAfterUpdates() {
           if (crIdx >= toCreateFw.length) {
             finishPolSave(null);
             return;
           }
-          var fwId = toCreateFw[crIdx];
+          let fwId = toCreateFw[crIdx];
           crIdx++;
           fetch(CREATE_URL, {
             method: "POST",
@@ -1031,7 +1031,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var em3 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
+                let em3 = (x.j && (x.j.detail || x.j.message)) || "Request failed.";
                 finishPolSave(typeof em3 === "string" ? em3 : JSON.stringify(em3));
                 return;
               }
@@ -1060,7 +1060,7 @@
   }
 
   function loadDropdowns() {
-    var raw = window.GC_IPS_POLICY_DROPDOWNS;
+    let raw = globalThis.GC_IPS_POLICY_DROPDOWNS;
     if (!raw || typeof raw !== "object") return;
     DD.categories = raw.categories || [];
     DD.severities = raw.severities || [];
@@ -1071,35 +1071,35 @@
     DD.actions = raw.actions || [];
   }
 
-  window.gcIpsPolicyFlyoutInit = function () {
+  globalThis.gcIpsPolicyFlyoutInit = function () {
     root = document.getElementById("gc-ips-pol-flyout");
-    CREATE_URL = typeof window.GC_IPS_POLICY_CREATE_URL === "string" ? window.GC_IPS_POLICY_CREATE_URL : "";
-    UPDATE_URL = typeof window.GC_IPS_POLICY_UPDATE_URL === "string" ? window.GC_IPS_POLICY_UPDATE_URL : "";
+    CREATE_URL = typeof globalThis.GC_IPS_POLICY_CREATE_URL === "string" ? globalThis.GC_IPS_POLICY_CREATE_URL : "";
+    UPDATE_URL = typeof globalThis.GC_IPS_POLICY_UPDATE_URL === "string" ? globalThis.GC_IPS_POLICY_UPDATE_URL : "";
     loadDropdowns();
     if (!root) return;
     bindOnce();
   };
 
-  window.gcIpsPolicyFlyoutOpenFromTr = function (tr) {
-    window.gcIpsPolicyFlyoutInit();
-    var row = tr && tr._gcNetRow;
+  globalThis.gcIpsPolicyFlyoutOpenFromTr = function (tr) {
+    globalThis.gcIpsPolicyFlyoutInit();
+    let row = tr && tr._gcNetRow;
     if (!row || !root) return;
     mode = "edit";
     currentRow = row;
     populateFromPolicy(row.policy, row);
     openFlyout();
-    var pBody = polMainFormBody();
-    if (pBody && typeof window.gcCombineFlyoutApplyConflictChrome === "function") {
-      window.gcCombineFlyoutApplyConflictChrome(pBody, row, {
+    let pBody = polMainFormBody();
+    if (pBody && typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function") {
+      globalThis.gcCombineFlyoutApplyConflictChrome(pBody, row, {
         columnLabels: { __description: "Description", __policy_body: "Policy content" },
         fieldPickHandlers: {
           __policy_body: function (raw) {
             try {
-              var o = JSON.parse(String(raw));
+              let o = JSON.parse(String(raw));
               populateFromPolicy(o, currentRow);
             } catch (ePol) {
-              if (typeof window.gcGlobalBannerShowResult === "function") {
-                window.gcGlobalBannerShowResult(false, "Could not parse stored policy JSON for that firewall.");
+              if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+                globalThis.gcGlobalBannerShowResult(false, "Could not parse stored policy JSON for that firewall.");
               } else {
                 alert("Could not parse stored policy JSON for that firewall.");
               }
@@ -1110,8 +1110,8 @@
     }
   };
 
-  window.gcIpsPolicyFlyoutOpenCreate = function () {
-    window.gcIpsPolicyFlyoutInit();
+  globalThis.gcIpsPolicyFlyoutOpenCreate = function () {
+    globalThis.gcIpsPolicyFlyoutInit();
     if (!root) return;
     mode = "create";
     currentRow = null;

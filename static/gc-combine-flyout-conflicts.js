@@ -5,8 +5,8 @@
 (function () {
   "use strict";
 
-  var MODAL_ID = "gc-combine-field-pick-modal";
-  var pickValueStore = [];
+  let MODAL_ID = "gc-combine-field-pick-modal";
+  let pickValueStore = [];
 
   function escapeHtml(s) {
     return String(s)
@@ -17,7 +17,7 @@
   }
 
   function previewText(s, maxLen) {
-    var t = String(s == null ? "" : s);
+    let t = String(s == null ? "" : s);
     if (t.length <= maxLen) return t;
     return t.slice(0, Math.max(0, maxLen - 1)) + "…";
   }
@@ -27,9 +27,9 @@
   }
 
   function itemsFromJsonArray(arr) {
-    var out = [];
-    for (var ai = 0; ai < arr.length; ai++) {
-      var x = arr[ai];
+    let out = [];
+    for (let ai = 0; ai < arr.length; ai++) {
+      let x = arr[ai];
       if (x === null || x === undefined) continue;
       if (typeof x === "object") out.push(JSON.stringify(x));
       else out.push(String(x));
@@ -40,18 +40,18 @@
   /** @returns {string[]|null} non-null means treat as list for display/compare */
   function detectListShape(raw) {
     if (Array.isArray(raw)) {
-      var fromArr = itemsFromJsonArray(raw);
+      let fromArr = itemsFromJsonArray(raw);
       return fromArr.length ? fromArr : null;
     }
     if (raw == null) return null;
     if (typeof raw !== "string") return null;
-    var t = raw.trim();
+    let t = raw.trim();
     if (!t) return null;
     if (t.charAt(0) === "[" || t.charAt(0) === "{") {
       try {
-        var p = JSON.parse(t);
+        let p = JSON.parse(t);
         if (Array.isArray(p)) {
-          var parsed = itemsFromJsonArray(p);
+          let parsed = itemsFromJsonArray(p);
           return parsed.length ? parsed : null;
         }
         if (p !== null && typeof p === "object") {
@@ -62,23 +62,23 @@
       }
       return null;
     }
-    var lines = t.split(/\r?\n/).map(normItem).filter(Boolean);
+    let lines = t.split(/\r?\n/).map(normItem).filter(Boolean);
     if (lines.length >= 2) return lines;
     if (t.indexOf(",") !== -1) {
-      var parts = t.split(",").map(normItem).filter(Boolean);
+      let parts = t.split(",").map(normItem).filter(Boolean);
       if (parts.length >= 2) return parts;
     }
     return null;
   }
 
   function itemsForDisplay(raw) {
-    var d = detectListShape(raw);
+    let d = detectListShape(raw);
     if (d) return d;
     return [normItem(raw)];
   }
 
   function useListPresentation(perFw, fwLabels) {
-    for (var i = 0; i < fwLabels.length; i++) {
+    for (let i = 0; i < fwLabels.length; i++) {
       if (detectListShape(perFw[fwLabels[i]]) !== null) return true;
     }
     return false;
@@ -86,10 +86,10 @@
 
   function itemPresentOnAllFirewalls(norm, perFw, fwLabels) {
     if (!fwLabels.length) return true;
-    for (var i = 0; i < fwLabels.length; i++) {
-      var items = itemsForDisplay(perFw[fwLabels[i]]);
-      var seen = {};
-      for (var j = 0; j < items.length; j++) seen[normItem(items[j])] = true;
+    for (let i = 0; i < fwLabels.length; i++) {
+      let items = itemsForDisplay(perFw[fwLabels[i]]);
+      let seen = {};
+      for (let j = 0; j < items.length; j++) seen[normItem(items[j])] = true;
       if (!seen[norm]) return false;
     }
     return true;
@@ -100,9 +100,9 @@
     if (row.access_per_firewall && typeof row.access_per_firewall === "object") {
       return row.access_per_firewall;
     }
-    var keys = Object.keys(row);
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i];
+    let keys = Object.keys(row);
+    for (let i = 0; i < keys.length; i++) {
+      let k = keys[i];
       if (/_combine_per_field$/.test(k) && row[k] && typeof row[k] === "object") {
         return row[k];
       }
@@ -121,15 +121,15 @@
   }
 
   function matchingPerFieldKey(el, perMap) {
-    var keys = parseFieldKeys(el.getAttribute("data-gc-combine-field-keys"));
-    for (var i = 0; i < keys.length; i++) {
+    let keys = parseFieldKeys(el.dataset.gcCombineFieldKeys);
+    for (let i = 0; i < keys.length; i++) {
       if (Object.prototype.hasOwnProperty.call(perMap, keys[i])) return keys[i];
     }
     return "";
   }
 
   function ensureModal() {
-    var m = document.getElementById(MODAL_ID);
+    let m = document.getElementById(MODAL_ID);
     if (m) return m;
     m = document.createElement("div");
     m.id = MODAL_ID;
@@ -173,49 +173,49 @@
   }
 
   function openPickModal(title, perFw, onChoose) {
-    var m = ensureModal();
-    var body = m.querySelector(".gc-combine-field-pick-modal__body");
-    var titleEl = m.querySelector("#" + MODAL_ID + "-title");
+    let m = ensureModal();
+    let body = m.querySelector(".gc-combine-field-pick-modal__body");
+    let titleEl = m.querySelector("#" + MODAL_ID + "-title");
     if (titleEl) titleEl.textContent = title || "Values by firewall";
     pickValueStore = [];
-    var fwLabels = Object.keys(perFw || {}).sort();
+    let fwLabels = Object.keys(perFw || {}).sort();
     if (!body) return;
     body.innerHTML = "";
-    var listMode = useListPresentation(perFw, fwLabels);
-    var hint = document.createElement("p");
+    let listMode = useListPresentation(perFw, fwLabels);
+    let hint = document.createElement("p");
     hint.className = "muted gc-combine-field-pick-hint";
     hint.textContent = listMode
       ? "Click a row to apply that firewall’s value to the form. Gray list items appear on every firewall; red items are missing on at least one."
       : "Click a row to apply that firewall’s value to the form.";
     body.appendChild(hint);
-    var ul = document.createElement("ul");
+    let ul = document.createElement("ul");
     ul.className = "gc-net-zone-modal__fw-list gc-combine-field-pick-list";
     fwLabels.forEach(function (fw, idx) {
-      var raw = perFw[fw];
+      let raw = perFw[fw];
       pickValueStore[idx] = raw;
-      var li = document.createElement("li");
+      let li = document.createElement("li");
       li.className = "gc-net-zone-modal__fw-row gc-combine-field-pick-row";
-      var btn = document.createElement("button");
+      let btn = document.createElement("button");
       btn.type = "button";
       btn.className = "gc-combine-field-pick-option";
       btn.setAttribute("data-gc-pick-idx", String(idx));
-      var pill =
-        typeof window.gcFirewallScopePillHtml === "function"
-          ? window.gcFirewallScopePillHtml(fw)
+      let pill =
+        typeof globalThis.gcFirewallScopePillHtml === "function"
+          ? globalThis.gcFirewallScopePillHtml(fw)
           : escapeHtml(fw);
-      var pillWrap = document.createElement("span");
+      let pillWrap = document.createElement("span");
       pillWrap.className = "gc-combine-field-pick-option__pill";
       pillWrap.innerHTML = pill;
-      var valCol = document.createElement("span");
+      let valCol = document.createElement("span");
       valCol.className = "gc-combine-field-pick-option__val mono";
       if (listMode) {
-        var rowItems = itemsForDisplay(raw);
-        var valList = document.createElement("ul");
+        let rowItems = itemsForDisplay(raw);
+        let valList = document.createElement("ul");
         valList.className = "gc-combine-field-pick-val-list";
-        for (var vi = 0; vi < rowItems.length; vi++) {
-          var entry = rowItems[vi];
-          var vli = document.createElement("li");
-          var n = normItem(entry);
+        for (let vi = 0; vi < rowItems.length; vi++) {
+          let entry = rowItems[vi];
+          let vli = document.createElement("li");
+          let n = normItem(entry);
           vli.className =
             "gc-combine-field-pick-val-li " +
             (itemPresentOnAllFirewalls(n, perFw, fwLabels)
@@ -231,9 +231,9 @@
       btn.appendChild(pillWrap);
       btn.appendChild(valCol);
       btn.addEventListener("click", function () {
-        var i = parseInt(btn.getAttribute("data-gc-pick-idx") || "-1", 10);
+        let i = parseInt(btn.dataset.gcPickIdx || "-1", 10);
         if (isNaN(i) || i < 0) return;
-        var v = pickValueStore[i];
+        let v = pickValueStore[i];
         onChoose(fw, v);
         m.hidden = true;
         m.setAttribute("aria-hidden", "true");
@@ -248,23 +248,23 @@
 
   function findPrimaryControl(fieldEl) {
     if (!fieldEl) return null;
-    var sel = fieldEl.querySelector(
+    let sel = fieldEl.querySelector(
       'input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), select, textarea',
     );
     if (sel) return sel;
-    var ra = fieldEl.querySelector('input[type="radio"]');
+    let ra = fieldEl.querySelector('input[type="radio"]');
     return ra;
   }
 
   function applyRawValueToControl(fieldEl, raw) {
-    var s = raw != null ? String(raw) : "";
-    var el = findPrimaryControl(fieldEl);
+    let s = raw != null ? String(raw) : "";
+    let el = findPrimaryControl(fieldEl);
     if (!el) return false;
-    var tag = el.tagName;
+    let tag = el.tagName;
     if (tag === "SELECT") {
       el.value = s;
       if (el.value !== s) {
-        var opt = document.createElement("option");
+        let opt = document.createElement("option");
         opt.value = s;
         opt.textContent = previewText(s, 80);
         el.appendChild(opt);
@@ -284,9 +284,9 @@
       return true;
     }
     if (tag === "INPUT" && el.type === "radio") {
-      var rname = el.name;
+      let rname = el.name;
       if (!rname) return false;
-      var hit = false;
+      let hit = false;
       fieldEl.querySelectorAll('input[type="radio"]').forEach(function (r) {
         if (r.name !== rname) return;
         r.checked = String(r.value) === s;
@@ -298,7 +298,7 @@
       return true;
     }
     if (tag === "INPUT" && el.type === "checkbox") {
-      var on =
+      let on =
         s === "1" ||
         /^true$/i.test(s) ||
         /^yes$/i.test(s) ||
@@ -333,18 +333,18 @@
   function gcCombineFlyoutApplyConflictChrome(root, row, options) {
     options = options || {};
     gcCombineFlyoutClearConflictChrome(root);
-    var perMap = gcExtractCombinePerFieldMap(row);
+    let perMap = gcExtractCombinePerFieldMap(row);
     if (!root || !perMap) return;
-    var handlers = options.fieldPickHandlers || {};
-    var colLabels = options.columnLabels || {};
-    var targets = root.querySelectorAll("[data-gc-combine-field-keys]");
+    let handlers = options.fieldPickHandlers || {};
+    let colLabels = options.columnLabels || {};
+    let targets = root.querySelectorAll("[data-gc-combine-field-keys]");
     targets.forEach(function (fieldEl) {
-      var colKey = matchingPerFieldKey(fieldEl, perMap);
+      let colKey = matchingPerFieldKey(fieldEl, perMap);
       if (!colKey) return;
       fieldEl.classList.add("gc-combine-flyout-field--conflict");
-      var perFw = perMap[colKey];
+      let perFw = perMap[colKey];
       if (!perFw || typeof perFw !== "object") return;
-      var trig = document.createElement("button");
+      let trig = document.createElement("button");
       trig.type = "button";
       trig.className = "gc-combine-flyout-conflict-trigger";
       trig.setAttribute("aria-label", "Compare values across firewalls and pick one");
@@ -354,7 +354,7 @@
       trig.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        var modalTitle = colLabels[colKey] || colKey;
+        let modalTitle = colLabels[colKey] || colKey;
         openPickModal(modalTitle, perFw, function (_fw, raw) {
           if (handlers[colKey]) {
             handlers[colKey](raw, _fw);
@@ -363,16 +363,16 @@
           }
         });
       });
-      var label = null;
-      var ch = fieldEl.children;
-      for (var ci = 0; ci < ch.length; ci++) {
+      let label = null;
+      let ch = fieldEl.children;
+      for (let ci = 0; ci < ch.length; ci++) {
         if (ch[ci].classList && ch[ci].classList.contains("gc-if-flyout__label")) {
           label = ch[ci];
           break;
         }
       }
       if (label && label.parentNode === fieldEl) {
-        var rowBar = document.createElement("div");
+        let rowBar = document.createElement("div");
         rowBar.className = "gc-combine-flyout-conflict-label-row";
         label.parentNode.insertBefore(rowBar, label);
         rowBar.appendChild(label);
@@ -385,8 +385,8 @@
     });
   }
 
-  window.gcExtractCombinePerFieldMap = gcExtractCombinePerFieldMap;
-  window.gcCombineFlyoutClearConflictChrome = gcCombineFlyoutClearConflictChrome;
-  window.gcCombineFlyoutApplyConflictChrome = gcCombineFlyoutApplyConflictChrome;
-  window.gcCombineFlyoutOpenPickModal = openPickModal;
+  globalThis.gcExtractCombinePerFieldMap = gcExtractCombinePerFieldMap;
+  globalThis.gcCombineFlyoutClearConflictChrome = gcCombineFlyoutClearConflictChrome;
+  globalThis.gcCombineFlyoutApplyConflictChrome = gcCombineFlyoutApplyConflictChrome;
+  globalThis.gcCombineFlyoutOpenPickModal = openPickModal;
 })();

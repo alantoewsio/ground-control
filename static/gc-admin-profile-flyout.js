@@ -4,10 +4,10 @@
 (function () {
   "use strict";
 
-  var LEVELS = ["None", "Read-Only", "Read-Write"];
+  let LEVELS = ["None", "Read-Only", "Read-Write"];
 
   /** Rows: { g: "Group title" } or { k: "Dot.Path", label: "…", d: depth } */
-  var ROWS = [
+  let ROWS = [
     { k: "Dashboard", label: "Control center", d: 0 },
     { k: "Wizard", label: "Initial setup", d: 0 },
     { g: "System" },
@@ -91,17 +91,17 @@
     { k: "LogsReports.De-Anonymization", label: "De-anonymization", d: 1 },
   ];
 
-  var CREATE_URL = "";
-  var UPDATE_URL = "";
-  var mode = "edit";
-  var currentRow = null;
+  let CREATE_URL = "";
+  let UPDATE_URL = "";
+  let mode = "edit";
+  let currentRow = null;
   /** @type {{ config_entry_id: number, firewall_id: number }[]} */
-  var apEditTargets = [];
-  var state = {};
+  let apEditTargets = [];
+  let state = {};
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -120,9 +120,9 @@
   }
 
   function getDeep(obj, dotKey) {
-    var p = pathParts(dotKey);
-    var cur = obj;
-    for (var i = 0; i < p.length; i++) {
+    let p = pathParts(dotKey);
+    let cur = obj;
+    for (let i = 0; i < p.length; i++) {
       if (!cur || typeof cur !== "object") return "None";
       cur = cur[p[i]];
     }
@@ -131,11 +131,11 @@
   }
 
   function setDeep(obj, dotKey, val) {
-    var p = pathParts(dotKey);
+    let p = pathParts(dotKey);
     if (!p.length) return;
-    var cur = obj;
-    for (var i = 0; i < p.length - 1; i++) {
-      var k = p[i];
+    let cur = obj;
+    for (let i = 0; i < p.length - 1; i++) {
+      let k = p[i];
       if (!cur[k] || typeof cur[k] !== "object") cur[k] = {};
       cur = cur[k];
     }
@@ -143,7 +143,7 @@
   }
 
   function defaultProfileShape(name) {
-    var o = { Name: name || "" };
+    let o = { Name: name || "" };
     ROWS.forEach(function (r) {
       if (r.k) setDeep(o, r.k, "None");
     });
@@ -151,7 +151,7 @@
   }
 
   function mergeFromPayload(raw) {
-    var base = defaultProfileShape("");
+    let base = defaultProfileShape("");
     if (raw && typeof raw === "object") {
       Object.keys(raw).forEach(function (k) {
         if (k === "Name") base.Name = raw.Name;
@@ -168,8 +168,8 @@
 
   function renderTable(wrap) {
     if (!wrap) return;
-    var esc =
-      window.gcEscapeHtmlForNetEntity ||
+    let esc =
+      globalThis.gcEscapeHtmlForNetEntity ||
       function (s) {
         return String(s)
           .replace(/&/g, "&amp;")
@@ -177,7 +177,7 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;");
       };
-    var h =
+    let h =
       '<table class="gc-ap-perm-table"><thead><tr><th class="gc-ap-perm-label">Configuration</th>';
     LEVELS.forEach(function (L) {
       h += "<th class=\"gc-ap-perm-radio\">" + esc(L) + "</th>";
@@ -189,9 +189,9 @@
           '<tr class="gc-ap-perm-group-row"><td colspan="4">' + esc(r.g) + "</td></tr>";
         return;
       }
-      var id = "gc-ap-r-" + idx;
-      var v = getDeep(state, r.k);
-      var d = r.d || 0;
+      let id = "gc-ap-r-" + idx;
+      let v = getDeep(state, r.k);
+      let d = r.d || 0;
       h +=
         '<tr class="gc-ap-perm-depth-' +
         d +
@@ -199,7 +199,7 @@
         esc(r.label) +
         "</td>";
       LEVELS.forEach(function (L) {
-        var chk = L === v;
+        let chk = L === v;
         h +=
           '<td class="gc-ap-perm-radio"><label><input type="radio" name="' +
           id +
@@ -215,10 +215,10 @@
     wrap.innerHTML = h;
     wrap.querySelectorAll('input[type="radio"]').forEach(function (inp) {
       inp.addEventListener("change", function () {
-        var m = String(inp.name || "").match(/^gc-ap-r-(\d+)$/);
+        let m = String(inp.name || "").match(/^gc-ap-r-(\d+)$/);
         if (!m) return;
-        var rowIdx = parseInt(m[1], 10);
-        var row = ROWS[rowIdx];
+        let rowIdx = parseInt(m[1], 10);
+        let row = ROWS[rowIdx];
         if (!row || !row.k) return;
         setDeep(state, row.k, inp.value);
       });
@@ -229,8 +229,8 @@
     if (!wrap) return;
     ROWS.forEach(function (r, idx) {
       if (r.g) return;
-      var id = "gc-ap-r-" + idx;
-      var sel = wrap.querySelector('input[name="' + id + '"]:checked');
+      let id = "gc-ap-r-" + idx;
+      let sel = wrap.querySelector('input[name="' + id + '"]:checked');
       if (sel) setDeep(state, r.k, sel.value);
     });
   }
@@ -244,17 +244,17 @@
 
   function collectApFirewallIds(ms) {
     if (!ms) return [];
-    var out = [];
+    let out = [];
     ms.querySelectorAll('input[type="checkbox"][data-gc-fw-id]').forEach(function (cb) {
       if (!cb.checked) return;
-      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      let n = parseInt(String(cb.dataset.gcFwId || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
   }
 
   function buildApEditTargets(row) {
-    var out = [];
+    let out = [];
     if (!row) return out;
     if (Array.isArray(row.adminprofile_edit_targets) && row.adminprofile_edit_targets.length) {
       row.adminprofile_edit_targets.forEach(function (t) {
@@ -276,40 +276,40 @@
   function init(cfg) {
     CREATE_URL = cfg.createUrl || "";
     UPDATE_URL = cfg.updateUrl || "";
-    var root = document.getElementById("gc-ap-flyout");
-    var form = document.getElementById("gc-ap-form");
-    var title = document.getElementById("gc-ap-flyout-title");
-    var nameInp = document.getElementById("gc-ap-name");
-    var wrap = document.getElementById("gc-ap-perm-wrap");
-    var fwField = document.getElementById("gc-ap-fw-field");
-    var msRoot = fwField ? fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms") : null;
+    let root = document.getElementById("gc-ap-flyout");
+    let form = document.getElementById("gc-ap-form");
+    let title = document.getElementById("gc-ap-flyout-title");
+    let nameInp = document.getElementById("gc-ap-name");
+    let wrap = document.getElementById("gc-ap-perm-wrap");
+    let fwField = document.getElementById("gc-ap-fw-field");
+    let msRoot = fwField ? fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms") : null;
 
     function close() {
       openFlyout(root, false);
       currentRow = null;
     }
 
-    var apClose = document.getElementById("gc-ap-flyout-close");
-    var apCancel = document.getElementById("gc-ap-cancel");
-    var apBackdrop = root ? root.querySelector(".gc-if-flyout__backdrop") : null;
+    let apClose = document.getElementById("gc-ap-flyout-close");
+    let apCancel = document.getElementById("gc-ap-cancel");
+    let apBackdrop = root ? root.querySelector(".gc-if-flyout__backdrop") : null;
     if (apClose) apClose.addEventListener("click", close);
     if (apCancel) apCancel.addEventListener("click", close);
     if (apBackdrop) apBackdrop.addEventListener("click", close);
 
     if (!root || !form) {
-      window.gcAdminProfileFlyoutOpenCreate = function () {};
-      window.gcAdminProfileFlyoutOpenFromTr = function () {};
+      globalThis.gcAdminProfileFlyoutOpenCreate = function () {};
+      globalThis.gcAdminProfileFlyoutOpenFromTr = function () {};
       return;
     }
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       readTableIntoState(wrap);
-      var profile = JSON.parse(JSON.stringify(state));
+      let profile = JSON.parse(JSON.stringify(state));
       profile.Name = (nameInp && nameInp.value) || profile.Name || "";
 
       if (mode === "add") {
-        var ids = collectApFirewallIds(msRoot);
+        let ids = collectApFirewallIds(msRoot);
         if (!ids.length) {
           bannerResult(false, "Select at least one firewall.");
           return;
@@ -318,9 +318,9 @@
           bannerResult(false, "Create URL not configured.");
           return;
         }
-        var done = 0;
-        var fail = 0;
-        var total = ids.length;
+        let done = 0;
+        let fail = 0;
+        let total = ids.length;
         ids.forEach(function (fid) {
           fetch(CREATE_URL, {
             method: "POST",
@@ -363,23 +363,23 @@
         return;
       }
 
-      var selFw = collectApFirewallIds(msRoot);
+      let selFw = collectApFirewallIds(msRoot);
       if (!selFw.length) {
         bannerResult(false, "Select at least one firewall.");
         return;
       }
-      var fwToCe = {};
+      let fwToCe = {};
       apEditTargets.forEach(function (t) {
         if (!t || t.firewall_id == null || t.config_entry_id == null) return;
-        var fid = parseInt(String(t.firewall_id), 10);
-        var ce = parseInt(String(t.config_entry_id), 10);
+        let fid = parseInt(String(t.firewall_id), 10);
+        let ce = parseInt(String(t.config_entry_id), 10);
         if (!isNaN(fid) && fid > 0 && !isNaN(ce) && ce > 0) fwToCe[fid] = ce;
       });
-      var entryIds = [];
+      let entryIds = [];
       selFw.forEach(function (fid) {
         if (fwToCe[fid]) entryIds.push(fwToCe[fid]);
       });
-      var createFwIds = selFw.filter(function (fid) {
+      let createFwIds = selFw.filter(function (fid) {
         return !fwToCe[fid];
       });
 
@@ -404,14 +404,14 @@
           bannerResult(false, "Create URL not configured.");
           return;
         }
-        var doneC = 0;
-        var failC = 0;
-        var totalC = createFwIds.length;
-        var lastErrC = "";
+        let doneC = 0;
+        let failC = 0;
+        let totalC = createFwIds.length;
+        let lastErrC = "";
         function finishCreates() {
           if (doneC + failC < totalC) return;
           if (failC === 0) {
-            var tail =
+            let tail =
               totalC === 1 ? "1 create task queued." : totalC + " create tasks queued.";
             afterAllOk(msgPrefix ? msgPrefix + " " + tail : tail.charAt(0).toUpperCase() + tail.slice(1));
           } else if (doneC === 0) {
@@ -443,7 +443,7 @@
               if (x.ok) doneC++;
               else {
                 failC++;
-                var emc = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+                let emc = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
                 lastErrC = typeof emc === "string" ? emc : JSON.stringify(emc);
               }
               finishCreates();
@@ -464,10 +464,10 @@
         bannerResult(false, "Update URL not configured.");
         return;
       }
-      var doneU = 0;
-      var failU = 0;
-      var totalU = entryIds.length;
-      var lastErrU = "";
+      let doneU = 0;
+      let failU = 0;
+      let totalU = entryIds.length;
+      let lastErrU = "";
       function finishUpdates() {
         if (doneU + failU < totalU) return;
         if (failU > 0) {
@@ -480,7 +480,7 @@
           }
           return;
         }
-        var upMsg = totalU === 1 ? "Update queued." : "Queued " + totalU + " update task(s).";
+        let upMsg = totalU === 1 ? "Update queued." : "Queued " + totalU + " update task(s).";
         runProfileCreates(upMsg);
       }
       entryIds.forEach(function (ceid) {
@@ -506,7 +506,7 @@
             if (x.ok) doneU++;
             else {
               failU++;
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+              let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
               lastErrU = typeof em === "string" ? em : JSON.stringify(em);
             }
             finishUpdates();
@@ -519,7 +519,7 @@
       });
     });
 
-    window.gcAdminProfileFlyoutOpenCreate = function () {
+    globalThis.gcAdminProfileFlyoutOpenCreate = function () {
       mode = "add";
       currentRow = null;
       apEditTargets = [];
@@ -535,8 +535,8 @@
         msRoot.setAttribute("data-fw-initial-selected", "[]");
         msRoot.setAttribute("data-fw-assigned-ids", "[]");
       }
-      if (msRoot && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-        window.gcHsHydrateFlyoutFirewallPicker(msRoot.closest(".gc-if-flyout__form-body") || msRoot, {
+      if (msRoot && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(msRoot.closest(".gc-if-flyout__form-body") || msRoot, {
           row: {},
         });
       }
@@ -544,9 +544,9 @@
       openFlyout(root, true);
     };
 
-    window.gcAdminProfileFlyoutOpenFromTr = function (tr) {
+    globalThis.gcAdminProfileFlyoutOpenFromTr = function (tr) {
       if (!tr || !tr._gcNetRow) return;
-      var row = tr._gcNetRow;
+      let row = tr._gcNetRow;
       mode = "edit";
       currentRow = row;
       apEditTargets = buildApEditTargets(row);
@@ -557,7 +557,7 @@
       }
       state = mergeFromPayload(row.payload || {});
       if (fwField) fwField.hidden = false;
-      var assignedFw = [];
+      let assignedFw = [];
       apEditTargets.forEach(function (x) {
         if (x.firewall_id > 0) assignedFw.push(x.firewall_id);
       });
@@ -568,14 +568,14 @@
           msRoot.setAttribute("data-fw-assigned-ids", JSON.stringify(assignedFw));
         } catch (eApFw) {}
       }
-      var apBody = root ? root.querySelector(".gc-if-flyout__form-body") : null;
-      if (apBody && msRoot && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-        window.gcHsHydrateFlyoutFirewallPicker(apBody, { row: row });
+      let apBody = root ? root.querySelector(".gc-if-flyout__form-body") : null;
+      if (apBody && msRoot && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(apBody, { row: row });
       }
       renderTable(wrap);
       openFlyout(root, true);
-      if (apBody && typeof window.gcCombineFlyoutApplyConflictChrome === "function") {
-        window.gcCombineFlyoutApplyConflictChrome(apBody, row, {
+      if (apBody && typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function") {
+        globalThis.gcCombineFlyoutApplyConflictChrome(apBody, row, {
           columnLabels: { __ap_detail: "Profile definition" },
           fieldPickHandlers: {
             __ap_detail: function (raw) {
@@ -592,5 +592,5 @@
     };
   }
 
-  window.gcAdminProfileFlyoutInit = init;
+  globalThis.gcAdminProfileFlyoutInit = init;
 })();

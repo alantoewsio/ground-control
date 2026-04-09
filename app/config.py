@@ -1,6 +1,17 @@
+import os
+import shutil
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+
+def _resolve_base_dir() -> Path:
+    """Repository root. Frozen launcher sets GROUND_CONTROL_BASE_DIR so .env and DB paths match the repo."""
+    raw = (os.environ.get("GROUND_CONTROL_BASE_DIR") or "").strip()
+    if raw:
+        return Path(raw).resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR = _resolve_base_dir()
 
 
 def _load_dotenv() -> None:
@@ -95,10 +106,65 @@ def monitor_tcp_timeout_seconds() -> float:
     return max(0.5, min(v, 120.0))
 
 
-FERNET_KEY_FILE = BASE_DIR / ".fernet_key"
+def tls_certificate_renew_within_days() -> int:
+    """Renew TLS when the active certificate expires within this many days (scheduler). Env: GROUND_CONTROL_TLS_RENEW_WITHIN_DAYS (1–365, default 30)."""
+    import os
 
-SESSION_SECRET_FILE = BASE_DIR / ".session_secret"
+    raw = (os.environ.get("GROUND_CONTROL_TLS_RENEW_WITHIN_DAYS") or "").strip()
+    if raw.isdigit():
+        n = int(raw)
+        if 1 <= n <= 365:
+            return n
+    return 30
+
+
+def tls_auto_renewal_enabled() -> bool:
+    """Daily TLS renewal job. Env: GROUND_CONTROL_TLS_AUTO_RENEW (default on; set 0/false/off to disable)."""
+    import os
+
+    raw = (os.environ.get("GROUND_CONTROL_TLS_AUTO_RENEW") or "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
 SESSION_SECRET_ENV = "GROUND_CONTROL_SESSION_SECRET"
+_FERNET_KEY_BASENAME = ".fernet_key"
+_SESSION_SECRET_BASENAME = ".session_secret"
+
+
+def fernet_key_file() -> Path:
+    """Fernet key path: persist volume in Docker (``GROUND_CONTROL_PERSIST_DIR``), else repo base."""
+    pr = persist_root()
+    if pr is not None:
+        return (pr / _FERNET_KEY_BASENAME).resolve()
+    return (BASE_DIR / _FERNET_KEY_BASENAME).resolve()
+
+
+def session_secret_file() -> Path:
+    """Session signing secret file: same rule as :func:`fernet_key_file`."""
+    pr = persist_root()
+    if pr is not None:
+        return (pr / _SESSION_SECRET_BASENAME).resolve()
+    return (BASE_DIR / _SESSION_SECRET_BASENAME).resolve()
+
+
+# Back-compat for code/tests that patch a fixed path (prefer :func:`fernet_key_file`).
+FERNET_KEY_FILE = BASE_DIR / _FERNET_KEY_BASENAME
+SESSION_SECRET_FILE = BASE_DIR / _SESSION_SECRET_BASENAME
+
+
+def _migrate_legacy_crypto_files_to_persist() -> None:
+    """Copy ``.fernet_key`` / ``.session_secret`` from ``BASE_DIR`` into persist root once (Docker volume)."""
+    pr = persist_root()
+    if pr is None:
+        return
+    pr.mkdir(parents=True, exist_ok=True)
+    for name in (_FERNET_KEY_BASENAME, _SESSION_SECRET_BASENAME):
+        dest = pr / name
+        if dest.is_file():
+            continue
+        src = BASE_DIR / name
+        if src.is_file():
+            shutil.copy2(src, dest)
 
 # Sign-out after this many minutes without API activity from the browser (0 = idle disabled).
 DEFAULT_SESSION_IDLE_MINUTES = 60
@@ -125,6 +191,25 @@ def under_pytest() -> bool:
     return os.environ.get("GROUND_CONTROL_UNDER_PYTEST") == "1"
 
 
+def persist_root() -> Path | None:
+    """When set, security state, TLS material, and Let's Encrypt files live under this directory (e.g. Docker ``/data``)."""
+    import os
+
+    raw = (os.environ.get("GROUND_CONTROL_PERSIST_DIR") or "").strip()
+    if not raw:
+        return None
+    return Path(raw).expanduser().resolve()
+
+
+def in_docker_deployment() -> bool:
+    import os
+
+    v = (os.environ.get("GROUND_CONTROL_DOCKER") or "").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    return Path("/.dockerenv").is_file()
+
+
 def secure_session_cookie_enabled() -> bool:
     import os
 
@@ -144,8 +229,15 @@ def fernet_key() -> str:
     k = (os.environ.get("GROUND_CONTROL_FERNET_KEY") or "").strip()
     if k:
         return k
-    if FERNET_KEY_FILE.is_file():
-        k = FERNET_KEY_FILE.read_text(encoding="utf-8").strip()
+    primary = fernet_key_file()
+    if primary.is_file():
+        k = primary.read_text(encoding="utf-8").strip()
+        if k:
+            os.environ["GROUND_CONTROL_FERNET_KEY"] = k
+        return k
+    legacy = BASE_DIR / _FERNET_KEY_BASENAME
+    if legacy.is_file():
+        k = legacy.read_text(encoding="utf-8").strip()
         if k:
             os.environ["GROUND_CONTROL_FERNET_KEY"] = k
         return k
@@ -153,20 +245,23 @@ def fernet_key() -> str:
 
 
 def ensure_local_fernet_key() -> None:
-    """If no key is configured, create .fernet_key so local dev can start without env vars."""
+    """If no key is configured, create ``.fernet_key`` on disk (persist dir when set)."""
     import logging
     import os
 
+    _migrate_legacy_crypto_files_to_persist()
     if fernet_key():
         return
     from cryptography.fernet import Fernet
 
+    path = fernet_key_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
     key = Fernet.generate_key().decode()
-    FERNET_KEY_FILE.write_text(key + "\n", encoding="utf-8")
+    path.write_text(key + "\n", encoding="utf-8")
     os.environ["GROUND_CONTROL_FERNET_KEY"] = key
     logging.getLogger("uvicorn.error").warning(
         "Created %s with a new encryption key. Back up this file; "
         "stored passwords cannot be decrypted without it. "
         "For production, prefer setting GROUND_CONTROL_FERNET_KEY instead.",
-        FERNET_KEY_FILE.name,
+        path.name,
     )

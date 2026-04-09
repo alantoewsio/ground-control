@@ -5,8 +5,8 @@
 (function (global) {
   "use strict";
 
-  var DEFAULT_THRESHOLD = 64;
-  var DEFAULT_CHUNK = 50;
+  let DEFAULT_THRESHOLD = 64;
+  let DEFAULT_CHUNK = 50;
 
   /**
    * Insert each node from `nodes` into `parent` before `insertBefore` (or append if null).
@@ -14,11 +14,11 @@
    */
   function appendBefore(parent, nodes, insertBefore, opts) {
     opts = opts || {};
-    var chunk = opts.chunkSize != null ? opts.chunkSize : DEFAULT_CHUNK;
-    var threshold = opts.threshold != null ? opts.threshold : DEFAULT_THRESHOLD;
-    var onProgress = opts.onProgress;
-    var onComplete = opts.onComplete;
-    var isCancelled = opts.isCancelled;
+    let chunk = opts.chunkSize != null ? opts.chunkSize : DEFAULT_CHUNK;
+    let threshold = opts.threshold != null ? opts.threshold : DEFAULT_THRESHOLD;
+    let onProgress = opts.onProgress;
+    let onComplete = opts.onComplete;
+    let isCancelled = opts.isCancelled;
 
     if (!parent || !nodes || !nodes.length) {
       if (onComplete) onComplete();
@@ -30,7 +30,7 @@
     }
 
     if (nodes.length <= threshold) {
-      for (var i = 0; i < nodes.length; i++) {
+      for (let i = 0; i < nodes.length; i++) {
         if (cancelled()) return;
         if (insertBefore && insertBefore.parentNode === parent) {
           parent.insertBefore(nodes[i], insertBefore);
@@ -42,10 +42,10 @@
       return;
     }
 
-    var idx = 0;
+    let idx = 0;
     function step() {
       if (cancelled()) return;
-      var end = Math.min(idx + chunk, nodes.length);
+      let end = Math.min(idx + chunk, nodes.length);
       for (; idx < end; idx++) {
         if (insertBefore && insertBefore.parentNode === parent) {
           parent.insertBefore(nodes[idx], insertBefore);
@@ -68,21 +68,21 @@
    */
   function forEachChunked(items, chunkSize, fn, done, opts) {
     opts = opts || {};
-    var isCancelled = opts.isCancelled;
-    var n = items.length;
+    let isCancelled = opts.isCancelled;
+    let n = items.length;
     if (!n) {
       if (done) done();
       return;
     }
-    var th = opts.threshold != null ? opts.threshold : DEFAULT_THRESHOLD;
-    var ch = chunkSize || DEFAULT_CHUNK;
+    let th = opts.threshold != null ? opts.threshold : DEFAULT_THRESHOLD;
+    let ch = chunkSize || DEFAULT_CHUNK;
 
     function cancelled() {
       return isCancelled && isCancelled();
     }
 
     if (n <= th) {
-      for (var j = 0; j < n; j++) {
+      for (let j = 0; j < n; j++) {
         if (cancelled()) return;
         fn(items[j], j);
       }
@@ -90,10 +90,10 @@
       return;
     }
 
-    var idx = 0;
+    let idx = 0;
     function step() {
       if (cancelled()) return;
-      var end = Math.min(idx + ch, n);
+      let end = Math.min(idx + ch, n);
       for (; idx < end; idx++) {
         fn(items[idx], idx);
       }
@@ -112,4 +112,4 @@
     appendBefore: appendBefore,
     forEachChunked: forEachChunked,
   };
-})(window);
+})(globalThis);

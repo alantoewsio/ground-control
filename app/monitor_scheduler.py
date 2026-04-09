@@ -24,6 +24,7 @@ from app.monitor_rollup import (
     run_rollup_for_previous_complete_utc_hour,
     run_rollup_for_previous_utc_day,
 )
+from app.tls_certificate_renewal import run_tls_certificate_renewal_job
 
 _log = logging.getLogger(__name__)
 
@@ -84,6 +85,18 @@ def _probe_worker(
         return ProbeResult(target.firewall_id, float(random.randint(20, 200)), None)
     ms, err = tcp_connect_ms(target.host, target.port, timeout_sec=timeout_sec)
     return ProbeResult(target.firewall_id, ms, err)
+
+
+def run_history_retention_job() -> None:
+    """Daily trim of history tables per Data Management limits (see ``app.history_retention``)."""
+    try:
+        from app.database import SessionLocal
+        from app.history_retention import run_history_retention_sweep
+
+        with SessionLocal() as db:
+            run_history_retention_sweep(db)
+    except Exception:  # noqa: BLE001
+        _log.exception("History retention sweep failed")
 
 
 def run_webadmin_ping_round() -> int:
@@ -216,11 +229,28 @@ def start_monitor_scheduler() -> None:
             max_instances=1,
             coalesce=True,
         )
+        sched.add_job(
+            run_history_retention_job,
+            CronTrigger(hour=4, minute=7, timezone=_UTC),
+            id="history_retention_daily",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        sched.add_job(
+            run_tls_certificate_renewal_job,
+            CronTrigger(hour=3, minute=41, timezone=_UTC),
+            id="tls_certificate_auto_renewal",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
         sched.start()
         _scheduler = sched
         _log.info(
             "Firewall webadmin monitor scheduler started "
-            "(1-minute tick; per-firewall probe interval from inventory)."
+            "(1-minute tick; per-firewall probe interval from inventory; "
+            "daily history retention at 04:07 UTC; TLS auto-renewal check at 03:41 UTC)."
         )
 
         def _backfill_rollups() -> None:

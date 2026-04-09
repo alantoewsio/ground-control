@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  var ACTIONS = {
+  let ACTIONS = {
     alert: true,
     log: true,
     pass: true,
@@ -13,8 +13,8 @@
     reject: true,
     sdrop: true,
   };
-  var PROTOS = { tcp: true, udp: true, icmp: true, ip: true };
-  var OPTION_KW = {
+  let PROTOS = { tcp: true, udp: true, icmp: true, ip: true };
+  let OPTION_KW = {
     msg: true,
     content: true,
     pcre: true,
@@ -90,12 +90,12 @@
   function highlightSnortRule(src) {
     if (src == null) src = "";
     src = String(src);
-    var out = [];
-    var n = src.length;
-    var i = 0;
-    var lineStart = true;
-    var parenDepth = 0;
-    var sawActionSlot = true;
+    let out = [];
+    let n = src.length;
+    let i = 0;
+    let lineStart = true;
+    let parenDepth = 0;
+    let sawActionSlot = true;
 
     function peek() {
       return i < n ? src.charAt(i) : "";
@@ -106,7 +106,7 @@
     }
 
     while (i < n) {
-      var c = peek();
+      let c = peek();
       if (c === "\r") {
         i++;
         continue;
@@ -125,17 +125,17 @@
       lineStart = false;
 
       if (c === "#") {
-        var start = i;
+        let start = i;
         while (i < n && src.charAt(i) !== "\n") i++;
         out.push(span("gc-snort-tok--comment", src.slice(start, i)));
         continue;
       }
 
       if (c === '"') {
-        var qs = i;
+        let qs = i;
         i++;
         while (i < n) {
-          var q = src.charAt(i);
+          let q = src.charAt(i);
           if (q === "\\" && i + 1 < n) {
             i += 2;
             continue;
@@ -151,7 +151,7 @@
       }
 
       if (c === "$") {
-        var vs = i;
+        let vs = i;
         i++;
         while (i < n && /[A-Za-z0-9_]/.test(src.charAt(i))) i++;
         out.push(span("gc-snort-tok--var", src.slice(vs, i)));
@@ -160,7 +160,7 @@
       }
 
       if (/[0-9]/.test(c)) {
-        var ns = i;
+        let ns = i;
         while (i < n && /[0-9]/.test(src.charAt(i))) i++;
         out.push(span("gc-snort-tok--number", src.slice(ns, i)));
         sawActionSlot = false;
@@ -168,12 +168,12 @@
       }
 
       if (/[a-zA-Z_]/.test(c)) {
-        var ws = i;
+        let ws = i;
         while (i < n && /[a-zA-Z0-9_]/.test(src.charAt(i))) i++;
-        var w = src.slice(ws, i);
-        var wl = w.toLowerCase();
-        var next = peek();
-        var cls = "gc-snort-tok--ident";
+        let w = src.slice(ws, i);
+        let wl = w.toLowerCase();
+        let next = peek();
+        let cls = "gc-snort-tok--ident";
         if (sawActionSlot && ACTIONS[wl]) {
           cls = "gc-snort-tok--action";
         } else if (sawActionSlot && PROTOS[wl]) {
@@ -231,5 +231,5 @@
     return out.join("");
   }
 
-  window.gcSnortRuleHighlightToHtml = highlightSnortRule;
+  globalThis.gcSnortRuleHighlightToHtml = highlightSnortRule;
 })();

@@ -207,7 +207,8 @@ class RefCountry(Base):
 
     __tablename__ = "ref_countries"
 
-    code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    # Sophos payloads can exceed ISO alpha-2; merge restore must not fail on PostgreSQL varchar limits.
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, onupdate=_utc_now)
 

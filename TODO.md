@@ -12,107 +12,49 @@
 - [ ] Expose APIs
 - [ ] Rule auditing
 - [x] Firewall Tags
+- [x] Assignable configs
+- [ ] Config editor mode
+- [x] Combined View
+- [x] IPAM
+- [x] Combined view interfaces w/address managemenent
+- [x] Task Queue
+- [x] History and Audit logs
+- [x] SSO for SSH
+- [x] SSO for WebAdmin
 - [ ] Implement scheduler
+    - [x] Firewall monitoring
     - [ ] Schedule firewall background sync on regular intervals
     - [ ] Schedule regular task queue retries for failures
-- [ ] View UI for 
-    - [x] Interfaces
-    - [x] Zones
-    - [x] VLANs
-    - [ ] Bridge pairs (not yet supported in SDK)
-    - [ ] Aliases (not yet supported in SDK)
-    - [ ] ACL rules
-    - [ ] Admin authentication
-    - [ ] Admin profiles
-    - [ ] Admin setttings
-    - [ ] Bakcup / restore settings
-    - [ ] DNS forwarders
-    - [ ] Firewall rules
-    - [ ] FQDN host groups
-    - [ ] FQDN hosts
-    - [ ] IP host groups
-    - [ ] IP hosts
-    - [ ] MAC hosts
-    - [ ] Country groups
-    - [ ] Services
-    - [ ] Service groups
-    - [ ] IPS policies
-    - [ ] Notifications
-    - [ ] Notification lists
-    - [ ] Reports retention
-    - [ ] Firewall rule groups
-    - [ ] SNMPv3 users
-    - [ ] Syslog servers
-    - [ ] URL groups
-    - [ ] Users
-    - [ ] Web filter policies
-    - [ ] User activities
-- [ ] Edit UI for 
-    - [x] Interfaces
-    - [ ] Zones
-    - [ ] VLANs
-    - [ ] Bridge pairs (not yet supported in SDK)
-    - [ ] Aliases (not yet supported in SDK)
-    - [ ] ACL rules
-    - [ ] Admin authentication
-    - [ ] Admin profiles
-    - [ ] Admin setttings
-    - [ ] Bakcup / restore settings
-    - [ ] DNS forwarders
-    - [ ] Firewall rules
-    - [ ] FQDN host groups
-    - [ ] FQDN hosts
-    - [ ] IP host groups
-    - [ ] IP hosts
-    - [ ] MAC hosts
-    - [ ] Country groups
-    - [ ] Services
-    - [ ] Service groups
-    - [ ] IPS policies
-    - [ ] Notifications
-    - [ ] Notification lists
-    - [ ] Reports retention
-    - [ ] Firewall rule groups
-    - [ ] SNMPv3 users
-    - [ ] Syslog servers
-    - [ ] URL groups
-    - [ ] Users
-    - [ ] Web filter policies
-    - [ ] User activities
-- [ ] Add UI for 
-    - [ ] Interfaces
-    - [ ] Zones
-    - [ ] VLANs
-    - [ ] Bridge pairs (not yet supported in SDK)
-    - [ ] Aliases (not yet supported in SDK)
-    - [ ] ACL rules
-    - [ ] Admin authentication
-    - [ ] Admin profiles
-    - [ ] Admin setttings
-    - [ ] Bakcup / restore settings
-    - [ ] DNS forwarders
-    - [ ] Firewall rules
-    - [ ] FQDN host groups
-    - [ ] FQDN hosts
-    - [ ] IP host groups
-    - [ ] IP hosts
-    - [ ] MAC hosts
-    - [ ] Country groups
-    - [ ] Services
-    - [ ] Service groups
-    - [ ] IPS policies
-    - [ ] Notifications
-    - [ ] Notification lists
-    - [ ] Reports retention
-    - [ ] Firewall rule groups
-    - [ ] SNMPv3 users
-    - [ ] Syslog servers
-    - [ ] URL groups
-    - [ ] Users
-    - [ ] Web filter policies
-    - [ ] User activities
-- [x] Smart sync of affected types after task queue executions
 
+- [ ] Implement Syncing and UI screens:
+    - [ ] MONITOR
+        - [x] Inventory
+        - [ ] Diagnostics
+        - [ ] Zero-Day Protection
+    - [ ] PROTECT
+        - [/] Firewall
+        - [x] Intrusion prevention 
+        - [/] Web
+        - [ ] Applications
+        - [ ] Wirless
+        - [ ] Email / MTA
+        - [ ] Web Server
+        - [ ] Advanced Protection
+    - [ ] COFIGURE
+        - [ ] VPN
+        - [/] Network
+        - [ ] Routing
+        - [/] Authentication
+        - [ ] System Services
+    - [ ] SYSTEM
+        - [ ] Sophos Central
+        - [x] Profiles
+        - [x] Hosts & Services
+        - [ ] Administration
+        - [ ] Backup & Firmware
+        - [ ] Certificates
+- [x] Smart sync of affected types after task queue executions
+- [ ] 
 
 
 

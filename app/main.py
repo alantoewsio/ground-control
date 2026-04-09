@@ -4,6 +4,8 @@ import asyncio
 import ipaddress
 import json
 import logging
+import os
+import zipfile
 import random
 import secrets
 import signal
@@ -15,7 +17,7 @@ import traceback
 import uuid
 from contextlib import asynccontextmanager, contextmanager
 from types import FrameType
-from typing import Any, Callable, Literal
+from typing import Annotated, Any, Callable, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import uvicorn
@@ -24,10 +26,12 @@ from fastapi import (
     Body,
     Depends,
     FastAPI,
+    File,
     Form,
     HTTPException,
     Query,
     Request,
+    UploadFile,
     WebSocket,
 )
 from fastapi.exception_handlers import (
@@ -40,7 +44,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, tuple_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -49,6 +53,21 @@ from starlette.requests import HTTPConnection
 from starlette.responses import PlainTextResponse, Response
 
 from app import background_activity, config, crypto, security_settings, users_service
+from app.backup_crypto import encrypt_backup_archive
+from app.backup_password import (
+    backup_password_is_configured,
+    backup_password_status_payload,
+    get_saved_backup_password,
+    set_backup_password,
+)
+from app.backup_restore import (
+    BackupBuildResult,
+    build_backup_zip,
+    generated_backup_status_payload,
+    read_generated_backup_bytes,
+    restore_backup_merge,
+    save_generated_backup,
+)
 from app.access_history import (
     create_access_log,
     get_or_create_webadmin_session_id,
@@ -218,7 +237,7 @@ from app.models import (
     RefCountry,
     TaskQueue,
 )
-from app.monitor_database import init_monitor_db
+from app.monitor_database import get_monitor_db, init_monitor_db
 from app.monitor_scheduler import start_monitor_scheduler, stop_monitor_scheduler
 from app.monitor_series import get_connectivity_series
 from app.profiles_entities_table import (
@@ -309,6 +328,7 @@ from app.task_queue_service import (
     list_tasks_with_firewall_page,
     process_task,
     run_post_task_queue_syncs,
+    TASK_QUEUE_BATCH_IDS_MAX,
     task_queue_badge_summary,
     task_queue_compare_payload,
 )
@@ -670,11 +690,15 @@ class IpsSwitchEnqueueItem(BaseModel):
 
 
 class EnqueueIpsSwitchBatchBody(BaseModel):
-    items: list[IpsSwitchEnqueueItem] = Field(..., min_length=1)
+    items: list[IpsSwitchEnqueueItem] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueIpsPolicyDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueIpsPolicyCreateBody(BaseModel):
@@ -688,7 +712,9 @@ class EnqueueIpsPolicyUpdateBody(BaseModel):
 
 
 class EnqueueWebfilterPolicyDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueWebfilterPolicyCreateBody(BaseModel):
@@ -702,7 +728,9 @@ class EnqueueWebfilterPolicyUpdateBody(BaseModel):
 
 
 class EnqueueAuthUserDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueAuthUserCreateBody(BaseModel):
@@ -716,7 +744,9 @@ class EnqueueAuthUserUpdateBody(BaseModel):
 
 
 class EnqueueAuthUserGroupDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueAuthUserGroupCreateBody(BaseModel):
@@ -730,7 +760,9 @@ class EnqueueAuthUserGroupUpdateBody(BaseModel):
 
 
 class EnqueueAdminProfileDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueAdminProfileCreateBody(BaseModel):
@@ -745,21 +777,29 @@ class EnqueueAdminProfileUpdateBody(BaseModel):
 
 class EnqueueProfileEntityCreateBatchBody(BaseModel):
     entity_type: str = Field(..., min_length=1)
-    firewall_ids: list[int] = Field(..., min_length=1)
+    firewall_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnqueueProfileEntityUpdateBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnqueueProfileEntityDeletesBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueIpsCustomSignatureDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueIpsCustomSignatureCreateBody(BaseModel):
@@ -768,7 +808,9 @@ class EnqueueIpsCustomSignatureCreateBody(BaseModel):
 
 
 class EnqueueIpsCustomSignatureCreateBatchBody(BaseModel):
-    firewall_ids: list[int] = Field(..., min_length=1)
+    firewall_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     signature: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -778,11 +820,15 @@ class EnqueueIpsCustomSignatureUpdateBody(BaseModel):
 
 
 class EnqueueIpsTrustedMacDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueIpsTrustedMacCreateBatchBody(BaseModel):
-    firewall_ids: list[int] = Field(..., min_length=1)
+    firewall_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     trusted_mac: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -850,12 +896,16 @@ class EnqueueIpHostUpdateBody(BaseModel):
 
 
 class EnqueueIpHostUpdateBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(default_factory=list)
+    config_entry_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnqueueIpHostDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(default_factory=list)
+    config_entry_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueIpHostCreateBody(BaseModel):
@@ -864,31 +914,43 @@ class EnqueueIpHostCreateBody(BaseModel):
 
 
 class EnqueueIpHostCreateBatchBody(BaseModel):
-    firewall_ids: list[int] = Field(default_factory=list)
+    firewall_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class ZoneUpdateBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(default_factory=list)
+    config_entry_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class ZoneCreateBatchBody(BaseModel):
-    firewall_ids: list[int] = Field(default_factory=list)
+    firewall_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class ZoneCreateConfigurationBatchBody(BaseModel):
-    configuration_ids: list[int] = Field(default_factory=list)
+    configuration_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class IpHostgroupAggregateBody(BaseModel):
-    firewall_ids: list[int] = Field(default_factory=list)
+    firewall_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class HsCachedNamesAggregateBody(BaseModel):
-    firewall_ids: list[int] = Field(default_factory=list)
+    firewall_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     entity_type: str = Field(
         ...,
         description="Member entity type for multiselect sources: ip_host, fqdn_host, mac_host, service",
@@ -896,7 +958,9 @@ class HsCachedNamesAggregateBody(BaseModel):
 
 
 class HsCachedNamesConfigurationAggregateBody(BaseModel):
-    configuration_ids: list[int] = Field(default_factory=list)
+    configuration_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     entity_type: str = Field(
         ...,
         description="Member entity type for multiselect sources: ip_host, fqdn_host, mac_host, service",
@@ -904,44 +968,60 @@ class HsCachedNamesConfigurationAggregateBody(BaseModel):
 
 
 class EnqueueHsDeleteBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(default_factory=list)
+    config_entry_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class ConfigViewerQueueDeletesBody(BaseModel):
-    config_entry_ids: list[int] = Field(..., min_length=1)
+    config_entry_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class ApplyConfigurationsToFirewallsBody(BaseModel):
-    configuration_ids: list[int] = Field(..., min_length=1)
-    firewall_ids: list[int] = Field(..., min_length=1)
+    configuration_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
+    firewall_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueHsUpdateBatchBody(BaseModel):
-    config_entry_ids: list[int] = Field(default_factory=list)
+    config_entry_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnqueueHsCreateBatchBody(BaseModel):
-    firewall_ids: list[int] = Field(default_factory=list)
+    firewall_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     entity_type: str = Field(...)
     form: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnqueueFirewallRuleReorderBatchBody(BaseModel):
     firewall_id: int = Field(...)
-    ordered_config_entry_ids: list[int] = Field(default_factory=list)
+    ordered_config_entry_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class TaskQueueDeleteBody(BaseModel):
-    ids: list[int] = Field(default_factory=list)
+    ids: list[int] = Field(default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX)
 
 
 class TaskQueueSendSelectedBody(BaseModel):
-    ids: list[int] = Field(default_factory=list)
+    ids: list[int] = Field(default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX)
 
 
 class TaskQueueSendAllBody(BaseModel):
-    firewall_ids: list[int] | None = None
+    firewall_ids: list[int] | None = Field(
+        default=None, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 _lifespan_lock = threading.Lock()
@@ -1003,7 +1083,24 @@ templates.env.globals["ssh_browser_url"] = _template_ssh_browser_url
 templates.env.globals["http_listen_port"] = config.http_listen_port
 templates.env.globals["https_listen_port"] = config.https_listen_port
 
-app = FastAPI(title="Ground Control", lifespan=lifespan, redirect_slashes=False)
+_GC_OPENAPI_COMMON_ERRORS: dict[int, dict[str, str]] = {
+    400: {"description": "Bad request — invalid input or business rule failure."},
+    401: {"description": "Authentication required."},
+    403: {"description": "Forbidden."},
+    404: {"description": "Resource not found."},
+    409: {"description": "Conflict."},
+    413: {"description": "Payload too large."},
+    422: {"description": "Request validation error."},
+    500: {"description": "Internal server error."},
+    502: {"description": "Bad gateway / upstream error."},
+}
+
+app = FastAPI(
+    title="Ground Control",
+    lifespan=lifespan,
+    redirect_slashes=False,
+    responses=_GC_OPENAPI_COMMON_ERRORS,
+)
 
 
 @app.middleware("http")
@@ -1052,7 +1149,9 @@ def _request_allowed_by_ranges(request: HTTPConnection) -> bool:
 @app.middleware("http")
 async def _gc_allowed_ranges_guard(request: Request, call_next):
     if not _request_allowed_by_ranges(request):
-        return PlainTextResponse("Forbidden: client IP is not allowed.", status_code=403)
+        return PlainTextResponse(
+            "Forbidden: client IP is not allowed.", status_code=403
+        )
     return await call_next(request)
 
 
@@ -1242,7 +1341,9 @@ class GenerateSelfSignedTlsBody(BaseModel):
 class TestFirewallGenerateBody(BaseModel):
     count: int = Field(default=10, ge=1, le=1000)
     source_firewall_id: int | None = Field(default=None, gt=0)
-    test_lan_pool_cidr: str = Field(default="172.16.0.0/12", min_length=1, max_length=128)
+    test_lan_pool_cidr: str = Field(
+        default="172.16.0.0/12", min_length=1, max_length=128
+    )
 
     @field_validator("test_lan_pool_cidr", mode="before")
     @classmethod
@@ -1251,6 +1352,18 @@ class TestFirewallGenerateBody(BaseModel):
             return "172.16.0.0/12"
         s = str(v).strip()
         return s if s else "172.16.0.0/12"
+
+
+class BackupPasswordSetBody(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+    password_confirm: str = Field(min_length=1, max_length=256)
+
+
+class BackupRestorePasswordBody(BaseModel):
+    password: str | None = Field(default=None, max_length=256)
+
+
+_MAX_BACKUP_UPLOAD_BYTES = 512 * 1024 * 1024
 
 
 def _security_ports_held_by_this_process() -> set[int]:
@@ -1276,7 +1389,7 @@ def _app_user_profile_updates_from_body(
 
 
 @app.get("/api/auth/status")
-def api_auth_status(request: Request, db: Session = Depends(get_secrets_db)):
+def api_auth_status(request: Request, db: Annotated[Session, Depends(get_secrets_db)]):
     return JSONResponse(
         auth_client_state(request, db),
         headers={"Cache-Control": "no-store, must-revalidate"},
@@ -1285,7 +1398,7 @@ def api_auth_status(request: Request, db: Session = Depends(get_secrets_db)):
 
 @app.post("/api/auth/login")
 def api_auth_login(
-    request: Request, body: LoginBody, db: Session = Depends(get_secrets_db)
+    request: Request, body: LoginBody, db: Annotated[Session, Depends(get_secrets_db)]
 ):
     users_service.ensure_default_admin_user(db)
     if users_service.needs_initial_admin_password(db):
@@ -1318,7 +1431,7 @@ def api_auth_login(
 def api_auth_setup_admin_password(
     request: Request,
     body: SetupAdminPasswordBody,
-    db: Session = Depends(get_secrets_db),
+    db: Annotated[Session, Depends(get_secrets_db)],
 ):
     if body.password != body.password_confirm:
         raise HTTPException(status_code=400, detail="Passwords do not match.")
@@ -1363,14 +1476,15 @@ def api_auth_logout(request: Request):
 
 
 @app.get("/api/auth/active-admin-sessions")
-def api_auth_active_admin_sessions(_: str = Depends(current_user_id_dep)):
+def api_auth_active_admin_sessions(_: Annotated[str, Depends(current_user_id_dep)]):
     admins = list_active_admin_sessions()
     return {"count": len(admins), "admins": admins}
 
 
 @app.get("/api/settings/users")
 def api_settings_users_list(
-    _: str = Depends(current_user_id_dep), db: Session = Depends(get_secrets_db)
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_secrets_db)],
 ):
     return users_service.list_app_users(db)
 
@@ -1378,8 +1492,8 @@ def api_settings_users_list(
 @app.post("/api/settings/users")
 def api_settings_users_create(
     body: CreateAppUserBody,
-    _: str = Depends(admin_user_id_dep),
-    db: Session = Depends(get_secrets_db),
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_secrets_db)],
 ):
     validate_new_password(body.password)
     uname = body.username.strip()
@@ -1401,8 +1515,8 @@ def api_settings_users_create(
 def api_settings_users_patch(
     user_id: str,
     body: PatchAppUserBody,
-    _: str = Depends(admin_user_id_dep),
-    db: Session = Depends(get_secrets_db),
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_secrets_db)],
 ):
     profile_updates = _app_user_profile_updates_from_body(body)
     if body.role is None and body.password is None and not profile_updates:
@@ -1445,8 +1559,8 @@ def api_settings_users_patch(
 @app.delete("/api/settings/users/{user_id}")
 def api_settings_users_delete(
     user_id: str,
-    _: str = Depends(admin_user_id_dep),
-    db: Session = Depends(get_secrets_db),
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_secrets_db)],
 ):
     total = users_service.total_app_users(db)
     if total <= 1:
@@ -1480,13 +1594,13 @@ def _security_state_from_body(
 
 
 @app.get("/api/settings/security")
-def api_settings_security_get(_: str = Depends(admin_user_id_dep)):
+def api_settings_security_get(_: Annotated[str, Depends(admin_user_id_dep)]):
     return security_settings.security_settings_payload()
 
 
 @app.post("/api/settings/security/validate")
 def api_settings_security_validate(
-    body: SecuritySettingsBody, _: str = Depends(admin_user_id_dep)
+    body: SecuritySettingsBody, _: Annotated[str, Depends(admin_user_id_dep)]
 ):
     state = _security_state_from_body(body)
     errs = security_settings.validate_security_apply(
@@ -1497,7 +1611,7 @@ def api_settings_security_validate(
 
 @app.post("/api/settings/security")
 def api_settings_security_apply(
-    body: SecuritySettingsBody, _: str = Depends(admin_user_id_dep)
+    body: SecuritySettingsBody, _: Annotated[str, Depends(admin_user_id_dep)]
 ):
     state = _security_state_from_body(body)
     errs = security_settings.validate_security_apply(
@@ -1520,7 +1634,7 @@ def api_settings_security_apply(
 
 @app.post("/api/settings/security/generate-self-signed")
 def api_settings_security_generate_self_signed(
-    body: GenerateSelfSignedTlsBody, _: str = Depends(admin_user_id_dep)
+    body: GenerateSelfSignedTlsBody, _: Annotated[str, Depends(admin_user_id_dep)]
 ):
     try:
         security_settings.generate_self_signed_certificate(body.hostname)
@@ -1533,7 +1647,9 @@ def api_settings_security_generate_self_signed(
 
 
 @app.get("/api/settings/security/tls-public-certificate.pem")
-def api_settings_security_download_tls_public_pem(_: str = Depends(admin_user_id_dep)):
+def api_settings_security_download_tls_public_pem(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+):
     """Download the public TLS certificate (PEM). For self-signed certs, import this as a trusted root in the OS or browser."""
     summ = security_settings.load_https_certificate_summary()
     if not summ["present"]:
@@ -1553,7 +1669,8 @@ def api_settings_security_download_tls_public_pem(_: str = Depends(admin_user_id
 
 @app.get("/api/settings/test-firewalls")
 def api_settings_test_firewalls_summary(
-    _: str = Depends(admin_user_id_dep), db: Session = Depends(get_db)
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     count = db.query(Firewall.id).filter(Firewall.is_test.is_(True)).count()
     return {"count": int(count)}
@@ -1562,9 +1679,9 @@ def api_settings_test_firewalls_summary(
 @app.post("/api/settings/test-firewalls/generate")
 def api_settings_test_firewalls_generate(
     body: TestFirewallGenerateBody,
-    _: str = Depends(admin_user_id_dep),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
 ):
     src_id = body.source_firewall_id
     if src_id is not None and db.get(Firewall, int(src_id)) is None:
@@ -1589,19 +1706,172 @@ def api_settings_test_firewalls_generate(
 
 @app.delete("/api/settings/test-firewalls")
 def api_settings_test_firewalls_cleanup(
-    _: str = Depends(admin_user_id_dep),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
 ):
     deleted = _delete_all_test_firewalls(db, sdb)
     return {"ok": True, "deleted": int(deleted), "total_test_firewalls": 0}
 
 
+_GC_BACKUP_RESTORE_DATA_TOO_LONG = (
+    "Restore failed: a value from the backup is too long for this server's database "
+    "(for example a country reference code). Restart the app after upgrading so "
+    "migrations can widen columns, then try again."
+)
+
+
+@app.get("/api/settings/backup/status")
+def api_settings_backup_status(_: Annotated[str, Depends(admin_user_id_dep)]):
+    return {**generated_backup_status_payload(), **backup_password_status_payload()}
+
+
+@app.post("/api/settings/backup/password")
+def api_settings_backup_set_password(
+    body: BackupPasswordSetBody,
+    _: Annotated[str, Depends(admin_user_id_dep)],
+):
+    if body.password != body.password_confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="New password and confirmation do not match.",
+        )
+    try:
+        set_backup_password(body.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **backup_password_status_payload()}
+
+
+@app.post("/api/settings/backup/generate")
+def api_settings_backup_generate(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    mdb: Annotated[Session, Depends(get_monitor_db)],
+):
+    if not backup_password_is_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="Set a backup password before creating a backup.",
+        )
+    pw = get_saved_backup_password()
+    if not pw:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read saved backup password. Set it again.",
+        )
+    built = build_backup_zip(db, sdb, mdb)
+    enc_bytes = encrypt_backup_archive(built.data, pw)
+    dl_name = built.filename
+    if not str(dl_name).lower().endswith(".gcbak"):
+        dl_name = f"{dl_name}.gcbak"
+    result = BackupBuildResult(filename=str(dl_name), data=enc_bytes)
+    meta = save_generated_backup(result)
+    return {"ok": True, **meta}
+
+
+@app.get("/api/settings/backup/download")
+def api_settings_backup_download(_: Annotated[str, Depends(admin_user_id_dep)]):
+    raw = read_generated_backup_bytes()
+    if raw is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No backup has been generated yet. Use Create backup first.",
+        )
+    st = generated_backup_status_payload()
+    fn = (st.get("download_filename") if isinstance(st, dict) else None) or (
+        "ground-control-backup.gcbak"
+    )
+    safe_fn = os.path.basename(str(fn)).strip() or "ground-control-backup.gcbak"
+    return Response(
+        content=raw,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_fn}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.post("/api/settings/backup/restore-last")
+def api_settings_backup_restore_last(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    mdb: Annotated[Session, Depends(get_monitor_db)],
+    body: BackupRestorePasswordBody = Body(default_factory=BackupRestorePasswordBody),
+):
+    raw = read_generated_backup_bytes()
+    if raw is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No generated backup on the server. Create a backup first.",
+        )
+    try:
+        return restore_backup_merge(
+            raw,
+            db,
+            sdb,
+            mdb,
+            backup_password=body.password,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DataError as exc:
+        raise HTTPException(status_code=400, detail=_GC_BACKUP_RESTORE_DATA_TOO_LONG) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Restore failed due to a database constraint (inconsistent backup or merge conflict).",
+        ) from exc
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(
+            status_code=400, detail="Backup payload is not a valid zip after decrypt.",
+        ) from exc
+
+
+@app.post("/api/settings/backup/restore")
+async def api_settings_backup_restore(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    mdb: Annotated[Session, Depends(get_monitor_db)],
+    file: UploadFile = File(...),
+    password: Annotated[str, Form()] = "",
+):
+    raw = await file.read()
+    if len(raw) > _MAX_BACKUP_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Backup file is too large (max 512 MiB).",
+        )
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    pw = password.strip() or None
+    try:
+        out = restore_backup_merge(raw, db, sdb, mdb, backup_password=pw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DataError as exc:
+        raise HTTPException(status_code=400, detail=_GC_BACKUP_RESTORE_DATA_TOO_LONG) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Restore failed due to a database constraint (inconsistent backup or merge conflict).",
+        ) from exc
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(
+            status_code=400, detail="Backup payload is not a valid zip after decrypt.",
+        ) from exc
+    return out
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
 ):
     return templates.TemplateResponse(
         request,
@@ -1614,7 +1884,9 @@ def dashboard(
     )
 
 
-def _address_management_template_context(request: Request, sdb, db, ipam_page: str) -> dict:
+def _address_management_template_context(
+    request: Request, sdb, db, ipam_page: str
+) -> dict:
     return {
         "app_about": APP_ABOUT,
         "auth_client_state": auth_client_state(request, sdb),
@@ -1643,7 +1915,7 @@ def _address_management_template_context(request: Request, sdb, db, ipam_page: s
 @app.get("/address-management", name="address_management_index")
 def address_management_index(
     request: Request,
-    _: None = Depends(require_browser_session),
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return RedirectResponse(
         url=str(request.url_for("address_management_pools")),
@@ -1658,9 +1930,9 @@ def address_management_index(
 )
 def address_management_pools(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -1676,9 +1948,9 @@ def address_management_pools(
 )
 def address_management_assignments(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -1694,9 +1966,9 @@ def address_management_assignments(
 )
 def address_management_hosts(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -1712,9 +1984,9 @@ def address_management_hosts(
 )
 def address_management_vrfs(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -1743,19 +2015,17 @@ def _parse_optional_firewall_ids_csv(raw: str) -> list[int] | None:
 
 @app.get("/api/ipam/prefixes", name="api_ipam_prefixes")
 def api_ipam_prefixes(
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
     q: str = "",
     firewall_ids: str = "",
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
 ) -> dict[str, Any]:
     fw_filter = _parse_optional_firewall_ids_csv(firewall_ids)
     ipam_conflict_ids, disc_conflict_keys = vrf_assignment_conflict_maps(db)
     prefixes = list_ipam_prefix_payloads(db, q)
     for p in prefixes:
         p["vrf_assignment_conflict"] = int(p["id"]) in ipam_conflict_ids
-    discovered = list_discovered_assignment_payloads(
-        db, q=q, firewall_ids=fw_filter
-    )
+    discovered = list_discovered_assignment_payloads(db, q=q, firewall_ids=fw_filter)
     for d in discovered:
         d["vrf_assignment_conflict"] = d["key"] in disc_conflict_keys
     return {
@@ -1767,8 +2037,8 @@ def api_ipam_prefixes(
 
 @app.get("/api/ipam/vrfs", name="api_ipam_vrfs")
 def api_ipam_vrfs(
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     return {"vrfs": list_ipam_vrf_payloads(db)}
 
@@ -1776,8 +2046,8 @@ def api_ipam_vrfs(
 @app.post("/api/ipam/vrfs", name="api_ipam_vrfs_create")
 def api_ipam_vrfs_create(
     body: IpamVrfWriteBody,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     try:
         row = create_ipam_vrf(db, name=body.name, description=body.description)
@@ -1798,10 +2068,10 @@ def api_ipam_vrfs_create(
 
 @app.get("/api/ipam/next-assignment-cidr", name="api_ipam_next_assignment_cidr")
 def api_ipam_next_assignment_cidr(
-    parent_pool_id: int = Query(..., gt=0),
-    prefix_len: int = Query(..., ge=1, le=128),
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
+    parent_pool_id: Annotated[int, Query(..., gt=0)],
+    prefix_len: Annotated[int, Query(..., ge=1, le=128)],
 ) -> dict[str, str]:
     try:
         cidr = suggest_next_assignment_cidr(
@@ -1817,11 +2087,11 @@ def api_ipam_next_assignment_cidr(
     name="api_ipam_resolve_interface_pool_ipv4",
 )
 def api_ipam_resolve_interface_pool_ipv4(
-    parent_pool_id: int = Query(..., gt=0),
-    prefix_len: int = Query(..., ge=1, le=32),
-    firewall_id: int | None = Query(default=None),
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
+    parent_pool_id: Annotated[int, Query(..., gt=0)],
+    prefix_len: Annotated[int, Query(..., ge=1, le=32)],
+    firewall_id: Annotated[int | None, Query()] = None,
 ) -> dict[str, Any]:
     fw: int | None = None
     if firewall_id is not None:
@@ -1842,8 +2112,8 @@ def api_ipam_resolve_interface_pool_ipv4(
 @app.post("/api/ipam/interface-pool-commit", name="api_ipam_interface_pool_commit")
 def api_ipam_interface_pool_commit(
     body: IpamInterfacePoolCommitBody,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     try:
         return commit_interface_static_to_ipam_pool(
@@ -1860,8 +2130,8 @@ def api_ipam_interface_pool_commit(
 @app.post("/api/ipam/prefixes", name="api_ipam_prefixes_create")
 def api_ipam_prefixes_create(
     body: IpamPrefixWriteBody,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     try:
         row = create_ipam_prefix(
@@ -1893,8 +2163,8 @@ def api_ipam_prefixes_create(
 def api_ipam_prefixes_update(
     prefix_id: int,
     body: IpamPrefixWriteBody,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     try:
         row = update_ipam_prefix(
@@ -1928,8 +2198,8 @@ def api_ipam_prefixes_update(
 @app.delete("/api/ipam/prefixes/{prefix_id}", name="api_ipam_prefixes_delete")
 def api_ipam_prefixes_delete(
     prefix_id: int,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     try:
         ok = delete_ipam_prefix(db, prefix_id)
@@ -1943,8 +2213,8 @@ def api_ipam_prefixes_delete(
 @app.post("/api/ipam/accept-discovered", name="api_ipam_accept_discovered")
 def api_ipam_accept_discovered(
     body: IpamAcceptDiscoveredBody,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     try:
         row = accept_discovered_assignment(
@@ -1980,9 +2250,9 @@ def api_ipam_accept_discovered(
 
 @app.post("/api/ipam/accept-discovered-batch", name="api_ipam_accept_discovered_batch")
 def api_ipam_accept_discovered_batch(
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
     firewall_ids: str = "",
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
 ) -> dict[str, Any]:
     fw_filter = _parse_optional_firewall_ids_csv(firewall_ids)
     return accept_all_eligible_discoveries(db, firewall_ids=fw_filter)
@@ -2004,10 +2274,10 @@ def _configuration_cache_entry_counts_by_id(db: Session) -> dict[int, int]:
 @app.get("/firewalls", response_class=HTMLResponse, name="firewalls_inventory_page")
 def firewalls_page(
     request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
     tab: str = "",
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
 ):
     firewalls = db.query(Firewall).order_by(Firewall.id.desc()).all()
     fw_ids = [f.id for f in firewalls]
@@ -2072,7 +2342,8 @@ def firewalls_page(
             ).replace("/0/", "/__CONFIG_ID__/"),
             "url_configuration_create": str(request.url_for("gc_create_configuration")),
             "firewall_label_by_id": {
-                int(f.id): ((f.name or f.host or str(f.id)).strip()) for f in nav_fw_sorted
+                int(f.id): ((f.name or f.host or str(f.id)).strip())
+                for f in nav_fw_sorted
             },
             "sync_entity_catalog": list_sync_entity_catalog(),
             "firewall_tag_suggestions": _distinct_firewall_tag_suggestions(firewalls),
@@ -2084,9 +2355,7 @@ _INVENTORY_DEFAULT_PAGE_SIZE = 100
 
 _CFG_STATUS_CACHE_TTL_SECONDS = 60
 _cfg_status_cache_lock = threading.Lock()
-_cfg_status_cache: dict[
-    tuple[int, ...], tuple[float, dict[int, dict[str, int]]]
-] = {}
+_cfg_status_cache: dict[tuple[int, ...], tuple[float, dict[int, dict[str, int]]]] = {}
 _cfg_member_drift_cache_lock = threading.Lock()
 _cfg_member_drift_cache: dict[int, tuple[float, dict[str, Any]]] = {}
 
@@ -2118,11 +2387,7 @@ def _compute_configuration_status_summary(
     cfg_ids = sorted({int(x) for x in configuration_ids if int(x) > 0})
     if not cfg_ids:
         return {}
-    cfg_rows = (
-        db.query(Configuration)
-        .filter(Configuration.id.in_(cfg_ids))
-        .all()
-    )
+    cfg_rows = db.query(Configuration).filter(Configuration.id.in_(cfg_ids)).all()
     cfg_by_id = {int(c.id): c for c in cfg_rows}
     all_firewalls = db.query(Firewall).all()
     member_fw_ids_by_cfg: dict[int, list[int]] = {}
@@ -2322,11 +2587,11 @@ def _compute_configuration_member_firewall_drift(
 
 @app.get("/api/firewalls/inventory", name="api_firewalls_inventory")
 def api_firewalls_inventory(
-    q: str = Query("", description="Search filter (name, host, tags)"),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(_INVENTORY_DEFAULT_PAGE_SIZE, ge=1, le=500),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    q: Annotated[str, Query(description="Search filter (name, host, tags)")] = "",
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=500)] = _INVENTORY_DEFAULT_PAGE_SIZE,
 ):
     """Paginated + searchable firewalls inventory for the /firewalls table."""
     query = db.query(Firewall)
@@ -2355,31 +2620,33 @@ def api_firewalls_inventory(
 
     firewalls_out = []
     for f in rows:
-        firewalls_out.append({
-            "id": f.id,
-            "name": f.name,
-            "description": f.description,
-            "host": f.host,
-            "port": f.port,
-            "username": f.username,
-            "device_hostname": f.device_hostname,
-            "serial_number": f.serial_number,
-            "model": f.model,
-            "firmware_version": f.firmware_version,
-            "license_info": f.license_info,
-            "firewall_subscriptions_json": f.firewall_subscriptions_json,
-            "webadmin_metadata_json": f.webadmin_metadata_json,
-            "webadmin_last_collected_at": f.webadmin_last_collected_at.isoformat()
-            if f.webadmin_last_collected_at
-            else None,
-            "verify_ssl": f.verify_ssl,
-            "monitor_enabled": f.monitor_enabled,
-            "monitor_interval_minutes": f.monitor_interval_minutes,
-            "tags": f.tags_list(),
-            "is_test": f.is_test,
-            "online": firewall_is_online(f),
-            "sync_entity_types": sync_map.get(f.id, []),
-        })
+        firewalls_out.append(
+            {
+                "id": f.id,
+                "name": f.name,
+                "description": f.description,
+                "host": f.host,
+                "port": f.port,
+                "username": f.username,
+                "device_hostname": f.device_hostname,
+                "serial_number": f.serial_number,
+                "model": f.model,
+                "firmware_version": f.firmware_version,
+                "license_info": f.license_info,
+                "firewall_subscriptions_json": f.firewall_subscriptions_json,
+                "webadmin_metadata_json": f.webadmin_metadata_json,
+                "webadmin_last_collected_at": f.webadmin_last_collected_at.isoformat()
+                if f.webadmin_last_collected_at
+                else None,
+                "verify_ssl": f.verify_ssl,
+                "monitor_enabled": f.monitor_enabled,
+                "monitor_interval_minutes": f.monitor_interval_minutes,
+                "tags": f.tags_list(),
+                "is_test": f.is_test,
+                "online": firewall_is_online(f),
+                "sync_entity_types": sync_map.get(f.id, []),
+            }
+        )
 
     return {
         "firewalls": firewalls_out,
@@ -2395,9 +2662,11 @@ def api_firewalls_inventory(
     name="api_configurations_status_summary",
 )
 def api_configurations_status_summary(
-    configuration_ids: str = Query("", description="Comma-separated configuration IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs")
+    ] = "",
 ):
     cfg_ids = _parse_configuration_ids_query(configuration_ids)
     if not cfg_ids:
@@ -2420,8 +2689,8 @@ def api_configurations_status_summary(
 )
 def api_configuration_member_firewall_drift_summary(
     configuration_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     now = time.time()
     with _cfg_member_drift_cache_lock:
@@ -2435,7 +2704,9 @@ def api_configuration_member_firewall_drift_summary(
                 "cached_seconds": int(now - hit[0]),
             }
     try:
-        payload = _compute_configuration_member_firewall_drift(db, int(configuration_id))
+        payload = _compute_configuration_member_firewall_drift(
+            db, int(configuration_id)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     with _cfg_member_drift_cache_lock:
@@ -2455,8 +2726,8 @@ def api_configuration_member_firewall_drift_summary(
 def api_configuration_member_firewall_drift_items(
     configuration_id: int,
     firewall_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     now = time.time()
     payload: dict[str, Any] | None = None
@@ -2466,7 +2737,9 @@ def api_configuration_member_firewall_drift_items(
             payload = hit[1]
     if payload is None:
         try:
-            payload = _compute_configuration_member_firewall_drift(db, int(configuration_id))
+            payload = _compute_configuration_member_firewall_drift(
+                db, int(configuration_id)
+            )
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         with _cfg_member_drift_cache_lock:
@@ -2500,9 +2773,9 @@ def _parse_configuration_ids_query(raw: str) -> list[int]:
 @app.get("/configurations/network", response_class=HTMLResponse)
 def configurations_network_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -2577,9 +2850,9 @@ def configurations_network_page(
 @app.get("/configurations/hosts-services", response_class=HTMLResponse)
 def configurations_hosts_services_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     nav_ctx = template_nav_firewall_context(request, sdb, db)
     return templates.TemplateResponse(
@@ -2647,8 +2920,8 @@ def configurations_hosts_services_page(
     name="api_configurations_nav_multiselect",
 )
 def api_configurations_nav_multiselect(
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     return nav_configurations_multiselect_json(db)
 
@@ -2658,12 +2931,17 @@ def api_configurations_nav_multiselect(
     name="api_configurations_network_interfaces",
 )
 def api_configurations_network_interfaces(
-    configuration_ids: str = Query("", description="Comma-separated configuration IDs"),
-    combine: bool = Query(
-        True, description="Merge rows with the same name and type across selected configurations"
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="Merge rows with the same name and type across selected configurations",
+        ),
+    ] = True,
 ):
     ids = _parse_configuration_ids_query(configuration_ids)
     pl = configuration_unified_interfaces_payload(db, ids, combine=combine)
@@ -2676,9 +2954,11 @@ def api_configurations_network_interfaces(
     name="api_configurations_network_vlans",
 )
 def api_configurations_network_vlans(
-    configuration_ids: str = Query("", description="Comma-separated configuration IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs")
+    ] = "",
 ):
     ids = _parse_configuration_ids_query(configuration_ids)
     return configuration_network_table_payload(db, ids, ENTITY_VLAN, zones_combine=True)
@@ -2689,13 +2969,17 @@ def api_configurations_network_vlans(
     name="api_configurations_network_zones",
 )
 def api_configurations_network_zones(
-    configuration_ids: str = Query("", description="Comma-separated configuration IDs"),
-    combine: bool = Query(
-        True,
-        description="Merge rows by zone name; when false, one row per zone per configuration.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="Merge rows by zone name; when false, one row per zone per configuration.",
+        ),
+    ] = True,
 ):
     ids = _parse_configuration_ids_query(configuration_ids)
     return configuration_network_table_payload(
@@ -2708,17 +2992,24 @@ def api_configurations_network_zones(
     name="api_configurations_hosts_services_table",
 )
 def api_configurations_hosts_services_table(
-    configuration_ids: str = Query("", description="Comma-separated configuration IDs"),
-    entity_type: str = Query(
-        ...,
-        description="Cache entity id: ip_host, ip_hostgroup, mac_host, …",
-    ),
-    combine: bool = Query(
-        True,
-        description="Merge rows with the same identity across selected configurations.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    entity_type: Annotated[
+        str,
+        Query(
+            ...,
+            description="Cache entity id: ip_host, ip_hostgroup, mac_host, …",
+        ),
+    ],
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="Merge rows with the same identity across selected configurations.",
+        ),
+    ] = True,
 ):
     et = (entity_type or "").strip()
     if et not in HOSTS_SERVICES_ENTITY_TYPES:
@@ -2731,7 +3022,9 @@ def api_configurations_hosts_services_table(
 
 
 class ConfigurationIdsBody(BaseModel):
-    configuration_ids: list[int] = Field(default_factory=list)
+    configuration_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 @app.post(
@@ -2740,8 +3033,8 @@ class ConfigurationIdsBody(BaseModel):
 )
 def api_configurations_hosts_services_ip_hostgroup_aggregate(
     body: ConfigurationIdsBody,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     return aggregate_ip_hostgroups_for_configurations(db, body.configuration_ids)
 
@@ -2752,8 +3045,8 @@ def api_configurations_hosts_services_ip_hostgroup_aggregate(
 )
 def api_configurations_hosts_services_cached_names_aggregate(
     body: HsCachedNamesConfigurationAggregateBody,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     et = (body.entity_type or "").strip()
     if et not in HS_CACHED_MEMBER_ENTITY_TYPES:
@@ -2772,8 +3065,8 @@ def api_configurations_hosts_services_cached_names_aggregate(
     name="api_reference_countries",
 )
 def api_reference_countries(
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """
     Country codes for Country group flyouts, seeded from the ``All Countries`` group
@@ -2790,9 +3083,9 @@ def api_reference_countries(
     name="api_configurations_hosts_services_ip_hostgroup_names",
 )
 def api_configurations_hosts_services_ip_hostgroup_names(
-    configuration_id: int = Query(..., ge=1, description="Configuration id"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_id: Annotated[int, Query(..., ge=1, description="Configuration id")],
 ):
     return {"groups": list_ip_hostgroups_for_configuration(db, configuration_id)}
 
@@ -2802,9 +3095,9 @@ def api_configurations_hosts_services_ip_hostgroup_names(
     name="api_configurations_hosts_services_fqdn_hostgroup_names",
 )
 def api_configurations_hosts_services_fqdn_hostgroup_names(
-    configuration_id: int = Query(..., ge=1, description="Configuration id"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_id: Annotated[int, Query(..., ge=1, description="Configuration id")],
 ):
     return {"groups": list_fqdn_hostgroups_for_configuration(db, configuration_id)}
 
@@ -2824,12 +3117,12 @@ def _optional_import_firewall_id_form(raw: str | None) -> int | None:
 
 @app.post("/configurations", name="gc_create_configuration")
 def create_configuration(
-    name: str | None = Form(None),
-    description: str | None = Form(None),
-    member_firewall_ids_json: str | None = Form(None),
-    import_firewall_id: str | None = Form(None),
-    db: Session = Depends(get_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+    name: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    member_firewall_ids_json: Annotated[str | None, Form()] = None,
+    import_firewall_id: Annotated[str | None, Form()] = None,
 ):
     name_clean = name.strip() if name else None
     if name_clean == "":
@@ -2867,14 +3160,14 @@ def create_configuration(
 
 
 class ConfigurationBatchDeleteBody(BaseModel):
-    ids: list[int] = Field(default_factory=list)
+    ids: list[int] = Field(default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX)
 
 
 @app.post("/configurations/delete-batch", name="gc_configurations_delete_batch")
 def delete_configurations_batch(
     body: ConfigurationBatchDeleteBody,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     ids = sorted(set(i for i in body.ids if isinstance(i, int)))
     for cid in ids:
@@ -2887,12 +3180,12 @@ def delete_configurations_batch(
 
 @app.post("/internal/configurations/update", name="gc_update_configuration")
 def update_configuration(
-    configuration_id: int = Form(...),
-    name: str | None = Form(None),
-    description: str | None = Form(None),
-    member_firewall_ids_json: str | None = Form(None),
-    db: Session = Depends(get_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+    configuration_id: Annotated[int, Form(...)],
+    name: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    member_firewall_ids_json: Annotated[str | None, Form()] = None,
 ):
     row = (
         db.query(Configuration)
@@ -2921,8 +3214,8 @@ def update_configuration(
 )
 def api_configurations_apply_interface(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_interface_update(
@@ -2940,8 +3233,8 @@ def api_configurations_apply_interface(
 @app.post("/api/configurations/apply-vlan", name="api_configurations_apply_vlan")
 def api_configurations_apply_vlan(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_vlan_update(
@@ -2961,8 +3254,8 @@ def api_configurations_apply_vlan(
 )
 def api_configurations_apply_vlan_create_route(
     body: VlanCreateConfigurationBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_vlan_create(
@@ -2982,8 +3275,8 @@ def api_configurations_apply_vlan_create_route(
 )
 def api_configurations_apply_bridge_pair(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_bridge_pair_update(
@@ -3004,8 +3297,8 @@ def api_configurations_apply_bridge_pair(
 )
 def api_configurations_apply_bridge_pair_create_route(
     body: BridgePairCreateConfigurationBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_bridge_pair_create(
@@ -3023,8 +3316,8 @@ def api_configurations_apply_bridge_pair_create_route(
 @app.post("/api/configurations/apply-alias", name="api_configurations_apply_alias")
 def api_configurations_apply_alias(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_alias_update(
@@ -3045,8 +3338,8 @@ def api_configurations_apply_alias(
 )
 def api_configurations_apply_alias_create_route(
     body: AliasCreateConfigurationBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_alias_create(
@@ -3064,8 +3357,8 @@ def api_configurations_apply_alias_create_route(
 @app.post("/api/configurations/apply-zone", name="api_configurations_apply_zone")
 def api_configurations_apply_zone(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_zone_update(
@@ -3086,8 +3379,8 @@ def api_configurations_apply_zone(
 )
 def api_configurations_apply_zone_updates_batch(
     body: ZoneUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_zone_update_batch(
@@ -3108,8 +3401,8 @@ def api_configurations_apply_zone_updates_batch(
 )
 def api_configurations_apply_zone_create_batch_route(
     body: ZoneCreateConfigurationBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_zone_create_batch(
@@ -3127,8 +3420,8 @@ def api_configurations_apply_zone_create_batch_route(
 @app.post("/api/configurations/apply-lag", name="api_configurations_apply_lag")
 def api_configurations_apply_lag(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_lag_update(
@@ -3149,8 +3442,8 @@ def api_configurations_apply_lag(
 )
 def api_configurations_apply_lag_create_route(
     body: LagCreateConfigurationBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_lag_create(
@@ -3177,8 +3470,8 @@ def api_configurations_apply_lag_create_route(
 @app.post("/api/configurations/apply-ip-host", name="api_configurations_apply_ip_host")
 def api_configurations_apply_ip_host(
     body: EnqueueIpHostUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_ip_host_update(
@@ -3199,8 +3492,8 @@ def api_configurations_apply_ip_host(
 )
 def api_configurations_apply_ip_host_updates_batch(
     body: EnqueueIpHostUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_ip_host_update_batch(
@@ -3221,8 +3514,8 @@ def api_configurations_apply_ip_host_updates_batch(
 )
 def api_configurations_apply_ip_host_deletes_batch(
     body: EnqueueIpHostDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_ip_host_delete_batch(
@@ -3247,8 +3540,8 @@ class IpHostCreateConfigurationBody(BaseModel):
 )
 def api_configurations_apply_ip_host_create(
     body: IpHostCreateConfigurationBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_ip_host_create(
@@ -3264,7 +3557,9 @@ def api_configurations_apply_ip_host_create(
 
 
 class IpHostCreateConfigurationBatchBody(BaseModel):
-    configuration_ids: list[int] = Field(default_factory=list)
+    configuration_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     form: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -3274,8 +3569,8 @@ class IpHostCreateConfigurationBatchBody(BaseModel):
 )
 def api_configurations_apply_ip_host_create_batch(
     body: IpHostCreateConfigurationBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_ip_host_create_many(
@@ -3296,8 +3591,8 @@ def api_configurations_apply_ip_host_create_batch(
 )
 def api_configurations_apply_hs_deletes_batch(
     body: EnqueueHsDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_hs_deletes_batch(
@@ -3317,8 +3612,8 @@ def api_configurations_apply_hs_deletes_batch(
 )
 def api_configurations_apply_network_entity_deletes_batch(
     body: EnqueueHsDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_network_entity_deletes_batch(
@@ -3338,8 +3633,8 @@ def api_configurations_apply_network_entity_deletes_batch(
 )
 def api_configurations_apply_hs_updates_batch(
     body: EnqueueHsUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         apply_configuration_hs_entity_update_batch(
@@ -3355,7 +3650,9 @@ def api_configurations_apply_hs_updates_batch(
 
 
 class HsCreateConfigurationBatchBody(BaseModel):
-    configuration_ids: list[int] = Field(default_factory=list)
+    configuration_ids: list[int] = Field(
+        default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
     entity_type: str = Field(...)
     form: dict[str, Any] = Field(default_factory=dict)
 
@@ -3366,8 +3663,8 @@ class HsCreateConfigurationBatchBody(BaseModel):
 )
 def api_configurations_apply_hs_creates_batch(
     body: HsCreateConfigurationBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     et = (body.entity_type or "").strip()
     if et not in HOSTS_SERVICES_ENTITY_TYPES:
@@ -3548,9 +3845,9 @@ def _merged_unified_interfaces_payload(
 @app.get("/firewalls/network", response_class=HTMLResponse)
 def firewalls_network_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -3656,9 +3953,9 @@ def firewalls_intrusion_prevention_configure_redirect():
 @app.get("/firewalls/intrusion-prevention", response_class=HTMLResponse)
 def firewalls_intrusion_prevention_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     ips_policy_dropdowns = {
         "categories": IPS_POLICY_CATEGORIES,
@@ -3748,9 +4045,9 @@ def firewalls_intrusion_prevention_page(
 @app.get("/firewalls/protect/firewall", response_class=HTMLResponse)
 def firewalls_protect_firewall_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -3772,9 +4069,9 @@ def firewalls_protect_firewall_page(
 @app.get("/firewalls/protect/web", response_class=HTMLResponse)
 def firewalls_protect_web_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -3808,9 +4105,9 @@ def firewalls_protect_web_page(
 @app.get("/firewalls/configure/authentication", response_class=HTMLResponse)
 def firewalls_configure_authentication_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -3856,9 +4153,9 @@ def firewalls_configure_authentication_page(
 @app.get("/firewalls/system/profiles", response_class=HTMLResponse)
 def firewalls_system_profiles_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -3910,9 +4207,9 @@ def firewalls_system_profiles_page(
 @app.get("/firewalls/hosts-services", response_class=HTMLResponse)
 def firewalls_hosts_services_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     nav_ctx = template_nav_firewall_context(request, sdb, db)
     return templates.TemplateResponse(
@@ -4035,9 +4332,9 @@ def _is_same_origin_browser_request(request: Request) -> bool:
 )
 def firewalls_history_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     outgoing_rows, outgoing_has_more = list_completed_tasks_with_firewall_page(
         db,
@@ -4153,15 +4450,15 @@ def firewalls_history_page(
         created_iso = created.isoformat() if created else ""
         fl = fw_label(fw) if fw is not None else "—"
         fw_online = firewall_is_online(fw) if fw is not None else None
-        outcome_label = (
-            "Yes" if entry.connected_successfully else "No"
-        )
+        outcome_label = "Yes" if entry.connected_successfully else "No"
         event_label = "Started" if entry.event_kind == "start" else "Ended"
         access_rows.append(
             {
                 "id": entry.id,
                 "session_id": entry.session_id,
-                "firewall_id": entry.firewall_id if entry.firewall_id is not None else "",
+                "firewall_id": entry.firewall_id
+                if entry.firewall_id is not None
+                else "",
                 "firewall_label": fl,
                 "access_type": (entry.access_type or "").upper(),
                 "access_type_key": (entry.access_type or "").strip().lower(),
@@ -4214,9 +4511,9 @@ def firewalls_history_page(
 @app.get("/task-queue", response_class=HTMLResponse, name="task_queue_page")
 def task_queue_page(
     request: Request,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     return templates.TemplateResponse(
         request,
@@ -4241,7 +4538,7 @@ def task_queue_page(
 @app.get("/task-queue/embed", response_class=HTMLResponse, name="task_queue_embed")
 def task_queue_embed(
     request: Request,
-    _: None = Depends(require_browser_session),
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     """Minimal task queue document for the Firewalls sidebar bottom dock (iframe)."""
     return templates.TemplateResponse(
@@ -4262,23 +4559,29 @@ def task_queue_embed(
 
 @app.get("/api/task-queue", name="api_task_queue_list")
 def api_task_queue_list(
-    firewall_ids: str | None = Query(
-        None,
-        description="Comma-separated firewall IDs; omit for all tasks; empty filters to none",
-    ),
-    limit: int | None = Query(
-        None,
-        ge=1,
-        le=500,
-        description="Max rows to return for paged/lazy loading.",
-    ),
-    offset: int = Query(
-        0,
-        ge=0,
-        description="Row offset for paged/lazy loading.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str | None,
+        Query(
+            description="Comma-separated firewall IDs; omit for all tasks; empty filters to none",
+        ),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        Query(
+            ge=1,
+            le=500,
+            description="Max rows to return for paged/lazy loading.",
+        ),
+    ] = None,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+            description="Row offset for paged/lazy loading.",
+        ),
+    ] = 0,
 ):
     ids = None
     if firewall_ids is not None:
@@ -4315,8 +4618,8 @@ def api_task_queue_list(
 
 @app.get("/api/task-queue/count", name="api_task_queue_count")
 def api_task_queue_count(
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     s = task_queue_badge_summary(db)
     return {"count": s["count"], "error_count": s["error_count"]}
@@ -4324,19 +4627,23 @@ def api_task_queue_count(
 
 @app.get("/api/task-queue/completed", name="api_task_queue_completed_list")
 def api_task_queue_completed_list(
-    limit: int = Query(
-        200,
-        ge=1,
-        le=500,
-        description="Max completed rows to return for paged/lazy loading.",
-    ),
-    offset: int = Query(
-        0,
-        ge=0,
-        description="Row offset for paged/lazy loading.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=500,
+            description="Max completed rows to return for paged/lazy loading.",
+        ),
+    ] = 200,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+            description="Row offset for paged/lazy loading.",
+        ),
+    ] = 0,
 ):
     rows, has_more = list_completed_tasks_with_firewall_page(
         db,
@@ -4354,8 +4661,8 @@ def api_task_queue_completed_list(
 @app.post("/api/task-queue/enqueue-interface", name="api_task_queue_enqueue_interface")
 def api_task_queue_enqueue_interface(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_interface_update(
@@ -4373,8 +4680,8 @@ def api_task_queue_enqueue_interface(
 @app.post("/api/task-queue/enqueue-vlan", name="api_task_queue_enqueue_vlan")
 def api_task_queue_enqueue_vlan(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_vlan_update(
@@ -4392,8 +4699,8 @@ def api_task_queue_enqueue_vlan(
 @app.post("/api/task-queue/enqueue-lag", name="api_task_queue_enqueue_lag")
 def api_task_queue_enqueue_lag(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_lag_update(
@@ -4414,8 +4721,8 @@ def api_task_queue_enqueue_lag(
 )
 def api_task_queue_enqueue_lag_create(
     body: EnqueueLagCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_lag_create(
@@ -4442,8 +4749,8 @@ def api_task_queue_enqueue_lag_create(
 @app.post("/api/task-queue/enqueue-zone", name="api_task_queue_enqueue_zone")
 def api_task_queue_enqueue_zone(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_zone_update(
@@ -4464,8 +4771,8 @@ def api_task_queue_enqueue_zone(
 )
 def api_task_queue_enqueue_zone_updates_batch(
     body: ZoneUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_zone_update_batch(
@@ -4486,8 +4793,8 @@ def api_task_queue_enqueue_zone_updates_batch(
 )
 def api_task_queue_enqueue_zone_create_batch(
     body: ZoneCreateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_zone_create_batch(
@@ -4507,8 +4814,8 @@ def api_task_queue_enqueue_zone_create_batch(
 )
 def api_task_queue_enqueue_bridge_pair(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_bridge_pair_update(
@@ -4526,8 +4833,8 @@ def api_task_queue_enqueue_bridge_pair(
 @app.post("/api/task-queue/enqueue-alias", name="api_task_queue_enqueue_alias")
 def api_task_queue_enqueue_alias(
     body: EnqueueInterfaceUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_alias_update(
@@ -4548,8 +4855,8 @@ def api_task_queue_enqueue_alias(
 )
 def api_task_queue_enqueue_alias_create(
     body: EnqueueAliasCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_alias_create(
@@ -4570,8 +4877,8 @@ def api_task_queue_enqueue_alias_create(
 )
 def api_task_queue_enqueue_bridge_pair_create(
     body: EnqueueBridgePairCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_bridge_pair_create(
@@ -4598,8 +4905,8 @@ def api_task_queue_enqueue_bridge_pair_create(
 @app.post("/api/task-queue/enqueue-ip-host", name="api_task_queue_enqueue_ip_host")
 def api_task_queue_enqueue_ip_host(
     body: EnqueueIpHostUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ip_host_update(
@@ -4620,8 +4927,8 @@ def api_task_queue_enqueue_ip_host(
 )
 def api_task_queue_enqueue_ip_host_updates_batch(
     body: EnqueueIpHostUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Apply the same IP host flyout payload to multiple cached host rows (e.g. combined table)."""
     try:
@@ -4643,8 +4950,8 @@ def api_task_queue_enqueue_ip_host_updates_batch(
 )
 def api_task_queue_enqueue_ip_host_deletes_batch(
     body: EnqueueIpHostDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue removal of cached IP host objects on their firewalls (Sophos remove by name)."""
     try:
@@ -4665,8 +4972,8 @@ def api_task_queue_enqueue_ip_host_deletes_batch(
 )
 def api_task_queue_enqueue_ip_host_create(
     body: EnqueueIpHostCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ip_host_create(
@@ -4687,8 +4994,8 @@ def api_task_queue_enqueue_ip_host_create(
 )
 def api_task_queue_enqueue_ip_host_create_batch(
     body: EnqueueIpHostCreateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_ip_host_create_many(
@@ -4709,8 +5016,8 @@ def api_task_queue_enqueue_ip_host_create_batch(
 )
 def api_task_queue_enqueue_hs_deletes_batch(
     body: EnqueueHsDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue deletes for any Hosts & Services cached object (including IP host)."""
     try:
@@ -4731,8 +5038,8 @@ def api_task_queue_enqueue_hs_deletes_batch(
 )
 def api_task_queue_enqueue_network_entity_deletes_batch(
     body: EnqueueHsDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue removal of VLAN, bridge pair, LAG, alias, or zone objects (not physical interfaces)."""
     try:
@@ -4753,8 +5060,8 @@ def api_task_queue_enqueue_network_entity_deletes_batch(
 )
 def api_task_queue_enqueue_ips_switch_batch(
     body: EnqueueIpsSwitchBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue IPS switch Enable/Disable per cached config entry (Protect · IPSSwitch)."""
     try:
@@ -4776,8 +5083,8 @@ def api_task_queue_enqueue_ips_switch_batch(
 )
 def api_task_queue_enqueue_dos_settings_update(
     body: EnqueueDosSettingsUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue Set DoSSettings (singleton cache row ``__config__``)."""
     try:
@@ -4799,8 +5106,8 @@ def api_task_queue_enqueue_dos_settings_update(
 )
 def api_task_queue_enqueue_spoof_prevention_update(
     body: EnqueueSpoofPreventionUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue Set SpoofPrevention (singleton cache row ``__config__``)."""
     try:
@@ -4822,8 +5129,8 @@ def api_task_queue_enqueue_spoof_prevention_update(
 )
 def api_task_queue_enqueue_hs_updates_batch(
     body: EnqueueHsUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_hs_entity_update_batch(
@@ -4844,8 +5151,8 @@ def api_task_queue_enqueue_hs_updates_batch(
 )
 def api_task_queue_enqueue_firewall_rule_reorder_batch(
     body: EnqueueFirewallRuleReorderBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_firewall_rule_reorder_batch(
@@ -4866,8 +5173,8 @@ def api_task_queue_enqueue_firewall_rule_reorder_batch(
 )
 def api_task_queue_enqueue_hs_creates_batch(
     body: EnqueueHsCreateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     et = (body.entity_type or "").strip()
     if et not in HOSTS_SERVICES_ENTITY_TYPES:
@@ -4892,8 +5199,8 @@ def api_task_queue_enqueue_hs_creates_batch(
 @app.post("/api/task-queue/delete", name="api_task_queue_delete")
 def api_task_queue_delete(
     body: TaskQueueDeleteBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     n = delete_tasks(
         db,
@@ -4907,8 +5214,8 @@ def api_task_queue_delete(
 @app.get("/api/task-queue/{task_id}/compare", name="api_task_queue_compare")
 def api_task_queue_compare(
     task_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if task_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid task id")
@@ -4924,8 +5231,8 @@ def api_task_queue_compare(
 )
 def api_task_queue_completed_compare(
     completed_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if completed_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid completed task id")
@@ -4941,8 +5248,8 @@ def api_task_queue_completed_compare(
 )
 def api_firewall_changelog_compare(
     entry_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if entry_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid changelog id")
@@ -4958,8 +5265,8 @@ def api_firewall_changelog_compare(
 )
 def api_firewall_sync_run_details(
     sync_run_id: str,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     sid = (sync_run_id or "").strip()
     try:
@@ -4976,8 +5283,8 @@ def api_firewall_sync_run_details(
 def api_task_queue_send(
     task_id: int,
     background_tasks: BackgroundTasks,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if task_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid task id")
@@ -5004,10 +5311,10 @@ def api_task_queue_send(
 )
 def api_task_queue_send_all(
     background_tasks: BackgroundTasks,
-    body: TaskQueueSendAllBody | None = Body(None),
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    body: Annotated[TaskQueueSendAllBody | None, Body()] = None,
 ) -> dict[str, Any] | JSONResponse:
     # Empty list must mean "no filter": the UI sends firewall_ids whenever
     # gcGetSelectedFirewallIds exists, which returns [] when the multiselect
@@ -5050,9 +5357,9 @@ def api_task_queue_send_all(
 def api_task_queue_send_selected(
     background_tasks: BackgroundTasks,
     body: TaskQueueSendSelectedBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
 ) -> dict[str, Any] | JSONResponse:
     ids = filter_sendable_task_ids_in_order(db, body.ids)
     if not ids:
@@ -5081,7 +5388,7 @@ def api_task_queue_send_selected(
 
 @app.get("/api/background-sync-status", name="api_background_sync_status")
 def api_background_sync_status(
-    uid: str = Depends(current_user_id_dep),
+    uid: Annotated[str, Depends(current_user_id_dep)],
 ) -> dict[str, Any]:
     """Whether this user has firewall/task-queue background work still running (for banner restore)."""
     return dict(background_activity.snapshot(uid))
@@ -5366,7 +5673,10 @@ def _api_hosts_services_entities(
         return _paginate_table_payload(cfg_result, q=q, limit=limit, offset=offset)
     merged_hs = _merge_vertical_table_payloads(fw_result, cfg_result)
     cl_hs = merged_hs.get("column_labels")
-    if isinstance(cl_hs, dict) and cl_hs.get("firewall") in ("Firewall", "Configuration"):
+    if isinstance(cl_hs, dict) and cl_hs.get("firewall") in (
+        "Firewall",
+        "Configuration",
+    ):
         cl_hs = dict(cl_hs)
         cl_hs["firewall"] = "Scope"
         merged_hs["column_labels"] = cl_hs
@@ -5439,8 +5749,8 @@ def _api_firewalls_network_entities(
 )
 def api_firewalls_nav_multiselect(
     request: Request,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Firewall id, label, tags, description, and action URLs for the global top-bar selector."""
     return nav_firewalls_multiselect_json(db, request)
@@ -5451,15 +5761,20 @@ def api_firewalls_nav_multiselect(
     name="api_firewalls_network_interfaces",
 )
 def api_firewalls_network_interfaces(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    configuration_ids: str = Query(
-        "", description="Comma-separated virtual configuration IDs"
-    ),
-    combine: bool = Query(
-        True, description="Merge rows with the same name and type across selected scopes"
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated virtual configuration IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="Merge rows with the same name and type across selected scopes",
+        ),
+    ] = True,
 ):
     """
     Network interface tab rows: physical interfaces, VLANs, and bridge pairs for selected firewalls.
@@ -5475,12 +5790,14 @@ def api_firewalls_network_interfaces(
     name="api_firewalls_network_vlans",
 )
 def api_firewalls_network_vlans(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    configuration_ids: str = Query(
-        "", description="Comma-separated virtual configuration IDs"
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated virtual configuration IDs")
+    ] = "",
 ):
     """VLAN config rows (same column layout as interfaces)."""
     return _api_firewalls_network_entities(
@@ -5493,23 +5810,32 @@ def api_firewalls_network_vlans(
     name="api_firewalls_hosts_services_table",
 )
 def api_firewalls_hosts_services_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    configuration_ids: str = Query(
-        "", description="Comma-separated virtual configuration IDs"
-    ),
-    entity_type: str = Query(
-        ...,
-        description="Cache entity id: ip_host, ip_hostgroup, mac_host, …",
-    ),
-    combine: bool = Query(
-        True,
-        description="Merge rows with the same identity across selected firewalls (per tab).",
-    ),
-    q: str = Query("", description="Server-side text search filter."),
-    limit: int | None = Query(None, ge=1, le=5000, description="Max rows to return."),
-    offset: int = Query(0, ge=0, description="Row offset for paging."),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    entity_type: Annotated[
+        str,
+        Query(
+            ...,
+            description="Cache entity id: ip_host, ip_hostgroup, mac_host, …",
+        ),
+    ],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated virtual configuration IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="Merge rows with the same identity across selected firewalls (per tab).",
+        ),
+    ] = True,
+    q: Annotated[str, Query(description="Server-side text search filter.")] = "",
+    limit: Annotated[
+        int | None, Query(ge=1, le=5000, description="Max rows to return.")
+    ] = None,
+    offset: Annotated[int, Query(ge=0, description="Row offset for paging.")] = 0,
 ):
     """Flattened rows from firewall_config_entries for Hosts & Services tabs."""
     et = (entity_type or "").strip()
@@ -5535,9 +5861,11 @@ def api_firewalls_hosts_services_table(
     name="api_hosts_services_ip_hostgroup_names",
 )
 def api_hosts_services_ip_hostgroup_names(
-    firewall_id: int = Query(..., ge=1, description="Firewall id for the IP host row"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_id: Annotated[
+        int, Query(..., ge=1, description="Firewall id for the IP host row")
+    ],
 ):
     """Cached IP host groups for the firewall: ``{ groups: [{ name, description }, ...] }`` for the flyout picker."""
     return {"groups": list_ip_hostgroups_for_firewall(db, firewall_id)}
@@ -5549,8 +5877,8 @@ def api_hosts_services_ip_hostgroup_names(
 )
 def api_hosts_services_ip_hostgroup_aggregate(
     body: IpHostgroupAggregateBody,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """
     Union of IP host group names across firewalls, with ``on_all_firewalls`` for the add-host flyout.
@@ -5563,9 +5891,9 @@ def api_hosts_services_ip_hostgroup_aggregate(
     name="api_hosts_services_fqdn_hostgroup_names",
 )
 def api_hosts_services_fqdn_hostgroup_names(
-    firewall_id: int = Query(..., ge=1, description="Firewall id"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_id: Annotated[int, Query(..., ge=1, description="Firewall id")],
 ):
     return {"groups": list_fqdn_hostgroups_for_firewall(db, firewall_id)}
 
@@ -5576,8 +5904,8 @@ def api_hosts_services_fqdn_hostgroup_names(
 )
 def api_hosts_services_cached_names_aggregate(
     body: HsCachedNamesAggregateBody,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     et = (body.entity_type or "").strip()
     if et not in HS_CACHED_MEMBER_ENTITY_TYPES:
@@ -5596,19 +5924,25 @@ def api_hosts_services_cached_names_aggregate(
     name="api_firewalls_network_zones",
 )
 def api_firewalls_network_zones(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    configuration_ids: str = Query(
-        "", description="Comma-separated virtual configuration IDs"
-    ),
-    combine: bool = Query(
-        True,
-        description="Merge rows by zone name; when false, one row per zone per firewall.",
-    ),
-    q: str = Query("", description="Server-side text search filter."),
-    limit: int | None = Query(None, ge=1, le=5000, description="Max rows to return."),
-    offset: int = Query(0, ge=0, description="Row offset for paging."),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated virtual configuration IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="Merge rows by zone name; when false, one row per zone per firewall.",
+        ),
+    ] = True,
+    q: Annotated[str, Query(description="Server-side text search filter.")] = "",
+    limit: Annotated[
+        int | None, Query(ge=1, le=5000, description="Max rows to return.")
+    ] = None,
+    offset: Annotated[int, Query(ge=0, description="Row offset for paging.")] = 0,
 ):
     """
     Zone rows: with combine=true, unique zone names with a Firewalls column; with
@@ -5631,9 +5965,11 @@ def api_firewalls_network_zones(
     name="api_firewalls_ips_switch_table",
 )
 def api_firewalls_ips_switch_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     """One row per selected firewall: cached IPS switch status (sync ips_switch to populate)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5645,13 +5981,17 @@ def api_firewalls_ips_switch_table(
     name="api_firewalls_ips_policy_table",
 )
 def api_firewalls_ips_policy_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(
-        True,
-        description="When true, merge policies with the same name across firewalls.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="When true, merge policies with the same name across firewalls.",
+        ),
+    ] = True,
 ):
     """Cached IPS policies (sync ``ips_policy`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5664,8 +6004,8 @@ def api_firewalls_ips_policy_table(
 )
 def api_task_queue_enqueue_ips_policy_create(
     body: EnqueueIpsPolicyCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ips_policy_create(
@@ -5686,8 +6026,8 @@ def api_task_queue_enqueue_ips_policy_create(
 )
 def api_task_queue_enqueue_ips_policy_update(
     body: EnqueueIpsPolicyUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ips_policy_update(
@@ -5708,8 +6048,8 @@ def api_task_queue_enqueue_ips_policy_update(
 )
 def api_task_queue_enqueue_ips_policy_deletes_batch(
     body: EnqueueIpsPolicyDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_ips_policy_deletes_batch(
@@ -5728,13 +6068,17 @@ def api_task_queue_enqueue_ips_policy_deletes_batch(
     name="api_firewalls_ips_custom_signature_table",
 )
 def api_firewalls_ips_custom_signature_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(
-        True,
-        description="When true, merge signatures with the same name across firewalls.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="When true, merge signatures with the same name across firewalls.",
+        ),
+    ] = True,
 ):
     """Cached IPS custom signatures (sync ``ips_custom_signature`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5746,13 +6090,17 @@ def api_firewalls_ips_custom_signature_table(
     name="api_firewalls_ips_trusted_mac_table",
 )
 def api_firewalls_ips_trusted_mac_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(
-        True,
-        description="When true, merge entries with the same MAC across firewalls.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="When true, merge entries with the same MAC across firewalls.",
+        ),
+    ] = True,
 ):
     """Cached Trusted MAC list (sync ``trusted_mac`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5764,13 +6112,17 @@ def api_firewalls_ips_trusted_mac_table(
     name="api_firewalls_webfilter_policy_table",
 )
 def api_firewalls_webfilter_policy_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(
-        True,
-        description="When true, merge policies with the same name across firewalls.",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[
+        bool,
+        Query(
+            description="When true, merge policies with the same name across firewalls.",
+        ),
+    ] = True,
 ):
     """Cached web filter policies (sync ``webfilterpolicy`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5783,8 +6135,8 @@ def api_firewalls_webfilter_policy_table(
 )
 def api_task_queue_enqueue_webfilter_policy_create(
     body: EnqueueWebfilterPolicyCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_webfilter_policy_create(
@@ -5805,8 +6157,8 @@ def api_task_queue_enqueue_webfilter_policy_create(
 )
 def api_task_queue_enqueue_webfilter_policy_update(
     body: EnqueueWebfilterPolicyUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_webfilter_policy_update(
@@ -5827,8 +6179,8 @@ def api_task_queue_enqueue_webfilter_policy_update(
 )
 def api_task_queue_enqueue_webfilter_policy_deletes_batch(
     body: EnqueueWebfilterPolicyDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_webfilter_policy_deletes_batch(
@@ -5847,9 +6199,11 @@ def api_task_queue_enqueue_webfilter_policy_deletes_batch(
     name="api_firewalls_user_activity_table",
 )
 def api_firewalls_user_activity_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     """Cached user activities (sync ``useractivity`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5861,9 +6215,11 @@ def api_firewalls_user_activity_table(
     name="api_firewalls_url_group_table",
 )
 def api_firewalls_url_group_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     """Cached URL groups (sync ``url_group`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5875,9 +6231,11 @@ def api_firewalls_url_group_table(
     name="api_firewalls_firewall_rules_table",
 )
 def api_firewalls_firewall_rules_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     """Cached firewall rules (sync ``firewall_rule`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
@@ -5889,9 +6247,11 @@ def api_firewalls_firewall_rules_table(
     name="api_firewalls_auth_user_table",
 )
 def api_firewalls_auth_user_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_auth_user_table_payload(db, ids)
@@ -5902,9 +6262,11 @@ def api_firewalls_auth_user_table(
     name="api_firewalls_auth_user_group_table",
 )
 def api_firewalls_auth_user_group_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_auth_user_group_table_payload(db, ids)
@@ -5915,9 +6277,11 @@ def api_firewalls_auth_user_group_table(
     name="api_firewalls_auth_admin_profile_options",
 )
 def api_firewalls_auth_admin_profile_options(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_admin_profile_options_payload(db, ids)
@@ -5928,9 +6292,11 @@ def api_firewalls_auth_admin_profile_options(
     name="api_firewalls_auth_user_group_options",
 )
 def api_firewalls_auth_user_group_options(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_user_group_options_payload(db, ids)
@@ -5941,10 +6307,12 @@ def api_firewalls_auth_user_group_options(
     name="api_firewalls_admin_profile_table",
 )
 def api_firewalls_admin_profile_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(True),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[bool, Query()] = True,
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_admin_profile_table_payload(db, ids, combine=combine)
@@ -5955,10 +6323,12 @@ def api_firewalls_admin_profile_table(
     name="api_firewalls_profile_schedule_table",
 )
 def api_firewalls_profile_schedule_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(True),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[bool, Query()] = True,
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_schedule_table_payload(db, ids, combine=combine)
@@ -5969,10 +6339,12 @@ def api_firewalls_profile_schedule_table(
     name="api_firewalls_profile_access_time_table",
 )
 def api_firewalls_profile_access_time_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(True),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[bool, Query()] = True,
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_access_time_policy_table_payload(db, ids, combine=combine)
@@ -5983,10 +6355,12 @@ def api_firewalls_profile_access_time_table(
     name="api_firewalls_profile_surfing_quota_table",
 )
 def api_firewalls_profile_surfing_quota_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(True),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[bool, Query()] = True,
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_surfing_quota_policy_table_payload(db, ids, combine=combine)
@@ -5997,10 +6371,12 @@ def api_firewalls_profile_surfing_quota_table(
     name="api_firewalls_profile_data_transfer_table",
 )
 def api_firewalls_profile_data_transfer_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(True),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[bool, Query()] = True,
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_data_transfer_policy_table_payload(db, ids, combine=combine)
@@ -6011,10 +6387,12 @@ def api_firewalls_profile_data_transfer_table(
     name="api_firewalls_profile_vpn_profile_table",
 )
 def api_firewalls_profile_vpn_profile_table(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    combine: bool = Query(True),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    combine: Annotated[bool, Query()] = True,
 ):
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_vpn_profile_table_payload(db, ids, combine=combine)
@@ -6026,8 +6404,8 @@ def api_firewalls_profile_vpn_profile_table(
 )
 def api_task_queue_enqueue_auth_user_create(
     body: EnqueueAuthUserCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_auth_user_create(
@@ -6048,8 +6426,8 @@ def api_task_queue_enqueue_auth_user_create(
 )
 def api_task_queue_enqueue_auth_user_update(
     body: EnqueueAuthUserUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_auth_user_update(
@@ -6070,8 +6448,8 @@ def api_task_queue_enqueue_auth_user_update(
 )
 def api_task_queue_enqueue_auth_user_deletes_batch(
     body: EnqueueAuthUserDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_auth_user_deletes_batch(
@@ -6091,8 +6469,8 @@ def api_task_queue_enqueue_auth_user_deletes_batch(
 )
 def api_task_queue_enqueue_auth_user_group_create(
     body: EnqueueAuthUserGroupCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_auth_user_group_create(
@@ -6113,8 +6491,8 @@ def api_task_queue_enqueue_auth_user_group_create(
 )
 def api_task_queue_enqueue_auth_user_group_update(
     body: EnqueueAuthUserGroupUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_auth_user_group_update(
@@ -6135,8 +6513,8 @@ def api_task_queue_enqueue_auth_user_group_update(
 )
 def api_task_queue_enqueue_auth_user_group_deletes_batch(
     body: EnqueueAuthUserGroupDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_auth_user_group_deletes_batch(
@@ -6156,8 +6534,8 @@ def api_task_queue_enqueue_auth_user_group_deletes_batch(
 )
 def api_task_queue_enqueue_admin_profile_create(
     body: EnqueueAdminProfileCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_admin_profile_create(
@@ -6178,8 +6556,8 @@ def api_task_queue_enqueue_admin_profile_create(
 )
 def api_task_queue_enqueue_admin_profile_update(
     body: EnqueueAdminProfileUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_admin_profile_update(
@@ -6200,8 +6578,8 @@ def api_task_queue_enqueue_admin_profile_update(
 )
 def api_task_queue_enqueue_admin_profile_deletes_batch(
     body: EnqueueAdminProfileDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_admin_profile_deletes_batch(
@@ -6221,8 +6599,8 @@ def api_task_queue_enqueue_admin_profile_deletes_batch(
 )
 def api_task_queue_enqueue_profile_entity_create_batch(
     body: EnqueueProfileEntityCreateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_profile_entity_create_batch(
@@ -6244,8 +6622,8 @@ def api_task_queue_enqueue_profile_entity_create_batch(
 )
 def api_task_queue_enqueue_profile_entity_update_batch(
     body: EnqueueProfileEntityUpdateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_profile_entity_update_batch(
@@ -6266,8 +6644,8 @@ def api_task_queue_enqueue_profile_entity_update_batch(
 )
 def api_task_queue_enqueue_profile_entity_deletes_batch(
     body: EnqueueProfileEntityDeletesBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_profile_entity_deletes_batch(
@@ -6287,8 +6665,8 @@ def api_task_queue_enqueue_profile_entity_deletes_batch(
 )
 def api_task_queue_enqueue_ips_custom_signature_create(
     body: EnqueueIpsCustomSignatureCreateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ips_custom_signature_create(
@@ -6309,8 +6687,8 @@ def api_task_queue_enqueue_ips_custom_signature_create(
 )
 def api_task_queue_enqueue_ips_custom_signature_create_batch(
     body: EnqueueIpsCustomSignatureCreateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_ips_custom_signature_create_batch(
@@ -6331,8 +6709,8 @@ def api_task_queue_enqueue_ips_custom_signature_create_batch(
 )
 def api_task_queue_enqueue_ips_custom_signature_update(
     body: EnqueueIpsCustomSignatureUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ips_custom_signature_update(
@@ -6353,8 +6731,8 @@ def api_task_queue_enqueue_ips_custom_signature_update(
 )
 def api_task_queue_enqueue_ips_custom_signature_deletes_batch(
     body: EnqueueIpsCustomSignatureDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_ips_custom_signature_deletes_batch(
@@ -6374,8 +6752,8 @@ def api_task_queue_enqueue_ips_custom_signature_deletes_batch(
 )
 def api_task_queue_enqueue_ips_trusted_mac_create_batch(
     body: EnqueueIpsTrustedMacCreateBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_ips_trusted_mac_create_batch(
@@ -6396,8 +6774,8 @@ def api_task_queue_enqueue_ips_trusted_mac_create_batch(
 )
 def api_task_queue_enqueue_ips_trusted_mac_update(
     body: EnqueueIpsTrustedMacUpdateBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         task = enqueue_ips_trusted_mac_update(
@@ -6418,8 +6796,8 @@ def api_task_queue_enqueue_ips_trusted_mac_update(
 )
 def api_task_queue_enqueue_ips_trusted_mac_deletes_batch(
     body: EnqueueIpsTrustedMacDeleteBatchBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         tasks = enqueue_ips_trusted_mac_deletes_batch(
@@ -6703,7 +7081,9 @@ def _delete_all_test_firewalls(db: Session, sdb: Session) -> int:
     for fid in ids:
         delete_firewall_credential(sdb, fid)
     if ids:
-        db.query(Firewall).filter(Firewall.id.in_(ids)).delete(synchronize_session=False)
+        db.query(Firewall).filter(Firewall.id.in_(ids)).delete(
+            synchronize_session=False
+        )
     sdb.commit()
     db.commit()
     return len(ids)
@@ -6711,20 +7091,20 @@ def _delete_all_test_firewalls(db: Session, sdb: Session) -> int:
 
 @app.post("/firewalls", name="gc_create_firewall")
 def create_firewall(
-    host: str = Form(...),
-    port: int = Form(4444),
-    username: str = Form(...),
-    password: str = Form(...),
-    verify_ssl: str | None = Form(None),
-    monitor_enabled: str | None = Form(None),
-    monitor_interval_minutes: str | None = Form(None),
-    api_request_timeout_seconds: str | None = Form(None),
-    name: str | None = Form(None),
-    description: str | None = Form(None),
-    tags_json: str | None = Form(None),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+    host: Annotated[str, Form(...)],
+    username: Annotated[str, Form(...)],
+    password: Annotated[str, Form(...)],
+    port: Annotated[int, Form()] = 4444,
+    verify_ssl: Annotated[str | None, Form()] = None,
+    monitor_enabled: Annotated[str | None, Form()] = None,
+    monitor_interval_minutes: Annotated[str | None, Form()] = None,
+    api_request_timeout_seconds: Annotated[str | None, Form()] = None,
+    name: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    tags_json: Annotated[str | None, Form()] = None,
 ):
     host = host.strip()
     if not host:
@@ -6768,20 +7148,20 @@ def create_firewall(
 
 
 class FirewallBatchDeleteBody(BaseModel):
-    ids: list[int] = Field(default_factory=list)
+    ids: list[int] = Field(default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX)
 
 
 class FirewallBatchSetTagsBody(BaseModel):
-    ids: list[int] = Field(default_factory=list)
+    ids: list[int] = Field(default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX)
     tags: list[str] = Field(default_factory=list)
 
 
 @app.post("/firewalls/delete-batch", name="gc_firewalls_delete_batch")
 def delete_firewalls_batch(
     body: FirewallBatchDeleteBody,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     ids = sorted(set(i for i in body.ids if isinstance(i, int)))
     for fid in ids:
@@ -6797,8 +7177,8 @@ def delete_firewalls_batch(
 @app.post("/firewalls/set-tags-batch", name="gc_firewalls_set_tags_batch")
 def set_firewalls_tags_batch(
     body: FirewallBatchSetTagsBody,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     ids = sorted(set(i for i in body.ids if isinstance(i, int) and i > 0))
     if not ids:
@@ -6835,21 +7215,21 @@ def set_firewalls_tags_batch(
 
 @app.post("/internal/firewalls/update", name="gc_update_firewall")
 def update_firewall(
-    firewall_id: int = Form(...),
-    host: str = Form(...),
-    port: int = Form(4444),
-    username: str = Form(...),
-    password: str | None = Form(None),
-    verify_ssl: str | None = Form(None),
-    monitor_enabled: str | None = Form(None),
-    monitor_interval_minutes: str | None = Form(None),
-    api_request_timeout_seconds: str | None = Form(None),
-    name: str | None = Form(None),
-    description: str | None = Form(None),
-    tags_json: str | None = Form(None),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+    firewall_id: Annotated[int, Form(...)],
+    host: Annotated[str, Form(...)],
+    username: Annotated[str, Form(...)],
+    port: Annotated[int, Form()] = 4444,
+    password: Annotated[str | None, Form()] = None,
+    verify_ssl: Annotated[str | None, Form()] = None,
+    monitor_enabled: Annotated[str | None, Form()] = None,
+    monitor_interval_minutes: Annotated[str | None, Form()] = None,
+    api_request_timeout_seconds: Annotated[str | None, Form()] = None,
+    name: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    tags_json: Annotated[str | None, Form()] = None,
 ):
     row = db.query(Firewall).filter(Firewall.id == firewall_id).one_or_none()
     if not row:
@@ -6896,9 +7276,9 @@ def update_firewall(
 def firewall_monitor_page(
     request: Request,
     firewall_id: int,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -6929,8 +7309,8 @@ def firewall_monitor_page(
 def firewall_webadmin_launch(
     request: Request,
     firewall_id: int,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -6942,7 +7322,9 @@ def firewall_webadmin_launch(
     try:
         tok = issue_launch_token(request, firewall_id=row.id, access_type="webadmin")
     except ValueError:
-        raise HTTPException(status_code=403, detail="Missing authenticated launch context.")
+        raise HTTPException(
+            status_code=403, detail="Missing authenticated launch context."
+        )
     target = _url_add_query_param(base, TOKEN_QUERY_PARAM, tok)
     return RedirectResponse(url=target, status_code=302)
 
@@ -6955,8 +7337,8 @@ def firewall_webadmin_launch(
 def firewall_ssh_launch(
     request: Request,
     firewall_id: int,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -6964,7 +7346,9 @@ def firewall_ssh_launch(
     try:
         tok = issue_launch_token(request, firewall_id=row.id, access_type="ssh_page")
     except ValueError:
-        raise HTTPException(status_code=403, detail="Missing authenticated launch context.")
+        raise HTTPException(
+            status_code=403, detail="Missing authenticated launch context."
+        )
     target = _url_add_query_param(
         str(request.url_for("firewall_ssh_terminal_page", firewall_id=row.id)),
         TOKEN_QUERY_PARAM,
@@ -6980,7 +7364,7 @@ def firewall_ssh_launch(
 def firewall_webadmin_trailing_slash_redirect(
     request: Request,
     firewall_id: int,
-    _: None = Depends(require_browser_session),
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     """Canonicalize to .../webadmin/ so relative asset URLs resolve under the proxy prefix."""
     p = request.url.path
@@ -7002,9 +7386,9 @@ async def firewall_webadmin_proxy(
     request: Request,
     firewall_id: int,
     full_path: str,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -7016,7 +7400,9 @@ async def firewall_webadmin_proxy(
         )
     if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
         if not _is_same_origin_browser_request(request):
-            raise HTTPException(status_code=403, detail="Blocked cross-origin proxy request.")
+            raise HTTPException(
+                status_code=403, detail="Blocked cross-origin proxy request."
+            )
     if not has_webadmin_session_id(request, firewall_id):
         if not (request.method.upper() == "GET" and _is_webadmin_entry_path(full_path)):
             raise HTTPException(
@@ -7066,13 +7452,12 @@ async def firewall_webadmin_proxy(
                     return auto
     proxied = await stream_firewall_webadmin(request, row, full_path)
 
-    if (
-        not has_webadmin_session_id(request, firewall_id)
-        and _is_webadmin_connected_response(
-            method=request.method,
-            full_path=full_path,
-            status_code=int(proxied.status_code or 0),
-        )
+    if not has_webadmin_session_id(
+        request, firewall_id
+    ) and _is_webadmin_connected_response(
+        method=request.method,
+        full_path=full_path,
+        status_code=int(proxied.status_code or 0),
     ):
         sid = get_or_create_webadmin_session_id(request, firewall_id)
         uid, uname = request_actor(request)
@@ -7116,9 +7501,9 @@ async def firewall_webadmin_proxy(
 def firewall_ssh_terminal_page(
     request: Request,
     firewall_id: int,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -7154,9 +7539,7 @@ def firewall_ssh_terminal_page(
             "ssh_diagnostics_url": str(
                 request.url_for("api_firewall_ssh_diagnostics", firewall_id=row.id)
             ),
-            "browser_ws_echo_path": str(
-                request.url_for("api_browser_ws_echo_ws").path
-            ),
+            "browser_ws_echo_path": str(request.url_for("api_browser_ws_echo_ws").path),
         },
     )
 
@@ -7180,8 +7563,8 @@ async def api_browser_ws_echo_ws(websocket: WebSocket) -> None:
 def api_firewall_ssh_ws_launch(
     request: Request,
     firewall_id: int,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, str]:
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -7204,8 +7587,8 @@ def api_firewall_ssh_ws_launch(
 async def api_firewall_ssh_diagnostics(
     request: Request,
     firewall_id: int,
-    db: Session = Depends(get_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     """Runs from the Ground Control server: DNS + TCP:22 to inventory host (not full SSH)."""
     row = db.get(Firewall, firewall_id)
@@ -7241,9 +7624,9 @@ async def api_firewall_ssh_diagnostics(
 )
 async def api_firewall_ssh_collect_device_info(
     firewall_id: int,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: str = Depends(require_browser_json_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
 ) -> dict[str, Any]:
     """
     SSH from the Ground Control server (non-interactive): read the SFOS main menu
@@ -7281,9 +7664,11 @@ async def firewall_ssh_ws(websocket: WebSocket, firewall_id: int) -> None:
     name="api_firewalls_cached_sync_entity_types",
 )
 def api_firewalls_cached_sync_entity_types(
-    firewall_ids: str = Query("", description="Comma-separated firewall IDs"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
 ):
     """Distinct config-cache entity_type values per firewall (Inventory sync column / search)."""
     ids: list[int] = []
@@ -7305,8 +7690,8 @@ def api_firewalls_cached_sync_entity_types(
 def api_firewall_config_viewer_tree(
     request: Request,
     firewall_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Hierarchical counts and item names for cached objects (Inventory config viewer)."""
     fw = db.get(Firewall, firewall_id)
@@ -7327,8 +7712,8 @@ def api_firewall_config_viewer_tree(
 def api_firewall_config_entry_detail(
     firewall_id: int,
     entry_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     row = (
         db.query(FirewallConfigEntry)
@@ -7360,8 +7745,8 @@ def api_firewall_config_entry_detail(
 )
 def api_configuration_config_viewer_tree(
     configuration_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if db.get(Configuration, configuration_id) is None:
         raise HTTPException(status_code=404, detail="Configuration not found")
@@ -7375,8 +7760,8 @@ def api_configuration_config_viewer_tree(
 def api_configuration_config_entry_detail(
     configuration_id: int,
     entry_id: int,
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     row = (
         db.query(ConfigurationConfigEntry)
@@ -7409,8 +7794,8 @@ def api_configuration_config_entry_detail(
 def api_firewall_config_viewer_queue_deletes(
     firewall_id: int,
     body: ConfigViewerQueueDeletesBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """Queue task-queue delete tasks for cached objects (per type routing)."""
     fw = db.get(Firewall, firewall_id)
@@ -7441,8 +7826,8 @@ def api_firewall_config_viewer_queue_deletes(
 def api_configuration_config_viewer_queue_deletes(
     configuration_id: int,
     body: ConfigViewerQueueDeletesBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     try:
         result = enqueue_config_viewer_deletes_for_configuration(
@@ -7463,12 +7848,14 @@ def api_configuration_config_viewer_queue_deletes(
 )
 def api_configurations_apply_to_firewalls_batch(
     body: ApplyConfigurationsToFirewallsBody,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     config_ids = sorted({int(x) for x in body.configuration_ids if int(x) > 0})
     if not config_ids:
-        raise HTTPException(status_code=400, detail="Select at least one configuration.")
+        raise HTTPException(
+            status_code=400, detail="Select at least one configuration."
+        )
     fw_ids = sorted({int(x) for x in body.firewall_ids if int(x) > 0})
     if not fw_ids:
         raise HTTPException(status_code=400, detail="Select at least one firewall.")
@@ -7516,8 +7903,8 @@ def api_configurations_apply_to_firewalls_batch(
 )
 def api_configuration_apply_to_member_firewalls(
     configuration_id: int,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     cfg = db.get(Configuration, configuration_id)
     if cfg is None:
@@ -7552,9 +7939,9 @@ async def api_firewall_config_sync(
     firewall_id: int,
     request: Request,
     background_tasks: BackgroundTasks,
-    uid: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
 ):
     entities_explicit = False
     entity_list: list[str] | None = None
@@ -7616,9 +8003,9 @@ async def api_firewall_config_sync(
 )
 def api_firewall_connectivity_series(
     firewall_id: int,
-    time_range: str = Query("24h", alias="range"),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    time_range: Annotated[str, Query(alias="range")] = "24h",
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -7640,14 +8027,18 @@ def api_firewall_connectivity_series(
 
 @app.get("/api/dashboard", name="api_dashboard")
 def api_dashboard(
-    firewall_ids: str | None = Query(None, description="Comma-separated firewall ids"),
-    browser_timezone: str | None = Query(
-        None,
-        alias="timezone",
-        description="IANA timezone (e.g. from Intl) for connected-chart hour buckets",
-    ),
-    _: str = Depends(current_user_id_dep),
-    db: Session = Depends(get_db),
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str | None, Query(description="Comma-separated firewall ids")
+    ] = None,
+    browser_timezone: Annotated[
+        str | None,
+        Query(
+            alias="timezone",
+            description="IANA timezone (e.g. from Intl) for connected-chart hour buckets",
+        ),
+    ] = None,
 ):
     """Aggregates dashboard metrics for the global firewall multiselect scope."""
     ids = parse_firewall_ids_query(firewall_ids)
@@ -7657,16 +8048,19 @@ def api_dashboard(
 @app.post("/firewalls/{firewall_id}/test", name="gc_test_firewall")
 def test_firewall(
     firewall_id: int,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
         raise HTTPException(status_code=404, detail="Firewall not found")
     if bool(row.is_test):
         if random.random() < 0.2:
-            return {"ok": False, "message": "Simulated connection failure (test firewall)."}
+            return {
+                "ok": False,
+                "message": "Simulated connection failure (test firewall).",
+            }
         latency = random.randint(20, 200)
         return {"ok": True, "message": f"Connected (simulated) in {latency} ms."}
     enc = get_firewall_password_encrypted(sdb, firewall_id)
@@ -7697,9 +8091,9 @@ def test_firewall(
 @app.delete("/firewalls/{firewall_id}")
 def delete_firewall(
     firewall_id: int,
-    db: Session = Depends(get_db),
-    sdb: Session = Depends(get_secrets_db),
-    _: None = Depends(require_browser_session),
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
 ):
     row = db.get(Firewall, firewall_id)
     if not row:
@@ -7753,7 +8147,9 @@ def main() -> None:
     log = logging.getLogger("uvicorn.error")
     st = security_settings.load_security_ui_state()
     if not st.http_enabled and not st.https_enabled:
-        log.warning("HTTP and HTTPS are both disabled in security settings; restoring defaults.")
+        log.warning(
+            "HTTP and HTTPS are both disabled in security settings; restoring defaults."
+        )
         st = security_settings.default_security_ui_state()
 
     bind_host = config.bind_listen_host() or st.listen_interface
@@ -7799,7 +8195,9 @@ def main() -> None:
                     )
                 )
         if not servers:
-            raise SystemExit("No listeners to start (enable HTTP and/or HTTPS in Settings → Security).")
+            raise SystemExit(
+                "No listeners to start (enable HTTP and/or HTTPS in Settings → Security)."
+            )
         prior_handlers = _install_gc_uvicorn_signal_handlers(servers)
         try:
             await asyncio.gather(*(s.serve() for s in servers))

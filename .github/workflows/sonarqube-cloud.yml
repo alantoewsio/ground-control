@@ -1,0 +1,49 @@
+# SonarQube Cloud with Python coverage (Cobertura XML).
+# Prerequisites:
+# - sonar-project.properties: project key + organization must match SonarCloud.
+# - Repository secret SONAR_TOKEN (SonarCloud user token).
+# - SonarCloud: Administration → Analysis Method → disable Automatic Analysis if you use CI.
+# https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/python-test-coverage
+
+name: SonarQube Cloud
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Tests with coverage (Cobertura XML)
+        run: >
+          uv run pytest
+          --cov=app --cov=main
+          --cov-report=xml --cov-report=term-missing
+          --cov-branch
+          -q
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

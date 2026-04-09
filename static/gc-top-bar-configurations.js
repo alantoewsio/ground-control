@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var configurationInventory = [];
+  let configurationInventory = [];
 
   function tagKey(s) {
     return String(s || "")
@@ -10,14 +10,14 @@
   }
 
   function normalizeInventoryRows(arr) {
-    var out = [];
+    let out = [];
     if (!Array.isArray(arr)) return out;
     arr.forEach(function (row) {
       if (!row || row.id == null) return;
-      var cid = parseInt(String(row.id), 10);
+      let cid = parseInt(String(row.id), 10);
       if (isNaN(cid) || cid <= 0) return;
-      var lbl = String(row.label != null ? row.label : "").trim() || String(cid);
-      var tags = [];
+      let lbl = String(row.label != null ? row.label : "").trim() || String(cid);
+      let tags = [];
       if (Array.isArray(row.tags)) {
         row.tags.forEach(function (t) {
           if (typeof t === "string" && t.trim()) tags.push(t.trim());
@@ -32,11 +32,11 @@
   }
 
   function distinctOrderedTags(rows) {
-    var seen = {};
-    var collected = [];
+    let seen = {};
+    let collected = [];
     (rows || []).forEach(function (row) {
       (row.tags || []).forEach(function (t) {
-        var k = tagKey(t);
+        let k = tagKey(t);
         if (!k || seen[k]) return;
         seen[k] = true;
         collected.push(String(t).trim());
@@ -49,22 +49,22 @@
   }
 
   function computeEffectiveIds(rows, selectedIds, selectedTags) {
-    var set = {};
-    var tagWant = {};
+    let set = {};
+    let tagWant = {};
     (selectedTags || []).forEach(function (t) {
-      var k = tagKey(t);
+      let k = tagKey(t);
       if (k) tagWant[k] = true;
     });
     (selectedIds || []).forEach(function (id) {
-      var n = parseInt(String(id), 10);
+      let n = parseInt(String(id), 10);
       if (!isNaN(n) && n > 0) set[String(n)] = true;
     });
     (rows || []).forEach(function (row) {
       if (!row || row.id == null) return;
-      var tags = row.tags || [];
-      for (var i = 0; i < tags.length; i++) {
+      let tags = row.tags || [];
+      for (let i = 0; i < tags.length; i++) {
         if (tagWant[tagKey(tags[i])]) {
-          var n = parseInt(String(row.id), 10);
+          let n = parseInt(String(row.id), 10);
           if (!isNaN(n) && n > 0) set[String(n)] = true;
           break;
         }
@@ -80,26 +80,26 @@
   }
 
   function readExplicitCfgIdsFromDom() {
-    var root = document.getElementById("gc-net-cfg-multiselect");
+    let root = document.getElementById("gc-net-cfg-multiselect");
     if (!root) return [];
-    var msEl = root.querySelector("[data-gc-cfg-ms]");
+    let msEl = root.querySelector("[data-gc-cfg-ms]");
     if (!msEl) return [];
-    var ids = [];
+    let ids = [];
     msEl.querySelectorAll(".gc-net-cfg-cb:checked").forEach(function (cb) {
-      var v = parseInt(cb.value, 10);
+      let v = parseInt(cb.value, 10);
       if (!isNaN(v)) ids.push(v);
     });
     return ids;
   }
 
   function readExplicitTagsFromDom() {
-    var root = document.getElementById("gc-net-cfg-multiselect");
+    let root = document.getElementById("gc-net-cfg-multiselect");
     if (!root) return [];
-    var msEl = root.querySelector("[data-gc-cfg-ms]");
+    let msEl = root.querySelector("[data-gc-cfg-ms]");
     if (!msEl) return [];
-    var tags = [];
+    let tags = [];
     msEl.querySelectorAll(".gc-net-cfg-tag-cb:checked").forEach(function (cb) {
-      var v = String(cb.value || "").trim();
+      let v = String(cb.value || "").trim();
       if (v) tags.push(v);
     });
     return tags;
@@ -113,31 +113,31 @@
     );
   }
 
-  window.gcGetSelectedConfigurationIds = getSelectedConfigurationIds;
+  globalThis.gcGetSelectedConfigurationIds = getSelectedConfigurationIds;
 
-  window.gcGetConfigurationNavInventory = function () {
+  globalThis.gcGetConfigurationNavInventory = function () {
     return (configurationInventory || []).map(function (x) {
       return { id: x.id, label: x.label };
     });
   };
 
-  var cfg = window.GC_TOP_BAR_CONFIGURATIONS;
+  let cfg = globalThis.GC_TOP_BAR_CONFIGURATIONS;
   if (!cfg || !cfg.userId) return;
 
   function storageKey() {
     return (cfg.storageKey || "ground-control-network-cfg-filter-v2") + ":" + String(cfg.userId);
   }
 
-  var root = document.getElementById("gc-net-cfg-multiselect");
-  var ms = root ? root.querySelector("[data-gc-cfg-ms]") : null;
-  var trigger = document.getElementById("gc-net-cfg-trigger");
-  var dropdown = document.getElementById("gc-net-cfg-dropdown");
-  var textEl = document.getElementById("gc-net-cfg-trigger-text");
-  var search = document.getElementById("gc-net-cfg-search");
-  var optsRoot = document.getElementById("gc-net-cfg-options");
-  var emptyEl = document.getElementById("gc-net-cfg-empty");
+  let root = document.getElementById("gc-net-cfg-multiselect");
+  let ms = root ? root.querySelector("[data-gc-cfg-ms]") : null;
+  let trigger = document.getElementById("gc-net-cfg-trigger");
+  let dropdown = document.getElementById("gc-net-cfg-dropdown");
+  let textEl = document.getElementById("gc-net-cfg-trigger-text");
+  let search = document.getElementById("gc-net-cfg-search");
+  let optsRoot = document.getElementById("gc-net-cfg-options");
+  let emptyEl = document.getElementById("gc-net-cfg-empty");
 
-  var ok = !!(root && ms && trigger && dropdown && textEl && optsRoot);
+  let ok = !!(root && ms && trigger && dropdown && textEl && optsRoot);
 
   function emitChange() {
     document.dispatchEvent(
@@ -157,12 +157,12 @@
   }
 
   function persist() {
-    var configurationIds = [];
+    let configurationIds = [];
     ms.querySelectorAll(".gc-net-cfg-cb:checked").forEach(function (cb) {
-      var v = parseInt(cb.value, 10);
+      let v = parseInt(cb.value, 10);
       if (!isNaN(v)) configurationIds.push(v);
     });
-    var tags = [];
+    let tags = [];
     ms.querySelectorAll(".gc-net-cfg-tag-cb:checked").forEach(function (cb) {
       tags.push(cb.value);
     });
@@ -176,9 +176,9 @@
 
   function loadFilterState() {
     try {
-      var raw = localStorage.getItem(storageKey());
+      let raw = localStorage.getItem(storageKey());
       if (raw) {
-        var o = JSON.parse(raw);
+        let o = JSON.parse(raw);
         if (o && o.v === 2 && Array.isArray(o.configurationIds) && Array.isArray(o.tags)) {
           return o;
         }
@@ -188,17 +188,17 @@
   }
 
   function syncTriggerText() {
-    var nCfg = ms.querySelectorAll(".gc-net-cfg-cb:checked").length;
-    var nTag = ms.querySelectorAll(".gc-net-cfg-tag-cb:checked").length;
-    var eff = getSelectedConfigurationIds().length;
+    let nCfg = ms.querySelectorAll(".gc-net-cfg-cb:checked").length;
+    let nTag = ms.querySelectorAll(".gc-net-cfg-tag-cb:checked").length;
+    let eff = getSelectedConfigurationIds().length;
     if (nCfg === 0 && nTag === 0) {
       textEl.textContent = "No configurations selected";
       return;
     }
-    var parts = [];
+    let parts = [];
     if (nTag) parts.push(nTag === 1 ? "1 tag" : nTag + " tags");
     if (nCfg) parts.push(nCfg === 1 ? "1 configuration" : nCfg + " configurations");
-    var base = parts.join(" · ");
+    let base = parts.join(" · ");
     if (nTag > 0) {
       textEl.textContent = base + " → " + eff + " configuration" + (eff === 1 ? "" : "s");
     } else {
@@ -214,53 +214,53 @@
 
   function renderMsOptions() {
     optsRoot.innerHTML = "";
-    var tags = distinctOrderedTags(configurationInventory);
+    let tags = distinctOrderedTags(configurationInventory);
     if (tags.length > 0) {
-      var sec = document.createElement("div");
+      let sec = document.createElement("div");
       sec.className = "gc-top-bar-fw__section-label";
       sec.textContent = "Tags";
       optsRoot.appendChild(sec);
       tags.forEach(function (tag) {
-        var lab = document.createElement("label");
+        let lab = document.createElement("label");
         lab.className =
           "gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__tag-option";
-        var cb = document.createElement("input");
+        let cb = document.createElement("input");
         cb.type = "checkbox";
         cb.className = "gc-net-cfg-tag-cb";
         cb.value = tag;
         cb.setAttribute("data-gc-cfg-tag", tag);
         cb.addEventListener("change", onMsCheckboxChange);
-        var pill = document.createElement("span");
+        let pill = document.createElement("span");
         pill.className = "gc-hs-ip-host-flyout__fw-pill";
         pill.textContent = tag;
         lab.appendChild(cb);
         lab.appendChild(pill);
         optsRoot.appendChild(lab);
       });
-      var div = document.createElement("div");
+      let div = document.createElement("div");
       div.className = "gc-top-bar-fw__divider";
       div.setAttribute("role", "separator");
       optsRoot.appendChild(div);
-      var secCfg = document.createElement("div");
+      let secCfg = document.createElement("div");
       secCfg.className = "gc-top-bar-fw__section-label";
       secCfg.textContent = "Configurations";
       optsRoot.appendChild(secCfg);
     }
     configurationInventory.forEach(function (it) {
-      var id = it.id;
-      var label = String(it.label != null ? it.label : "").trim() || String(id);
-      var lab = document.createElement("label");
+      let id = it.id;
+      let label = String(it.label != null ? it.label : "").trim() || String(id);
+      let lab = document.createElement("label");
       lab.className = "gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__fw-option";
-      var cb = document.createElement("input");
+      let cb = document.createElement("input");
       cb.type = "checkbox";
       cb.className = "gc-net-cfg-cb";
       cb.value = String(id);
       cb.setAttribute("data-gc-cfg-id", String(id));
       cb.setAttribute("data-gc-cfg-label", label);
       cb.addEventListener("change", onMsCheckboxChange);
-      var textWrap = document.createElement("span");
+      let textWrap = document.createElement("span");
       textWrap.className = "gc-hs-ip-host-flyout__hg-opt-text";
-      var nameEl = document.createElement("span");
+      let nameEl = document.createElement("span");
       nameEl.className = "gc-hs-ip-host-flyout__hg-opt-name mono";
       nameEl.textContent = label;
       textWrap.appendChild(nameEl);
@@ -269,7 +269,7 @@
       optsRoot.appendChild(lab);
     });
     if (emptyEl) {
-      var showEmpty = configurationInventory.length === 0;
+      let showEmpty = configurationInventory.length === 0;
       emptyEl.hidden = !showEmpty;
       if (showEmpty) {
         emptyEl.textContent = "No configurations yet.";
@@ -279,12 +279,12 @@
   }
 
   function restoreCheckboxesFromState(st) {
-    var want = {};
+    let want = {};
     (st.configurationIds || []).forEach(function (x) {
-      var n = parseInt(String(x), 10);
+      let n = parseInt(String(x), 10);
       if (!isNaN(n)) want[String(n)] = true;
     });
-    var wantTag = {};
+    let wantTag = {};
     (st.tags || []).forEach(function (t) {
       wantTag[tagKey(t)] = true;
     });
@@ -303,18 +303,18 @@
   }
 
   function runCfgFilter() {
-    var q = norm(search ? search.value : "");
+    let q = norm(search ? search.value : "");
     ms.querySelectorAll(".gc-top-bar-fw__tag-option").forEach(function (lab) {
-      var cb = lab.querySelector("[data-gc-cfg-tag]");
-      var tg = cb ? norm(cb.getAttribute("data-gc-cfg-tag") || "") : "";
-      var match = !q || tg.indexOf(q) !== -1;
+      let cb = lab.querySelector("[data-gc-cfg-tag]");
+      let tg = cb ? norm(cb.dataset.gcCfgTag || "") : "";
+      let match = !q || tg.indexOf(q) !== -1;
       lab.style.display = match ? "" : "none";
     });
     ms.querySelectorAll(".gc-top-bar-fw__fw-option").forEach(function (lab) {
-      var cb = lab.querySelector("[data-gc-cfg-id]");
-      var nm = cb ? norm(cb.getAttribute("data-gc-cfg-label") || "") : "";
-      var idStr = cb ? norm(String(cb.getAttribute("data-gc-cfg-id") || "")) : "";
-      var match = !q || nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1;
+      let cb = lab.querySelector("[data-gc-cfg-id]");
+      let nm = cb ? norm(cb.dataset.gcCfgLabel || "") : "";
+      let idStr = cb ? norm(String(cb.dataset.gcCfgId || "")) : "";
+      let match = !q || nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1;
       lab.style.display = match ? "" : "none";
     });
   }
@@ -325,8 +325,8 @@
     if (open) scheduleInventoryRefresh();
   }
 
-  var refreshTimer = null;
-  var slowRefreshTimer = null;
+  let refreshTimer = null;
+  let slowRefreshTimer = null;
 
   function scheduleInventoryRefresh() {
     if (!cfg.navRefreshUrl) return;
@@ -371,8 +371,8 @@
   }
 
   function applyConfigurationInventory(raw) {
-    var normalized = normalizeInventoryRows(raw);
-    var st = {
+    let normalized = normalizeInventoryRows(raw);
+    let st = {
       v: 2,
       configurationIds: readExplicitCfgIdsFromDom(),
       tags: readExplicitTagsFromDom(),
@@ -384,22 +384,22 @@
     ) {
       st = loadFilterState();
     }
-    var beforeEff = sortedIdStr(
+    let beforeEff = sortedIdStr(
       computeEffectiveIds(configurationInventory, st.configurationIds, st.tags),
     );
     configurationInventory = normalized;
     try {
-      window.gcNavConfigurationsJson = configurationInventory;
+      globalThis.gcNavConfigurationsJson = configurationInventory;
     } catch (e) {}
     renderMsOptions();
     restoreCheckboxesFromState(st);
     syncTriggerText();
     persist();
-    var afterEff = sortedIdStr(getSelectedConfigurationIds());
+    let afterEff = sortedIdStr(getSelectedConfigurationIds());
     if (beforeEff !== afterEff) emitChange();
   }
 
-  window.gcApplyNavConfigurationsJson = function (data) {
+  globalThis.gcApplyNavConfigurationsJson = function (data) {
     applyConfigurationInventory(data);
   };
 
@@ -429,7 +429,7 @@
   }
 
   document.addEventListener("click", function (e) {
-    var t = e.target;
+    let t = e.target;
     if (!(t instanceof Node) || !root.contains(t)) setOpen(false);
   });
 
@@ -446,10 +446,10 @@
     doInventoryRefresh();
   });
 
-  var initial = window.gcNavConfigurationsJson;
+  let initial = globalThis.gcNavConfigurationsJson;
   configurationInventory = normalizeInventoryRows(Array.isArray(initial) ? initial : []);
   try {
-    window.gcNavConfigurationsJson = configurationInventory;
+    globalThis.gcNavConfigurationsJson = configurationInventory;
   } catch (e2) {}
   renderMsOptions();
   restoreCheckboxesFromState(loadFilterState());

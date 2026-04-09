@@ -1,16 +1,16 @@
 (function () {
   "use strict";
 
-  var root = document.getElementById("gc-ipam-root");
+  let root = document.getElementById("gc-ipam-root");
   if (!root) return;
 
-  var PREFIX = "gc-ipam";
+  let PREFIX = "gc-ipam";
   /** Parent pool dropdown: opens nested “new pool” sheet (IPv4 only). */
-  var NEW_POOL_VALUE = "__gc_new_pool__";
-  var FACET_STORAGE_KEY = "gc-ipam";
-  var LS_COLS = "gc-ipam-cols-v1";
-  var COL_CHECK_ATTR = "data-gc-ipam-col";
-  var COLS = [
+  let NEW_POOL_VALUE = "__gc_new_pool__";
+  let FACET_STORAGE_KEY = "gc-ipam";
+  let LS_COLS = "gc-ipam-cols-v1";
+  let COL_CHECK_ATTR = "data-gc-ipam-col";
+  let COLS = [
     { id: "name", label: "Name" },
     { id: "cidr", label: "Prefix" },
     { id: "family", label: "Family" },
@@ -21,15 +21,15 @@
     { id: "description", label: "Description" },
     { id: "origin", label: "Source" },
   ];
-  var colInputSel = "input[" + COL_CHECK_ATTR + "]";
+  let colInputSel = "input[" + COL_CHECK_ATTR + "]";
 
-  var facetCols = COLS.filter(function (c) {
+  let facetCols = COLS.filter(function (c) {
     return c.id !== "origin";
   })
     .map(function (c) {
-      var lab = c.label;
-      if (typeof window.gcTableColumnDisplayLabel === "function") {
-        lab = window.gcTableColumnDisplayLabel(lab);
+      let lab = c.label;
+      if (typeof globalThis.gcTableColumnDisplayLabel === "function") {
+        lab = globalThis.gcTableColumnDisplayLabel(lab);
       }
       return { id: c.id, label: lab };
     })
@@ -37,145 +37,145 @@
       {
         id: "discovered",
         label:
-          typeof window.gcTableColumnDisplayLabel === "function"
-            ? window.gcTableColumnDisplayLabel("Discovered")
+          typeof globalThis.gcTableColumnDisplayLabel === "function"
+            ? globalThis.gcTableColumnDisplayLabel("Discovered")
             : "Discovered",
       },
       {
         id: "conflict",
         label:
-          typeof window.gcTableColumnDisplayLabel === "function"
-            ? window.gcTableColumnDisplayLabel("VRF conflict")
+          typeof globalThis.gcTableColumnDisplayLabel === "function"
+            ? globalThis.gcTableColumnDisplayLabel("VRF conflict")
             : "VRF conflict",
       },
     ]);
 
-  var apiList = root.getAttribute("data-api-prefixes") || "";
-  var apiCreate = root.getAttribute("data-api-create") || "";
-  var apiAccept = root.getAttribute("data-api-accept-discovered") || "";
-  var apiAcceptBatch = root.getAttribute("data-api-accept-discovered-batch") || "";
-  var apiNextAssignment = root.getAttribute("data-api-next-assignment") || "";
-  var apiVrfs = root.getAttribute("data-api-vrfs") || "";
-  var apiVrfsCreate = root.getAttribute("data-api-vrfs-create") || "";
-  var pageMode = (root.getAttribute("data-gc-ipam-page") || "").trim().toLowerCase();
-  var lockedPrefixType = (root.getAttribute("data-gc-ipam-locked-type") || "").trim().toLowerCase();
-  var isPrefixPage =
+  let apiList = root.dataset.apiPrefixes || "";
+  let apiCreate = root.dataset.apiCreate || "";
+  let apiAccept = root.dataset.apiAcceptDiscovered || "";
+  let apiAcceptBatch = root.dataset.apiAcceptDiscoveredBatch || "";
+  let apiNextAssignment = root.dataset.apiNextAssignment || "";
+  let apiVrfs = root.dataset.apiVrfs || "";
+  let apiVrfsCreate = root.dataset.apiVrfsCreate || "";
+  let pageMode = (root.dataset.gcIpamPage || "").trim().toLowerCase();
+  let lockedPrefixType = (root.dataset.gcIpamLockedType || "").trim().toLowerCase();
+  let isPrefixPage =
     pageMode === "pools" || pageMode === "assignments" || pageMode === "hosts";
-  var isVrfPage = pageMode === "vrfs";
-  var table = document.getElementById("gc-ipam-table");
-  var tbody = document.getElementById("gc-ipam-tbody");
-  var searchInput = document.getElementById("gc-ipam-search");
-  var statusEl = document.getElementById("gc-ipam-status");
-  var filtersDrawerEl = document.getElementById(PREFIX + "-filters-drawer");
-  var filtersAsideEl = document.getElementById(PREFIX + "-filters-aside");
-  var facetHeadActions = document.getElementById(PREFIX + "-facet-head-actions");
-  var facetCountEl = document.getElementById(PREFIX + "-facet-count");
-  var facetResetBtn = document.getElementById(PREFIX + "-facet-reset");
-  var countEl = document.getElementById(PREFIX + "-count");
-  var colsModal = document.getElementById(PREFIX + "-cols-modal");
-  var colsTrigger = document.getElementById(PREFIX + "-cols-trigger");
-  var colsPanel = document.getElementById(PREFIX + "-cols-panel");
-  var colsFilter = document.getElementById(PREFIX + "-cols-filter");
-  var colsList = document.getElementById(PREFIX + "-cols-list");
-  var colsClose = document.getElementById(PREFIX + "-cols-close");
+  let isVrfPage = pageMode === "vrfs";
+  let table = document.getElementById("gc-ipam-table");
+  let tbody = document.getElementById("gc-ipam-tbody");
+  let searchInput = document.getElementById("gc-ipam-search");
+  let statusEl = document.getElementById("gc-ipam-status");
+  let filtersDrawerEl = document.getElementById(PREFIX + "-filters-drawer");
+  let filtersAsideEl = document.getElementById(PREFIX + "-filters-aside");
+  let facetHeadActions = document.getElementById(PREFIX + "-facet-head-actions");
+  let facetCountEl = document.getElementById(PREFIX + "-facet-count");
+  let facetResetBtn = document.getElementById(PREFIX + "-facet-reset");
+  let countEl = document.getElementById(PREFIX + "-count");
+  let colsModal = document.getElementById(PREFIX + "-cols-modal");
+  let colsTrigger = document.getElementById(PREFIX + "-cols-trigger");
+  let colsPanel = document.getElementById(PREFIX + "-cols-panel");
+  let colsFilter = document.getElementById(PREFIX + "-cols-filter");
+  let colsList = document.getElementById(PREFIX + "-cols-list");
+  let colsClose = document.getElementById(PREFIX + "-cols-close");
 
-  var flyout = document.getElementById("gc-ipam-flyout");
-  var flyoutPanel = flyout && flyout.querySelector(".gc-if-flyout__panel");
-  var flyoutBackdrop = flyout && flyout.querySelector(".gc-if-flyout__backdrop");
-  var flyoutTitle = document.getElementById("gc-ipam-flyout-title");
-  var form = document.getElementById("gc-ipam-flyout-form");
-  var fieldId = document.getElementById("gc-ipam-flyout-id");
-  var fieldName = document.getElementById("gc-ipam-flyout-name");
-  var fieldCidr = document.getElementById("gc-ipam-flyout-cidr");
-  var wrapAssignmentSize = document.getElementById("gc-ipam-flyout-assignment-size-wrap");
-  var fieldAssignmentPl = document.getElementById("gc-ipam-flyout-assignment-pl");
-  var labelCidr = document.getElementById("gc-ipam-flyout-cidr-label");
-  var btnCidrRefresh = document.getElementById("gc-ipam-flyout-cidr-refresh");
-  var fieldVrf = document.getElementById("gc-ipam-flyout-vrf");
-  var fieldType = document.getElementById("gc-ipam-flyout-type");
-  var fieldTypeDisplay = document.getElementById("gc-ipam-flyout-type-display");
-  var fieldPoolUnmanagedWrap = document.getElementById("gc-ipam-flyout-pool-unmanaged-wrap");
-  var fieldPoolUnmanagedSwitch = document.getElementById("gc-ipam-flyout-pool-unmanaged-switch");
-  var fieldAssignedFw = document.getElementById("gc-ipam-flyout-assigned-fw");
-  var fieldAssignedCustom = document.getElementById("gc-ipam-flyout-assigned-custom");
-  var assignedWrap = document.getElementById("gc-ipam-flyout-assigned-wrap");
-  var fieldDesc = document.getElementById("gc-ipam-flyout-description");
-  var fieldParentPool = document.getElementById("gc-ipam-flyout-parent-pool");
-  var fieldParentAssignment = document.getElementById("gc-ipam-flyout-parent-assignment");
-  var wrapParentPool = document.getElementById("gc-ipam-flyout-parent-pool-wrap");
-  var wrapParentAssignment = document.getElementById("gc-ipam-flyout-parent-assignment-wrap");
-  var parentPoolReqStar = document.getElementById("gc-ipam-flyout-parent-pool-req");
-  var parentPoolHint = document.getElementById("gc-ipam-flyout-parent-pool-hint");
-  var parentPoolHintPool = document.getElementById("gc-ipam-flyout-parent-pool-hint-pool");
-  var parentPoolSelectBlock = document.getElementById("gc-ipam-flyout-parent-pool-select-block");
-  var parentPoolReadonlyBlock = document.getElementById("gc-ipam-flyout-parent-pool-readonly-block");
-  var parentPoolReadonlyEl = document.getElementById("gc-ipam-flyout-parent-pool-readonly");
-  var formStatus = document.getElementById("gc-ipam-flyout-status");
-  var deleteBtn = document.getElementById("gc-ipam-flyout-delete");
+  let flyout = document.getElementById("gc-ipam-flyout");
+  let flyoutPanel = flyout && flyout.querySelector(".gc-if-flyout__panel");
+  let flyoutBackdrop = flyout && flyout.querySelector(".gc-if-flyout__backdrop");
+  let flyoutTitle = document.getElementById("gc-ipam-flyout-title");
+  let form = document.getElementById("gc-ipam-flyout-form");
+  let fieldId = document.getElementById("gc-ipam-flyout-id");
+  let fieldName = document.getElementById("gc-ipam-flyout-name");
+  let fieldCidr = document.getElementById("gc-ipam-flyout-cidr");
+  let wrapAssignmentSize = document.getElementById("gc-ipam-flyout-assignment-size-wrap");
+  let fieldAssignmentPl = document.getElementById("gc-ipam-flyout-assignment-pl");
+  let labelCidr = document.getElementById("gc-ipam-flyout-cidr-label");
+  let btnCidrRefresh = document.getElementById("gc-ipam-flyout-cidr-refresh");
+  let fieldVrf = document.getElementById("gc-ipam-flyout-vrf");
+  let fieldType = document.getElementById("gc-ipam-flyout-type");
+  let fieldTypeDisplay = document.getElementById("gc-ipam-flyout-type-display");
+  let fieldPoolUnmanagedWrap = document.getElementById("gc-ipam-flyout-pool-unmanaged-wrap");
+  let fieldPoolUnmanagedSwitch = document.getElementById("gc-ipam-flyout-pool-unmanaged-switch");
+  let fieldAssignedFw = document.getElementById("gc-ipam-flyout-assigned-fw");
+  let fieldAssignedCustom = document.getElementById("gc-ipam-flyout-assigned-custom");
+  let assignedWrap = document.getElementById("gc-ipam-flyout-assigned-wrap");
+  let fieldDesc = document.getElementById("gc-ipam-flyout-description");
+  let fieldParentPool = document.getElementById("gc-ipam-flyout-parent-pool");
+  let fieldParentAssignment = document.getElementById("gc-ipam-flyout-parent-assignment");
+  let wrapParentPool = document.getElementById("gc-ipam-flyout-parent-pool-wrap");
+  let wrapParentAssignment = document.getElementById("gc-ipam-flyout-parent-assignment-wrap");
+  let parentPoolReqStar = document.getElementById("gc-ipam-flyout-parent-pool-req");
+  let parentPoolHint = document.getElementById("gc-ipam-flyout-parent-pool-hint");
+  let parentPoolHintPool = document.getElementById("gc-ipam-flyout-parent-pool-hint-pool");
+  let parentPoolSelectBlock = document.getElementById("gc-ipam-flyout-parent-pool-select-block");
+  let parentPoolReadonlyBlock = document.getElementById("gc-ipam-flyout-parent-pool-readonly-block");
+  let parentPoolReadonlyEl = document.getElementById("gc-ipam-flyout-parent-pool-readonly");
+  let formStatus = document.getElementById("gc-ipam-flyout-status");
+  let deleteBtn = document.getElementById("gc-ipam-flyout-delete");
 
-  var discFlyout = document.getElementById("gc-ipam-disc-flyout");
-  var discFlyoutPanel = discFlyout && discFlyout.querySelector(".gc-if-flyout__panel");
-  var discFlyoutBackdrop = discFlyout && discFlyout.querySelector(".gc-if-flyout__backdrop");
-  var discTitle = document.getElementById("gc-ipam-disc-flyout-title");
-  var discCidrEl = document.getElementById("gc-ipam-disc-flyout-cidr");
-  var discFwEl = document.getElementById("gc-ipam-disc-flyout-fw");
-  var discSourcesEl = document.getElementById("gc-ipam-disc-flyout-sources");
-  var discName = document.getElementById("gc-ipam-disc-flyout-name");
-  var discAssignedFw = document.getElementById("gc-ipam-disc-flyout-assigned-fw");
-  var discAssignedCustom = document.getElementById("gc-ipam-disc-flyout-assigned-custom");
-  var discDesc = document.getElementById("gc-ipam-disc-flyout-description");
-  var discPoolLine = document.getElementById("gc-ipam-disc-flyout-pool-line");
-  var discStatus = document.getElementById("gc-ipam-disc-flyout-status");
-  var discAcceptBtn = document.getElementById("gc-ipam-disc-flyout-accept");
-  var discCancelBtn = document.getElementById("gc-ipam-disc-flyout-cancel");
+  let discFlyout = document.getElementById("gc-ipam-disc-flyout");
+  let discFlyoutPanel = discFlyout && discFlyout.querySelector(".gc-if-flyout__panel");
+  let discFlyoutBackdrop = discFlyout && discFlyout.querySelector(".gc-if-flyout__backdrop");
+  let discTitle = document.getElementById("gc-ipam-disc-flyout-title");
+  let discCidrEl = document.getElementById("gc-ipam-disc-flyout-cidr");
+  let discFwEl = document.getElementById("gc-ipam-disc-flyout-fw");
+  let discSourcesEl = document.getElementById("gc-ipam-disc-flyout-sources");
+  let discName = document.getElementById("gc-ipam-disc-flyout-name");
+  let discAssignedFw = document.getElementById("gc-ipam-disc-flyout-assigned-fw");
+  let discAssignedCustom = document.getElementById("gc-ipam-disc-flyout-assigned-custom");
+  let discDesc = document.getElementById("gc-ipam-disc-flyout-description");
+  let discPoolLine = document.getElementById("gc-ipam-disc-flyout-pool-line");
+  let discStatus = document.getElementById("gc-ipam-disc-flyout-status");
+  let discAcceptBtn = document.getElementById("gc-ipam-disc-flyout-accept");
+  let discCancelBtn = document.getElementById("gc-ipam-disc-flyout-cancel");
 
-  var poolFlyout = document.getElementById("gc-ipam-pool-flyout");
-  var poolFlyoutPanel = poolFlyout && poolFlyout.querySelector(".gc-if-flyout__panel");
-  var poolFlyoutBackdrop = poolFlyout && poolFlyout.querySelector(".gc-if-flyout__backdrop");
-  var poolForm = document.getElementById("gc-ipam-pool-flyout-form");
-  var poolCidr = document.getElementById("gc-ipam-pool-flyout-cidr");
-  var poolName = document.getElementById("gc-ipam-pool-flyout-name");
-  var poolStatus = document.getElementById("gc-ipam-pool-flyout-status");
-  var poolCancelBtn = document.getElementById("gc-ipam-pool-flyout-cancel");
+  let poolFlyout = document.getElementById("gc-ipam-pool-flyout");
+  let poolFlyoutPanel = poolFlyout && poolFlyout.querySelector(".gc-if-flyout__panel");
+  let poolFlyoutBackdrop = poolFlyout && poolFlyout.querySelector(".gc-if-flyout__backdrop");
+  let poolForm = document.getElementById("gc-ipam-pool-flyout-form");
+  let poolCidr = document.getElementById("gc-ipam-pool-flyout-cidr");
+  let poolName = document.getElementById("gc-ipam-pool-flyout-name");
+  let poolStatus = document.getElementById("gc-ipam-pool-flyout-status");
+  let poolCancelBtn = document.getElementById("gc-ipam-pool-flyout-cancel");
 
-  var nestedPoolFlyout = document.getElementById("gc-ipam-nested-pool-flyout");
-  var nestedPoolFlyoutPanel = nestedPoolFlyout && nestedPoolFlyout.querySelector(".gc-if-flyout__panel");
-  var nestedPoolFlyoutBackdrop = nestedPoolFlyout && nestedPoolFlyout.querySelector(".gc-if-flyout__backdrop");
-  var nestedPoolForm = document.getElementById("gc-ipam-nested-pool-flyout-form");
-  var nestedPoolPl = document.getElementById("gc-ipam-nested-pool-pl");
-  var nestedPoolName = document.getElementById("gc-ipam-nested-pool-name");
-  var nestedPoolResult = document.getElementById("gc-ipam-nested-pool-result");
-  var nestedPoolVrf = document.getElementById("gc-ipam-nested-pool-vrf");
-  var nestedPoolAssignCidr = document.getElementById("gc-ipam-nested-pool-assignment-cidr");
-  var nestedPoolStatus = document.getElementById("gc-ipam-nested-pool-flyout-status");
-  var nestedPoolCancelBtn = document.getElementById("gc-ipam-nested-pool-flyout-cancel");
-  var nestedPoolSubmitBtn = document.getElementById("gc-ipam-nested-pool-flyout-submit");
-  var assignedFwLockedHint = document.getElementById("gc-ipam-flyout-assigned-fw-locked-hint");
+  let nestedPoolFlyout = document.getElementById("gc-ipam-nested-pool-flyout");
+  let nestedPoolFlyoutPanel = nestedPoolFlyout && nestedPoolFlyout.querySelector(".gc-if-flyout__panel");
+  let nestedPoolFlyoutBackdrop = nestedPoolFlyout && nestedPoolFlyout.querySelector(".gc-if-flyout__backdrop");
+  let nestedPoolForm = document.getElementById("gc-ipam-nested-pool-flyout-form");
+  let nestedPoolPl = document.getElementById("gc-ipam-nested-pool-pl");
+  let nestedPoolName = document.getElementById("gc-ipam-nested-pool-name");
+  let nestedPoolResult = document.getElementById("gc-ipam-nested-pool-result");
+  let nestedPoolVrf = document.getElementById("gc-ipam-nested-pool-vrf");
+  let nestedPoolAssignCidr = document.getElementById("gc-ipam-nested-pool-assignment-cidr");
+  let nestedPoolStatus = document.getElementById("gc-ipam-nested-pool-flyout-status");
+  let nestedPoolCancelBtn = document.getElementById("gc-ipam-nested-pool-flyout-cancel");
+  let nestedPoolSubmitBtn = document.getElementById("gc-ipam-nested-pool-flyout-submit");
+  let assignedFwLockedHint = document.getElementById("gc-ipam-flyout-assigned-fw-locked-hint");
 
-  var vrfTbody = document.getElementById("gc-ipam-vrf-tbody");
-  var vrfCountEl = document.getElementById("gc-ipam-vrf-count");
-  var vrfFlyout = document.getElementById("gc-ipam-vrf-flyout");
-  var vrfFlyoutPanel = vrfFlyout && vrfFlyout.querySelector(".gc-if-flyout__panel");
-  var vrfFlyoutBackdrop = vrfFlyout && vrfFlyout.querySelector(".gc-if-flyout__backdrop");
-  var vrfForm = document.getElementById("gc-ipam-vrf-flyout-form");
-  var vrfFlyoutName = document.getElementById("gc-ipam-vrf-flyout-name");
-  var vrfFlyoutDesc = document.getElementById("gc-ipam-vrf-flyout-description");
-  var vrfFlyoutStatus = document.getElementById("gc-ipam-vrf-flyout-status");
-  var vrfFlyoutCancel = document.getElementById("gc-ipam-vrf-flyout-cancel");
-  var vrfAddOpenBtn = document.getElementById("gc-ipam-vrf-add-open");
+  let vrfTbody = document.getElementById("gc-ipam-vrf-tbody");
+  let vrfCountEl = document.getElementById("gc-ipam-vrf-count");
+  let vrfFlyout = document.getElementById("gc-ipam-vrf-flyout");
+  let vrfFlyoutPanel = vrfFlyout && vrfFlyout.querySelector(".gc-if-flyout__panel");
+  let vrfFlyoutBackdrop = vrfFlyout && vrfFlyout.querySelector(".gc-if-flyout__backdrop");
+  let vrfForm = document.getElementById("gc-ipam-vrf-flyout-form");
+  let vrfFlyoutName = document.getElementById("gc-ipam-vrf-flyout-name");
+  let vrfFlyoutDesc = document.getElementById("gc-ipam-vrf-flyout-description");
+  let vrfFlyoutStatus = document.getElementById("gc-ipam-vrf-flyout-status");
+  let vrfFlyoutCancel = document.getElementById("gc-ipam-vrf-flyout-cancel");
+  let vrfAddOpenBtn = document.getElementById("gc-ipam-vrf-add-open");
 
-  var quickDiscoveredMode = "all";
-  var quickConflictOnly = false;
-  var editId = null;
-  var cache = [];
-  var cacheDiscovered = [];
-  var discCurrent = null;
+  let quickDiscoveredMode = "all";
+  let quickConflictOnly = false;
+  let editId = null;
+  let cache = [];
+  let cacheDiscovered = [];
+  let discCurrent = null;
   /** When set, main add flyout was opened from a discovered row (firewall field locked). */
-  var discoveredPrefillSource = null;
-  var ipamFormMeta = { vrf_names: [], pools: [], assignments: [] };
+  let discoveredPrefillSource = null;
+  let ipamFormMeta = { vrf_names: [], pools: [], assignments: [] };
 
   function prefixTypeLabel(ptype) {
-    var p = (ptype || "").trim().toLowerCase();
+    let p = (ptype || "").trim().toLowerCase();
     if (p === "pool") return "Pool";
     if (p === "assignment") return "Assignment";
     if (p === "host") return "Host";
@@ -190,7 +190,7 @@
   }
 
   function editTitleForPrefixType(ptype) {
-    var p = (ptype || "").trim().toLowerCase();
+    let p = (ptype || "").trim().toLowerCase();
     if (p === "pool") return "Edit pool";
     if (p === "assignment") return "Edit assignment";
     if (p === "host") return "Edit host";
@@ -199,7 +199,7 @@
 
   /** Keep hidden prefix_type, readonly label, and dependent flyout sections in sync. */
   function setFlyoutPrefixType(ptypeRaw) {
-    var ptype = (ptypeRaw || "").trim().toLowerCase();
+    let ptype = (ptypeRaw || "").trim().toLowerCase();
     if (!ptype) ptype = lockedPrefixType || "assignment";
     if (fieldType) fieldType.value = ptype;
     if (fieldTypeDisplay) fieldTypeDisplay.textContent = prefixTypeLabel(ptype);
@@ -211,14 +211,14 @@
   }
 
   function loadColVis() {
-    var d = {};
+    let d = {};
     COLS.forEach(function (c) {
       d[c.id] = true;
     });
     try {
-      var raw = localStorage.getItem(LS_COLS);
+      let raw = localStorage.getItem(LS_COLS);
       if (raw) {
-        var o = JSON.parse(raw);
+        let o = JSON.parse(raw);
         if (o && typeof o === "object") {
           COLS.forEach(function (c) {
             if (Object.prototype.hasOwnProperty.call(o, c.id)) d[c.id] = !!o[c.id];
@@ -226,7 +226,7 @@
         }
       }
     } catch (e) {}
-    var visible = 0;
+    let visible = 0;
     COLS.forEach(function (c) {
       if (d[c.id]) visible++;
     });
@@ -234,7 +234,7 @@
     return d;
   }
 
-  var colVis = loadColVis();
+  let colVis = loadColVis();
 
   function persistColVis(vis) {
     try {
@@ -245,7 +245,7 @@
   function applyColVis(vis) {
     if (!table) return;
     COLS.forEach(function (c) {
-      var on = !!vis[c.id];
+      let on = !!vis[c.id];
       table.querySelectorAll('[data-gc-col="' + c.id + '"]').forEach(function (el) {
         el.classList.toggle("gc-col-hidden", !on);
       });
@@ -253,23 +253,23 @@
   }
 
   function syncFilterEmptyColspan() {
-    var n = table ? table.querySelectorAll("thead th").length : 9;
-    var fe = document.getElementById("gc-ipam-filter-empty");
+    let n = table ? table.querySelectorAll("thead th").length : 9;
+    let fe = document.getElementById("gc-ipam-filter-empty");
     if (fe) {
-      var td = fe.querySelector("td");
+      let td = fe.querySelector("td");
       if (td) td.setAttribute("colspan", String(n));
     }
-    var ph = document.getElementById("gc-ipam-placeholder");
+    let ph = document.getElementById("gc-ipam-placeholder");
     if (ph) {
-      var ptd = ph.querySelector("td");
+      let ptd = ph.querySelector("td");
       if (ptd) ptd.setAttribute("colspan", String(n));
     }
   }
 
   function updateFacetChrome() {
-    var n =
-      filtersDrawerEl && window.gcTableFacets
-        ? window.gcTableFacets.appliedCount(filtersDrawerEl)
+    let n =
+      filtersDrawerEl && globalThis.gcTableFacets
+        ? globalThis.gcTableFacets.appliedCount(filtersDrawerEl)
         : 0;
     if (!facetHeadActions || !facetCountEl || !facetResetBtn) return;
     if (n > 0) {
@@ -315,20 +315,20 @@
   }
 
   function vrfKey(v) {
-    var t = (v || "").trim();
+    let t = (v || "").trim();
     return t ? t : "default";
   }
 
   function ipv4ParseCidr(s) {
-    var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(String(s || "").trim());
+    let m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(String(s || "").trim());
     if (!m) return null;
-    var a = +m[1];
-    var b = +m[2];
-    var c = +m[3];
-    var d = +m[4];
-    var pl = +m[5];
+    let a = +m[1];
+    let b = +m[2];
+    let c = +m[3];
+    let d = +m[4];
+    let pl = +m[5];
     if (a > 255 || b > 255 || c > 255 || d > 255 || pl < 0 || pl > 32) return null;
-    var ip = (((a << 24) | (b << 16) | (c << 8) | d) >>> 0);
+    let ip = (((a << 24) | (b << 16) | (c << 8) | d) >>> 0);
     return { ip: ip, pl: pl };
   }
 
@@ -338,20 +338,20 @@
   }
 
   function ipv4NetworkFromCidr(cidrStr) {
-    var p = ipv4ParseCidr(cidrStr);
+    let p = ipv4ParseCidr(cidrStr);
     if (!p) return null;
-    var mask = p.pl === 0 ? 0 : (0xffffffff << (32 - p.pl)) >>> 0;
-    var net = (p.ip & mask) >>> 0;
+    let mask = p.pl === 0 ? 0 : (0xffffffff << (32 - p.pl)) >>> 0;
+    let net = (p.ip & mask) >>> 0;
     return { net: net, pl: p.pl };
   }
 
   /** Supernet CIDR with prefix length *poolPl* strictly shorter than the assignment’s (larger aggregate). */
   function ipv4SupernetCidrForAssignment(assignmentCidr, poolPl) {
-    var nw = ipv4NetworkFromCidr(assignmentCidr);
+    let nw = ipv4NetworkFromCidr(assignmentCidr);
     if (!nw || poolPl < 0 || poolPl > 32) return null;
     if (poolPl >= nw.pl) return null;
-    var mask = poolPl === 0 ? 0 : (0xffffffff << (32 - poolPl)) >>> 0;
-    var superNet = (nw.net & mask) >>> 0;
+    let mask = poolPl === 0 ? 0 : (0xffffffff << (32 - poolPl)) >>> 0;
+    let superNet = (nw.net & mask) >>> 0;
     if ((nw.net & mask) >>> 0 !== superNet) return null;
     return intToIpv4(superNet) + "/" + poolPl;
   }
@@ -362,7 +362,7 @@
 
   function showNewPoolInParentDropdown() {
     if (!fieldType) return false;
-    var t = fieldType.value || "";
+    let t = fieldType.value || "";
     if (t !== "assignment" && t !== "host") return false;
     if (cidrLooksIpv6(fieldCidr && fieldCidr.value)) return false;
     return true;
@@ -372,13 +372,13 @@
   function cidrStrictInside(containerCidr, candidateCidr) {
     if (!containerCidr || !candidateCidr) return true;
     if (/:/.test(containerCidr) || /:/.test(candidateCidr)) return null;
-    var P = ipv4ParseCidr(containerCidr);
-    var C = ipv4ParseCidr(candidateCidr);
+    let P = ipv4ParseCidr(containerCidr);
+    let C = ipv4ParseCidr(candidateCidr);
     if (!P || !C) return null;
-    var pMask = P.pl === 0 ? 0 : (0xffffffff << (32 - P.pl)) >>> 0;
-    var cMask = C.pl === 0 ? 0 : (0xffffffff << (32 - C.pl)) >>> 0;
-    var pNet = (P.ip & pMask) >>> 0;
-    var cNet = (C.ip & cMask) >>> 0;
+    let pMask = P.pl === 0 ? 0 : (0xffffffff << (32 - P.pl)) >>> 0;
+    let cMask = C.pl === 0 ? 0 : (0xffffffff << (32 - C.pl)) >>> 0;
+    let pNet = (P.ip & pMask) >>> 0;
+    let cNet = (C.ip & cMask) >>> 0;
     if (C.pl < P.pl) return false;
     if ((cNet & pMask) >>> 0 !== pNet) return false;
     if (C.pl === P.pl && cNet === pNet) return false;
@@ -386,8 +386,8 @@
   }
 
   function poolById(pid) {
-    var list = (ipamFormMeta && ipamFormMeta.pools) || [];
-    for (var i = 0; i < list.length; i++) {
+    let list = (ipamFormMeta && ipamFormMeta.pools) || [];
+    for (let i = 0; i < list.length; i++) {
       if (list[i].id === pid) return list[i];
     }
     return null;
@@ -395,8 +395,8 @@
 
   function poolMetaByCidr(cidr) {
     if (!cidr) return null;
-    var pools = (ipamFormMeta && ipamFormMeta.pools) || [];
-    var i;
+    let pools = (ipamFormMeta && ipamFormMeta.pools) || [];
+    let i;
     for (i = 0; i < pools.length; i++) {
       if (pools[i].cidr === cidr) return pools[i];
     }
@@ -404,8 +404,8 @@
   }
 
   function assignmentById(aid) {
-    var list = (ipamFormMeta && ipamFormMeta.assignments) || [];
-    for (var i = 0; i < list.length; i++) {
+    let list = (ipamFormMeta && ipamFormMeta.assignments) || [];
+    for (let i = 0; i < list.length; i++) {
       if (list[i].id === aid) return list[i];
     }
     return null;
@@ -413,27 +413,27 @@
 
   /** Prefix length from CIDR string; -1 if missing (IPv4/IPv6). */
   function cidrPrefixLength(cidr) {
-    var parts = String(cidr || "").split("/");
+    let parts = String(cidr || "").split("/");
     if (parts.length < 2) return -1;
-    var pl = parseInt(parts[parts.length - 1], 10);
+    let pl = parseInt(parts[parts.length - 1], 10);
     return isNaN(pl) ? -1 : pl;
   }
 
   /** Smallest containing pool in *vk* that strictly contains *childCidr* (matches server find_most_specific_containing_pool). */
   function findMostSpecificContainingPoolMeta(childCidr, vk, excludeId) {
-    var child = (childCidr || "").trim();
+    let child = (childCidr || "").trim();
     if (!child || !vk) return null;
-    var pools = (ipamFormMeta && ipamFormMeta.pools) || [];
-    var best = null;
-    var bestPl = -1;
-    var i;
+    let pools = (ipamFormMeta && ipamFormMeta.pools) || [];
+    let best = null;
+    let bestPl = -1;
+    let i;
     for (i = 0; i < pools.length; i++) {
-      var p = pools[i];
+      let p = pools[i];
       if (p.vrf_key !== vk) continue;
       if (excludeId != null && String(p.id) === String(excludeId)) continue;
-      var inside = cidrStrictInside(p.cidr, child);
+      let inside = cidrStrictInside(p.cidr, child);
       if (inside !== true) continue;
-      var pl = cidrPrefixLength(p.cidr);
+      let pl = cidrPrefixLength(p.cidr);
       if (pl > bestPl) {
         bestPl = pl;
         best = p;
@@ -448,9 +448,9 @@
       parentPoolReadonlyEl.textContent = "None (root pool for this prefix in this VRF)";
       return;
     }
-    var p = poolById(row.parent_pool_id);
+    let p = poolById(row.parent_pool_id);
     if (p) {
-      var lab = (p.name || "").trim();
+      let lab = (p.name || "").trim();
       parentPoolReadonlyEl.textContent = (lab ? lab + " — " : "") + p.cidr;
     } else {
       parentPoolReadonlyEl.textContent = "Pool #" + row.parent_pool_id;
@@ -459,15 +459,15 @@
 
   function syncPoolParentReadonly() {
     if (!parentPoolReadonlyEl || !fieldType || fieldType.value !== "pool") return;
-    var cid = ((fieldCidr && fieldCidr.value) || "").trim();
-    var vk = selectedVrfKeyFromFlyout();
+    let cid = ((fieldCidr && fieldCidr.value) || "").trim();
+    let vk = selectedVrfKeyFromFlyout();
     if (!cid || !vk) {
       parentPoolReadonlyEl.textContent = "Enter prefix and VRF to see parent.";
       return;
     }
-    var best = findMostSpecificContainingPoolMeta(cid, vk, editId);
+    let best = findMostSpecificContainingPoolMeta(cid, vk, editId);
     if (best) {
-      var lab = (best.name || "").trim();
+      let lab = (best.name || "").trim();
       parentPoolReadonlyEl.textContent = (lab ? lab + " — " : "") + best.cidr;
     } else {
       parentPoolReadonlyEl.textContent = "None (root pool for this prefix in this VRF)";
@@ -480,37 +480,37 @@
 
   function effectiveVrfLabelForRow(row) {
     if (!row) return "";
-    var v = (row.vrf || "").trim();
+    let v = (row.vrf || "").trim();
     return v ? v : "default";
   }
 
   /** @param {string} preserveVrfLabel - label to select after rebuild (e.g. from saved row, or "" for add). */
   function rebuildVrfSelect(preserveVrfLabel) {
     if (!fieldVrf) return;
-    var preserve = (preserveVrfLabel || "").trim();
-    var names = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
+    let preserve = (preserveVrfLabel || "").trim();
+    let names = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
     fieldVrf.innerHTML = "";
     if (names.length === 0) {
-      var o0 = document.createElement("option");
+      let o0 = document.createElement("option");
       o0.value = "default";
       o0.textContent = "default";
       fieldVrf.appendChild(o0);
       fieldVrf.value = "default";
       return;
     }
-    var multi = names.length > 1;
+    let multi = names.length > 1;
     if (multi) {
-      var ph = document.createElement("option");
+      let ph = document.createElement("option");
       ph.value = "";
       ph.textContent = "Select VRF…";
       ph.disabled = true;
       ph.selected = !preserve;
       fieldVrf.appendChild(ph);
     }
-    var i;
+    let i;
     for (i = 0; i < names.length; i++) {
-      var nm = String(names[i]);
-      var o = document.createElement("option");
+      let nm = String(names[i]);
+      let o = document.createElement("option");
       o.value = nm;
       o.textContent = nm;
       fieldVrf.appendChild(o);
@@ -526,7 +526,7 @@
 
   function optionValueExists(selectEl, val) {
     if (!selectEl) return false;
-    var i;
+    let i;
     for (i = 0; i < selectEl.options.length; i++) {
       if (selectEl.options[i].value === val) return true;
     }
@@ -538,17 +538,17 @@
     if (!fieldType || fieldType.value !== "assignment") return false;
     if (discoveredPrefillSource) return false;
     if (!fieldParentPool) return false;
-    var v = fieldParentPool.value;
+    let v = fieldParentPool.value;
     if (!v || v === NEW_POOL_VALUE) return false;
-    var pid = parseInt(v, 10);
+    let pid = parseInt(v, 10);
     if (isNaN(pid) || pid <= 0) return false;
-    var pool = poolById(pid);
+    let pool = poolById(pid);
     if (!pool || !pool.cidr) return false;
     return !cidrLooksIpv6(pool.cidr);
   }
 
   function defaultAssignmentPrefixLen(poolPl) {
-    var minChild = poolPl + 1;
+    let minChild = poolPl + 1;
     if (minChild > 32) return 32;
     if (minChild >= 24) return minChild;
     return 24;
@@ -556,28 +556,28 @@
 
   function rebuildAssignmentPrefixLenOptions() {
     if (!fieldAssignmentPl || !fieldParentPool) return;
-    var v = fieldParentPool.value;
-    var prev = fieldAssignmentPl.value;
+    let v = fieldParentPool.value;
+    let prev = fieldAssignmentPl.value;
     fieldAssignmentPl.innerHTML = "";
     if (!v || v === NEW_POOL_VALUE) return;
-    var pid = parseInt(v, 10);
+    let pid = parseInt(v, 10);
     if (isNaN(pid)) return;
-    var pool = poolById(pid);
+    let pool = poolById(pid);
     if (!pool || !pool.cidr) return;
-    var parsed = ipv4ParseCidr(pool.cidr);
+    let parsed = ipv4ParseCidr(pool.cidr);
     if (!parsed) return;
-    var poolPl = parsed.pl;
-    var start = poolPl + 1;
+    let poolPl = parsed.pl;
+    let start = poolPl + 1;
     if (start > 32) return;
-    var pl;
+    let pl;
     for (pl = start; pl <= 32; pl++) {
-      var o = document.createElement("option");
+      let o = document.createElement("option");
       o.value = String(pl);
       o.textContent = "/" + pl;
       fieldAssignmentPl.appendChild(o);
     }
-    var defPl = String(defaultAssignmentPrefixLen(poolPl));
-    var prevN = parseInt(prev, 10);
+    let defPl = String(defaultAssignmentPrefixLen(poolPl));
+    let prevN = parseInt(prev, 10);
     if (!isNaN(prevN) && prevN >= start && prevN <= 32) {
       fieldAssignmentPl.value = String(prevN);
     } else if (optionValueExists(fieldAssignmentPl, defPl)) {
@@ -587,16 +587,16 @@
     }
   }
 
-  var nextAssignmentCidrSeq = 0;
+  let nextAssignmentCidrSeq = 0;
   function fetchNextAssignmentCidrFromApi() {
     if (!usesAssignmentAutoCidr() || !apiNextAssignment || !fieldParentPool || !fieldAssignmentPl) {
       return Promise.resolve();
     }
-    var pid = parseInt(fieldParentPool.value, 10);
-    var pl = parseInt(fieldAssignmentPl.value, 10);
+    let pid = parseInt(fieldParentPool.value, 10);
+    let pl = parseInt(fieldAssignmentPl.value, 10);
     if (isNaN(pid) || isNaN(pl)) return Promise.resolve();
-    var seq = ++nextAssignmentCidrSeq;
-    var url =
+    let seq = ++nextAssignmentCidrSeq;
+    let url =
       apiNextAssignment.replace(/\/?$/, "") +
       "?parent_pool_id=" +
       encodeURIComponent(String(pid)) +
@@ -612,12 +612,12 @@
         if (res.seq !== nextAssignmentCidrSeq) return;
         if (!fieldCidr) return;
         if (!res.ok) {
-          var det = res.body && res.body.detail;
+          let det = res.body && res.body.detail;
           setFormStatus(typeof det === "string" ? det : "Could not allocate a prefix.", true);
           fieldCidr.value = "";
           return;
         }
-        var c = res.body && res.body.cidr;
+        let c = res.body && res.body.cidr;
         if (c) fieldCidr.value = c;
         setFormStatus("", false);
       })
@@ -630,7 +630,7 @@
 
   function syncAssignmentCidrUi() {
     if (!wrapAssignmentSize || !fieldCidr || !labelCidr) return;
-    var auto = usesAssignmentAutoCidr();
+    let auto = usesAssignmentAutoCidr();
     wrapAssignmentSize.hidden = !auto;
     if (auto) {
       rebuildAssignmentPrefixLenOptions();
@@ -641,7 +641,7 @@
       fieldCidr.setAttribute("aria-readonly", "true");
       fetchNextAssignmentCidrFromApi();
     } else {
-      var wasAuto = fieldCidr.classList.contains("gc-if-flyout__input--readonly");
+      let wasAuto = fieldCidr.classList.contains("gc-if-flyout__input--readonly");
       labelCidr.innerHTML =
         'Prefix (CIDR) <span class="gc-if-flyout__req" aria-hidden="true">*</span>';
       fieldCidr.removeAttribute("readonly");
@@ -655,25 +655,25 @@
 
   function rebuildParentPoolSelect(preserveValue) {
     if (!fieldParentPool) return;
-    var prev = preserveValue ? fieldParentPool.value : "";
+    let prev = preserveValue ? fieldParentPool.value : "";
     fieldParentPool.innerHTML = "";
-    var opt0 = document.createElement("option");
+    let opt0 = document.createElement("option");
     opt0.value = "";
     opt0.textContent = "— Select pool —";
     fieldParentPool.appendChild(opt0);
-    var vk = selectedVrfKeyFromFlyout();
-    var pools = (ipamFormMeta && ipamFormMeta.pools) || [];
-    for (var i = 0; i < pools.length; i++) {
-      var p = pools[i];
+    let vk = selectedVrfKeyFromFlyout();
+    let pools = (ipamFormMeta && ipamFormMeta.pools) || [];
+    for (let i = 0; i < pools.length; i++) {
+      let p = pools[i];
       if (p.vrf_key !== vk) continue;
-      var o = document.createElement("option");
+      let o = document.createElement("option");
       o.value = String(p.id);
-      var label = (p.name || "").trim();
+      let label = (p.name || "").trim();
       o.textContent = (label ? label + " — " : "") + p.cidr;
       fieldParentPool.appendChild(o);
     }
     if (showNewPoolInParentDropdown()) {
-      var optNew = document.createElement("option");
+      let optNew = document.createElement("option");
       optNew.value = NEW_POOL_VALUE;
       optNew.textContent = "New pool…";
       fieldParentPool.appendChild(optNew);
@@ -690,22 +690,22 @@
 
   function rebuildParentAssignmentSelect(preserveValue) {
     if (!fieldParentAssignment) return;
-    var prev = preserveValue ? fieldParentAssignment.value : "";
+    let prev = preserveValue ? fieldParentAssignment.value : "";
     fieldParentAssignment.innerHTML = "";
-    var opt0 = document.createElement("option");
+    let opt0 = document.createElement("option");
     opt0.value = "";
     opt0.textContent = "— Select assignment —";
     fieldParentAssignment.appendChild(opt0);
-    var vk = selectedVrfKeyFromFlyout();
-    var asg = (ipamFormMeta && ipamFormMeta.assignments) || [];
-    var poolSel = fieldParentPool && fieldParentPool.value ? parseInt(fieldParentPool.value, 10) : NaN;
-    for (var i = 0; i < asg.length; i++) {
-      var a = asg[i];
+    let vk = selectedVrfKeyFromFlyout();
+    let asg = (ipamFormMeta && ipamFormMeta.assignments) || [];
+    let poolSel = fieldParentPool && fieldParentPool.value ? parseInt(fieldParentPool.value, 10) : NaN;
+    for (let i = 0; i < asg.length; i++) {
+      let a = asg[i];
       if (a.vrf_key !== vk) continue;
       if (!isNaN(poolSel) && a.parent_pool_id !== poolSel) continue;
-      var o = document.createElement("option");
+      let o = document.createElement("option");
       o.value = String(a.id);
-      var lab = (a.name || "").trim();
+      let lab = (a.name || "").trim();
       o.textContent = (lab ? lab + " — " : "") + a.cidr;
       fieldParentAssignment.appendChild(o);
     }
@@ -718,21 +718,21 @@
 
   function setPoolUnmanagedSwitch(on) {
     if (!fieldPoolUnmanagedSwitch) return;
-    var v = !!on;
+    let v = !!on;
     fieldPoolUnmanagedSwitch.classList.toggle("gc-table-toggle--on", v);
     fieldPoolUnmanagedSwitch.setAttribute("aria-checked", v ? "true" : "false");
   }
 
   function syncPoolUnmanagedWrap() {
     if (!fieldPoolUnmanagedWrap || !fieldType) return;
-    var isPool = fieldType.value === "pool";
+    let isPool = fieldType.value === "pool";
     fieldPoolUnmanagedWrap.hidden = !isPool;
     fieldPoolUnmanagedWrap.setAttribute("aria-hidden", isPool ? "false" : "true");
   }
 
   function syncHierarchyFlyout() {
     if (!fieldType) return;
-    var t = fieldType.value || "assignment";
+    let t = fieldType.value || "assignment";
     if (t === "pool") {
       if (wrapParentPool) wrapParentPool.hidden = false;
       if (parentPoolSelectBlock) parentPoolSelectBlock.hidden = true;
@@ -788,12 +788,12 @@
     } else {
       rebuildParentPoolSelect(false);
       if (fieldParentPool && row && row.parent_pool_id != null) {
-        var ps = String(row.parent_pool_id);
+        let ps = String(row.parent_pool_id);
         if (optionValueExists(fieldParentPool, ps)) fieldParentPool.value = ps;
       }
       rebuildParentAssignmentSelect(false);
       if (fieldParentAssignment && row && row.parent_assignment_id != null) {
-        var as = String(row.parent_assignment_id);
+        let as = String(row.parent_assignment_id);
         if (optionValueExists(fieldParentAssignment, as)) fieldParentAssignment.value = as;
       }
     }
@@ -817,10 +817,10 @@
       if (fieldParentPool.value === NEW_POOL_VALUE) {
         return "Finish creating a new pool or choose an existing pool.";
       }
-      var pid = parseInt(fieldParentPool.value, 10);
-      var pool = poolById(pid);
+      let pid = parseInt(fieldParentPool.value, 10);
+      let pool = poolById(pid);
       if (!pool) return "Invalid parent pool.";
-      var inside = cidrStrictInside(pool.cidr, cidrTrimmed);
+      let inside = cidrStrictInside(pool.cidr, cidrTrimmed);
       if (inside === false) {
         return "Prefix must be a strict subnet of the parent pool (" + pool.cidr + ").";
       }
@@ -833,18 +833,18 @@
       if (!fieldParentAssignment || !fieldParentAssignment.value) {
         return "Select a parent assignment for this host.";
       }
-      var aid = parseInt(fieldParentAssignment.value, 10);
-      var asn = assignmentById(aid);
+      let aid = parseInt(fieldParentAssignment.value, 10);
+      let asn = assignmentById(aid);
       if (!asn) return "Invalid parent assignment.";
-      var inside = cidrStrictInside(asn.cidr, cidrTrimmed);
+      let inside = cidrStrictInside(asn.cidr, cidrTrimmed);
       if (inside === false) {
         return "Host prefix must be a strict subnet of the parent assignment (" + asn.cidr + ").";
       }
       if (fieldParentPool && fieldParentPool.value) {
-        var hpp = parseInt(fieldParentPool.value, 10);
-        var poolH = poolById(hpp);
+        let hpp = parseInt(fieldParentPool.value, 10);
+        let poolH = poolById(hpp);
         if (poolH) {
-          var inPool = cidrStrictInside(poolH.cidr, cidrTrimmed);
+          let inPool = cidrStrictInside(poolH.cidr, cidrTrimmed);
           if (inPool === false) {
             return "Prefix must fall inside the selected parent pool (" + poolH.cidr + ").";
           }
@@ -856,7 +856,7 @@
   }
 
   function displayName(row) {
-    var n = (row && row.name) || "";
+    let n = (row && row.name) || "";
     n = n.trim();
     if (!n) return row.cidr;
     if (/^discovered\s*[·.]\s*/i.test(n)) return row.cidr || n;
@@ -881,8 +881,8 @@
   }
 
   function manualFacetMap(r) {
-    var vrfDisp = (r.vrf || "").trim() || "default";
-    var asn =
+    let vrfDisp = (r.vrf || "").trim() || "default";
+    let asn =
       (r.prefix_type || "") === "assignment" && r.assigned_to_display
         ? r.assigned_to_display
         : "—";
@@ -935,21 +935,21 @@
 
   function fillFirewallDropdown(selectEl) {
     if (!selectEl) return;
-    var json = typeof window.gcNavFirewallsJson !== "undefined" ? window.gcNavFirewallsJson : [];
-    var list = Array.isArray(json) ? json.slice() : [];
+    let json = typeof globalThis.gcNavFirewallsJson !== "undefined" ? globalThis.gcNavFirewallsJson : [];
+    let list = Array.isArray(json) ? json.slice() : [];
     list.sort(function (a, b) {
       return String(a.label || "").localeCompare(String(b.label || ""), undefined, {
         sensitivity: "base",
       });
     });
     selectEl.innerHTML = "";
-    var opt0 = document.createElement("option");
+    let opt0 = document.createElement("option");
     opt0.value = "";
     opt0.textContent = "— None —";
     selectEl.appendChild(opt0);
-    for (var i = 0; i < list.length; i++) {
-      var fw = list[i];
-      var o = document.createElement("option");
+    for (let i = 0; i < list.length; i++) {
+      let fw = list[i];
+      let o = document.createElement("option");
       o.value = String(fw.id);
       o.textContent = fw.label || String(fw.id);
       selectEl.appendChild(o);
@@ -958,14 +958,14 @@
 
   function syncAssignedWrap() {
     if (!assignedWrap || !fieldType) return;
-    var on = fieldType.value === "assignment";
+    let on = fieldType.value === "assignment";
     assignedWrap.hidden = !on;
     assignedWrap.setAttribute("aria-hidden", on ? "false" : "true");
   }
 
   function assignedCellHtml(r) {
     if ((r.prefix_type || "") !== "assignment") return "—";
-    var d = r.assigned_to_display;
+    let d = r.assigned_to_display;
     return d ? esc(d) : "—";
   }
 
@@ -976,12 +976,12 @@
   }
 
   function manualRowHtml(r) {
-    var fv = vrfKey(r.vrf);
-    var famNum = r.family === 6 ? 6 : 4;
-    var famLabel = r.family === 6 ? "IPv6" : "IPv4";
-    var vrfConflict = !!r.vrf_assignment_conflict;
-    var rowExtra = vrfConflict ? " gc-ipam-row--vrf-conflict" : "";
-    var srcCell = vrfConflict ? conflictPill() : "";
+    let fv = vrfKey(r.vrf);
+    let famNum = r.family === 6 ? 6 : 4;
+    let famLabel = r.family === 6 ? "IPv6" : "IPv4";
+    let vrfConflict = !!r.vrf_assignment_conflict;
+    let rowExtra = vrfConflict ? " gc-ipam-row--vrf-conflict" : "";
+    let srcCell = vrfConflict ? conflictPill() : "";
     return (
       '<tr class="gc-ipam-row gc-ipam-data-row' +
       rowExtra +
@@ -1033,11 +1033,11 @@
   }
 
   function discRowHtml(d) {
-    var famNum = d.family === 6 ? 6 : 4;
-    var famLabel = d.family === 6 ? "IPv6" : "IPv4";
-    var vrfConflict = !!d.vrf_assignment_conflict;
-    var rowExtra = vrfConflict ? " gc-ipam-row--vrf-conflict" : "";
-    var srcCell =
+    let famNum = d.family === 6 ? 6 : 4;
+    let famLabel = d.family === 6 ? "IPv6" : "IPv4";
+    let vrfConflict = !!d.vrf_assignment_conflict;
+    let rowExtra = vrfConflict ? " gc-ipam-row--vrf-conflict" : "";
+    let srcCell =
       '<span class="gc-ipam-pill gc-ipam-pill--discovered">Discovered</span>' +
       (vrfConflict ? " " + conflictPill() : "");
     return (
@@ -1077,8 +1077,8 @@
   }
 
   function mergedRows() {
-    var m = [];
-    var i;
+    let m = [];
+    let i;
     for (i = 0; i < cache.length; i++) {
       m.push({ kind: "manual", row: cache[i] });
     }
@@ -1086,19 +1086,19 @@
       m.push({ kind: "discovered", disc: cacheDiscovered[i] });
     }
     m.sort(function (a, b) {
-      var ca = a.kind === "manual" ? a.row.cidr : a.disc.cidr;
-      var cb = b.kind === "manual" ? b.row.cidr : b.disc.cidr;
+      let ca = a.kind === "manual" ? a.row.cidr : a.disc.cidr;
+      let cb = b.kind === "manual" ? b.row.cidr : b.disc.cidr;
       return ca.localeCompare(cb, undefined, { numeric: true });
     });
     return m;
   }
 
   function mergedRowsForView() {
-    var all = mergedRows();
+    let all = mergedRows();
     if (!lockedPrefixType) return all;
     return all.filter(function (item) {
       if (item.kind === "manual") {
-        var pt = (item.row.prefix_type || "").trim();
+        let pt = (item.row.prefix_type || "").trim();
         return pt === lockedPrefixType;
       }
       return lockedPrefixType === "assignment";
@@ -1119,39 +1119,39 @@
   }
 
   function rebuildFacets(done) {
-    if (!filtersDrawerEl || !window.gcTableFacets) {
+    if (!filtersDrawerEl || !globalThis.gcTableFacets) {
       if (typeof done === "function") done();
       return;
     }
-    var rowEls = tbody
+    let rowEls = tbody
       ? Array.prototype.slice.call(tbody.querySelectorAll("tr.gc-ipam-data-row"))
       : [];
-    var maps = rowEls.map(function (tr) {
+    let maps = rowEls.map(function (tr) {
       try {
-        var raw = tr.getAttribute("data-gc-row-facets");
+        let raw = tr.dataset.gcRowFacets;
         return raw ? JSON.parse(raw) : {};
       } catch (e) {
         return {};
       }
     });
-    window.gcTableFacets.rebuild(filtersDrawerEl, facetCols, maps, FACET_STORAGE_KEY);
+    globalThis.gcTableFacets.rebuild(filtersDrawerEl, facetCols, maps, FACET_STORAGE_KEY);
     if (typeof done === "function") done();
   }
 
   function rowMatchesSearch(tr, q) {
     if (!q) return true;
-    var s = tr.getAttribute("data-search") || "";
+    let s = tr.dataset.search || "";
     return s.indexOf(q) !== -1;
   }
 
   function rowMatchesFacets(tr) {
-    if (!filtersDrawerEl || !window.gcTableFacets) return true;
-    return window.gcTableFacets.rowMatches(tr, filtersDrawerEl);
+    if (!filtersDrawerEl || !globalThis.gcTableFacets) return true;
+    return globalThis.gcTableFacets.rowMatches(tr, filtersDrawerEl);
   }
 
   function rowPassesQuickDiscovered(tr) {
     if (quickDiscoveredMode === "all") return true;
-    var isDisc = tr.classList.contains("gc-ipam-row--discovered");
+    let isDisc = tr.classList.contains("gc-ipam-row--discovered");
     if (quickDiscoveredMode === "manual") return !isDisc;
     if (quickDiscoveredMode === "discovered") return isDisc;
     return true;
@@ -1163,27 +1163,27 @@
   }
 
   function syncQuickFilterButtons() {
-    var nav = document.getElementById("gc-ipam-quick-nav");
+    let nav = document.getElementById("gc-ipam-quick-nav");
     if (nav) {
       nav.querySelectorAll("[data-gc-ipam-quick]").forEach(function (btn) {
-        var mode = btn.getAttribute("data-gc-ipam-quick") || "";
+        let mode = btn.dataset.gcIpamQuick || "";
         btn.setAttribute("aria-pressed", mode === quickDiscoveredMode ? "true" : "false");
       });
     }
-    var cbtn = document.getElementById("gc-ipam-quick-conflicts");
+    let cbtn = document.getElementById("gc-ipam-quick-conflicts");
     if (cbtn) cbtn.setAttribute("aria-pressed", quickConflictOnly ? "true" : "false");
   }
 
   function applyRowFilter() {
     if (!tbody) return;
-    var q = (searchInput && searchInput.value ? searchInput.value : "").trim().toLowerCase();
-    var rows = tbody.querySelectorAll("tr.gc-ipam-data-row");
-    var place = document.getElementById("gc-ipam-placeholder");
-    var emptyFilter = document.getElementById("gc-ipam-filter-empty");
-    var visible = 0;
-    var totalData = rows.length;
+    let q = (searchInput && searchInput.value ? searchInput.value : "").trim().toLowerCase();
+    let rows = tbody.querySelectorAll("tr.gc-ipam-data-row");
+    let place = document.getElementById("gc-ipam-placeholder");
+    let emptyFilter = document.getElementById("gc-ipam-filter-empty");
+    let visible = 0;
+    let totalData = rows.length;
     Array.prototype.forEach.call(rows, function (tr) {
-      var ok =
+      let ok =
         rowMatchesSearch(tr, q) &&
         rowMatchesFacets(tr) &&
         rowPassesQuickDiscovered(tr) &&
@@ -1210,15 +1210,15 @@
 
   function renderTable() {
     if (!tbody) return;
-    var merged = mergedRowsForView();
-    var totalFromApi = cache.length + cacheDiscovered.length;
+    let merged = mergedRowsForView();
+    let totalFromApi = cache.length + cacheDiscovered.length;
     if (totalFromApi === 0) {
       tbody.innerHTML =
         '<tr id="gc-ipam-placeholder" class="gc-ipam-placeholder-row"><td class="muted" colspan="9">No prefixes yet. Add one or sync firewalls to see discovered networks.</td></tr>';
       if (filtersDrawerEl) filtersDrawerEl.innerHTML = "";
       updateFacetChrome();
       if (countEl) countEl.textContent = "";
-      if (table && window.gcTableSort) window.gcTableSort.bindTable(table);
+      if (table && globalThis.gcTableSort) globalThis.gcTableSort.bindTable(table);
       syncFilterEmptyColspan();
       syncQuickFilterButtons();
       return;
@@ -1231,16 +1231,16 @@
       if (filtersDrawerEl) filtersDrawerEl.innerHTML = "";
       updateFacetChrome();
       if (countEl) countEl.textContent = "";
-      if (table && window.gcTableSort) window.gcTableSort.bindTable(table);
+      if (table && globalThis.gcTableSort) globalThis.gcTableSort.bindTable(table);
       syncFilterEmptyColspan();
       syncQuickFilterButtons();
       return;
     }
-    var parts = [];
-    var maps = [];
-    var i;
+    let parts = [];
+    let maps = [];
+    let i;
     for (i = 0; i < merged.length; i++) {
-      var item = merged[i];
+      let item = merged[i];
       if (item.kind === "manual") {
         parts.push(manualRowHtml(item.row));
         maps.push(manualFacetMap(item.row));
@@ -1253,34 +1253,34 @@
       '<tr id="gc-ipam-filter-empty" class="gc-ipam-filter-empty-row" hidden><td class="muted" colspan="9">No prefixes match the current filters.</td></tr>'
     );
     tbody.innerHTML = parts.join("");
-    var dataRows = tbody.querySelectorAll("tr.gc-ipam-data-row");
+    let dataRows = tbody.querySelectorAll("tr.gc-ipam-data-row");
     for (i = 0; i < dataRows.length; i++) {
-      if (window.gcTableFacets) window.gcTableFacets.setRowFacets(dataRows[i], maps[i]);
+      if (globalThis.gcTableFacets) globalThis.gcTableFacets.setRowFacets(dataRows[i], maps[i]);
     }
     applyColVis(colVis);
     syncFilterEmptyColspan();
     rebuildFacets(function () {
       applyRowFilter();
       updateFacetChrome();
-      if (table && window.gcTableSort) window.gcTableSort.bindTable(table);
+      if (table && globalThis.gcTableSort) globalThis.gcTableSort.bindTable(table);
     });
   }
 
   function renderStats(prefixes, discovered) {
     // Summary cards count saved plan rows only; discovered has its own stat.
-    var total = prefixes.length;
-    var v4 = 0;
-    var v6 = 0;
-    var pools = 0;
-    var i;
-    var p;
+    let total = prefixes.length;
+    let v4 = 0;
+    let v6 = 0;
+    let pools = 0;
+    let i;
+    let p;
     for (i = 0; i < prefixes.length; i++) {
       p = prefixes[i];
       if (p.family === 6) v6++;
       else v4++;
       if (p.prefix_type === "pool") pools++;
     }
-    var conflictN = 0;
+    let conflictN = 0;
     for (i = 0; i < prefixes.length; i++) {
       if (prefixes[i].vrf_assignment_conflict) conflictN++;
     }
@@ -1288,7 +1288,7 @@
       if (discovered[i].vrf_assignment_conflict) conflictN++;
     }
     function set(id, v) {
-      var el = document.getElementById(id);
+      let el = document.getElementById(id);
       if (el) el.textContent = String(v);
     }
     set("gc-ipam-stat-total", total);
@@ -1319,11 +1319,11 @@
         setStatus("", false);
         if (flyout && !flyout.hidden) {
           if (editId != null) {
-            var er = findRow(editId);
+            let er = findRow(editId);
             if (er) rebuildVrfSelect(effectiveVrfLabelForRow(er));
           } else {
             rebuildVrfSelect("");
-            var ns = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
+            let ns = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
             if (ns.length === 1 && fieldVrf) fieldVrf.value = String(ns[0]);
           }
           syncAssignmentCidrUi();
@@ -1336,15 +1336,15 @@
   }
 
   function findRow(id) {
-    var n = Number(id);
-    for (var i = 0; i < cache.length; i++) {
+    let n = Number(id);
+    for (let i = 0; i < cache.length; i++) {
       if (cache[i].id === n) return cache[i];
     }
     return null;
   }
 
   function findDiscovered(key) {
-    for (var i = 0; i < cacheDiscovered.length; i++) {
+    for (let i = 0; i < cacheDiscovered.length; i++) {
       if (cacheDiscovered[i].key === key) return cacheDiscovered[i];
     }
     return null;
@@ -1359,13 +1359,13 @@
       deleteBtn.removeAttribute("aria-label");
       return;
     }
-    var row = findRow(editId);
+    let row = findRow(editId);
     if (!row) {
       deleteBtn.hidden = true;
       return;
     }
-    var pt = (fieldType && fieldType.value) || row.prefix_type || "";
-    var show = !!row.delete_eligible && (pt === "pool" || pt === "assignment");
+    let pt = (fieldType && fieldType.value) || row.prefix_type || "";
+    let show = !!row.delete_eligible && (pt === "pool" || pt === "assignment");
     deleteBtn.hidden = !show;
     if (!show) {
       deleteBtn.disabled = false;
@@ -1374,7 +1374,7 @@
       return;
     }
     deleteBtn.disabled = !row.delete_allowed;
-    var reason = row.delete_blocked_reason || "";
+    let reason = row.delete_blocked_reason || "";
     if (reason) {
       deleteBtn.setAttribute("title", reason);
       deleteBtn.setAttribute("aria-label", "Delete — " + reason);
@@ -1494,13 +1494,13 @@
   }
 
   function prefersReducedMotion() {
-    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return globalThis.matchMedia && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
   function layoutSubflyoutLeftOf(subPanel, primaryPanel, gap) {
     if (!subPanel || !primaryPanel) return;
-    var w = primaryPanel.offsetWidth;
-    var g = gap == null ? 10 : gap;
+    let w = primaryPanel.offsetWidth;
+    let g = gap == null ? 10 : gap;
     subPanel.style.right = Math.max(0, w + g) + "px";
   }
 
@@ -1512,8 +1512,8 @@
     layoutSubflyoutLeftOf(poolFlyoutPanel, discFlyoutPanel, 10);
   }
 
-  var nestedPoolCloseAnimTimer = null;
-  var poolFlyoutCloseAnimTimer = null;
+  let nestedPoolCloseAnimTimer = null;
+  let poolFlyoutCloseAnimTimer = null;
 
   function finishNestedPoolFlyoutCleanup() {
     if (!nestedPoolFlyout) return;
@@ -1530,7 +1530,7 @@
   function closeNestedPoolFlyout(immediate) {
     if (!nestedPoolFlyout) return;
     if (nestedPoolCloseAnimTimer) {
-      window.clearTimeout(nestedPoolCloseAnimTimer);
+      globalThis.clearTimeout(nestedPoolCloseAnimTimer);
       nestedPoolCloseAnimTimer = null;
     }
     nestedPoolFlyout.classList.remove("gc-ipam-nested-pool-flyout--open");
@@ -1538,7 +1538,7 @@
       finishNestedPoolFlyoutCleanup();
       return;
     }
-    nestedPoolCloseAnimTimer = window.setTimeout(function () {
+    nestedPoolCloseAnimTimer = globalThis.setTimeout(function () {
       nestedPoolCloseAnimTimer = null;
       finishNestedPoolFlyoutCleanup();
     }, 300);
@@ -1547,7 +1547,7 @@
   function showNestedPoolFlyout() {
     if (!nestedPoolFlyout) return;
     if (nestedPoolCloseAnimTimer) {
-      window.clearTimeout(nestedPoolCloseAnimTimer);
+      globalThis.clearTimeout(nestedPoolCloseAnimTimer);
       nestedPoolCloseAnimTimer = null;
     }
     layoutNestedPoolBesidePrimary();
@@ -1571,9 +1571,9 @@
 
   function updateNestedPoolPreview() {
     if (!nestedPoolPl || !nestedPoolResult || !fieldCidr) return;
-    var assign = (fieldCidr.value || "").trim();
-    var pl = parseInt(nestedPoolPl.value, 10);
-    var cidr = ipv4SupernetCidrForAssignment(assign, pl);
+    let assign = (fieldCidr.value || "").trim();
+    let pl = parseInt(nestedPoolPl.value, 10);
+    let cidr = ipv4SupernetCidrForAssignment(assign, pl);
     nestedPoolResult.textContent = cidr || "—";
   }
 
@@ -1584,9 +1584,9 @@
 
   /** Sync nested “New pool” sheet from the primary add-prefix form; keep Parent pool on “New pool…”. */
   function syncNestedPoolFlyoutFromPrimary() {
-    var assign = ((fieldCidr && fieldCidr.value) || "").trim();
+    let assign = ((fieldCidr && fieldCidr.value) || "").trim();
     if (nestedPoolVrf) {
-      var vk = selectedVrfKeyFromFlyout();
+      let vk = selectedVrfKeyFromFlyout();
       nestedPoolVrf.textContent = vk === "default" ? "default (global)" : vk;
     }
     if (nestedPoolAssignCidr) nestedPoolAssignCidr.textContent = assign || "—";
@@ -1598,7 +1598,7 @@
       setNestedPoolSubmitEnabled(false);
       return;
     }
-    var nw = ipv4NetworkFromCidr(assign);
+    let nw = ipv4NetworkFromCidr(assign);
     if (!nw) {
       setNestedPoolStatus(
         "Enter a valid IPv4 CIDR in the add-prefix form above (this sheet is for IPv4 only).",
@@ -1621,10 +1621,10 @@
     setNestedPoolSubmitEnabled(true);
     if (nestedPoolPl) {
       nestedPoolPl.innerHTML = "";
-      var maxPl = nw.pl - 1;
-      var pl;
+      let maxPl = nw.pl - 1;
+      let pl;
       for (pl = maxPl; pl >= 0; pl--) {
-        var o = document.createElement("option");
+        let o = document.createElement("option");
         o.value = String(pl);
         o.textContent = "/" + pl + " (aggregate)";
         nestedPoolPl.appendChild(o);
@@ -1656,7 +1656,7 @@
   function showPoolFlyout() {
     if (!poolFlyout) return;
     if (poolFlyoutCloseAnimTimer) {
-      window.clearTimeout(poolFlyoutCloseAnimTimer);
+      globalThis.clearTimeout(poolFlyoutCloseAnimTimer);
       poolFlyoutCloseAnimTimer = null;
     }
     layoutPoolFlyoutBesideDisc();
@@ -1679,7 +1679,7 @@
   function closePoolFlyout(immediate) {
     if (!poolFlyout) return;
     if (poolFlyoutCloseAnimTimer) {
-      window.clearTimeout(poolFlyoutCloseAnimTimer);
+      globalThis.clearTimeout(poolFlyoutCloseAnimTimer);
       poolFlyoutCloseAnimTimer = null;
     }
     poolFlyout.classList.remove("gc-ipam-pool-flyout--open");
@@ -1687,7 +1687,7 @@
       finishPoolFlyoutCleanup();
       return;
     }
-    poolFlyoutCloseAnimTimer = window.setTimeout(function () {
+    poolFlyoutCloseAnimTimer = globalThis.setTimeout(function () {
       poolFlyoutCloseAnimTimer = null;
       finishPoolFlyoutCleanup();
     }, 300);
@@ -1701,10 +1701,10 @@
     if (fieldId) fieldId.value = "";
     if (form) form.reset();
     fillFirewallDropdown(fieldAssignedFw);
-    var firstSrc = (d.source_summary || "").split(",")[0].trim();
+    let firstSrc = (d.source_summary || "").split(",")[0].trim();
     if (fieldName) fieldName.value = firstSrc || (d.cidr || "").trim() || "";
     if (fieldCidr) fieldCidr.value = d.cidr || "";
-    var encCidr = d.encompassing_pool_cidr;
+    let encCidr = d.encompassing_pool_cidr;
     if (fieldAssignedFw) {
       fieldAssignedFw.value = d.firewall_id != null ? String(d.firewall_id) : "";
     }
@@ -1712,7 +1712,7 @@
     if (fieldDesc) fieldDesc.value = (d.source_summary || "").trim() || "";
     lockAssignedFirewallFromDiscovered();
     setFormStatus("", false);
-    var msgs = [];
+    let msgs = [];
     if (d.already_in_ipam) msgs.push("This prefix is already in the address plan.");
     if (d.overlap_conflict) {
       msgs.push(
@@ -1727,21 +1727,21 @@
     rebuildVrfSelect("");
     rebuildParentPoolSelect(false);
     if (fieldParentPool && d.has_encompassing_pool && encCidr) {
-      var pm2 = poolMetaByCidr(encCidr);
+      let pm2 = poolMetaByCidr(encCidr);
       if (pm2 && optionValueExists(fieldParentPool, String(pm2.id))) {
         fieldParentPool.value = String(pm2.id);
       }
     }
     rebuildParentAssignmentSelect(false);
-    var vrfPick = "";
+    let vrfPick = "";
     if (d.has_encompassing_pool && encCidr) {
-      var pmv = poolMetaByCidr(encCidr);
+      let pmv = poolMetaByCidr(encCidr);
       if (pmv) vrfPick = String(pmv.vrf_key || "default");
     }
     if (vrfPick && fieldVrf && optionValueExists(fieldVrf, vrfPick)) {
       fieldVrf.value = vrfPick;
     } else {
-      var ns0 = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
+      let ns0 = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
       if (ns0.length === 1 && fieldVrf) fieldVrf.value = String(ns0[0]);
     }
     setFlyoutPrefixType("assignment");
@@ -1775,8 +1775,8 @@
         typeof body.detail === "string" ? body.detail : "Conflict saving prefix."
       );
     }
-    var d = body.detail;
-    var msg = typeof d === "string" ? d : detailMessage(d);
+    let d = body.detail;
+    let msg = typeof d === "string" ? d : detailMessage(d);
     throw new Error(msg || "Could not save prefix.");
   }
 
@@ -1794,7 +1794,7 @@
     if (!discCurrent || !apiAccept) return;
     setDiscStatus("Saving…", false);
     setPoolStatus("", false);
-    var body = {
+    let body = {
       firewall_id: discCurrent.firewall_id,
       cidr: discCurrent.cidr,
       name: ((discName && discName.value) || "").trim(),
@@ -1809,7 +1809,7 @@
       return;
     }
     if (discAssignedFw && discAssignedFw.value) {
-      var parsed = parseInt(discAssignedFw.value, 10);
+      let parsed = parseInt(discAssignedFw.value, 10);
       if (!isNaN(parsed) && parsed > 0) body.assigned_to_firewall_id = parsed;
     } else if (discAssignedCustom) {
       body.assigned_to_custom = (discAssignedCustom.value || "").trim() || null;
@@ -1827,7 +1827,7 @@
       })
       .then(function (res) {
         if (!res.ok) {
-          var det = res.body && res.body.detail;
+          let det = res.body && res.body.detail;
           if (res.status === 400 && det && typeof det === "object" && det.code === "pool_required") {
             setDiscStatus(det.message || "Create a pool first.", false);
             openPoolFlyoutForCurrent();
@@ -1840,7 +1840,7 @@
       })
       .catch(function (e) {
         if (e && e.message === "__pool_handled") return;
-        var msg = e && e.message ? e.message : String(e);
+        let msg = e && e.message ? e.message : String(e);
         if (poolFlyout && !poolFlyout.hidden) {
           setPoolStatus(msg, true);
         } else {
@@ -1850,9 +1850,9 @@
   }
 
   function setFiltersAsideCollapsed(collapsed) {
-    var aside = filtersAsideEl;
-    var drawer = filtersDrawerEl;
-    var btn = document.getElementById(PREFIX + "-filters-toggle");
+    let aside = filtersAsideEl;
+    let drawer = filtersDrawerEl;
+    let btn = document.getElementById(PREFIX + "-filters-toggle");
     if (!aside || !drawer || !btn) return;
     aside.classList.toggle("filters--collapsed", collapsed);
     btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
@@ -1861,10 +1861,10 @@
   }
 
   function filterColMenuList() {
-    var q = (colsFilter && colsFilter.value ? colsFilter.value : "").trim().toLowerCase();
+    let q = (colsFilter && colsFilter.value ? colsFilter.value : "").trim().toLowerCase();
     if (!colsList) return;
     colsList.querySelectorAll("li[data-col-label]").forEach(function (li) {
-      var lab = (li.dataset.colLabel || "").toLowerCase();
+      let lab = (li.dataset.colLabel || "").toLowerCase();
       li.hidden = q !== "" && lab.indexOf(q) === -1;
     });
   }
@@ -1899,23 +1899,23 @@
   function positionColsDropdown() {
     if (!colsTrigger || !colsPanel || !colsModal || colsModal.hidden) return;
     colsPanel.style.maxHeight = "";
-    var r = colsTrigger.getBoundingClientRect();
-    var gap = 6;
-    var margin = 8;
-    var pw = colsPanel.offsetWidth || Math.min(380, window.innerWidth - 2 * margin);
-    var left = r.left;
-    if (left + pw > window.innerWidth - margin) left = window.innerWidth - margin - pw;
+    let r = colsTrigger.getBoundingClientRect();
+    let gap = 6;
+    let margin = 8;
+    let pw = colsPanel.offsetWidth || Math.min(380, globalThis.innerWidth - 2 * margin);
+    let left = r.left;
+    if (left + pw > globalThis.innerWidth - margin) left = globalThis.innerWidth - margin - pw;
     left = Math.max(margin, left);
-    var topBelow = r.bottom + gap;
+    let topBelow = r.bottom + gap;
     colsPanel.style.left = left + "px";
     colsPanel.style.top = topBelow + "px";
-    var after = colsPanel.getBoundingClientRect();
-    if (after.bottom > window.innerHeight - margin) {
-      var aboveTop = r.top - gap - after.height;
+    let after = colsPanel.getBoundingClientRect();
+    if (after.bottom > globalThis.innerHeight - margin) {
+      let aboveTop = r.top - gap - after.height;
       if (aboveTop >= margin) colsPanel.style.top = aboveTop + "px";
       else {
         colsPanel.style.top = margin + "px";
-        colsPanel.style.maxHeight = Math.max(120, window.innerHeight - 2 * margin) + "px";
+        colsPanel.style.maxHeight = Math.max(120, globalThis.innerHeight - 2 * margin) + "px";
       }
     }
   }
@@ -1938,7 +1938,7 @@
   }
 
   function openColsFromTrigger() {
-    var willOpen = colsModal.hidden;
+    let willOpen = colsModal.hidden;
     setColPanelOpen(willOpen);
     if (willOpen) {
       buildColMenuList();
@@ -2006,11 +2006,11 @@
   if (fieldParentAssignment) {
     fieldParentAssignment.addEventListener("change", function () {
       if (!fieldType || fieldType.value !== "host") return;
-      var raw = fieldParentAssignment.value;
+      let raw = fieldParentAssignment.value;
       if (!raw || !fieldParentPool) return;
-      var id = parseInt(raw, 10);
+      let id = parseInt(raw, 10);
       if (isNaN(id)) return;
-      var asg = assignmentById(id);
+      let asg = assignmentById(id);
       if (!asg || asg.parent_pool_id == null) return;
       fieldParentPool.value = String(asg.parent_pool_id);
       rebuildParentAssignmentSelect(true);
@@ -2020,22 +2020,22 @@
   if (deleteBtn) {
     deleteBtn.addEventListener("click", function () {
       if (editId == null || deleteBtn.disabled) return;
-      var row = findRow(editId);
+      let row = findRow(editId);
       if (!row) return;
-      var pt = row.prefix_type || "";
-      var name = displayName(row);
-      var cidr = row.cidr || "";
-      var msg = 'Delete "' + name + '" (' + cidr + ")?";
-      var cascade = Number(row.ipam_delete_cascade_count) || 0;
+      let pt = row.prefix_type || "";
+      let name = displayName(row);
+      let cidr = row.cidr || "";
+      let msg = 'Delete "' + name + '" (' + cidr + ")?";
+      let cascade = Number(row.ipam_delete_cascade_count) || 0;
       if (pt === "pool" && cascade > 0) {
         msg +=
           "\n\nThis pool contains " +
           cascade +
           " other prefix(es) in the address plan (assignments, hosts, or nested pools). They will be deleted as well.";
       }
-      if (!window.confirm(msg)) return;
+      if (!globalThis.confirm(msg)) return;
       setFormStatus("Deleting…", false);
-      var delUrl =
+      let delUrl =
         apiList.replace(/\/?$/, "") + "/" + encodeURIComponent(String(editId));
       fetch(delUrl, { method: "DELETE", credentials: "same-origin" })
         .then(function (r) {
@@ -2084,26 +2084,26 @@
     });
   }
 
-  var filtersToggleBtn = document.getElementById(PREFIX + "-filters-toggle");
+  let filtersToggleBtn = document.getElementById(PREFIX + "-filters-toggle");
   if (filtersToggleBtn) {
     filtersToggleBtn.addEventListener("click", function () {
-      var collapsed = filtersAsideEl && filtersAsideEl.classList.contains("filters--collapsed");
+      let collapsed = filtersAsideEl && filtersAsideEl.classList.contains("filters--collapsed");
       setFiltersAsideCollapsed(!collapsed);
     });
   }
 
   if (facetResetBtn) {
     facetResetBtn.addEventListener("click", function () {
-      if (filtersDrawerEl && window.gcTableFacets) {
-        window.gcTableFacets.reset(filtersDrawerEl, FACET_STORAGE_KEY);
+      if (filtersDrawerEl && globalThis.gcTableFacets) {
+        globalThis.gcTableFacets.reset(filtersDrawerEl, FACET_STORAGE_KEY);
       }
       updateFacetChrome();
       applyRowFilter();
     });
   }
 
-  if (filtersAsideEl && window.gcTableFacets) {
-    window.gcTableFacets.bindAside(
+  if (filtersAsideEl && globalThis.gcTableFacets) {
+    globalThis.gcTableFacets.bindAside(
       filtersAsideEl,
       function () {
         updateFacetChrome();
@@ -2114,26 +2114,26 @@
   }
 
   if (searchInput) {
-    if (window.gcTableFacets && window.gcTableFacets.bindToolbarSearch) {
-      window.gcTableFacets.bindToolbarSearch(searchInput, FACET_STORAGE_KEY, applyRowFilter);
+    if (globalThis.gcTableFacets && globalThis.gcTableFacets.bindToolbarSearch) {
+      globalThis.gcTableFacets.bindToolbarSearch(searchInput, FACET_STORAGE_KEY, applyRowFilter);
     } else {
       searchInput.addEventListener("input", applyRowFilter);
     }
   }
 
-  var quickNav = document.getElementById("gc-ipam-quick-nav");
+  let quickNav = document.getElementById("gc-ipam-quick-nav");
   if (quickNav) {
     quickNav.addEventListener("click", function (ev) {
-      var btn = ev.target.closest("[data-gc-ipam-quick]");
+      let btn = ev.target.closest("[data-gc-ipam-quick]");
       if (!btn || !quickNav.contains(btn)) return;
-      var mode = btn.getAttribute("data-gc-ipam-quick") || "";
+      let mode = btn.dataset.gcIpamQuick || "";
       if (mode !== "all" && mode !== "manual" && mode !== "discovered") return;
       quickDiscoveredMode = mode;
       applyRowFilter();
     });
   }
 
-  var quickConflictsBtn = document.getElementById("gc-ipam-quick-conflicts");
+  let quickConflictsBtn = document.getElementById("gc-ipam-quick-conflicts");
   if (quickConflictsBtn) {
     quickConflictsBtn.addEventListener("click", function () {
       quickConflictOnly = !quickConflictOnly;
@@ -2141,11 +2141,11 @@
     });
   }
 
-  var acceptAllBtn = document.getElementById("gc-ipam-accept-all");
+  let acceptAllBtn = document.getElementById("gc-ipam-accept-all");
   if (acceptAllBtn && apiAcceptBatch) {
     acceptAllBtn.addEventListener("click", function () {
       if (
-        !window.confirm(
+        !globalThis.confirm(
           "Accept every discovered prefix that already sits in a pool, passes individual checks, and has no same-VRF conflict with another assignment?"
         )
       ) {
@@ -2167,10 +2167,10 @@
           if (!res.ok) {
             throw new Error(detailMessage(res.body.detail) || "Batch accept failed.");
           }
-          var n = res.body.accepted_count != null ? Number(res.body.accepted_count) : 0;
-          var parts = [];
+          let n = res.body.accepted_count != null ? Number(res.body.accepted_count) : 0;
+          let parts = [];
           parts.push(n === 1 ? "Accepted 1 assignment." : "Accepted " + n + " assignments.");
-          var sk = res.body.skipped;
+          let sk = res.body.skipped;
           if (Array.isArray(sk) && sk.length) {
             parts.push(sk.length + " skipped (see server log or retry individually).");
           }
@@ -2203,7 +2203,7 @@
     });
   }
   if (colsModal) {
-    var bd = colsModal.querySelector(".fw-cols-modal__backdrop");
+    let bd = colsModal.querySelector(".fw-cols-modal__backdrop");
     if (bd) {
       bd.addEventListener("click", function () {
         setColPanelOpen(false);
@@ -2213,12 +2213,12 @@
   }
   if (colsList) {
     colsList.addEventListener("change", function (e) {
-      var cb = e.target.closest(colInputSel);
+      let cb = e.target.closest(colInputSel);
       if (!cb || cb.type !== "checkbox") return;
-      var id = cb.getAttribute(COL_CHECK_ATTR);
+      let id = cb.getAttribute(COL_CHECK_ATTR);
       if (!id || !Object.prototype.hasOwnProperty.call(colVis, id)) return;
       colVis[id] = cb.checked;
-      var nOn = 0;
+      let nOn = 0;
       COLS.forEach(function (c) {
         if (colVis[c.id]) nOn++;
       });
@@ -2245,7 +2245,7 @@
       if (colsTrigger) colsTrigger.focus();
     }
   });
-  window.addEventListener("resize", function () {
+  globalThis.addEventListener("resize", function () {
     if (colsModal && !colsModal.hidden) positionColsDropdown();
   });
 
@@ -2290,8 +2290,8 @@
   if (poolForm) {
     poolForm.addEventListener("submit", function (ev) {
       ev.preventDefault();
-      var pc = (poolCidr && poolCidr.value) || "";
-      var pn = (poolName && poolName.value) || "";
+      let pc = (poolCidr && poolCidr.value) || "";
+      let pn = (poolName && poolName.value) || "";
       if (!pc.trim() || !pn.trim()) {
         setPoolStatus("Pool CIDR and name are required.", true);
         return;
@@ -2331,11 +2331,11 @@
   if (nestedPoolForm) {
     nestedPoolForm.addEventListener("submit", function (ev) {
       ev.preventDefault();
-      var assign = ((fieldCidr && fieldCidr.value) || "").trim();
-      var pl = parseInt(nestedPoolPl && nestedPoolPl.value, 10);
-      var name = ((nestedPoolName && nestedPoolName.value) || "").trim();
-      var poolCidrStr = ipv4SupernetCidrForAssignment(assign, pl);
-      var vrfRaw = ((fieldVrf && fieldVrf.value) || "").trim();
+      let assign = ((fieldCidr && fieldCidr.value) || "").trim();
+      let pl = parseInt(nestedPoolPl && nestedPoolPl.value, 10);
+      let name = ((nestedPoolName && nestedPoolName.value) || "").trim();
+      let poolCidrStr = ipv4SupernetCidrForAssignment(assign, pl);
+      let vrfRaw = ((fieldVrf && fieldVrf.value) || "").trim();
       if (!name) {
         setNestedPoolStatus("Pool name is required.", true);
         return;
@@ -2372,8 +2372,8 @@
         })
         .then(function (res) {
           if (!res.ok) {
-            var det = res.body && res.body.detail;
-            var msg =
+            let det = res.body && res.body.detail;
+            let msg =
               res.status === 409
                 ? "That CIDR already exists in this VRF."
                 : typeof det === "string"
@@ -2382,7 +2382,7 @@
             setNestedPoolStatus(msg, true);
             return;
           }
-          var newId = res.body && res.body.id;
+          let newId = res.body && res.body.id;
           closeNestedPoolFlyout();
           applyFilters()
             .then(function () {
@@ -2430,17 +2430,17 @@
 
   function renderVrfTable(rows) {
     if (!vrfTbody) return;
-    var list = rows || [];
+    let list = rows || [];
     if (!list.length) {
       vrfTbody.innerHTML =
         '<tr><td class="muted" colspan="3">No VRFs defined yet. Add one to use when creating prefixes.</td></tr>';
       if (vrfCountEl) vrfCountEl.textContent = "";
       return;
     }
-    var i;
-    var parts = [];
+    let i;
+    let parts = [];
     for (i = 0; i < list.length; i++) {
-      var r = list[i];
+      let r = list[i];
       parts.push(
         "<tr><td><code class=\"mono\">" +
           esc(r.name || "") +
@@ -2492,8 +2492,8 @@
         setVrfFlyoutStatus("VRF API URL is not configured.", true);
         return;
       }
-      var nm = ((vrfFlyoutName && vrfFlyoutName.value) || "").trim();
-      var ds = ((vrfFlyoutDesc && vrfFlyoutDesc.value) || "").trim();
+      let nm = ((vrfFlyoutName && vrfFlyoutName.value) || "").trim();
+      let ds = ((vrfFlyoutDesc && vrfFlyoutDesc.value) || "").trim();
       if (!nm) {
         setVrfFlyoutStatus("Name is required.", true);
         return;
@@ -2512,8 +2512,8 @@
         })
         .then(function (res) {
           if (!res.ok) {
-            var det = res.body && res.body.detail;
-            var msg =
+            let det = res.body && res.body.detail;
+            let msg =
               res.status === 409
                 ? typeof det === "string"
                   ? det
@@ -2564,34 +2564,34 @@
 
   if (tbody) {
     tbody.addEventListener("click", function (ev) {
-      var trD = ev.target.closest("tr[data-discovered-key]");
+      let trD = ev.target.closest("tr[data-discovered-key]");
       if (trD && tbody.contains(trD) && trD.classList.contains("gc-ipam-data-row")) {
-        var dk = trD.getAttribute("data-discovered-key");
-        var dr = findDiscovered(dk);
+        let dk = trD.dataset.discoveredKey;
+        let dr = findDiscovered(dk);
         if (dr) openFlyoutFromDiscovered(dr);
         return;
       }
-      var tr = ev.target.closest("tr[data-ipam-id]");
+      let tr = ev.target.closest("tr[data-ipam-id]");
       if (!tr || !tbody.contains(tr) || !tr.classList.contains("gc-ipam-data-row")) return;
-      var id = tr.getAttribute("data-ipam-id");
-      var row = findRow(id);
+      let id = tr.dataset.ipamId;
+      let row = findRow(id);
       if (row) openFlyoutEdit(row);
     });
     tbody.addEventListener("keydown", function (ev) {
       if (ev.key !== "Enter" && ev.key !== " ") return;
-      var trD = ev.target.closest("tr[data-discovered-key]");
+      let trD = ev.target.closest("tr[data-discovered-key]");
       if (trD && tbody.contains(trD) && trD.classList.contains("gc-ipam-data-row")) {
         ev.preventDefault();
-        var dk = trD.getAttribute("data-discovered-key");
-        var dr = findDiscovered(dk);
+        let dk = trD.dataset.discoveredKey;
+        let dr = findDiscovered(dk);
         if (dr) openFlyoutFromDiscovered(dr);
         return;
       }
-      var tr = ev.target.closest("tr[data-ipam-id]");
+      let tr = ev.target.closest("tr[data-ipam-id]");
       if (!tr || !tbody.contains(tr) || !tr.classList.contains("gc-ipam-data-row")) return;
       ev.preventDefault();
-      var id = tr.getAttribute("data-ipam-id");
-      var row = findRow(id);
+      let id = tr.dataset.ipamId;
+      let row = findRow(id);
       if (row) openFlyoutEdit(row);
     });
   }
@@ -2600,47 +2600,47 @@
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       setFormStatus("Saving…", false);
-      var name = (fieldName && fieldName.value) || "";
-      var cidr = (fieldCidr && fieldCidr.value) || "";
-      var cidrTrim = cidr.trim();
-      var vrfRaw = ((fieldVrf && fieldVrf.value) || "").trim();
+      let name = (fieldName && fieldName.value) || "";
+      let cidr = (fieldCidr && fieldCidr.value) || "";
+      let cidrTrim = cidr.trim();
+      let vrfRaw = ((fieldVrf && fieldVrf.value) || "").trim();
       if (!vrfRaw) {
         setFormStatus("Select a VRF.", true);
         return;
       }
-      var ptype = (fieldType && fieldType.value) || "assignment";
-      var hierErr = validateHierarchyBeforeSubmit(ptype, cidrTrim);
+      let ptype = (fieldType && fieldType.value) || "assignment";
+      let hierErr = validateHierarchyBeforeSubmit(ptype, cidrTrim);
       if (hierErr) {
         setFormStatus(hierErr, true);
         return;
       }
-      var parentPoolId = null;
-      var parentAssignmentId = null;
+      let parentPoolId = null;
+      let parentAssignmentId = null;
       if (ptype === "assignment") {
         if (fieldParentPool && fieldParentPool.value) {
-          var pp = parseInt(fieldParentPool.value, 10);
+          let pp = parseInt(fieldParentPool.value, 10);
           if (!isNaN(pp)) parentPoolId = pp;
         }
       } else if (ptype === "host") {
         if (fieldParentPool && fieldParentPool.value) {
-          var ppH = parseInt(fieldParentPool.value, 10);
+          let ppH = parseInt(fieldParentPool.value, 10);
           if (!isNaN(ppH)) parentPoolId = ppH;
         }
         if (fieldParentAssignment && fieldParentAssignment.value) {
-          var pa = parseInt(fieldParentAssignment.value, 10);
+          let pa = parseInt(fieldParentAssignment.value, 10);
           if (!isNaN(pa)) parentAssignmentId = pa;
         }
       }
-      var fwVal = null;
+      let fwVal = null;
       if (discoveredPrefillSource && discoveredPrefillSource.firewall_id != null) {
-        var fdi = parseInt(discoveredPrefillSource.firewall_id, 10);
+        let fdi = parseInt(discoveredPrefillSource.firewall_id, 10);
         if (!isNaN(fdi) && fdi > 0) fwVal = fdi;
       } else if (fieldAssignedFw && fieldAssignedFw.value) {
-        var parsed2 = parseInt(fieldAssignedFw.value, 10);
+        let parsed2 = parseInt(fieldAssignedFw.value, 10);
         if (!isNaN(parsed2) && parsed2 > 0) fwVal = parsed2;
       }
-      var customRaw = (fieldAssignedCustom && fieldAssignedCustom.value) || "";
-      var body = {
+      let customRaw = (fieldAssignedCustom && fieldAssignedCustom.value) || "";
+      let body = {
         name: name.trim(),
         cidr: cidrTrim,
         vrf: vrfRaw,
@@ -2659,8 +2659,8 @@
           body.assigned_to_custom = customRaw.trim() || null;
         }
       }
-      var url = apiCreate;
-      var method = "POST";
+      let url = apiCreate;
+      let method = "POST";
       if (editId != null) {
         url = apiList.replace(/\/?$/, "") + "/" + encodeURIComponent(String(editId));
         method = "PUT";
@@ -2687,7 +2687,7 @@
     });
   }
 
-  window.addEventListener(
+  globalThis.addEventListener(
     "resize",
     function () {
       if (nestedPoolFlyout && !nestedPoolFlyout.hidden) layoutNestedPoolBesidePrimary();

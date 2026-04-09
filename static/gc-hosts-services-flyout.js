@@ -4,30 +4,30 @@
 (function () {
   "use strict";
 
-  var flyout = null;
-  var panel = null;
-  var backdrop = null;
-  var titleEl = null;
-  var metaEl = null;
-  var sectionLabelEl = null;
-  var hintEl = null;
-  var fieldsRoot = null;
-  var closeBtn = null;
-  var doneBtn = null;
-  var saveBtn = null;
+  let flyout = null;
+  let panel = null;
+  let backdrop = null;
+  let titleEl = null;
+  let metaEl = null;
+  let sectionLabelEl = null;
+  let hintEl = null;
+  let fieldsRoot = null;
+  let closeBtn = null;
+  let doneBtn = null;
+  let saveBtn = null;
   /** @type {object|null} */
-  var currentHsRow = null;
+  let currentHsRow = null;
 
   function gcHsIsConfigurationTarget() {
-    return typeof window.gcHsEntityTarget === "string" && window.gcHsEntityTarget === "configuration";
+    return typeof globalThis.gcHsEntityTarget === "string" && globalThis.gcHsEntityTarget === "configuration";
   }
 
   function gcHsNavInventoryArray() {
     if (gcHsIsConfigurationTarget()) {
-      var c = window.gcNavConfigurationsJson;
+      let c = globalThis.gcNavConfigurationsJson;
       return Array.isArray(c) ? c : [];
     }
-    var f = window.gcNavFirewallsJson;
+    let f = globalThis.gcNavFirewallsJson;
     return Array.isArray(f) ? f : [];
   }
 
@@ -50,13 +50,13 @@
     if (!t) return null;
     if (gcHsIsConfigurationTarget()) {
       if (t.configuration_id != null) {
-        var nc = parseInt(String(t.configuration_id), 10);
+        let nc = parseInt(String(t.configuration_id), 10);
         return isNaN(nc) || nc <= 0 ? null : nc;
       }
       return null;
     }
     if (t.firewall_id != null) {
-      var nf = parseInt(String(t.firewall_id), 10);
+      let nf = parseInt(String(t.firewall_id), 10);
       return isNaN(nf) || nf <= 0 ? null : nf;
     }
     return null;
@@ -80,8 +80,8 @@
 
   function pick(flat, keys) {
     if (!flat) return "";
-    for (var i = 0; i < keys.length; i++) {
-      var v = flat[keys[i]];
+    for (let i = 0; i < keys.length; i++) {
+      let v = flat[keys[i]];
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
     return "";
@@ -96,13 +96,13 @@
   function netmaskToPrefix(nm) {
     nm = String(nm || "").trim();
     if (!nm) return null;
-    var parts = nm.split(".");
+    let parts = nm.split(".");
     if (parts.length !== 4) return null;
-    var bits = "";
-    for (var i = 0; i < 4; i++) {
-      var o = parseInt(parts[i], 10);
+    let bits = "";
+    for (let i = 0; i < 4; i++) {
+      let o = parseInt(parts[i], 10);
       if (isNaN(o) || o < 0 || o > 255) return null;
-      var b = o.toString(2);
+      let b = o.toString(2);
       while (b.length < 8) b = "0" + b;
       bits += b;
     }
@@ -111,28 +111,28 @@
   }
 
   function subnetDisplayLabel(netmask) {
-    var nm = String(netmask || "").trim();
+    let nm = String(netmask || "").trim();
     if (!nm) return "";
-    var p = netmaskToPrefix(nm);
+    let p = netmaskToPrefix(nm);
     if (p == null) return nm;
     return "/" + p + " (" + nm + ")";
   }
 
   /** @returns {string[]} */
   function hostGroupLabels(flat) {
-    var out = [];
+    let out = [];
     if (!flat) return out;
     Object.keys(flat).forEach(function (k) {
       if (k === "HostGroupList.HostGroup") {
-        var agg = String(flat[k] || "").trim();
+        let agg = String(flat[k] || "").trim();
         if (agg) {
           agg.split(",").forEach(function (part) {
-            var p = String(part || "").trim();
+            let p = String(part || "").trim();
             if (p) out.push(p);
           });
         }
       } else if (/^HostGroupList\.\d+\.HostGroup$/.test(k)) {
-        var v = String(flat[k] || "").trim();
+        let v = String(flat[k] || "").trim();
         if (v) out.push(v);
       }
     });
@@ -142,7 +142,7 @@
   }
 
   function listOfIpContent(flat) {
-    var direct = pick(flat, [
+    let direct = pick(flat, [
       "IPAddresses",
       "IPAddressList",
       "ListOfIPAddress",
@@ -150,10 +150,10 @@
       "IPList",
     ]);
     if (direct) return direct;
-    var parts = [];
+    let parts = [];
     Object.keys(flat).forEach(function (k) {
       if (/^IPAddresses\.\d+$/.test(k) || /^IPAddressList\.\d+$/.test(k) || /^ListOfIPAddress\.\d+$/.test(k)) {
-        var v = String(flat[k] || "").trim();
+        let v = String(flat[k] || "").trim();
         if (v) parts.push(v);
       }
     });
@@ -164,7 +164,7 @@
    * @returns {'ip'|'network'|'iprange'|'iplist'|'system'|'other'}
    */
   function hostTypeUiKind(hostTypeRaw) {
-    var t = norm(hostTypeRaw);
+    let t = norm(hostTypeRaw);
     if (t === "ip") return "ip";
     if (t === "network") return "network";
     if (t === "iprange") return "iprange";
@@ -175,8 +175,8 @@
 
   /** Value sent as host_type_ui when the type control is read-only (matches server HostType). */
   function hostTypeUiValueForSave(flat) {
-    var hostTypeRaw = pick(flat, ["HostType"]) || "";
-    var kind = hostTypeUiKind(hostTypeRaw);
+    let hostTypeRaw = pick(flat, ["HostType"]) || "";
+    let kind = hostTypeUiKind(hostTypeRaw);
     if (kind === "other" && listOfIpContent(flat)) kind = "iplist";
     if (kind === "ip") return "ip";
     if (kind === "network") return "network";
@@ -191,11 +191,11 @@
    * @returns {{ name: string, description: string }[]}
    */
   function mergeSortedUniqueHostGroups(apiGroups, selectedNames) {
-    var byName = {};
+    let byName = {};
     (apiGroups || []).forEach(function (g) {
-      var n = String(g && g.name != null ? g.name : "").trim();
+      let n = String(g && g.name != null ? g.name : "").trim();
       if (!n) return;
-      var row = {
+      let row = {
         name: n,
         description: String(g && g.description != null ? g.description : "").trim(),
       };
@@ -205,7 +205,7 @@
       byName[n] = row;
     });
     (selectedNames || []).forEach(function (n) {
-      var s = String(n || "").trim();
+      let s = String(n || "").trim();
       if (!s) return;
       if (!byName[s]) byName[s] = { name: s, description: "", on_all_firewalls: true };
     });
@@ -301,15 +301,15 @@
    * @param {number[]} firewallIds Positive firewall ids (empty = cannot load groups).
    */
   function buildHostGroupSection(firewallIds, hgReadOnly) {
-    var ids = [];
+    let ids = [];
     if (Array.isArray(firewallIds)) {
       firewallIds.forEach(function (x) {
-        var n = parseInt(String(x), 10);
+        let n = parseInt(String(x), 10);
         if (!isNaN(n) && n > 0) ids.push(n);
       });
     }
-    var idsJson = escapeHtml(JSON.stringify(ids));
-    var multiHint =
+    let idsJson = escapeHtml(JSON.stringify(ids));
+    let multiHint =
       ids.length > 1
         ? '<p class="muted gc-hs-ip-host-flyout__hg-aggregate-hint">Groups are the union across selected firewalls. A label marks groups that are missing on at least one selected firewall. Saving queues empty copies of those groups on firewalls where they are missing, before the new host.</p>'
         : "";
@@ -349,26 +349,26 @@
    * @param {number[]} [assignedFirewallIds] edit: firewalls that already have this host (for “add on save” hint)
    */
   function buildFirewallPickerSection(pickerMode, initialSelectedIds, assignedFirewallIds) {
-    var ids = [];
+    let ids = [];
     if (Array.isArray(initialSelectedIds)) {
       initialSelectedIds.forEach(function (x) {
-        var n = parseInt(String(x), 10);
+        let n = parseInt(String(x), 10);
         if (!isNaN(n) && n > 0) ids.push(n);
       });
     }
-    var idsJson = escapeHtml(JSON.stringify(ids));
-    var assigned = [];
+    let idsJson = escapeHtml(JSON.stringify(ids));
+    let assigned = [];
     if (Array.isArray(assignedFirewallIds)) {
       assignedFirewallIds.forEach(function (x) {
-        var na = parseInt(String(x), 10);
+        let na = parseInt(String(x), 10);
         if (!isNaN(na) && na > 0) assigned.push(na);
       });
     }
-    var assignedJson = escapeHtml(JSON.stringify(assigned));
-    var pm = pickerMode === "edit" ? "edit" : "add";
-    var isCfg = gcHsIsConfigurationTarget();
-    var msAttr = isCfg ? 'data-gc-cfg-ms="1"' : 'data-gc-fw-ms="1"';
-    var hint =
+    let assignedJson = escapeHtml(JSON.stringify(assigned));
+    let pm = pickerMode === "edit" ? "edit" : "add";
+    let isCfg = gcHsIsConfigurationTarget();
+    let msAttr = isCfg ? 'data-gc-cfg-ms="1"' : 'data-gc-fw-ms="1"';
+    let hint =
       pm === "add"
         ? isCfg
           ? '<p class="muted gc-hs-ip-host-flyout__fw-hint">The same host is stored on every configuration you leave selected. Search to filter the list.</p>'
@@ -376,9 +376,9 @@
         : isCfg
           ? '<p class="muted gc-hs-ip-host-flyout__fw-hint">All configurations are listed. Uncheck to skip where the host exists. Newly checked configurations get this host added (and empty host groups created first if needed).</p>'
           : '<p class="muted gc-hs-ip-host-flyout__fw-hint">All inventory firewalls are listed. Uncheck to skip updates where the host exists. Newly checked firewalls get this host added (and empty host groups created first if needed), same as Add IP host.</p>';
-    var lbl = isCfg ? "Configurations" : "Firewalls";
-    var ph = isCfg ? "Search configurations" : "Search firewalls";
-    var emptyT = isCfg ? "No configurations available." : "No firewalls available.";
+    let lbl = isCfg ? "Configurations" : "Firewalls";
+    let ph = isCfg ? "Search configurations" : "Search firewalls";
+    let emptyT = isCfg ? "No configurations available." : "No firewalls available.";
     return (
       '<div class="gc-if-flyout__field gc-hs-ip-host-flyout__fw-field">' +
       '<span class="gc-if-flyout__label">' +
@@ -416,12 +416,12 @@
 
   function buildIpHostAddressInnerHtml(kind, vals, readOnly) {
     vals = vals || {};
-    var ipAddr = vals.ipAddr != null ? String(vals.ipAddr) : "";
-    var subnet = vals.subnet != null ? String(vals.subnet) : "";
-    var startIp = vals.startIp != null ? String(vals.startIp) : "";
-    var endIp = vals.endIp != null ? String(vals.endIp) : "";
-    var listContent = vals.listContent != null ? String(vals.listContent) : "";
-    var roAttr = readOnly ? " readonly" : "";
+    let ipAddr = vals.ipAddr != null ? String(vals.ipAddr) : "";
+    let subnet = vals.subnet != null ? String(vals.subnet) : "";
+    let startIp = vals.startIp != null ? String(vals.startIp) : "";
+    let endIp = vals.endIp != null ? String(vals.endIp) : "";
+    let listContent = vals.listContent != null ? String(vals.listContent) : "";
+    let roAttr = readOnly ? " readonly" : "";
     if (kind === "system" || kind === "other") {
       return (
         '<div class="gc-if-flyout__field gc-hs-ip-host-flyout__conditional">' +
@@ -502,10 +502,10 @@
   }
 
   function scrapeIpHostAddressVals(root) {
-    var slot = root.querySelector("#gc-hs-ip-address-slot");
-    var out = { ipAddr: "", subnet: "", startIp: "", endIp: "", listContent: "" };
+    let slot = root.querySelector("#gc-hs-ip-address-slot");
+    let out = { ipAddr: "", subnet: "", startIp: "", endIp: "", listContent: "" };
     if (!slot) return out;
-    var x;
+    let x;
     x = slot.querySelector("#gc-hs-ip-addr-single");
     if (x) out.ipAddr = String(x.value || "");
     x = slot.querySelector("#gc-hs-ip-net-addr");
@@ -522,49 +522,49 @@
   }
 
   function applyIpHostAddressKind(root, kind) {
-    var slot = root.querySelector("#gc-hs-ip-address-slot");
+    let slot = root.querySelector("#gc-hs-ip-address-slot");
     if (!slot) return;
-    var vals = scrapeIpHostAddressVals(root);
+    let vals = scrapeIpHostAddressVals(root);
     slot.innerHTML = buildIpHostAddressInnerHtml(kind, vals, false);
   }
 
   function buildIpHostFormHtml(row, opts) {
     opts = opts || {};
-    var typeEditable = !!opts.typeEditable;
-    var flat = row.flat && typeof row.flat === "object" ? row.flat : {};
-    var systemHost = !!row.system_host;
-    var name =
+    let typeEditable = !!opts.typeEditable;
+    let flat = row.flat && typeof row.flat === "object" ? row.flat : {};
+    let systemHost = !!row.system_host;
+    let name =
       pick(flat, ["Name"]) ||
       String((row.cells && row.cells["__name"]) || "").trim() ||
       String(row.external_name || "").trim() ||
       "";
-    var desc = pick(flat, ["Description"]);
-    var ipFamily = pick(flat, ["IPFamily"]) || "IPv4";
-    var hostTypeRaw = pick(flat, ["HostType"]) || "";
-    var kind = hostTypeUiKind(hostTypeRaw);
+    let desc = pick(flat, ["Description"]);
+    let ipFamily = pick(flat, ["IPFamily"]) || "IPv4";
+    let hostTypeRaw = pick(flat, ["HostType"]) || "";
+    let kind = hostTypeUiKind(hostTypeRaw);
     if (kind === "other" && listOfIpContent(flat)) kind = "iplist";
     if (typeEditable && (kind === "system" || kind === "other")) kind = "ip";
 
-    var ip4 = norm(ipFamily) !== "ipv6";
-    var ip6 = norm(ipFamily) === "ipv6";
+    let ip4 = norm(ipFamily) !== "ipv6";
+    let ip6 = norm(ipFamily) === "ipv6";
 
-    var typeIp = kind === "ip";
-    var typeNet = kind === "network";
-    var typeRange = kind === "iprange";
-    var typeList = kind === "iplist";
-    var typeSystem = kind === "system";
-    var typeOther = kind === "other";
+    let typeIp = kind === "ip";
+    let typeNet = kind === "network";
+    let typeRange = kind === "iprange";
+    let typeList = kind === "iplist";
+    let typeSystem = kind === "system";
+    let typeOther = kind === "other";
 
-    var ro = systemHost || typeSystem;
-    var flyoutEditable = typeEditable ? true : !ro;
+    let ro = systemHost || typeSystem;
+    let flyoutEditable = typeEditable ? true : !ro;
 
-    var ipAddr = pick(flat, ["IPAddress"]);
-    var startIp = pick(flat, ["StartIPAddress"]);
-    var endIp = pick(flat, ["EndIPAddress"]);
-    var subnet = pick(flat, ["Subnet"]);
-    var listContent = listOfIpContent(flat);
+    let ipAddr = pick(flat, ["IPAddress"]);
+    let startIp = pick(flat, ["StartIPAddress"]);
+    let endIp = pick(flat, ["EndIPAddress"]);
+    let subnet = pick(flat, ["Subnet"]);
+    let listContent = listOfIpContent(flat);
 
-    var ipVersionHtml =
+    let ipVersionHtml =
       '<div class="gc-if-flyout__field" data-gc-combine-field-keys="IPFamily">' +
       '<span class="gc-if-flyout__label">IP version <span class="gc-if-flyout__req" aria-hidden="true">*</span></span>' +
       '<div class="gc-hs-ip-host-flyout__radio-row" role="radiogroup" aria-label="IP version">' +
@@ -572,8 +572,8 @@
       ipVerRadio("gc-hs-ipver", "IPv6", "IPv6", ip6, ro || !flyoutEditable) +
       "</div></div>";
 
-    var hiddenType = "";
-    var typeHtml;
+    let hiddenType = "";
+    let typeHtml;
     if (typeEditable) {
       typeHtml =
         '<div class="gc-if-flyout__field" id="gc-hs-ip-type-field" data-gc-combine-field-keys="HostType">' +
@@ -599,8 +599,8 @@
         "</div>";
     }
 
-    var addrRo = ro || !flyoutEditable;
-    var addressInner = buildIpHostAddressInnerHtml(kind, {
+    let addrRo = ro || !flyoutEditable;
+    let addressInner = buildIpHostAddressInnerHtml(kind, {
       ipAddr: ipAddr,
       subnet: subnet,
       startIp: startIp,
@@ -608,12 +608,12 @@
       listContent: listContent,
     }, addrRo);
 
-    var pickerMode = opts.pickerMode === "edit" ? "edit" : "add";
-    var initialFwIds = [];
+    let pickerMode = opts.pickerMode === "edit" ? "edit" : "add";
+    let initialFwIds = [];
     if (pickerMode === "add") {
       if (Array.isArray(opts.addFirewallIds)) {
         opts.addFirewallIds.forEach(function (x) {
-          var nInit = parseInt(String(x), 10);
+          let nInit = parseInt(String(x), 10);
           if (!isNaN(nInit) && nInit > 0) initialFwIds.push(nInit);
         });
       }
@@ -621,20 +621,20 @@
       if (Array.isArray(row.ip_host_edit_targets) && row.ip_host_edit_targets.length) {
         row.ip_host_edit_targets.forEach(function (t) {
           if (t && t.firewall_id != null) {
-            var nt = parseInt(String(t.firewall_id), 10);
+            let nt = parseInt(String(t.firewall_id), 10);
             if (!isNaN(nt) && nt > 0) initialFwIds.push(nt);
           }
         });
       } else if (row.firewall_id != null && String(row.firewall_id).trim() !== "") {
-        var oneInit = parseInt(String(row.firewall_id), 10);
+        let oneInit = parseInt(String(row.firewall_id), 10);
         if (!isNaN(oneInit) && oneInit > 0) initialFwIds = [oneInit];
       }
     }
-    var assignedForPicker = pickerMode === "edit" ? initialFwIds.slice() : [];
-    var fwPickerHtml = buildFirewallPickerSection(pickerMode, initialFwIds, assignedForPicker);
-    var hgFwIds = initialFwIds.slice();
+    let assignedForPicker = pickerMode === "edit" ? initialFwIds.slice() : [];
+    let fwPickerHtml = buildFirewallPickerSection(pickerMode, initialFwIds, assignedForPicker);
+    let hgFwIds = initialFwIds.slice();
 
-    var nameDescRo = ro || !flyoutEditable;
+    let nameDescRo = ro || !flyoutEditable;
     return (
       '<div class="gc-hs-ip-host-flyout">' +
       fwPickerHtml +
@@ -658,60 +658,60 @@
   }
 
   function collectIpHostForm(root) {
-    var out = {};
+    let out = {};
     if (!root) return out;
-    var nameEl = root.querySelector("#gc-hs-ip-name");
-    var descEl = root.querySelector("#gc-hs-ip-desc");
+    let nameEl = root.querySelector("#gc-hs-ip-name");
+    let descEl = root.querySelector("#gc-hs-ip-desc");
     out.name = nameEl ? String(nameEl.value || "").trim() : "";
     out.description = descEl ? String(descEl.value || "") : "";
-    var ver = root.querySelector('input[name="gc-hs-ipver"]:checked');
+    let ver = root.querySelector('input[name="gc-hs-ipver"]:checked');
     out.ip_family = ver ? String(ver.value || "").trim() : "";
-    var htRadio = root.querySelector('input[name="gc-hs-htype"]:checked');
+    let htRadio = root.querySelector('input[name="gc-hs-htype"]:checked');
     if (htRadio) {
       out.host_type_ui = String(htRadio.value || "").trim().toLowerCase();
     } else {
-      var htHidden = root.querySelector("#gc-hs-htype-ui");
+      let htHidden = root.querySelector("#gc-hs-htype-ui");
       out.host_type_ui = htHidden ? String(htHidden.value || "").trim().toLowerCase() : "";
     }
-    var ui = out.host_type_ui || "";
-    var hgNames = [];
+    let ui = out.host_type_ui || "";
+    let hgNames = [];
     root.querySelectorAll('input[type="checkbox"][data-gc-hg-name]').forEach(function (cb) {
       if (cb.checked) {
-        var nm = cb.getAttribute("data-gc-hg-name");
+        let nm = cb.dataset.gcHgName;
         if (nm) hgNames.push(nm);
       }
     });
     out.host_groups = hgNames;
     if (ui === "ip") {
-      var ip = root.querySelector("#gc-hs-ip-addr-single");
+      let ip = root.querySelector("#gc-hs-ip-addr-single");
       out.ip_address = ip ? String(ip.value || "").trim() : "";
     } else if (ui === "network") {
-      var ipn = root.querySelector("#gc-hs-ip-net-addr");
-      var sn = root.querySelector("#gc-hs-ip-subnet");
+      let ipn = root.querySelector("#gc-hs-ip-net-addr");
+      let sn = root.querySelector("#gc-hs-ip-subnet");
       out.ip_address = ipn ? String(ipn.value || "").trim() : "";
       out.subnet = sn ? String(sn.value || "").trim() : "";
     } else if (ui === "iprange") {
-      var rs = root.querySelector("#gc-hs-ip-range-start");
-      var re = root.querySelector("#gc-hs-ip-range-end");
+      let rs = root.querySelector("#gc-hs-ip-range-start");
+      let re = root.querySelector("#gc-hs-ip-range-end");
       out.start_ip = rs ? String(rs.value || "").trim() : "";
       out.end_ip = re ? String(re.value || "").trim() : "";
     } else if (ui === "iplist") {
-      var tl = root.querySelector("#gc-hs-ip-list");
+      let tl = root.querySelector("#gc-hs-ip-list");
       out.ip_list = tl ? String(tl.value || "") : "";
     }
     return out;
   }
 
   function collectFlyoutFirewallIdsOrdered() {
-    var out = [];
+    let out = [];
     if (!fieldsRoot) return out;
-    var ms = fieldsRoot.querySelector(gcHsFlyoutMsSelector());
+    let ms = fieldsRoot.querySelector(gcHsFlyoutMsSelector());
     if (!ms) return out;
-    var idA = gcHsFlyoutIdAttr();
+    let idA = gcHsFlyoutIdAttr();
     ms.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
       if (!cb.checked) return;
       if (!cb.hasAttribute(idA)) return;
-      var n = parseInt(String(cb.getAttribute(idA) || ""), 10);
+      let n = parseInt(String(cb.getAttribute(idA) || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
@@ -719,21 +719,21 @@
 
   function refreshHostGroupSectionForFlyoutFirewallIds() {
     if (!fieldsRoot || !flyout) return;
-    if (flyout.getAttribute("data-gc-hs-flyout-kind") !== "ip-host") return;
-    var msHg = fieldsRoot.querySelector("[data-gc-hg-ms]");
+    if (flyout.dataset.gcHsFlyoutKind !== "ip-host") return;
+    let msHg = fieldsRoot.querySelector("[data-gc-hg-ms]");
     if (!msHg) return;
-    var field = msHg.closest(".gc-if-flyout__field");
+    let field = msHg.closest(".gc-if-flyout__field");
     if (!field || !field.parentNode) return;
-    var ids = collectFlyoutFirewallIdsOrdered();
-    var readOnlyHg = false;
-    if (flyout.getAttribute("data-gc-hs-ip-host-mode") === "edit" && currentHsRow) {
-      var f0 = currentHsRow.flat && typeof currentHsRow.flat === "object" ? currentHsRow.flat : {};
+    let ids = collectFlyoutFirewallIdsOrdered();
+    let readOnlyHg = false;
+    if (flyout.dataset.gcHsIpHostMode === "edit" && currentHsRow) {
+      let f0 = currentHsRow.flat && typeof currentHsRow.flat === "object" ? currentHsRow.flat : {};
       readOnlyHg =
         !!currentHsRow.system_host || hostTypeUiKind(pick(f0, ["HostType"])) === "system";
     }
-    var wrap = document.createElement("div");
+    let wrap = document.createElement("div");
     wrap.innerHTML = buildHostGroupSection(ids, readOnlyHg);
-    var replacement = wrap.firstElementChild;
+    let replacement = wrap.firstElementChild;
     if (!replacement) return;
     field.parentNode.replaceChild(replacement, field);
     if (currentHsRow) {
@@ -747,42 +747,42 @@
   }
 
   function hydrateIpHostFirewallMs(root, ctx) {
-    var ms = root.querySelector(gcHsFlyoutMsSelector());
+    let ms = root.querySelector(gcHsFlyoutMsSelector());
     if (!ms) return;
-    var idA = gcHsFlyoutIdAttr();
+    let idA = gcHsFlyoutIdAttr();
     ctx = ctx || {};
-    var row = ctx.row || currentHsRow || {};
-    var mode = ms.getAttribute("data-fw-picker-mode") || "add";
-    var trigger = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger");
-    var triggerText = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger-text");
-    var dropdown = ms.querySelector(".gc-hs-ip-host-flyout__fw-dropdown");
-    var search = ms.querySelector(".gc-hs-ip-host-flyout__fw-search");
-    var optsRoot = ms.querySelector(".gc-hs-ip-host-flyout__fw-ms-options");
-    var emptyEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-empty");
-    var pillsEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-pills");
+    let row = ctx.row || currentHsRow || {};
+    let mode = ms.dataset.fwPickerMode || "add";
+    let trigger = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger");
+    let triggerText = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger-text");
+    let dropdown = ms.querySelector(".gc-hs-ip-host-flyout__fw-dropdown");
+    let search = ms.querySelector(".gc-hs-ip-host-flyout__fw-search");
+    let optsRoot = ms.querySelector(".gc-hs-ip-host-flyout__fw-ms-options");
+    let emptyEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-empty");
+    let pillsEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-pills");
 
-    var initialSet = {};
+    let initialSet = {};
     try {
-      var rawInit = ms.getAttribute("data-fw-initial-selected");
+      let rawInit = ms.dataset.fwInitialSelected;
       if (rawInit) {
-        var arr = JSON.parse(rawInit);
+        let arr = JSON.parse(rawInit);
         if (Array.isArray(arr)) {
           arr.forEach(function (x) {
-            var n = parseInt(String(x), 10);
+            let n = parseInt(String(x), 10);
             if (!isNaN(n) && n > 0) initialSet[String(n)] = true;
           });
         }
       }
     } catch (eInit) {}
 
-    var assignedSet = {};
+    let assignedSet = {};
     try {
-      var rawA = ms.getAttribute("data-fw-assigned-ids");
+      let rawA = ms.dataset.fwAssignedIds;
       if (rawA) {
-        var arrA = JSON.parse(rawA);
+        let arrA = JSON.parse(rawA);
         if (Array.isArray(arrA)) {
           arrA.forEach(function (x) {
-            var na = parseInt(String(x), 10);
+            let na = parseInt(String(x), 10);
             if (!isNaN(na) && na > 0) assignedSet[String(na)] = true;
           });
         }
@@ -796,7 +796,7 @@
     }
 
     function countFwChecked() {
-      var n = 0;
+      let n = 0;
       ms.querySelectorAll("input[type=\"checkbox\"]").forEach(function (cb) {
         if (!cb.hasAttribute(idA) || !cb.checked) return;
         n++;
@@ -811,18 +811,18 @@
     function syncPills() {
       if (!pillsEl) return;
       pillsEl.innerHTML = "";
-      var items = [];
+      let items = [];
       ms.querySelectorAll("input[type=\"checkbox\"]").forEach(function (cb) {
         if (!cb.hasAttribute(idA) || !cb.checked) return;
-        var id = String(cb.getAttribute(idA) || "");
-        var lab = String(cb.getAttribute("data-gc-fw-label") || id).trim() || id;
+        let id = String(cb.getAttribute(idA) || "");
+        let lab = String(cb.dataset.gcFwLabel || id).trim() || id;
         items.push({ id: id, lab: lab });
       });
       items.sort(function (a, b) {
         return a.lab.toLowerCase().localeCompare(b.lab.toLowerCase());
       });
       items.forEach(function (it) {
-        var li = document.createElement("li");
+        let li = document.createElement("li");
         li.className = "gc-hs-ip-host-flyout__fw-pill mono";
         li.textContent = it.lab;
         li.setAttribute("title", it.lab);
@@ -834,9 +834,9 @@
       syncTriggerText();
       syncPills();
       refreshHostGroupSectionForFlyoutFirewallIds();
-      if (typeof window.gcHsOnFlyoutFirewallSelectionChange === "function") {
+      if (typeof globalThis.gcHsOnFlyoutFirewallSelectionChange === "function") {
         try {
-          window.gcHsOnFlyoutFirewallSelectionChange(fieldsRoot);
+          globalThis.gcHsOnFlyoutFirewallSelectionChange(fieldsRoot);
         } catch (eFwHook) {}
       }
     }
@@ -845,24 +845,24 @@
       if (!optsRoot) return;
       optsRoot.innerHTML = "";
       (items || []).forEach(function (it) {
-        var id = it.id;
-        var label = String(it.label != null ? it.label : "").trim() || String(id);
-        var lab = document.createElement("label");
+        let id = it.id;
+        let label = String(it.label != null ? it.label : "").trim() || String(id);
+        let lab = document.createElement("label");
         lab.className = "gc-multiselect__option gc-hs-ip-host-flyout__fw-option";
-        var cb = document.createElement("input");
+        let cb = document.createElement("input");
         cb.type = "checkbox";
         cb.setAttribute(idA, String(id));
         cb.setAttribute("data-gc-fw-label", label);
         cb.checked = !!initialSet[String(id)];
         cb.addEventListener("change", onFwCheckboxChange);
-        var textWrap = document.createElement("span");
+        let textWrap = document.createElement("span");
         textWrap.className = "gc-hs-ip-host-flyout__hg-opt-text";
-        var nameEl = document.createElement("span");
+        let nameEl = document.createElement("span");
         nameEl.className = "gc-hs-ip-host-flyout__hg-opt-name mono";
         nameEl.textContent = label;
         textWrap.appendChild(nameEl);
         if (mode === "edit" && !assignedSet[String(id)]) {
-          var nu = document.createElement("span");
+          let nu = document.createElement("span");
           nu.className = "gc-hs-ip-host-flyout__fw-opt-new muted";
           nu.textContent = " · add on save";
           textWrap.appendChild(nu);
@@ -872,7 +872,7 @@
         optsRoot.appendChild(lab);
       });
       if (emptyEl) {
-        var showEmpty = !items || items.length === 0;
+        let showEmpty = !items || items.length === 0;
         emptyEl.hidden = !showEmpty;
         if (showEmpty) {
           emptyEl.textContent = gcHsIsConfigurationTarget()
@@ -885,13 +885,13 @@
     }
 
     function runFwFilter() {
-      var q = norm(search ? search.value : "");
+      let q = norm(search ? search.value : "");
       ms.querySelectorAll(".gc-hs-ip-host-flyout__fw-option").forEach(function (lab) {
-        var cb = lab.querySelector("input[type=\"checkbox\"]");
+        let cb = lab.querySelector("input[type=\"checkbox\"]");
         if (!cb || !cb.hasAttribute(idA)) return;
-        var nm = norm(cb.getAttribute("data-gc-fw-label") || "");
-        var idStr = norm(String(cb.getAttribute(idA) || ""));
-        var match = !q || nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1;
+        let nm = norm(cb.dataset.gcFwLabel || "");
+        let idStr = norm(String(cb.getAttribute(idA) || ""));
+        let match = !q || nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1;
         lab.style.display = match ? "" : "none";
       });
     }
@@ -900,8 +900,8 @@
       trigger.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        var next = dropdown.hidden;
-        var closeScope = root || fieldsRoot;
+        let next = dropdown.hidden;
+        let closeScope = root || fieldsRoot;
         if (closeScope) {
           closeScope.querySelectorAll(".gc-hs-ip-host-flyout__hg-dropdown").forEach(function (d) {
             d.hidden = true;
@@ -941,12 +941,12 @@
       });
     }
 
-    var navItems = [];
+    let navItems = [];
     gcHsNavInventoryArray().forEach(function (fw) {
       if (!fw || fw.id == null) return;
-      var fid = parseInt(String(fw.id), 10);
+      let fid = parseInt(String(fw.id), 10);
       if (isNaN(fid) || fid <= 0) return;
-      var lbl = String(fw.label != null ? fw.label : "").trim() || String(fid);
+      let lbl = String(fw.label != null ? fw.label : "").trim() || String(fid);
       navItems.push({ id: fid, label: lbl });
     });
     navItems.sort(function (a, b) {
@@ -957,28 +957,28 @@
   }
 
   function hydrateIpHostHostGroupMs(root, row) {
-    var ms = root.querySelector("[data-gc-hg-ms]");
+    let ms = root.querySelector("[data-gc-hg-ms]");
     if (!ms) return;
-    var readOnly = ms.getAttribute("data-hg-readonly") === "1";
-    var flat = row.flat && typeof row.flat === "object" ? row.flat : {};
-    var selected = hostGroupLabels(flat);
-    var firewallIds = [];
+    let readOnly = ms.dataset.hgReadonly === "1";
+    let flat = row.flat && typeof row.flat === "object" ? row.flat : {};
+    let selected = hostGroupLabels(flat);
+    let firewallIds = [];
     try {
-      firewallIds = JSON.parse(ms.getAttribute("data-firewall-ids") || "[]");
+      firewallIds = JSON.parse(ms.dataset.firewallIds || "[]");
       if (!Array.isArray(firewallIds)) firewallIds = [];
     } catch (e0) {
       firewallIds = [];
     }
-    var urlBase = typeof window.gcHsIpHostgroupNamesUrl === "string" ? window.gcHsIpHostgroupNamesUrl : "";
-    var aggUrl =
-      typeof window.gcHsIpHostgroupAggregateUrl === "string" ? window.gcHsIpHostgroupAggregateUrl : "";
-    var trigger = ms.querySelector(".gc-hs-ip-host-flyout__hg-trigger");
-    var triggerText = ms.querySelector(".gc-hs-ip-host-flyout__hg-trigger-text");
-    var dropdown = ms.querySelector(".gc-hs-ip-host-flyout__hg-dropdown");
-    var search = ms.querySelector(".gc-hs-ip-host-flyout__hg-search");
-    var optsRoot = ms.querySelector(".gc-hs-ip-host-flyout__hg-ms-options");
-    var emptyEl = ms.querySelector(".gc-hs-ip-host-flyout__hg-empty");
-    var pillsEl = ms.querySelector(".gc-hs-ip-host-flyout__hg-pills");
+    let urlBase = typeof globalThis.gcHsIpHostgroupNamesUrl === "string" ? globalThis.gcHsIpHostgroupNamesUrl : "";
+    let aggUrl =
+      typeof globalThis.gcHsIpHostgroupAggregateUrl === "string" ? globalThis.gcHsIpHostgroupAggregateUrl : "";
+    let trigger = ms.querySelector(".gc-hs-ip-host-flyout__hg-trigger");
+    let triggerText = ms.querySelector(".gc-hs-ip-host-flyout__hg-trigger-text");
+    let dropdown = ms.querySelector(".gc-hs-ip-host-flyout__hg-dropdown");
+    let search = ms.querySelector(".gc-hs-ip-host-flyout__hg-search");
+    let optsRoot = ms.querySelector(".gc-hs-ip-host-flyout__hg-ms-options");
+    let emptyEl = ms.querySelector(".gc-hs-ip-host-flyout__hg-empty");
+    let pillsEl = ms.querySelector(".gc-hs-ip-host-flyout__hg-pills");
 
     function setOpen(open) {
       if (!dropdown) return;
@@ -987,7 +987,7 @@
     }
 
     function countChecked() {
-      var n = 0;
+      let n = 0;
       ms.querySelectorAll('input[type="checkbox"][data-gc-hg-name]').forEach(function (cb) {
         if (cb.checked) n++;
       });
@@ -1001,17 +1001,17 @@
     function syncPills() {
       if (!pillsEl) return;
       pillsEl.innerHTML = "";
-      var names = [];
+      let names = [];
       ms.querySelectorAll('input[type="checkbox"][data-gc-hg-name]').forEach(function (cb) {
         if (!cb.checked) return;
-        var nm = cb.getAttribute("data-gc-hg-name");
+        let nm = cb.dataset.gcHgName;
         if (nm) names.push(nm);
       });
       names.sort(function (a, b) {
         return a.toLowerCase().localeCompare(b.toLowerCase());
       });
       names.forEach(function (nm) {
-        var li = document.createElement("li");
+        let li = document.createElement("li");
         li.className = "gc-hs-ip-host-flyout__hg-pill mono";
         li.textContent = nm;
         li.setAttribute("title", nm);
@@ -1027,40 +1027,40 @@
     function renderHostGroups(groups) {
       if (!optsRoot) return;
       optsRoot.innerHTML = "";
-      var selectedSet = {};
+      let selectedSet = {};
       selected.forEach(function (s) {
         selectedSet[s] = true;
       });
       (groups || []).forEach(function (g) {
-        var name = String(g && g.name != null ? g.name : "").trim();
+        let name = String(g && g.name != null ? g.name : "").trim();
         if (!name) return;
-        var desc = String(g && g.description != null ? g.description : "").trim();
-        var lab = document.createElement("label");
+        let desc = String(g && g.description != null ? g.description : "").trim();
+        let lab = document.createElement("label");
         lab.className = "gc-multiselect__option gc-hs-ip-host-flyout__hg-option";
-        var cb = document.createElement("input");
+        let cb = document.createElement("input");
         cb.type = "checkbox";
         cb.setAttribute("data-gc-hg-name", name);
         cb.checked = !!selectedSet[name];
         if (readOnly) cb.disabled = true;
         cb.addEventListener("change", onHgCheckboxChange);
-        var textWrap = document.createElement("span");
+        let textWrap = document.createElement("span");
         textWrap.className = "gc-hs-ip-host-flyout__hg-opt-text";
-        var nameEl = document.createElement("span");
+        let nameEl = document.createElement("span");
         nameEl.className = "gc-hs-ip-host-flyout__hg-opt-name mono";
         nameEl.textContent = name;
         textWrap.appendChild(nameEl);
         if (desc) {
-          var sep = document.createElement("span");
+          let sep = document.createElement("span");
           sep.className = "gc-hs-ip-host-flyout__hg-opt-sep muted";
           sep.textContent = " · ";
           textWrap.appendChild(sep);
-          var descEl = document.createElement("span");
+          let descEl = document.createElement("span");
           descEl.className = "gc-hs-ip-host-flyout__hg-opt-desc muted";
           descEl.textContent = desc;
           textWrap.appendChild(descEl);
         }
         if (g && g.on_all_firewalls === false) {
-          var part = document.createElement("span");
+          let part = document.createElement("span");
           part.className = "gc-hs-ip-host-flyout__hg-opt-partial muted";
           part.textContent = " · not on all selected firewalls";
           textWrap.appendChild(part);
@@ -1070,13 +1070,13 @@
         optsRoot.appendChild(lab);
       });
       if (emptyEl) {
-        var showEmpty = !groups || groups.length === 0;
+        let showEmpty = !groups || groups.length === 0;
         emptyEl.hidden = !showEmpty;
         if (showEmpty) {
-          var multiFw = ms.getAttribute("data-firewall-ids");
-          var nFw = 0;
+          let multiFw = ms.dataset.firewallIds;
+          let nFw = 0;
           try {
-            var parsed = JSON.parse(multiFw || "[]");
+            let parsed = JSON.parse(multiFw || "[]");
             if (Array.isArray(parsed)) nFw = parsed.length;
           } catch (e2) {
             nFw = 0;
@@ -1092,13 +1092,13 @@
     }
 
     function runFilter() {
-      var q = norm(search ? search.value : "");
+      let q = norm(search ? search.value : "");
       ms.querySelectorAll(".gc-hs-ip-host-flyout__hg-option").forEach(function (lab) {
-        var cb = lab.querySelector("[data-gc-hg-name]");
-        var nm = cb ? norm(cb.getAttribute("data-gc-hg-name") || "") : "";
-        var descEl = lab.querySelector(".gc-hs-ip-host-flyout__hg-opt-desc");
-        var dsc = descEl ? norm(descEl.textContent || "") : "";
-        var match = !q || nm.indexOf(q) !== -1 || dsc.indexOf(q) !== -1;
+        let cb = lab.querySelector("[data-gc-hg-name]");
+        let nm = cb ? norm(cb.dataset.gcHgName || "") : "";
+        let descEl = lab.querySelector(".gc-hs-ip-host-flyout__hg-opt-desc");
+        let dsc = descEl ? norm(descEl.textContent || "") : "";
+        let match = !q || nm.indexOf(q) !== -1 || dsc.indexOf(q) !== -1;
         lab.style.display = match ? "" : "none";
       });
     }
@@ -1107,7 +1107,7 @@
       trigger.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        var next = dropdown.hidden;
+        let next = dropdown.hidden;
         if (fieldsRoot) {
           fieldsRoot.querySelectorAll(".gc-hs-ip-host-flyout__hg-dropdown").forEach(function (d) {
             d.hidden = true;
@@ -1155,7 +1155,7 @@
         if (triggerText) triggerText.textContent = "Could not load groups";
         return;
       }
-      var merged = mergeSortedUniqueHostGroups(raw, selected);
+      let merged = mergeSortedUniqueHostGroups(raw, selected);
       renderHostGroups(merged);
       runFilter();
     }
@@ -1177,7 +1177,7 @@
           });
         })
         .then(function (x) {
-          var raw = x.j && x.j.groups;
+          let raw = x.j && x.j.groups;
           if (!x.ok || !Array.isArray(raw)) {
             if (triggerText) triggerText.textContent = "Could not load groups";
             return;
@@ -1194,9 +1194,9 @@
       if (triggerText) triggerText.textContent = "Group list URL not configured";
       return;
     }
-    var join = urlBase.indexOf("?") >= 0 ? "&" : "?";
-    var qk = gcHsIsConfigurationTarget() ? "configuration_id" : "firewall_id";
-    var u = urlBase + join + qk + "=" + encodeURIComponent(String(firewallIds[0]));
+    let join = urlBase.indexOf("?") >= 0 ? "&" : "?";
+    let qk = gcHsIsConfigurationTarget() ? "configuration_id" : "firewall_id";
+    let u = urlBase + join + qk + "=" + encodeURIComponent(String(firewallIds[0]));
     fetch(u, { credentials: "same-origin" })
       .then(function (r) {
         return r.json().then(function (j) {
@@ -1204,12 +1204,12 @@
         });
       })
       .then(function (x) {
-        var raw = x.j && x.j.groups;
+        let raw = x.j && x.j.groups;
         if (!x.ok || !Array.isArray(raw)) {
           if (triggerText) triggerText.textContent = "Could not load groups";
           return;
         }
-        var merged = mergeSortedUniqueHostGroups(raw, selected);
+        let merged = mergeSortedUniqueHostGroups(raw, selected);
         renderHostGroups(merged);
         runFilter();
       })
@@ -1219,16 +1219,16 @@
   }
 
   function buildGenericFieldsHtml(row) {
-    var flat = row.flat && typeof row.flat === "object" ? row.flat : {};
-    var keys = Object.keys(flat).sort();
+    let flat = row.flat && typeof row.flat === "object" ? row.flat : {};
+    let keys = Object.keys(flat).sort();
     if (keys.length === 0) {
       return "<p class=\"muted\">No flattened fields in this payload.</p>";
     }
     return keys
       .map(function (k) {
-        var v = flat[k] != null ? String(flat[k]) : "";
-        var multiline = v.indexOf("\n") >= 0 || v.length > 120;
-        var inputHtml = multiline
+        let v = flat[k] != null ? String(flat[k]) : "";
+        let multiline = v.indexOf("\n") >= 0 || v.length > 120;
+        let inputHtml = multiline
           ? "<textarea class=\"gc-if-flyout__input gc-hs-flyout__textarea\" readonly rows=\"4\">" +
             escapeHtml(v) +
             "</textarea>"
@@ -1248,17 +1248,17 @@
   }
 
   function bindResize(root) {
-    var p = root.querySelector(".gc-if-flyout__panel");
-    var handle = root.querySelector(".gc-if-flyout__resize");
+    let p = root.querySelector(".gc-if-flyout__panel");
+    let handle = root.querySelector(".gc-if-flyout__resize");
     if (!p || !handle || handle.dataset.gcHsResizeBound === "1") return;
     handle.dataset.gcHsResizeBound = "1";
     handle.addEventListener("mousedown", function (e) {
       e.preventDefault();
-      var startX = e.clientX;
-      var startW = p.getBoundingClientRect().width;
-      var maxW = Math.min(720, window.innerWidth - 24);
+      let startX = e.clientX;
+      let startW = p.getBoundingClientRect().width;
+      let maxW = Math.min(720, globalThis.innerWidth - 24);
       function onMove(e2) {
-        var w = startW + (startX - e2.clientX);
+        let w = startW + (startX - e2.clientX);
         w = Math.max(280, Math.min(maxW, w));
         p.style.width = w + "px";
       }
@@ -1283,34 +1283,34 @@
   }
 
   function topBarSelectedFirewallIdsOrdered() {
-    var getter = gcHsIsConfigurationTarget()
-      ? typeof window.gcGetEffectiveConfigurationIds === "function"
-        ? window.gcGetEffectiveConfigurationIds
-        : window.gcGetSelectedConfigurationIds
-      : window.gcGetSelectedFirewallIds;
+    let getter = gcHsIsConfigurationTarget()
+      ? typeof globalThis.gcGetEffectiveConfigurationIds === "function"
+        ? globalThis.gcGetEffectiveConfigurationIds
+        : globalThis.gcGetSelectedConfigurationIds
+      : globalThis.gcGetSelectedFirewallIds;
     if (typeof getter === "function") {
-      var eff = getter();
-      var set = {};
+      let eff = getter();
+      let set = {};
       eff.forEach(function (id) {
         set[String(id)] = true;
       });
-      var out = [];
+      let out = [];
       gcHsNavInventoryArray().forEach(function (fw) {
         if (fw && fw.id != null && set[String(fw.id)]) {
-          var n = parseInt(String(fw.id), 10);
+          let n = parseInt(String(fw.id), 10);
           if (!isNaN(n) && n > 0) out.push(n);
         }
       });
       return out;
     }
-    var outLegacy = [];
-    var sel = {};
+    let outLegacy = [];
+    let sel = {};
     document.querySelectorAll(".gc-net-fw-cb:checked").forEach(function (cb) {
       sel[String(cb.value)] = true;
     });
     gcHsNavInventoryArray().forEach(function (fw) {
       if (sel[String(fw.id)]) {
-        var n2 = parseInt(String(fw.id), 10);
+        let n2 = parseInt(String(fw.id), 10);
         if (!isNaN(n2) && n2 > 0) outLegacy.push(n2);
       }
     });
@@ -1318,42 +1318,42 @@
   }
 
   function collectEditConfigEntryIds() {
-    var row = currentHsRow;
+    let row = currentHsRow;
     if (!row) return [];
-    var targets = row.hs_edit_targets;
+    let targets = row.hs_edit_targets;
     if (!Array.isArray(targets) || !targets.length) {
       targets = row.ip_host_edit_targets;
     }
     if (!Array.isArray(targets)) return [];
-    var sel = {};
+    let sel = {};
     collectFlyoutFirewallIdsOrdered().forEach(function (id) {
       sel[id] = true;
     });
-    var out = [];
+    let out = [];
     targets.forEach(function (t) {
       if (!t || t.config_entry_id == null) return;
-      var fid = gcHsTargetOwnerId(t);
+      let fid = gcHsTargetOwnerId(t);
       if (fid == null) return;
       if (!sel[fid]) return;
-      var ce = parseInt(String(t.config_entry_id), 10);
+      let ce = parseInt(String(t.config_entry_id), 10);
       if (!isNaN(ce) && ce > 0) out.push(ce);
     });
     return out;
   }
 
   function collectEditCreateFirewallIds() {
-    var row = currentHsRow;
+    let row = currentHsRow;
     if (!row) return [];
-    var existing = {};
-    var targets = row.hs_edit_targets;
+    let existing = {};
+    let targets = row.hs_edit_targets;
     if (!Array.isArray(targets) || !targets.length) {
       targets = row.ip_host_edit_targets;
     }
     (targets || []).forEach(function (t) {
-      var oid = gcHsTargetOwnerId(t);
+      let oid = gcHsTargetOwnerId(t);
       if (oid != null) existing[oid] = true;
     });
-    var out = [];
+    let out = [];
     collectFlyoutFirewallIdsOrdered().forEach(function (id) {
       if (!existing[id]) out.push(id);
     });
@@ -1361,7 +1361,7 @@
   }
 
   function humanHsEntityTitle(entityKey) {
-    var m = {
+    let m = {
       fqdn_host: "FQDN host",
       service: "service",
       mac_host: "MAC host",
@@ -1370,23 +1370,23 @@
       service_group: "service group",
       country_group: "country group",
     };
-    var k = String(entityKey || "").trim();
+    let k = String(entityKey || "").trim();
     return m[k] || k.replace(/_/g, " ");
   }
 
   function openFlyoutAddHsEntity(entityKey) {
-    if (!flyout || typeof window.gcHsBuildFlyoutFieldsHtml !== "function") return;
-    var ek = String(entityKey || "").trim();
+    if (!flyout || typeof globalThis.gcHsBuildFlyoutFieldsHtml !== "function") return;
+    let ek = String(entityKey || "").trim();
     if (ek === "ip_host") {
       openFlyoutAddIpHost();
       return;
     }
-    var ids =
-      typeof window.gcHsTopBarFirewallIds === "function"
-        ? window.gcHsTopBarFirewallIds()
+    let ids =
+      typeof globalThis.gcHsTopBarFirewallIds === "function"
+        ? globalThis.gcHsTopBarFirewallIds()
         : topBarSelectedFirewallIdsOrdered();
-    var fwid = ids.length ? ids[0] : null;
-    var ist = gcHsIsConfigurationTarget();
+    let fwid = ids.length ? ids[0] : null;
+    let ist = gcHsIsConfigurationTarget();
     currentHsRow = {
       entity_type: ek,
       firewall_id: ist ? null : fwid,
@@ -1408,17 +1408,17 @@
     if (sectionLabelEl) sectionLabelEl.hidden = true;
     if (hintEl) hintEl.hidden = true;
     if (fieldsRoot) {
-      fieldsRoot.innerHTML = window.gcHsBuildFlyoutFieldsHtml(ek, currentHsRow, "add", {
+      fieldsRoot.innerHTML = globalThis.gcHsBuildFlyoutFieldsHtml(ek, currentHsRow, "add", {
         firewallIds: ids,
       });
       flyout.setAttribute("data-gc-hs-flyout-kind", "hs-entity");
       flyout.setAttribute("data-gc-hs-entity-mode", "add");
       flyout.removeAttribute("data-gc-hs-ip-host-mode");
-      if (window.gcHsHydrateFlyoutFirewallPicker) {
-        window.gcHsHydrateFlyoutFirewallPicker(fieldsRoot, { row: currentHsRow });
+      if (globalThis.gcHsHydrateFlyoutFirewallPicker) {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(fieldsRoot, { row: currentHsRow });
       }
-      if (window.gcHsHydrateHsEntityFields) {
-        window.gcHsHydrateHsEntityFields(fieldsRoot, ek, currentHsRow, "add");
+      if (globalThis.gcHsHydrateHsEntityFields) {
+        globalThis.gcHsHydrateHsEntityFields(fieldsRoot, ek, currentHsRow, "add");
       }
     }
     flyout.hidden = false;
@@ -1432,9 +1432,9 @@
 
   function openFlyoutAddIpHost() {
     if (!flyout) return;
-    var ids = topBarSelectedFirewallIdsOrdered();
-    var fwid = ids.length ? ids[0] : null;
-    var ist2 = gcHsIsConfigurationTarget();
+    let ids = topBarSelectedFirewallIdsOrdered();
+    let fwid = ids.length ? ids[0] : null;
+    let ist2 = gcHsIsConfigurationTarget();
     currentHsRow = {
       entity_type: "ip_host",
       firewall_id: ist2 ? null : fwid,
@@ -1477,33 +1477,33 @@
     }
   }
 
-  var HS_MEMBER_TARGET_SLUG = {
+  let HS_MEMBER_TARGET_SLUG = {
     ip_host: "ip-host",
     fqdn_host: "fqdn-host",
     service: "service",
   };
 
   function hsMemberTargetTbodyId(targetEntityType) {
-    var slug = HS_MEMBER_TARGET_SLUG[targetEntityType];
+    let slug = HS_MEMBER_TARGET_SLUG[targetEntityType];
     if (!slug) return null;
-    var base = gcHsIsConfigurationTarget() ? "gc-cfg-hs-" : "gc-hs-";
+    let base = gcHsIsConfigurationTarget() ? "gc-cfg-hs-" : "gc-hs-";
     return base + slug + "-tbody";
   }
 
   function hsScopedEntityRowOverlapsScope(entityRow, scopeSet) {
     if (!scopeSet) return false;
-    var keys = Object.keys(scopeSet);
+    let keys = Object.keys(scopeSet);
     if (!keys.length) return false;
-    var targets = entityRow.hs_edit_targets || entityRow.ip_host_edit_targets;
+    let targets = entityRow.hs_edit_targets || entityRow.ip_host_edit_targets;
     if (Array.isArray(targets) && targets.length) {
-      for (var j = 0; j < targets.length; j++) {
-        var oid = gcHsTargetOwnerId(targets[j]);
+      for (let j = 0; j < targets.length; j++) {
+        let oid = gcHsTargetOwnerId(targets[j]);
         if (oid != null && scopeSet[oid]) return true;
       }
       return false;
     }
-    var sid = gcHsIsConfigurationTarget() ? entityRow.configuration_id : entityRow.firewall_id;
-    var n = parseInt(String(sid), 10);
+    let sid = gcHsIsConfigurationTarget() ? entityRow.configuration_id : entityRow.firewall_id;
+    let n = parseInt(String(sid), 10);
     return !isNaN(n) && n > 0 && !!scopeSet[n];
   }
 
@@ -1515,32 +1515,32 @@
     tabHint,
   ) {
     if (!flyout || !memberName || !hostGroupRow || !targetEntityType) return;
-    var normMember = norm(String(memberName));
+    let normMember = norm(String(memberName));
     if (!normMember) return;
 
-    var scopeSet = {};
-    var gt = hostGroupRow.hs_edit_targets;
+    let scopeSet = {};
+    let gt = hostGroupRow.hs_edit_targets;
     if (Array.isArray(gt)) {
       gt.forEach(function (t) {
-        var oid = gcHsTargetOwnerId(t);
+        let oid = gcHsTargetOwnerId(t);
         if (oid != null) scopeSet[oid] = true;
       });
     }
     if (!Object.keys(scopeSet).length) return;
 
-    var tbodyId = hsMemberTargetTbodyId(targetEntityType);
+    let tbodyId = hsMemberTargetTbodyId(targetEntityType);
     if (!tbodyId) return;
-    var tbody = document.getElementById(tbodyId);
+    let tbody = document.getElementById(tbodyId);
     if (!tbody) return;
 
-    var nodeList = tbody.querySelectorAll("tr");
-    var found = null;
-    for (var i = 0; i < nodeList.length; i++) {
-      var tr = nodeList[i];
-      var entRow = tr._gcNetRow;
+    let nodeList = tbody.querySelectorAll("tr");
+    let found = null;
+    for (let i = 0; i < nodeList.length; i++) {
+      let tr = nodeList[i];
+      let entRow = tr._gcNetRow;
       if (!entRow || String(entRow.entity_type || "") !== targetEntityType) continue;
-      var cells = entRow.cells || {};
-      var nm =
+      let cells = entRow.cells || {};
+      let nm =
         String(cells["__name"] != null ? cells["__name"] : "").trim() ||
         String(entRow.external_name || "").trim();
       if (norm(nm) !== normMember) continue;
@@ -1549,13 +1549,13 @@
       break;
     }
 
-    if (typeof window.gcTableListModalClose === "function") {
-      window.gcTableListModalClose();
+    if (typeof globalThis.gcTableListModalClose === "function") {
+      globalThis.gcTableListModalClose();
     }
 
     if (!found) {
-      var scopeWord = gcHsIsConfigurationTarget() ? "configurations" : "firewalls";
-      var hint = tabHint || "the matching tab";
+      let scopeWord = gcHsIsConfigurationTarget() ? "configurations" : "firewalls";
+      let hint = tabHint || "the matching tab";
       alert(
         "No " +
           entitySingularLabel +
@@ -1605,19 +1605,19 @@
 
   function openFlyout(tr) {
     if (!flyout || !tr || !tr._gcNetRow) return;
-    var row = tr._gcNetRow;
+    let row = tr._gcNetRow;
     currentHsRow = row;
     if (saveBtn) saveBtn.disabled = false;
-    var cells = row.cells || {};
-    var name =
+    let cells = row.cells || {};
+    let name =
       String(cells["__name"] != null ? cells["__name"] : "").trim() ||
       String(row.external_name || "").trim() ||
       "—";
-    var fw =
+    let fw =
       String(cells.firewall != null ? cells.firewall : "").trim() ||
       String(cells["__firewalls"] != null ? cells["__firewalls"] : "").trim() ||
       "—";
-    var et = String(row.entity_type || "").trim() || "entry";
+    let et = String(row.entity_type || "").trim() || "entry";
 
     if (titleEl) {
       titleEl.textContent = name;
@@ -1633,8 +1633,8 @@
         "";
     }
 
-    var isIpHost = et === "ip_host";
-    var HS_ENTITY_TYPES = {
+    let isIpHost = et === "ip_host";
+    let HS_ENTITY_TYPES = {
       fqdn_host: true,
       service: true,
       mac_host: true,
@@ -1643,11 +1643,11 @@
       service_group: true,
       country_group: true,
     };
-    var isHsEntity = !!HS_ENTITY_TYPES[et] && typeof window.gcHsBuildFlyoutFieldsHtml === "function";
-    var flat0 = row.flat && typeof row.flat === "object" ? row.flat : {};
-    var hostTypeForSave = pick(flat0, ["HostType"]);
-    var sysByType = hostTypeUiKind(hostTypeForSave) === "system";
-    var canEnqueueIpHost = isIpHost && !row.system_host && !sysByType;
+    let isHsEntity = !!HS_ENTITY_TYPES[et] && typeof globalThis.gcHsBuildFlyoutFieldsHtml === "function";
+    let flat0 = row.flat && typeof row.flat === "object" ? row.flat : {};
+    let hostTypeForSave = pick(flat0, ["HostType"]);
+    let sysByType = hostTypeUiKind(hostTypeForSave) === "system";
+    let canEnqueueIpHost = isIpHost && !row.system_host && !sysByType;
 
     if (isIpHost && (!row.ip_host_edit_targets || !row.ip_host_edit_targets.length)) {
       if (row.configuration_id != null && row.config_entry_id != null && gcHsIsConfigurationTarget()) {
@@ -1721,15 +1721,15 @@
         hydrateIpHostFirewallMs(fieldsRoot, { row: row });
         hydrateIpHostHostGroupMs(fieldsRoot, row);
       } else if (isHsEntity) {
-        fieldsRoot.innerHTML = window.gcHsBuildFlyoutFieldsHtml(et, row, "edit", {});
+        fieldsRoot.innerHTML = globalThis.gcHsBuildFlyoutFieldsHtml(et, row, "edit", {});
         flyout.setAttribute("data-gc-hs-flyout-kind", "hs-entity");
         flyout.setAttribute("data-gc-hs-entity-mode", "edit");
         flyout.removeAttribute("data-gc-hs-ip-host-mode");
-        if (window.gcHsHydrateFlyoutFirewallPicker) {
-          window.gcHsHydrateFlyoutFirewallPicker(fieldsRoot, { row: row });
+        if (globalThis.gcHsHydrateFlyoutFirewallPicker) {
+          globalThis.gcHsHydrateFlyoutFirewallPicker(fieldsRoot, { row: row });
         }
-        if (window.gcHsHydrateHsEntityFields) {
-          window.gcHsHydrateHsEntityFields(fieldsRoot, et, row, "edit");
+        if (globalThis.gcHsHydrateHsEntityFields) {
+          globalThis.gcHsHydrateHsEntityFields(fieldsRoot, et, row, "edit");
         }
       } else {
         fieldsRoot.innerHTML = buildGenericFieldsHtml(row);
@@ -1737,8 +1737,8 @@
         flyout.removeAttribute("data-gc-hs-entity-mode");
         flyout.removeAttribute("data-gc-hs-ip-host-mode");
       }
-      if (typeof window.gcCombineFlyoutApplyConflictChrome === "function") {
-        window.gcCombineFlyoutApplyConflictChrome(fieldsRoot, row, {});
+      if (typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function") {
+        globalThis.gcCombineFlyoutApplyConflictChrome(fieldsRoot, row, {});
       }
     }
 
@@ -1767,11 +1767,11 @@
 
     bindResize(flyout);
 
-    var panelForm = flyout.querySelector(".gc-if-flyout__panel-form");
+    let panelForm = flyout.querySelector(".gc-if-flyout__panel-form");
     if (panelForm && panelForm.dataset.gcHsHgPanelClose !== "1") {
       panelForm.dataset.gcHsHgPanelClose = "1";
       panelForm.addEventListener("click", function (e) {
-        var fk = flyout && flyout.getAttribute("data-gc-hs-flyout-kind");
+        let fk = flyout && flyout.dataset.gcHsFlyoutKind;
         if (!flyout || flyout.hidden || (fk !== "ip-host" && fk !== "hs-entity")) return;
         if (!fieldsRoot) return;
         if (e.target.closest("[data-gc-hg-ms]") || e.target.closest("[data-gc-fw-ms]")) return;
@@ -1793,9 +1793,9 @@
     if (fieldsRoot && fieldsRoot.dataset.gcHsHtypeDeleg !== "1") {
       fieldsRoot.dataset.gcHsHtypeDeleg = "1";
       fieldsRoot.addEventListener("change", function (e) {
-        var t = e.target;
+        let t = e.target;
         if (!t || t.name !== "gc-hs-htype") return;
-        if (!flyout || flyout.getAttribute("data-gc-hs-ip-host-mode") !== "add") return;
+        if (!flyout || flyout.dataset.gcHsIpHostMode !== "add") return;
         applyIpHostAddressKind(fieldsRoot, String(t.value || "").trim().toLowerCase());
       });
     }
@@ -1811,14 +1811,14 @@
     if (saveBtn && saveBtn.dataset.gcHsSaveBound !== "1") {
       saveBtn.dataset.gcHsSaveBound = "1";
       saveBtn.addEventListener("click", function () {
-        var fk = flyout.getAttribute("data-gc-hs-flyout-kind");
+        let fk = flyout.dataset.gcHsFlyoutKind;
         if (fk === "hs-entity") {
-          var et = currentHsRow && String(currentHsRow.entity_type || "").trim();
-          if (!et || typeof window.gcHsCollectFlyoutEntityForm !== "function") {
+          let et = currentHsRow && String(currentHsRow.entity_type || "").trim();
+          if (!et || typeof globalThis.gcHsCollectFlyoutEntityForm !== "function") {
             alert("Form is not available.");
             return;
           }
-          var gForm = window.gcHsCollectFlyoutEntityForm(fieldsRoot, et);
+          let gForm = globalThis.gcHsCollectFlyoutEntityForm(fieldsRoot, et);
           if (!gForm || !String(gForm.name || "").trim()) {
             alert("Name is required.");
             return;
@@ -1828,14 +1828,14 @@
             return;
           }
           saveBtn.disabled = true;
-          var em = flyout.getAttribute("data-gc-hs-entity-mode");
-          var upUrl =
-            typeof window.gcHsEnqueueUpdatesBatchUrl === "string"
-              ? window.gcHsEnqueueUpdatesBatchUrl
+          let em = flyout.dataset.gcHsEntityMode;
+          let upUrl =
+            typeof globalThis.gcHsEnqueueUpdatesBatchUrl === "string"
+              ? globalThis.gcHsEnqueueUpdatesBatchUrl
               : "";
-          var crUrl =
-            typeof window.gcHsEnqueueCreatesBatchUrl === "string"
-              ? window.gcHsEnqueueCreatesBatchUrl
+          let crUrl =
+            typeof globalThis.gcHsEnqueueCreatesBatchUrl === "string"
+              ? globalThis.gcHsEnqueueCreatesBatchUrl
               : "";
 
           function finishHsOk() {
@@ -1844,7 +1844,7 @@
           }
 
           if (em === "add") {
-            var fwIdsA = collectFlyoutFirewallIdsOrdered();
+            let fwIdsA = collectFlyoutFirewallIdsOrdered();
             if (!crUrl || !fwIdsA.length) {
               alert(
                 gcHsIsConfigurationTarget()
@@ -1869,7 +1869,7 @@
               })
               .then(function (x) {
                 if (!x.ok) {
-                  var msg =
+                  let msg =
                     (x.j && (x.j.detail || x.j.message)) || "Could not enqueue create tasks.";
                   alert(typeof msg === "string" ? msg : JSON.stringify(msg));
                   saveBtn.disabled = false;
@@ -1884,8 +1884,8 @@
             return;
           }
 
-          var updateEntryIdsH = collectEditConfigEntryIds();
-          var createFwIdsH = collectEditCreateFirewallIds();
+          let updateEntryIdsH = collectEditConfigEntryIds();
+          let createFwIdsH = collectEditCreateFirewallIds();
           if (!updateEntryIdsH.length && !createFwIdsH.length) {
             alert(gcHsIsConfigurationTarget() ? "Select at least one configuration." : "Select at least one firewall.");
             saveBtn.disabled = false;
@@ -1920,7 +1920,7 @@
               })
               .then(function (x) {
                 if (!x.ok) {
-                  var msgC =
+                  let msgC =
                     (x.j && (x.j.detail || x.j.message)) || "Could not enqueue create tasks.";
                   alert(typeof msgC === "string" ? msgC : JSON.stringify(msgC));
                   saveBtn.disabled = false;
@@ -1953,7 +1953,7 @@
               })
               .then(function (x) {
                 if (!x.ok) {
-                  var msg2 =
+                  let msg2 =
                     (x.j && (x.j.detail || x.j.message)) || "Could not enqueue update tasks.";
                   alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
                   saveBtn.disabled = false;
@@ -1971,19 +1971,19 @@
           return;
         }
 
-        var mode = flyout.getAttribute("data-gc-hs-ip-host-mode");
-        var form = collectIpHostForm(fieldsRoot);
+        let mode = flyout.dataset.gcHsIpHostMode;
+        let form = collectIpHostForm(fieldsRoot);
         if (!form.name) {
           alert("Name is required.");
           return;
         }
         saveBtn.disabled = true;
         if (mode === "add") {
-          var bUrl =
-            typeof window.gcHsIpHostEnqueueCreateBatchUrl === "string"
-              ? window.gcHsIpHostEnqueueCreateBatchUrl
+          let bUrl =
+            typeof globalThis.gcHsIpHostEnqueueCreateBatchUrl === "string"
+              ? globalThis.gcHsIpHostEnqueueCreateBatchUrl
               : "";
-          var fwIds = collectFlyoutFirewallIdsOrdered();
+          let fwIds = collectFlyoutFirewallIdsOrdered();
           if (!bUrl || !fwIds.length) {
             alert(
               gcHsIsConfigurationTarget()
@@ -2006,7 +2006,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var msg =
+                let msg =
                   (x.j && (x.j.detail || x.j.message)) || "Could not save to task queue.";
                 alert(typeof msg === "string" ? msg : JSON.stringify(msg));
                 saveBtn.disabled = false;
@@ -2021,20 +2021,20 @@
             });
           return;
         }
-        var updateEntryIds = collectEditConfigEntryIds();
-        var createFwIds = collectEditCreateFirewallIds();
+        let updateEntryIds = collectEditConfigEntryIds();
+        let createFwIds = collectEditCreateFirewallIds();
         if (!updateEntryIds.length && !createFwIds.length) {
           alert(gcHsIsConfigurationTarget() ? "Select at least one configuration." : "Select at least one firewall.");
           saveBtn.disabled = false;
           return;
         }
-        var batchUpUrl =
-          typeof window.gcHsIpHostEnqueueUpdatesBatchUrl === "string"
-            ? window.gcHsIpHostEnqueueUpdatesBatchUrl
+        let batchUpUrl =
+          typeof globalThis.gcHsIpHostEnqueueUpdatesBatchUrl === "string"
+            ? globalThis.gcHsIpHostEnqueueUpdatesBatchUrl
             : "";
-        var createBatchUrl =
-          typeof window.gcHsIpHostEnqueueCreateBatchUrl === "string"
-            ? window.gcHsIpHostEnqueueCreateBatchUrl
+        let createBatchUrl =
+          typeof globalThis.gcHsIpHostEnqueueCreateBatchUrl === "string"
+            ? globalThis.gcHsIpHostEnqueueCreateBatchUrl
             : "";
 
         function finishOk() {
@@ -2065,7 +2065,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var msgC =
+                let msgC =
                   (x.j && (x.j.detail || x.j.message)) || "Could not enqueue creates.";
                 alert(typeof msgC === "string" ? msgC : JSON.stringify(msgC));
                 saveBtn.disabled = false;
@@ -2098,7 +2098,7 @@
             })
             .then(function (x) {
               if (!x.ok) {
-                var msg2 =
+                let msg2 =
                   (x.j && (x.j.detail || x.j.message)) || "Could not save to task queue.";
                 alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
                 saveBtn.disabled = false;
@@ -2124,13 +2124,13 @@
     });
   }
 
-  window.gcHsFlyoutInit = gcHsFlyoutInit;
-  window.gcHsFlyoutOpenFromTr = openFlyout;
-  window.gcHsFlyoutOpenIpHostFromGroupMember = gcHsFlyoutOpenIpHostFromGroupMember;
-  window.gcHsFlyoutOpenFqdnHostFromGroupMember = gcHsFlyoutOpenFqdnHostFromGroupMember;
-  window.gcHsFlyoutOpenServiceFromGroupMember = gcHsFlyoutOpenServiceFromGroupMember;
-  window.gcHsFlyoutOpenAddIpHost = openFlyoutAddIpHost;
-  window.gcHsFlyoutOpenAddForEntity = openFlyoutAddHsEntity;
-  window.gcHsHydrateFlyoutFirewallPicker = hydrateIpHostFirewallMs;
-  window.gcHsDispatchAfterDeleteBatch = gcHsNotifySaveSuccess;
+  globalThis.gcHsFlyoutInit = gcHsFlyoutInit;
+  globalThis.gcHsFlyoutOpenFromTr = openFlyout;
+  globalThis.gcHsFlyoutOpenIpHostFromGroupMember = gcHsFlyoutOpenIpHostFromGroupMember;
+  globalThis.gcHsFlyoutOpenFqdnHostFromGroupMember = gcHsFlyoutOpenFqdnHostFromGroupMember;
+  globalThis.gcHsFlyoutOpenServiceFromGroupMember = gcHsFlyoutOpenServiceFromGroupMember;
+  globalThis.gcHsFlyoutOpenAddIpHost = openFlyoutAddIpHost;
+  globalThis.gcHsFlyoutOpenAddForEntity = openFlyoutAddHsEntity;
+  globalThis.gcHsHydrateFlyoutFirewallPicker = hydrateIpHostFirewallMs;
+  globalThis.gcHsDispatchAfterDeleteBatch = gcHsNotifySaveSuccess;
 })();

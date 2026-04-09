@@ -5,8 +5,8 @@
   "use strict";
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -19,17 +19,17 @@
   }
 
   function firewallScopeIds() {
-    var base = [];
-    if (typeof window.gcGetSelectedFirewallIds === "function") {
+    let base = [];
+    if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
       try {
-        base = window.gcGetSelectedFirewallIds() || [];
+        base = globalThis.gcGetSelectedFirewallIds() || [];
       } catch (eSel) {
         base = [];
       }
     }
     if (!Array.isArray(base)) base = [];
     if (base.length) return base;
-    var inv = window.gcNavFirewallsJson;
+    let inv = globalThis.gcNavFirewallsJson;
     if (!Array.isArray(inv) || !inv.length) return [];
     return inv
       .map(function (x) {
@@ -50,13 +50,13 @@
 
   function collectCheckedFwIdsFromMs(msRoot) {
     if (!msRoot || !msRoot.querySelectorAll) return [];
-    var out = [];
-    var seen = {};
+    let out = [];
+    let seen = {};
     msRoot.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
       if (!cb.checked) return;
-      var id = cb.getAttribute("data-gc-fw-id") || cb.getAttribute("data-gc-cfg-id");
+      let id = cb.dataset.gcFwId || cb.dataset.gcCfgId;
       if (id == null) return;
-      var n = parseInt(String(id), 10);
+      let n = parseInt(String(id), 10);
       if (isNaN(n) || n < 1 || seen[n]) return;
       seen[n] = true;
       out.push(n);
@@ -65,11 +65,11 @@
   }
 
   function selectedFirewallIdsFromMs(msRoot) {
-    var live = collectCheckedFwIdsFromMs(msRoot);
+    let live = collectCheckedFwIdsFromMs(msRoot);
     if (live.length) return live;
     if (!msRoot || !msRoot.getAttribute) return [];
     try {
-      var a = JSON.parse(msRoot.getAttribute("data-fw-assigned-ids") || "[]");
+      let a = JSON.parse(msRoot.dataset.fwAssignedIds || "[]");
       return Array.isArray(a) ? a.map(Number).filter(function (n) { return n > 0; }) : [];
     } catch (e) {
       return [];
@@ -77,7 +77,7 @@
   }
 
   function openAuFlyout(open) {
-    var root = document.getElementById("gc-au-flyout");
+    let root = document.getElementById("gc-au-flyout");
     if (!root) return;
     root.hidden = !open;
     root.setAttribute("aria-hidden", open ? "false" : "true");
@@ -85,9 +85,9 @@
   }
 
   function syncAuProfileFieldVisibility() {
-    var wrap = document.getElementById("gc-au-profile-field");
+    let wrap = document.getElementById("gc-au-profile-field");
     if (!wrap) return;
-    var ut = "User";
+    let ut = "User";
     document.querySelectorAll('input[name="gc-au-usertype"]').forEach(function (r) {
       if (r.checked) ut = r.value;
     });
@@ -95,7 +95,7 @@
   }
 
   function openAgFlyout(open) {
-    var root = document.getElementById("gc-ag-flyout");
+    let root = document.getElementById("gc-ag-flyout");
     if (!root) return;
     root.hidden = !open;
     root.setAttribute("aria-hidden", open ? "false" : "true");
@@ -107,14 +107,14 @@
     document.getElementById("gc-au-username").value = textScalar(p.Username);
     document.getElementById("gc-au-name").value = textScalar(p.Name);
     document.getElementById("gc-au-desc").value = textScalar(p.Description);
-    var ut = textScalar(p.UserType) || "User";
+    let ut = textScalar(p.UserType) || "User";
     document.querySelectorAll('input[name="gc-au-usertype"]').forEach(function (r) {
       r.checked = r.value === ut;
     });
-    var profSel = document.getElementById("gc-au-profile");
+    let profSel = document.getElementById("gc-au-profile");
     if (profSel) {
       if (ut === "Administrator") {
-        var pv = textScalar(p.Profile);
+        let pv = textScalar(p.Profile);
         if (pv) profSel.setAttribute("data-gc-profile-pending", pv);
         else profSel.removeAttribute("data-gc-profile-pending");
       } else {
@@ -122,17 +122,17 @@
       }
     }
     document.getElementById("gc-au-password").value = "";
-    var email = "";
-    var el = p.EmailList;
+    let email = "";
+    let el = p.EmailList;
     if (el && typeof el === "object") {
-      var eid = el.EmailID;
+      let eid = el.EmailID;
       if (Array.isArray(eid)) email = textScalar(eid[0]);
       else email = textScalar(eid);
     }
     document.getElementById("gc-au-email").value = email;
-    var grpSel = document.getElementById("gc-au-group");
+    let grpSel = document.getElementById("gc-au-group");
     if (grpSel) {
-      var gv = textScalar(p.Group);
+      let gv = textScalar(p.Group);
       if (gv) grpSel.setAttribute("data-gc-group-pending", gv);
       else grpSel.removeAttribute("data-gc-group-pending");
     }
@@ -142,25 +142,25 @@
     document.getElementById("gc-au-qos").value = textScalar(p.QoSPolicy);
     document.getElementById("gc-au-sslvpn").value = textScalar(p.SSLVPNPolicy);
     document.getElementById("gc-au-clientless").value = textScalar(p.ClientlessPolicy);
-    var qd = textScalar(p.QuarantineDigest) || "Disable";
+    let qd = textScalar(p.QuarantineDigest) || "Disable";
     document.querySelectorAll('input[name="gc-au-quarantine"]').forEach(function (r) {
       r.checked = r.value === qd;
     });
-    var mb = textScalar(p.MACBinding) || "Disable";
+    let mb = textScalar(p.MACBinding) || "Disable";
     document.querySelectorAll('input[name="gc-au-macbind"]').forEach(function (r) {
       r.checked = r.value === mb;
     });
-    var macs = [];
-    var ml = p.MACAddressList;
+    let macs = [];
+    let ml = p.MACAddressList;
     if (ml && typeof ml === "object") {
-      var mm = ml.MACAddress;
+      let mm = ml.MACAddress;
       if (Array.isArray(mm)) macs = mm.map(textScalar).filter(Boolean);
       else if (mm) macs = [textScalar(mm)];
     }
     document.getElementById("gc-au-maclist").value = macs.join("\n");
     document.getElementById("gc-au-applsched").value =
       textScalar(p.ScheduleForApplianceAccess) || "All the time";
-    var ar = textScalar(p.LoginRestrictionForAppliance) || "AnyNode";
+    let ar = textScalar(p.LoginRestrictionForAppliance) || "AnyNode";
     document.querySelectorAll('input[name="gc-au-admlogin"]').forEach(function (r) {
       r.checked = r.value === ar;
     });
@@ -168,36 +168,36 @@
   }
 
   function collectUserPayload() {
-    var ut = "User";
+    let ut = "User";
     document.querySelectorAll('input[name="gc-au-usertype"]').forEach(function (r) {
       if (r.checked) ut = r.value;
     });
-    var email = document.getElementById("gc-au-email").value.trim();
-    var macRaw = document.getElementById("gc-au-maclist").value || "";
-    var macList = macRaw
+    let email = document.getElementById("gc-au-email").value.trim();
+    let macRaw = document.getElementById("gc-au-maclist").value || "";
+    let macList = macRaw
       .split(/[\n,]+/)
       .map(function (s) {
         return s.trim();
       })
       .filter(Boolean);
-    var qd = "Disable";
+    let qd = "Disable";
     document.querySelectorAll('input[name="gc-au-quarantine"]').forEach(function (r) {
       if (r.checked) qd = r.value;
     });
-    var mb = "Disable";
+    let mb = "Disable";
     document.querySelectorAll('input[name="gc-au-macbind"]').forEach(function (r) {
       if (r.checked) mb = r.value;
     });
-    var adm = "AnyNode";
+    let adm = "AnyNode";
     document.querySelectorAll('input[name="gc-au-admlogin"]').forEach(function (r) {
       if (r.checked) adm = r.value;
     });
-    var profVal = "";
+    let profVal = "";
     if (ut === "Administrator") {
-      var ps = document.getElementById("gc-au-profile");
+      let ps = document.getElementById("gc-au-profile");
       profVal = ps ? String(ps.value || "").trim() : "";
     }
-    var o = {
+    let o = {
       Username: document.getElementById("gc-au-username").value.trim(),
       Name: document.getElementById("gc-au-name").value.trim(),
       Description: document.getElementById("gc-au-desc").value.trim(),
@@ -215,7 +215,7 @@
       ScheduleForApplianceAccess: document.getElementById("gc-au-applsched").value.trim(),
       LoginRestrictionForAppliance: adm,
     };
-    var pw = document.getElementById("gc-au-password").value;
+    let pw = document.getElementById("gc-au-password").value;
     if (pw) o.Password = pw;
     if (email) o.EmailList = { EmailID: email };
     if (macList.length) {
@@ -228,12 +228,12 @@
 
   function fillGroupForm(p) {
     p = p || {};
-    var gd = p.GroupDetail;
+    let gd = p.GroupDetail;
     if (Array.isArray(gd) && gd.length) gd = gd[0];
     if (!gd || typeof gd !== "object") gd = {};
     document.getElementById("gc-ag-name").value = textScalar(gd.Name);
     document.getElementById("gc-ag-desc").value = textScalar(gd.Description);
-    var gt = textScalar(gd.GroupType) || "Normal";
+    let gt = textScalar(gd.GroupType) || "Normal";
     document.getElementById("gc-ag-grouptype").value = gt === "Clientless" ? "Clientless" : "Normal";
     document.getElementById("gc-ag-surfing").value = textScalar(gd.SurfingQuotaPolicy);
     document.getElementById("gc-ag-access").value = textScalar(gd.AccessTimePolicy);
@@ -241,46 +241,46 @@
     document.getElementById("gc-ag-qos").value = textScalar(gd.QoSPolicy);
     document.getElementById("gc-ag-sslvpn").value = textScalar(gd.SSLVPNPolicy);
     document.getElementById("gc-ag-clientless").value = textScalar(gd.ClientlessPolicy);
-    var l2 = textScalar(gd.L2TP) || "Disable";
+    let l2 = textScalar(gd.L2TP) || "Disable";
     document.querySelectorAll('input[name="gc-ag-l2tp"]').forEach(function (r) {
       r.checked = r.value === l2;
     });
-    var pp = textScalar(gd.PPTP) || "Disable";
+    let pp = textScalar(gd.PPTP) || "Disable";
     document.querySelectorAll('input[name="gc-ag-pptp"]').forEach(function (r) {
       r.checked = r.value === pp;
     });
-    var qd = textScalar(gd.QuarantineDigest) || "Enable";
+    let qd = textScalar(gd.QuarantineDigest) || "Enable";
     document.querySelectorAll('input[name="gc-ag-quarantine"]').forEach(function (r) {
       r.checked = r.value === qd;
     });
-    var mb = textScalar(gd.MACBinding) || "Disable";
+    let mb = textScalar(gd.MACBinding) || "Disable";
     document.querySelectorAll('input[name="gc-ag-macbind"]').forEach(function (r) {
       r.checked = r.value === mb;
     });
-    var lr = textScalar(gd.LoginRestriction) || "AnyNode";
+    let lr = textScalar(gd.LoginRestriction) || "AnyNode";
     document.querySelectorAll('input[name="gc-ag-loginrestriction"]').forEach(function (r) {
       r.checked = r.value === lr;
     });
   }
 
   function collectGroupPayload() {
-    var l2 = "Disable";
+    let l2 = "Disable";
     document.querySelectorAll('input[name="gc-ag-l2tp"]').forEach(function (r) {
       if (r.checked) l2 = r.value;
     });
-    var pp = "Disable";
+    let pp = "Disable";
     document.querySelectorAll('input[name="gc-ag-pptp"]').forEach(function (r) {
       if (r.checked) pp = r.value;
     });
-    var qd = "Enable";
+    let qd = "Enable";
     document.querySelectorAll('input[name="gc-ag-quarantine"]').forEach(function (r) {
       if (r.checked) qd = r.value;
     });
-    var mb = "Disable";
+    let mb = "Disable";
     document.querySelectorAll('input[name="gc-ag-macbind"]').forEach(function (r) {
       if (r.checked) mb = r.value;
     });
-    var lr = "AnyNode";
+    let lr = "AnyNode";
     document.querySelectorAll('input[name="gc-ag-loginrestriction"]').forEach(function (r) {
       if (r.checked) lr = r.value;
     });
@@ -304,34 +304,34 @@
     };
   }
 
-  window.gcInitAuthenticationPage = function (cfg) {
-    var URL_USERS = cfg.urlUsers;
-    var URL_GROUPS = cfg.urlGroups;
-    var U_CREATE = cfg.urlUserCreate;
-    var U_UPDATE = cfg.urlUserUpdate;
-    var U_DEL = cfg.urlUserDeletes;
-    var G_CREATE = cfg.urlGroupCreate;
-    var G_UPDATE = cfg.urlGroupUpdate;
-    var G_DEL = cfg.urlGroupDeletes;
+  globalThis.gcInitAuthenticationPage = function (cfg) {
+    let URL_USERS = cfg.urlUsers;
+    let URL_GROUPS = cfg.urlGroups;
+    let U_CREATE = cfg.urlUserCreate;
+    let U_UPDATE = cfg.urlUserUpdate;
+    let U_DEL = cfg.urlUserDeletes;
+    let G_CREATE = cfg.urlGroupCreate;
+    let G_UPDATE = cfg.urlGroupUpdate;
+    let G_DEL = cfg.urlGroupDeletes;
 
-    var auMode = "edit";
-    var auRow = null;
-    var agMode = "edit";
-    var agRow = null;
+    let auMode = "edit";
+    let auRow = null;
+    let agMode = "edit";
+    let agRow = null;
 
-    var URL_ADMIN_PROFILE_OPTS = (cfg && cfg.urlAdminProfileOptions) || "";
-    var URL_USER_GROUP_OPTS = (cfg && cfg.urlUserGroupOptions) || "";
-    var auProfileRefreshGen = 0;
-    var auGroupRefreshGen = 0;
+    let URL_ADMIN_PROFILE_OPTS = (cfg && cfg.urlAdminProfileOptions) || "";
+    let URL_USER_GROUP_OPTS = (cfg && cfg.urlUserGroupOptions) || "";
+    let auProfileRefreshGen = 0;
+    let auGroupRefreshGen = 0;
 
     function auFlyoutFirewallIdsForPicker() {
-      var ids = [];
+      let ids = [];
       if (auMode === "edit" && auRow && auRow.firewall_id != null) {
-        var f0 = Number(auRow.firewall_id);
+        let f0 = Number(auRow.firewall_id);
         if (!isNaN(f0) && f0 > 0) ids = [f0];
       } else {
-        var fwF = document.getElementById("gc-au-fw-field");
-        var ms0 = fwF && fwF.querySelector(".gc-hs-ip-host-flyout__fw-ms");
+        let fwF = document.getElementById("gc-au-fw-field");
+        let ms0 = fwF && fwF.querySelector(".gc-hs-ip-host-flyout__fw-ms");
         ids = collectCheckedFwIdsFromMs(ms0);
         if (!ids.length) ids = selectedFirewallIdsFromMs(ms0);
       }
@@ -339,23 +339,23 @@
     }
 
     function refreshAuAdminProfileSelect() {
-      var utCur = "User";
+      let utCur = "User";
       document.querySelectorAll('input[name="gc-au-usertype"]').forEach(function (r) {
         if (r.checked) utCur = r.value;
       });
       if (utCur !== "Administrator") return;
 
-      var gen = ++auProfileRefreshGen;
-      var sel = document.getElementById("gc-au-profile");
+      let gen = ++auProfileRefreshGen;
+      let sel = document.getElementById("gc-au-profile");
       if (!sel) return;
-      var ids = auFlyoutFirewallIdsForPicker();
-      var pendingRaw = sel.getAttribute("data-gc-profile-pending");
+      let ids = auFlyoutFirewallIdsForPicker();
+      let pendingRaw = sel.dataset.gcProfilePending;
       sel.removeAttribute("data-gc-profile-pending");
-      var pending = pendingRaw != null ? String(pendingRaw).trim() : "";
+      let pending = pendingRaw != null ? String(pendingRaw).trim() : "";
 
       if (!URL_ADMIN_PROFILE_OPTS) {
         sel.innerHTML = "";
-        var pm = document.createElement("option");
+        let pm = document.createElement("option");
         pm.value = "";
         pm.textContent = "Profile options unavailable";
         sel.appendChild(pm);
@@ -365,7 +365,7 @@
 
       if (!ids.length) {
         sel.innerHTML = "";
-        var oz = document.createElement("option");
+        let oz = document.createElement("option");
         oz.value = "";
         oz.textContent = "Select firewall(s) first…";
         sel.appendChild(oz);
@@ -374,7 +374,7 @@
       }
 
       sel.disabled = false;
-      var url =
+      let url =
         URL_ADMIN_PROFILE_OPTS + "?firewall_ids=" + encodeURIComponent(ids.join(","));
       fetch(url, {
         credentials: "same-origin",
@@ -392,16 +392,16 @@
           if (gen !== auProfileRefreshGen) return;
           if (!sel.isConnected) return;
           sel.innerHTML = "";
-          var p0 = document.createElement("option");
+          let p0 = document.createElement("option");
           p0.value = "";
           p0.textContent = "Select profile…";
           sel.appendChild(p0);
           if (!x.ok) return;
-          var opts = (x.j && x.j.options) || [];
+          let opts = (x.j && x.j.options) || [];
           if (Array.isArray(opts)) {
             opts.forEach(function (name) {
               if (!name) return;
-              var o = document.createElement("option");
+              let o = document.createElement("option");
               o.value = name;
               o.textContent = name;
               sel.appendChild(o);
@@ -413,7 +413,7 @@
               return opt.value === pending;
             })
           ) {
-            var ox = document.createElement("option");
+            let ox = document.createElement("option");
             ox.value = pending;
             ox.textContent = pending + " (not in cache)";
             sel.appendChild(ox);
@@ -424,7 +424,7 @@
           if (gen !== auProfileRefreshGen) return;
           if (!sel.isConnected) return;
           sel.innerHTML = "";
-          var pe = document.createElement("option");
+          let pe = document.createElement("option");
           pe.value = "";
           pe.textContent = "Could not load profiles";
           sel.appendChild(pe);
@@ -432,17 +432,17 @@
     }
 
     function refreshAuUserGroupSelect() {
-      var gen = ++auGroupRefreshGen;
-      var sel = document.getElementById("gc-au-group");
+      let gen = ++auGroupRefreshGen;
+      let sel = document.getElementById("gc-au-group");
       if (!sel) return;
-      var ids = auFlyoutFirewallIdsForPicker();
-      var pendingRaw = sel.getAttribute("data-gc-group-pending");
+      let ids = auFlyoutFirewallIdsForPicker();
+      let pendingRaw = sel.dataset.gcGroupPending;
       sel.removeAttribute("data-gc-group-pending");
-      var pending = pendingRaw != null ? String(pendingRaw).trim() : "";
+      let pending = pendingRaw != null ? String(pendingRaw).trim() : "";
 
       if (!URL_USER_GROUP_OPTS) {
         sel.innerHTML = "";
-        var pm = document.createElement("option");
+        let pm = document.createElement("option");
         pm.value = "";
         pm.textContent = "Group options unavailable";
         sel.appendChild(pm);
@@ -452,7 +452,7 @@
 
       if (!ids.length) {
         sel.innerHTML = "";
-        var oz = document.createElement("option");
+        let oz = document.createElement("option");
         oz.value = "";
         oz.textContent = "Select firewall(s) first…";
         sel.appendChild(oz);
@@ -461,7 +461,7 @@
       }
 
       sel.disabled = false;
-      var url =
+      let url =
         URL_USER_GROUP_OPTS + "?firewall_ids=" + encodeURIComponent(ids.join(","));
       fetch(url, {
         credentials: "same-origin",
@@ -479,16 +479,16 @@
           if (gen !== auGroupRefreshGen) return;
           if (!sel.isConnected) return;
           sel.innerHTML = "";
-          var p0 = document.createElement("option");
+          let p0 = document.createElement("option");
           p0.value = "";
           p0.textContent = "— No group —";
           sel.appendChild(p0);
           if (!x.ok) return;
-          var opts = (x.j && x.j.options) || [];
+          let opts = (x.j && x.j.options) || [];
           if (Array.isArray(opts)) {
             opts.forEach(function (name) {
               if (!name) return;
-              var o = document.createElement("option");
+              let o = document.createElement("option");
               o.value = name;
               o.textContent = name;
               sel.appendChild(o);
@@ -500,7 +500,7 @@
               return opt.value === pending;
             })
           ) {
-            var ox = document.createElement("option");
+            let ox = document.createElement("option");
             ox.value = pending;
             ox.textContent = pending + " (not in cache)";
             sel.appendChild(ox);
@@ -511,15 +511,15 @@
           if (gen !== auGroupRefreshGen) return;
           if (!sel.isConnected) return;
           sel.innerHTML = "";
-          var pe = document.createElement("option");
+          let pe = document.createElement("option");
           pe.value = "";
           pe.textContent = "Could not load groups";
           sel.appendChild(pe);
         });
     }
 
-    var prevFwSelHook = window.gcHsOnFlyoutFirewallSelectionChange;
-    window.gcHsOnFlyoutFirewallSelectionChange = function (root) {
+    let prevFwSelHook = globalThis.gcHsOnFlyoutFirewallSelectionChange;
+    globalThis.gcHsOnFlyoutFirewallSelectionChange = function (root) {
       if (typeof prevFwSelHook === "function") {
         try {
           prevFwSelHook(root);
@@ -536,14 +536,14 @@
     document.querySelectorAll('input[name="gc-au-usertype"]').forEach(function (r) {
       r.addEventListener("change", function () {
         syncAuProfileFieldVisibility();
-        var ch = document.querySelector('input[name="gc-au-usertype"]:checked');
+        let ch = document.querySelector('input[name="gc-au-usertype"]:checked');
         if (ch && ch.value === "Administrator") {
           refreshAuAdminProfileSelect();
         }
       });
     });
 
-    var tableUsers = window.gcCreateNetworkEntityTable({
+    let tableUsers = globalThis.gcCreateNetworkEntityTable({
       prefix: "gc-auth-u",
       apiUrl: URL_USERS,
       getSelectedIds: firewallScopeIds,
@@ -560,7 +560,7 @@
         auRow = tr._gcNetRow;
         document.getElementById("gc-au-flyout-title").textContent = "Edit user";
         document.getElementById("gc-au-username").disabled = true;
-        var fwField = document.getElementById("gc-au-fw-field");
+        let fwField = document.getElementById("gc-au-fw-field");
         if (fwField) fwField.hidden = true;
         fillUserForm(auRow.payload || {});
         openAuFlyout(true);
@@ -577,7 +577,7 @@
       },
     });
 
-    var tableGroups = window.gcCreateNetworkEntityTable({
+    let tableGroups = globalThis.gcCreateNetworkEntityTable({
       prefix: "gc-auth-g",
       apiUrl: URL_GROUPS,
       getSelectedIds: firewallScopeIds,
@@ -594,7 +594,7 @@
         agRow = tr._gcNetRow;
         document.getElementById("gc-ag-flyout-title").textContent = "Edit group";
         document.getElementById("gc-ag-name").disabled = true;
-        var fwField = document.getElementById("gc-ag-fw-field");
+        let fwField = document.getElementById("gc-ag-fw-field");
         if (fwField) fwField.hidden = true;
         fillGroupForm(agRow.payload || {});
         openAgFlyout(true);
@@ -609,21 +609,21 @@
       },
     });
 
-    var AUTH_TAB_LS = "ground-control-auth-main-tab-v1";
-    var activeTab = "users";
+    let AUTH_TAB_LS = "ground-control-auth-main-tab-v1";
+    let activeTab = "users";
     try {
-      var s = localStorage.getItem(AUTH_TAB_LS);
+      let s = localStorage.getItem(AUTH_TAB_LS);
       if (s === "groups") activeTab = "groups";
     } catch (e) {}
 
     function applyAuthTabs() {
       document.querySelectorAll("[data-gc-auth-tab]").forEach(function (btn) {
-        var on = btn.getAttribute("data-gc-auth-tab") === activeTab;
+        let on = btn.dataset.gcAuthTab === activeTab;
         btn.classList.toggle("is-active", on);
         btn.setAttribute("aria-selected", on ? "true" : "false");
       });
-      var pu = document.getElementById("gc-panel-auth-users");
-      var pg = document.getElementById("gc-panel-auth-groups");
+      let pu = document.getElementById("gc-panel-auth-users");
+      let pg = document.getElementById("gc-panel-auth-groups");
       if (pu) {
         pu.classList.toggle("is-active", activeTab === "users");
         pu.hidden = activeTab !== "users";
@@ -632,15 +632,15 @@
         pg.classList.toggle("is-active", activeTab === "groups");
         pg.hidden = activeTab !== "groups";
       }
-      var fa = document.getElementById("gc-auth-u-filters-aside");
-      var fb = document.getElementById("gc-auth-g-filters-aside");
+      let fa = document.getElementById("gc-auth-u-filters-aside");
+      let fb = document.getElementById("gc-auth-g-filters-aside");
       if (fa) fa.hidden = activeTab !== "users";
       if (fb) fb.hidden = activeTab !== "groups";
     }
 
     document.querySelectorAll("[data-gc-auth-tab]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        activeTab = btn.getAttribute("data-gc-auth-tab") || "users";
+        activeTab = btn.dataset.gcAuthTab || "users";
         try {
           localStorage.setItem(AUTH_TAB_LS, activeTab);
         } catch (e2) {}
@@ -655,11 +655,11 @@
       document.getElementById("gc-au-flyout-title").textContent = "Add user";
       document.getElementById("gc-au-username").disabled = false;
       fillUserForm({});
-      var fwField = document.getElementById("gc-au-fw-field");
+      let fwField = document.getElementById("gc-au-fw-field");
       if (fwField) fwField.hidden = false;
-      var ms = fwField && fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms");
-      if (ms && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-        window.gcHsHydrateFlyoutFirewallPicker(
+      let ms = fwField && fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms");
+      if (ms && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(
           ms.closest(".gc-if-flyout__form-body") || ms,
           { row: {} },
         );
@@ -675,11 +675,11 @@
       document.getElementById("gc-ag-flyout-title").textContent = "Add group";
       document.getElementById("gc-ag-name").disabled = false;
       fillGroupForm({});
-      var fwField = document.getElementById("gc-ag-fw-field");
+      let fwField = document.getElementById("gc-ag-fw-field");
       if (fwField) fwField.hidden = false;
-      var ms = fwField && fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms");
-      if (ms && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-        window.gcHsHydrateFlyoutFirewallPicker(
+      let ms = fwField && fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms");
+      if (ms && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(
           ms.closest(".gc-if-flyout__form-body") || ms,
           { row: {} },
         );
@@ -688,17 +688,17 @@
     });
 
     function bindDel(btnId, table, url, noun) {
-      var btn = document.getElementById(btnId);
+      let btn = document.getElementById(btnId);
       if (!btn || !table) return;
       btn.addEventListener("click", function () {
         if (typeof table.getDeleteConfigEntryIdsFromSelection !== "function") return;
-        var ids = table.getDeleteConfigEntryIdsFromSelection();
+        let ids = table.getDeleteConfigEntryIdsFromSelection();
         if (!ids.length) {
           bannerResult(false, "Select one or more rows.");
           return;
         }
         if (
-          !window.confirm(
+          !globalThis.confirm(
             "Queue deletion of " + ids.length + " " + noun + " on the firewall(s)?",
           )
         ) {
@@ -723,7 +723,7 @@
           .then(function (x) {
             btn.disabled = false;
             if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+              let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
               bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
               return;
             }
@@ -766,16 +766,16 @@
 
     document.getElementById("gc-au-form").addEventListener("submit", function (e) {
       e.preventDefault();
-      var body = collectUserPayload();
+      let body = collectUserPayload();
       if (!body.Username || !body.Name) {
         bannerResult(false, "Username and name are required.");
         return;
       }
       if (auMode === "add") {
-        var ms = document
+        let ms = document
           .getElementById("gc-au-fw-field")
           .querySelector(".gc-hs-ip-host-flyout__fw-ms");
-        var fids = selectedFirewallIdsFromMs(ms);
+        let fids = selectedFirewallIdsFromMs(ms);
         if (!fids.length) {
           bannerResult(false, "Select at least one firewall.");
           return;
@@ -784,9 +784,9 @@
           bannerResult(false, "Password is required for new users.");
           return;
         }
-        var ok = 0;
-        var fail = 0;
-        var tot = fids.length;
+        let ok = 0;
+        let fail = 0;
+        let tot = fids.length;
         fids.forEach(function (fid) {
           fetch(U_CREATE, {
             method: "POST",
@@ -841,7 +841,7 @@
         })
         .then(function (x) {
           if (!x.ok) {
-            var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue update.";
+            let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue update.";
             bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
@@ -870,24 +870,24 @@
 
     document.getElementById("gc-ag-form").addEventListener("submit", function (e) {
       e.preventDefault();
-      var body = collectGroupPayload();
-      var gn = body.GroupDetail && body.GroupDetail.Name;
+      let body = collectGroupPayload();
+      let gn = body.GroupDetail && body.GroupDetail.Name;
       if (!gn) {
         bannerResult(false, "Group name is required.");
         return;
       }
       if (agMode === "add") {
-        var ms = document
+        let ms = document
           .getElementById("gc-ag-fw-field")
           .querySelector(".gc-hs-ip-host-flyout__fw-ms");
-        var fids = selectedFirewallIdsFromMs(ms);
+        let fids = selectedFirewallIdsFromMs(ms);
         if (!fids.length) {
           bannerResult(false, "Select at least one firewall.");
           return;
         }
-        var ok = 0;
-        var fail = 0;
-        var tot = fids.length;
+        let ok = 0;
+        let fail = 0;
+        let tot = fids.length;
         fids.forEach(function (fid) {
           fetch(G_CREATE, {
             method: "POST",
@@ -942,7 +942,7 @@
         })
         .then(function (x) {
           if (!x.ok) {
-            var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue update.";
+            let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue update.";
             bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
@@ -957,8 +957,8 @@
     });
   };
 
-  var lastApCombinePayload = {};
-  var AP_LS_COMBINE = "ground-control-prof-ap-combine-v1";
+  let lastApCombinePayload = {};
+  let AP_LS_COMBINE = "ground-control-prof-ap-combine-v1";
 
   function escApCombine(s) {
     return String(s == null ? "" : s)
@@ -973,18 +973,18 @@
   }
 
   function apCombineScopePill(fw) {
-    if (typeof window.gcFirewallScopePillHtml === "function") {
-      return window.gcFirewallScopePillHtml(fw);
+    if (typeof globalThis.gcFirewallScopePillHtml === "function") {
+      return globalThis.gcFirewallScopePillHtml(fw);
     }
     return escApCombine(fw);
   }
 
   function buildApCombineModalHtml(data) {
-    var labels = (data && data.column_labels) || {};
-    var rows = (data && data.rows) || [];
-    var conflictRows = rows.filter(function (r) {
+    let labels = (data && data.column_labels) || {};
+    let rows = (data && data.rows) || [];
+    let conflictRows = rows.filter(function (r) {
       if (!r) return false;
-      var pf = r.adminprofile_combine_per_field;
+      let pf = r.adminprofile_combine_per_field;
       return r.adminprofile_combine_conflict && pf;
     });
     if (!conflictRows.length) {
@@ -992,19 +992,19 @@
     }
     return conflictRows
       .map(function (row) {
-        var hname = (row.cells && row.cells.__name) || "";
-        var pf = row.adminprofile_combine_per_field || {};
-        var colKeys = Object.keys(pf).sort();
-        var parts =
+        let hname = (row.cells && row.cells.__name) || "";
+        let pf = row.adminprofile_combine_per_field || {};
+        let colKeys = Object.keys(pf).sort();
+        let parts =
           '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
           escApCombine(hname) +
           "</h3>";
         colKeys.forEach(function (colKey) {
-          var lbl = labels[colKey] || colKey;
+          let lbl = labels[colKey] || colKey;
           parts +=
             '<h4 class="gc-net-zone-modal__col">' + escApCombine(lbl).replace(/\n/g, "<br />") + "</h4>";
           parts += '<ul class="gc-net-zone-modal__fw-list">';
-          var per = pf[colKey];
+          let per = pf[colKey];
           Object.keys(per)
             .sort()
             .forEach(function (fw) {
@@ -1024,20 +1024,20 @@
   }
 
   function updateApCombineChrome(data) {
-    var wrap = document.getElementById("gc-prof-ap-combine-wrap");
-    var inp = document.getElementById("gc-prof-ap-combine");
+    let wrap = document.getElementById("gc-prof-ap-combine-wrap");
+    let inp = document.getElementById("gc-prof-ap-combine");
     if (!wrap || !inp) return;
-    var conflicts = !!(data && data.adminprofile_combine_conflicts);
-    var flat = !!(data && data.adminprofile_combined === false);
+    let conflicts = !!(data && data.adminprofile_combine_conflicts);
+    let flat = !!(data && data.adminprofile_combined === false);
     wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
   }
 
   function bindApDeviceAccessCombine(table) {
-    var cbx = document.getElementById("gc-prof-ap-combine");
+    let cbx = document.getElementById("gc-prof-ap-combine");
     if (!cbx) return;
 
     try {
-      var vp = localStorage.getItem(AP_LS_COMBINE);
+      let vp = localStorage.getItem(AP_LS_COMBINE);
       if (vp === "0") cbx.checked = false;
       else if (vp === "1") cbx.checked = true;
     } catch (eLs) {}
@@ -1049,12 +1049,12 @@
       if (table.refresh) table.refresh();
     });
 
-    var modal = document.getElementById("gc-prof-combine-modal");
-    var modalBody = document.getElementById("gc-prof-combine-modal-body");
-    var modalTitle = document.getElementById("gc-prof-combine-modal-title");
-    var modalClose = document.getElementById("gc-prof-combine-modal-close");
-    var modalDone = document.getElementById("gc-prof-combine-modal-done");
-    var modalBackdrop = document.getElementById("gc-prof-combine-modal-backdrop");
+    let modal = document.getElementById("gc-prof-combine-modal");
+    let modalBody = document.getElementById("gc-prof-combine-modal-body");
+    let modalTitle = document.getElementById("gc-prof-combine-modal-title");
+    let modalClose = document.getElementById("gc-prof-combine-modal-close");
+    let modalDone = document.getElementById("gc-prof-combine-modal-done");
+    let modalBackdrop = document.getElementById("gc-prof-combine-modal-backdrop");
 
     function closeApCombineModal() {
       if (!modal) return;
@@ -1073,9 +1073,9 @@
     }
 
     cbx.addEventListener("pointerdown", function (e) {
-      var data = lastApCombinePayload;
-      var conflicts = !!(data && data.adminprofile_combine_conflicts);
-      var flat = !!(data && data.adminprofile_combined === false);
+      let data = lastApCombinePayload;
+      let conflicts = !!(data && data.adminprofile_combine_conflicts);
+      let flat = !!(data && data.adminprofile_combined === false);
       if (conflicts && !flat && cbx.checked && !e.shiftKey) {
         e.preventDefault();
         openApCombineModal();
@@ -1087,14 +1087,14 @@
     if (modalBackdrop) modalBackdrop.addEventListener("click", closeApCombineModal);
   }
 
-  window.gcInitProfilesDeviceAccessPage = function (cfg) {
-    var URL_TABLE = cfg.urlTable;
-    var CREATE_URL = cfg.urlCreate;
-    var UPDATE_URL = cfg.urlUpdate;
-    var DEL_URL = cfg.urlDeletes;
-    var suppressFirewallRefreshListener = !!(cfg && cfg.suppressFirewallRefreshListener);
+  globalThis.gcInitProfilesDeviceAccessPage = function (cfg) {
+    let URL_TABLE = cfg.urlTable;
+    let CREATE_URL = cfg.urlCreate;
+    let UPDATE_URL = cfg.urlUpdate;
+    let DEL_URL = cfg.urlDeletes;
+    let suppressFirewallRefreshListener = !!(cfg && cfg.suppressFirewallRefreshListener);
 
-    var table = window.gcCreateNetworkEntityTable({
+    let table = globalThis.gcCreateNetworkEntityTable({
       prefix: "gc-prof-ap",
       apiUrl: URL_TABLE,
       apiEntityType: "admin_profile",
@@ -1112,7 +1112,7 @@
         createUrl: CREATE_URL,
       },
       onRowClick: function (tr) {
-        if (window.gcAdminProfileFlyoutOpenFromTr) window.gcAdminProfileFlyoutOpenFromTr(tr);
+        if (globalThis.gcAdminProfileFlyoutOpenFromTr) globalThis.gcAdminProfileFlyoutOpenFromTr(tr);
       },
       labels: {
         countSingular: "profile",
@@ -1132,9 +1132,9 @@
 
     if (table.refresh) table.refresh();
 
-    if (typeof window.gcAdminProfileFlyoutInit === "function") {
+    if (typeof globalThis.gcAdminProfileFlyoutInit === "function") {
       try {
-        window.gcAdminProfileFlyoutInit({
+        globalThis.gcAdminProfileFlyoutInit({
           createUrl: CREATE_URL,
           updateUrl: UPDATE_URL,
           onSaved: function () {
@@ -1148,23 +1148,23 @@
       }
     }
 
-    var apAdd = document.getElementById("gc-prof-ap-add");
+    let apAdd = document.getElementById("gc-prof-ap-add");
     if (apAdd) {
       apAdd.addEventListener("click", function () {
-        if (window.gcAdminProfileFlyoutOpenCreate) window.gcAdminProfileFlyoutOpenCreate();
+        if (globalThis.gcAdminProfileFlyoutOpenCreate) globalThis.gcAdminProfileFlyoutOpenCreate();
       });
     }
 
-    var btn = document.getElementById("gc-prof-ap-delete-selected");
+    let btn = document.getElementById("gc-prof-ap-delete-selected");
     if (btn) {
       btn.addEventListener("click", function () {
         if (typeof table.getDeleteConfigEntryIdsFromSelection !== "function") return;
-        var ids = table.getDeleteConfigEntryIdsFromSelection();
+        let ids = table.getDeleteConfigEntryIdsFromSelection();
         if (!ids.length) {
           bannerResult(false, "Select one or more profiles.");
           return;
         }
-        if (!window.confirm("Queue deletion of " + ids.length + " profile(s) on the firewall(s)?")) {
+        if (!globalThis.confirm("Queue deletion of " + ids.length + " profile(s) on the firewall(s)?")) {
           return;
         }
         btn.disabled = true;
@@ -1186,7 +1186,7 @@
           .then(function (x) {
             btn.disabled = false;
             if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+              let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
               bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
               return;
             }

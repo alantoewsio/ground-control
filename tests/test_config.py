@@ -132,32 +132,61 @@ def test_fernet_key_from_env(monkeypatch):
 
 def test_fernet_key_from_file(monkeypatch, tmp_path):
     monkeypatch.delenv("GROUND_CONTROL_FERNET_KEY", raising=False)
-    key_file = tmp_path / ".fernet_key"
-    key_file.write_text("filekey\n", encoding="utf-8")
-    monkeypatch.setattr(config, "FERNET_KEY_FILE", key_file)
+    persist = tmp_path / "persist"
+    persist.mkdir()
+    (persist / ".fernet_key").write_text("filekey\n", encoding="utf-8")
+    monkeypatch.setenv("GROUND_CONTROL_PERSIST_DIR", str(persist))
     assert config.fernet_key().strip() == "filekey"
 
 
 def test_fernet_key_empty(monkeypatch, tmp_path):
     monkeypatch.delenv("GROUND_CONTROL_FERNET_KEY", raising=False)
-    monkeypatch.setattr(config, "FERNET_KEY_FILE", tmp_path / "missing")
+    persist = tmp_path / "empty"
+    persist.mkdir()
+    monkeypatch.setenv("GROUND_CONTROL_PERSIST_DIR", str(persist))
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
     assert config.fernet_key() == ""
 
 
-def test_ensure_local_fernet_key_creates_file(monkeypatch, tmp_path):
+def test_fernet_key_legacy_base_dir_when_persist_unset(monkeypatch, tmp_path):
     monkeypatch.delenv("GROUND_CONTROL_FERNET_KEY", raising=False)
-    monkeypatch.setattr(config, "FERNET_KEY_FILE", tmp_path / ".fernet_key")
+    monkeypatch.delenv("GROUND_CONTROL_PERSIST_DIR", raising=False)
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
+    (tmp_path / ".fernet_key").write_text("legacykey\n", encoding="utf-8")
+    assert config.fernet_key().strip() == "legacykey"
+
+
+def test_ensure_local_fernet_key_creates_file_under_persist(monkeypatch, tmp_path):
+    monkeypatch.delenv("GROUND_CONTROL_FERNET_KEY", raising=False)
+    persist = tmp_path / "data"
+    persist.mkdir()
+    monkeypatch.setenv("GROUND_CONTROL_PERSIST_DIR", str(persist))
     monkeypatch.setattr(config, "BASE_DIR", tmp_path)
     config.ensure_local_fernet_key()
-    assert (tmp_path / ".fernet_key").is_file()
+    assert (persist / ".fernet_key").is_file()
     assert config.fernet_key()
 
 
 def test_ensure_local_fernet_key_noop_when_key_set(monkeypatch, tmp_path):
     monkeypatch.setenv("GROUND_CONTROL_FERNET_KEY", Fernet.generate_key().decode())
-    monkeypatch.setattr(config, "FERNET_KEY_FILE", tmp_path / ".fernet_key")
+    persist = tmp_path / "data"
+    persist.mkdir()
+    monkeypatch.setenv("GROUND_CONTROL_PERSIST_DIR", str(persist))
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
     config.ensure_local_fernet_key()
-    assert not (tmp_path / ".fernet_key").exists()
+    assert not (persist / ".fernet_key").exists()
+
+
+def test_migrate_fernet_from_base_dir_to_persist(monkeypatch, tmp_path):
+    monkeypatch.delenv("GROUND_CONTROL_FERNET_KEY", raising=False)
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
+    (tmp_path / ".fernet_key").write_text("migrated\n", encoding="utf-8")
+    persist = tmp_path / "vol"
+    persist.mkdir()
+    monkeypatch.setenv("GROUND_CONTROL_PERSIST_DIR", str(persist))
+    config.ensure_local_fernet_key()
+    assert (persist / ".fernet_key").read_text(encoding="utf-8").strip() == "migrated"
+    assert config.fernet_key().strip() == "migrated"
 
 
 def test_load_dotenv_import_error_returns_early():

@@ -5,8 +5,8 @@
   "use strict";
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -19,17 +19,17 @@
   }
 
   function firewallScopeIds() {
-    var base = [];
-    if (typeof window.gcGetSelectedFirewallIds === "function") {
+    let base = [];
+    if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
       try {
-        base = window.gcGetSelectedFirewallIds() || [];
+        base = globalThis.gcGetSelectedFirewallIds() || [];
       } catch (eSel) {
         base = [];
       }
     }
     if (!Array.isArray(base)) base = [];
     if (base.length) return base;
-    var inv = window.gcNavFirewallsJson;
+    let inv = globalThis.gcNavFirewallsJson;
     if (!Array.isArray(inv) || !inv.length) return [];
     return inv
       .map(function (x) {
@@ -49,8 +49,8 @@
   }
 
   function scopePillForModal(fw) {
-    if (typeof window.gcFirewallScopePillHtml === "function") {
-      return window.gcFirewallScopePillHtml(fw);
+    if (typeof globalThis.gcFirewallScopePillHtml === "function") {
+      return globalThis.gcFirewallScopePillHtml(fw);
     }
     return esc(fw);
   }
@@ -60,13 +60,13 @@
   }
 
   function buildProfCombineModalHtml(data, tabCfg) {
-    var labels = (data && data.column_labels) || {};
-    var rows = (data && data.rows) || [];
-    var ck = tabCfg.conflictRow;
-    var pk = tabCfg.perField;
-    var conflictRows = rows.filter(function (r) {
+    let labels = (data && data.column_labels) || {};
+    let rows = (data && data.rows) || [];
+    let ck = tabCfg.conflictRow;
+    let pk = tabCfg.perField;
+    let conflictRows = rows.filter(function (r) {
       if (!r) return false;
-      var pf = r[pk];
+      let pf = r[pk];
       return r[ck] && pf;
     });
     if (!conflictRows.length) {
@@ -74,19 +74,19 @@
     }
     return conflictRows
       .map(function (row) {
-        var hname = (row.cells && row.cells.__name) || "";
-        var pf = row[pk] || {};
-        var colKeys = Object.keys(pf).sort();
-        var parts =
+        let hname = (row.cells && row.cells.__name) || "";
+        let pf = row[pk] || {};
+        let colKeys = Object.keys(pf).sort();
+        let parts =
           '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
           esc(hname) +
           "</h3>";
         colKeys.forEach(function (colKey) {
-          var lbl = labels[colKey] || colKey;
+          let lbl = labels[colKey] || colKey;
           parts +=
             '<h4 class="gc-net-zone-modal__col">' + esc(lbl).replace(/\n/g, "<br />") + "</h4>";
           parts += '<ul class="gc-net-zone-modal__fw-list">';
-          var per = pf[colKey];
+          let per = pf[colKey];
           Object.keys(per)
             .sort()
             .forEach(function (fw) {
@@ -105,24 +105,24 @@
       .join("");
   }
 
-  var lastPayloadByKey = {};
-  var tablesByKey = {};
+  let lastPayloadByKey = {};
+  let tablesByKey = {};
 
   function updateCombineChrome(tabCfg, data) {
-    var wrap = document.getElementById(tabCfg.prefix + "-combine-wrap");
-    var inp = document.getElementById(tabCfg.prefix + "-combine");
+    let wrap = document.getElementById(tabCfg.prefix + "-combine-wrap");
+    let inp = document.getElementById(tabCfg.prefix + "-combine");
     if (!wrap || !inp) return;
-    var conflicts = !!(data && data[tabCfg.metaConflicts]);
-    var flat = !!(data && data[tabCfg.metaCombined] === false);
+    let conflicts = !!(data && data[tabCfg.metaConflicts]);
+    let flat = !!(data && data[tabCfg.metaCombined] === false);
     wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
   }
 
   function bindCombineForTable(tabCfg, table) {
-    var cbx = document.getElementById(tabCfg.prefix + "-combine");
+    let cbx = document.getElementById(tabCfg.prefix + "-combine");
     if (!cbx) return;
 
     try {
-      var vp = localStorage.getItem(tabCfg.lsCombine);
+      let vp = localStorage.getItem(tabCfg.lsCombine);
       if (vp === "0") cbx.checked = false;
       else if (vp === "1") cbx.checked = true;
     } catch (eLs) {}
@@ -134,12 +134,12 @@
       if (table.refresh) table.refresh();
     });
 
-    var modal = document.getElementById("gc-prof-combine-modal");
-    var modalBody = document.getElementById("gc-prof-combine-modal-body");
-    var modalTitle = document.getElementById("gc-prof-combine-modal-title");
-    var modalClose = document.getElementById("gc-prof-combine-modal-close");
-    var modalDone = document.getElementById("gc-prof-combine-modal-done");
-    var modalBackdrop = document.getElementById("gc-prof-combine-modal-backdrop");
+    let modal = document.getElementById("gc-prof-combine-modal");
+    let modalBody = document.getElementById("gc-prof-combine-modal-body");
+    let modalTitle = document.getElementById("gc-prof-combine-modal-title");
+    let modalClose = document.getElementById("gc-prof-combine-modal-close");
+    let modalDone = document.getElementById("gc-prof-combine-modal-done");
+    let modalBackdrop = document.getElementById("gc-prof-combine-modal-backdrop");
 
     function closeModal() {
       if (!modal) return;
@@ -149,7 +149,7 @@
     }
 
     function openModal() {
-      var data = lastPayloadByKey[tabCfg.key];
+      let data = lastPayloadByKey[tabCfg.key];
       if (!modal || !modalBody) return;
       if (modalTitle) {
         modalTitle.textContent =
@@ -170,9 +170,9 @@
     }
 
     cbx.addEventListener("pointerdown", function (e) {
-      var data = lastPayloadByKey[tabCfg.key];
-      var conflicts = !!(data && data[tabCfg.metaConflicts]);
-      var flat = !!(data && data[tabCfg.metaCombined] === false);
+      let data = lastPayloadByKey[tabCfg.key];
+      let conflicts = !!(data && data[tabCfg.metaConflicts]);
+      let flat = !!(data && data[tabCfg.metaCombined] === false);
       if (conflicts && !flat && cbx.checked && !e.shiftKey) {
         e.preventDefault();
         openModal();
@@ -184,35 +184,35 @@
     if (modalBackdrop) modalBackdrop.addEventListener("click", closeModal);
   }
 
-  window.gcInitProfilesPolicyEntitiesPage = function (cfg) {
-    var urls = (cfg && cfg.urls) || {};
-    var tabCfgs = (cfg && cfg.tables) || [];
-    var deviceTableHolder = cfg && cfg.deviceTableHolder;
+  globalThis.gcInitProfilesPolicyEntitiesPage = function (cfg) {
+    let urls = (cfg && cfg.urls) || {};
+    let tabCfgs = (cfg && cfg.tables) || [];
+    let deviceTableHolder = cfg && cfg.deviceTableHolder;
 
     function refreshAll() {
       tabCfgs.forEach(function (tc) {
-        var tb = tablesByKey[tc.key];
+        let tb = tablesByKey[tc.key];
         if (tb && tb.refresh) tb.refresh();
       });
-      var dt = deviceTableHolder && deviceTableHolder.table;
+      let dt = deviceTableHolder && deviceTableHolder.table;
       if (dt && dt.refresh) dt.refresh();
     }
 
     document.addEventListener("gc-firewall-selection-changed", refreshAll);
 
-    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
-      window.gcRegisterConfigCacheTableRefresher(function (ids) {
+    if (typeof globalThis.gcRegisterConfigCacheTableRefresher === "function") {
+      globalThis.gcRegisterConfigCacheTableRefresher(function (ids) {
         if (!ids || !ids.length) return;
-        var sel =
-          typeof window.gcGetSelectedFirewallIds === "function"
-            ? window.gcGetSelectedFirewallIds()
+        let sel =
+          typeof globalThis.gcGetSelectedFirewallIds === "function"
+            ? globalThis.gcGetSelectedFirewallIds()
             : [];
         if (!sel || !sel.length) return;
-        var set = {};
+        let set = {};
         sel.forEach(function (id) {
           set[Number(id)] = true;
         });
-        var hit = ids.some(function (id) {
+        let hit = ids.some(function (id) {
           return set[Number(id)];
         });
         if (hit) refreshAll();
@@ -220,7 +220,7 @@
     }
 
     tabCfgs.forEach(function (tabCfg) {
-      var tableOpts = {
+      let tableOpts = {
         prefix: tabCfg.prefix,
         apiUrl: tabCfg.apiUrl,
         apiEntityType: tabCfg.entityType,
@@ -239,8 +239,8 @@
           profileEntityType: tabCfg.entityType,
         },
         onRowClick: function (tr) {
-          if (window.gcProfileEntityFlyoutOpenFromTr) {
-            window.gcProfileEntityFlyoutOpenFromTr(tr, tabCfg);
+          if (globalThis.gcProfileEntityFlyoutOpenFromTr) {
+            globalThis.gcProfileEntityFlyoutOpenFromTr(tr, tabCfg);
           }
         },
         labels: tabCfg.labels,
@@ -252,29 +252,29 @@
       if (Array.isArray(tabCfg.valuePillColIds) && tabCfg.valuePillColIds.length) {
         tableOpts.valuePillColIds = tabCfg.valuePillColIds;
       }
-      var table = window.gcCreateNetworkEntityTable(tableOpts);
+      let table = globalThis.gcCreateNetworkEntityTable(tableOpts);
       tablesByKey[tabCfg.key] = table;
       bindCombineForTable(tabCfg, table);
 
-      var addBtn = document.getElementById(tabCfg.prefix + "-add");
+      let addBtn = document.getElementById(tabCfg.prefix + "-add");
       if (addBtn) {
         addBtn.addEventListener("click", function () {
-          if (typeof window.gcProfileEntityFlyoutOpenCreate === "function") {
-            window.gcProfileEntityFlyoutOpenCreate(tabCfg);
+          if (typeof globalThis.gcProfileEntityFlyoutOpenCreate === "function") {
+            globalThis.gcProfileEntityFlyoutOpenCreate(tabCfg);
           }
         });
       }
 
-      var delBtn = document.getElementById(tabCfg.prefix + "-delete-selected");
+      let delBtn = document.getElementById(tabCfg.prefix + "-delete-selected");
       if (delBtn) {
         delBtn.addEventListener("click", function () {
           if (typeof table.getDeleteConfigEntryIdsFromSelection !== "function") return;
-          var ids = table.getDeleteConfigEntryIdsFromSelection();
+          let ids = table.getDeleteConfigEntryIdsFromSelection();
           if (!ids.length) {
             bannerResult(false, "Select one or more rows.");
             return;
           }
-          if (!window.confirm("Queue deletion of " + ids.length + " row(s)?")) return;
+          if (!globalThis.confirm("Queue deletion of " + ids.length + " row(s)?")) return;
           delBtn.disabled = true;
           fetch(urls.deleteBatch, {
             method: "POST",
@@ -294,7 +294,7 @@
             .then(function (x) {
               delBtn.disabled = false;
               if (!x.ok) {
-                var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+                let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
                 bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
                 return;
               }
@@ -310,9 +310,9 @@
       }
     });
 
-    if (typeof window.gcProfileEntityFlyoutInit === "function") {
+    if (typeof globalThis.gcProfileEntityFlyoutInit === "function") {
       try {
-        window.gcProfileEntityFlyoutInit({
+        globalThis.gcProfileEntityFlyoutInit({
           urls: urls,
           onSaved: function () {
             refreshAll();
@@ -326,7 +326,7 @@
     }
 
     tabCfgs.forEach(function (tc) {
-      var tb = tablesByKey[tc.key];
+      let tb = tablesByKey[tc.key];
       if (tb && typeof tb.refresh === "function") {
         try {
           tb.refresh();

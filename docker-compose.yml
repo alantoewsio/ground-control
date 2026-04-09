@@ -1,19 +1,99 @@
+# Ground Control — Docker Compose
+#
+# Secrets are read from ./.gc_docker_secrets/<name> (create empty files, or use the Launcher
+# Settings tab in Docker mode to fill them). Host ↔ container port mapping uses GC_PUBLISH_*
+# and GC_CONTAINER_* so they stay aligned when you change HTTP/HTTPS ports.
+#
+# Example (matches defaults): docker compose up -d --build
+#
+# PostgreSQL: default password is gc_docker_pg (override with GC_POSTGRES_PASSWORD). Use a URL-safe
+# password if you change it (avoid @ : / in the value, or URL-encode the password in the three URLs).
+
 services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ground_control
+      POSTGRES_PASSWORD: ${GC_POSTGRES_PASSWORD:-gc_docker_pg}
+      POSTGRES_DB: ground_control
+    volumes:
+      - ground_control_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ground_control -d ground_control"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   ground-control:
     build: .
     image: ground-control:local
-    ports:
-      - "8000:8000"
-      - "8443:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
+      GROUND_CONTROL_DOCKER: "1"
+      GROUND_CONTROL_PERSIST_DIR: "/data"
       GROUND_CONTROL_BIND_ADDRESS: "0.0.0.0"
-      PORT: "8000"
-      GROUND_CONTROL_HTTPS_PORT: "8443"
-      GROUND_CONTROL_DATABASE_URL: sqlite:////data/ground_control.db
-      GROUND_CONTROL_MONITOR_DATABASE_URL: sqlite:////data/ground_control_monitor.db
-      GROUND_CONTROL_SECRETS_DATABASE_URL: sqlite:////data/ground_control_secrets.db
+      GROUND_CONTROL_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control
+      GROUND_CONTROL_MONITOR_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_monitor
+      GROUND_CONTROL_SECRETS_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_secrets
+    ports:
+      - "${GC_PUBLISH_HTTP:-8000}:${GC_CONTAINER_HTTP:-8000}"
+      - "${GC_PUBLISH_HTTPS:-8443}:${GC_CONTAINER_HTTPS:-8443}"
+    secrets:
+      - ground_control_default_admin_password
+      - ground_control_http_port
+      - ground_control_https_port
+      - ground_control_tls_hostnames
+      - ground_control_cert_source
+      - ground_control_http_enabled
+      - ground_control_https_enabled
+      - ground_control_redirect_http_to_https
+      - ground_control_listen_interface
+      - ground_control_allowed_ranges
+      - ground_control_letsencrypt_validation_method
+      - ground_control_letsencrypt_dns_plugin
+      - ground_control_letsencrypt_email
+      - ground_control_letsencrypt_dns_credentials_ini
+      - ground_control_letsencrypt_google_credentials_json
     volumes:
       - ground_control_data:/data
 
+secrets:
+  ground_control_default_admin_password:
+    file: .gc_docker_secrets/ground_control_default_admin_password
+  ground_control_http_port:
+    file: .gc_docker_secrets/ground_control_http_port
+  ground_control_https_port:
+    file: .gc_docker_secrets/ground_control_https_port
+  ground_control_tls_hostnames:
+    file: .gc_docker_secrets/ground_control_tls_hostnames
+  ground_control_cert_source:
+    file: .gc_docker_secrets/ground_control_cert_source
+  ground_control_http_enabled:
+    file: .gc_docker_secrets/ground_control_http_enabled
+  ground_control_https_enabled:
+    file: .gc_docker_secrets/ground_control_https_enabled
+  ground_control_redirect_http_to_https:
+    file: .gc_docker_secrets/ground_control_redirect_http_to_https
+  ground_control_listen_interface:
+    file: .gc_docker_secrets/ground_control_listen_interface
+  ground_control_allowed_ranges:
+    file: .gc_docker_secrets/ground_control_allowed_ranges
+  ground_control_letsencrypt_validation_method:
+    file: .gc_docker_secrets/ground_control_letsencrypt_validation_method
+  ground_control_letsencrypt_dns_plugin:
+    file: .gc_docker_secrets/ground_control_letsencrypt_dns_plugin
+  ground_control_letsencrypt_email:
+    file: .gc_docker_secrets/ground_control_letsencrypt_email
+  ground_control_letsencrypt_dns_credentials_ini:
+    file: .gc_docker_secrets/ground_control_letsencrypt_dns_credentials_ini
+  ground_control_letsencrypt_google_credentials_json:
+    file: .gc_docker_secrets/ground_control_letsencrypt_google_credentials_json
+
 volumes:
   ground_control_data:
+  ground_control_pgdata:

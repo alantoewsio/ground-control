@@ -37,7 +37,7 @@
   }
 
   function notify(title, message) {
-    window.alert([title, message].filter(Boolean).join("\n"));
+    globalThis.alert([title, message].filter(Boolean).join("\n"));
   }
 
   function stopSessionIdleWatch() {
@@ -77,7 +77,7 @@
       });
       sessionIdleListenersBound = true;
     }
-    sessionIdleWatchdogTimer = window.setInterval(() => {
+    sessionIdleWatchdogTimer = globalThis.setInterval(() => {
       if (!currentSessionUser || sessionIdleMs <= 0) return;
       if (Date.now() - lastUserActivityAt >= sessionIdleMs) {
         handleSessionExpired("Signed out due to inactivity.");
@@ -196,8 +196,8 @@
     const btnUser = document.getElementById("btn-user-menu");
     if (btnUser) btnUser.hidden = false;
     applySessionUserToChrome();
-    if (typeof window.gcRefreshTaskQueueBadge === "function") {
-      window.gcRefreshTaskQueueBadge();
+    if (typeof globalThis.gcRefreshTaskQueueBadge === "function") {
+      globalThis.gcRefreshTaskQueueBadge();
     }
   }
 
@@ -214,9 +214,9 @@
 
   function scheduleAuthGateFocus() {
     const reduce =
-      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      typeof globalThis.matchMedia === "function" && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const delay = reduce ? 0 : 560;
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       const o = document.getElementById("auth-overlay");
       if (!o || o.hidden) return;
       const setup = document.getElementById("auth-setup-block");
@@ -295,8 +295,13 @@
     scheduleAuthGateFocus();
   }
 
+  function initNeedsAdminPasswordSetup(init) {
+    const v = init && init.needs_admin_password_setup;
+    return v === true || v === "true" || v === 1;
+  }
+
   async function bootAuth() {
-    const init = window.GC_INITIAL_AUTH || {};
+    const init = globalThis.GC_INITIAL_AUTH || {};
     if (typeof init.session_idle_timeout_minutes === "number") {
       sessionIdleMinutes = init.session_idle_timeout_minutes;
     }
@@ -310,7 +315,15 @@
         credentials: "same-origin",
         cache: "no-store",
       });
-      const st = await r.json();
+      if (!r.ok) {
+        throw new Error(`auth status ${r.status}`);
+      }
+      let st;
+      try {
+        st = await r.json();
+      } catch {
+        throw new Error("auth status bad json");
+      }
       if (typeof st.session_idle_timeout_minutes === "number") {
         sessionIdleMinutes = st.session_idle_timeout_minutes;
       }
@@ -333,6 +346,18 @@
       if (init.authenticated && init.user) {
         currentSessionUser = null;
         stopSessionIdleWatch();
+      }
+      /* Page HTML already reflected server-side auth state; keep setup gate if API cannot be reached. */
+      if (initNeedsAdminPasswordSetup(init)) {
+        showSetupGate(init.default_admin_username);
+        const stEl = document.getElementById("auth-setup-status");
+        if (stEl) {
+          stEl.textContent =
+            "Could not reach the server to refresh status. You can still set your password below; if this keeps happening, check the URL, proxy, or TLS settings.";
+          stEl.classList.add("is-error");
+          stEl.classList.remove("is-ok");
+        }
+        return;
       }
       showLoginGate("Could not reach the server.");
     }
@@ -360,7 +385,7 @@
         currentSessionUser = res?.user;
         revealAuthenticatedChrome();
         restartSessionIdleWatchIfAuthenticated();
-        window.location.reload();
+        globalThis.location.reload();
       } catch (err) {
         if (st) {
           st.textContent = err.message || "Could not save password.";
@@ -388,7 +413,7 @@
           st.classList.remove("is-error");
         }
         restartSessionIdleWatchIfAuthenticated();
-        window.location.reload();
+        globalThis.location.reload();
       } catch (err) {
         const msg = err.message || "";
         if (
@@ -457,7 +482,7 @@
       trigger.hidden = true;
       closeUserDropdown();
       closeActiveAdminsDialog();
-      window.location.href = "/";
+      globalThis.location.href = "/";
     });
   }
 
@@ -469,10 +494,22 @@
     if (wrap) wrap.classList.toggle("settings-user-readonly", !admin);
     const secNav = document.getElementById("settings-nav-security");
     if (secNav) secNav.hidden = !admin;
+    const leNav = document.getElementById("settings-nav-letsencrypt");
+    if (leNav) leNav.hidden = !admin;
     const testNav = document.getElementById("settings-nav-test");
     if (testNav) testNav.hidden = !admin;
+    const dmNav = document.getElementById("settings-nav-data-management");
+    if (dmNav) dmNav.hidden = !admin;
+    const backupNav = document.getElementById("settings-nav-backup");
+    if (backupNav) backupNav.hidden = !admin;
     const activePanel = document.querySelector("#settings-modal .settings-panel.is-active");
-    if (!admin && (activePanel?.dataset?.settingsPanel === "security" || activePanel?.dataset?.settingsPanel === "test")) {
+    const adminOnlyPanel =
+      activePanel?.dataset?.settingsPanel === "security" ||
+      activePanel?.dataset?.settingsPanel === "letsencrypt" ||
+      activePanel?.dataset?.settingsPanel === "test" ||
+      activePanel?.dataset?.settingsPanel === "data-management" ||
+      activePanel?.dataset?.settingsPanel === "backup";
+    if (!admin && adminOnlyPanel) {
       setSettingsSection("users");
     }
   }
@@ -572,7 +609,7 @@
 
   function startActiveAdminsTicker() {
     stopActiveAdminsTicker();
-    activeAdminsTickTimer = window.setInterval(() => {
+    activeAdminsTickTimer = globalThis.setInterval(() => {
       if (!activeAdminsDialogOpen) return;
       renderActiveAdminsTable();
     }, 30000);
@@ -626,6 +663,7 @@
   function closeSettingsModal() {
     const m = document.getElementById("settings-modal");
     if (!m || m.hidden) return;
+    stopLetsEncryptQueuePoll();
     closeUserFormDialog();
     closeUserEditProfileDialog();
     m.hidden = true;
@@ -639,6 +677,42 @@
 
   let securityCertPresent = false;
 
+  function securityExternalSettingsTooltip(info) {
+    if (!info) return "";
+    const env = !!info.from_environment;
+    const dock = !!info.from_docker_secret;
+    const restart =
+      "Saving a different value here updates the on-disk settings file only. After you restart the application, any matching environment variable or Docker Compose / Swarm secret is merged in again and can overwrite what you saved—so the running service may ignore your edit.";
+    if (env && dock) {
+      return (
+        "This field is set from an environment variable and/or a Docker secret (for example under /run/secrets). " +
+        restart
+      );
+    }
+    if (dock) {
+      return "This field is supplied from a Docker secret (for example under /run/secrets). " + restart;
+    }
+    return "This field is set from an environment variable. " + restart;
+  }
+
+  function applySecurityFieldSourceWarnings(sources) {
+    if (!sources) return;
+    document.querySelectorAll("[data-security-field-source]").forEach((el) => {
+      const key = el.dataset.securityFieldSource;
+      const row = key ? sources[key] : null;
+      const warn = !!(row && (row.from_environment || row.from_docker_secret));
+      el.hidden = !warn;
+      if (warn) {
+        const t = securityExternalSettingsTooltip(row);
+        el.setAttribute("title", t);
+        el.setAttribute("aria-label", t);
+      } else {
+        el.removeAttribute("title");
+        el.setAttribute("aria-label", "");
+      }
+    });
+  }
+
   function setSecurityStatus(message, kind) {
     const st = document.getElementById("settings-security-status");
     if (!st) return;
@@ -648,33 +722,118 @@
     else if (kind === "ok") st.classList.add("is-ok");
   }
 
-  function renderSecurityCertificateSummary(cert) {
-    const el = document.getElementById("settings-security-cert-summary");
-    const dlBtn = document.getElementById("settings-security-download-public-cert");
-    const dlHint = document.getElementById("settings-security-download-cert-hint");
-    const hasCert = !!(cert && cert.present);
-    if (dlBtn) dlBtn.disabled = !hasCert;
-    if (dlHint) dlHint.hidden = !hasCert;
-    if (!el) return;
-    if (!hasCert) {
-      el.textContent =
-        "No certificate on disk yet. Use “Generate certificate” (self-signed) or place PEM files where the server expects them (see GROUND_CONTROL_TLS_CERT_PATH / GROUND_CONTROL_TLS_KEY_PATH).";
-      securityCertPresent = false;
-      return;
+  function renderSecurityTlsCertificatePanels(data) {
+    const payload = data || {};
+    const active = payload.certificate;
+    const selfC = payload.certificate_self_signed;
+    const leC = payload.certificate_letsencrypt;
+    const certSource =
+      payload.cert_source ||
+      (document.querySelector('#settings-security-form input[name="cert_method"]:checked')?.value === "letsencrypt"
+        ? "letsencrypt"
+        : "self_signed");
+
+    const selfEl = document.getElementById("settings-security-cert-self-summary");
+    const leEl = document.getElementById("settings-security-cert-le-summary");
+    const dlSelf = document.getElementById("settings-security-download-self-chain");
+    const dlLe = document.getElementById("settings-security-download-le-chain");
+    const activeHint = document.getElementById("settings-security-active-cert-hint");
+    const selfChainHint = document.getElementById("settings-security-self-chain-hint");
+    const leChainHint = document.getElementById("settings-security-le-chain-hint");
+    const selfTrustHint = document.getElementById("settings-security-self-trust-hint");
+    const pillSelf = document.getElementById("settings-security-active-pill-self");
+    const pillLe = document.getElementById("settings-security-active-pill-le");
+
+    const hasSelf = !!(selfC && selfC.present);
+    const hasLe = !!(leC && leC.present);
+    securityCertPresent = !!(active && active.present);
+
+    if (dlSelf) dlSelf.disabled = !hasSelf;
+    if (dlLe) dlLe.disabled = !hasLe;
+
+    function fillSummaryText(cert, textEl, emptyMessage) {
+      if (!textEl) return;
+      if (!cert || !cert.present) {
+        textEl.textContent = emptyMessage;
+        return;
+      }
+      const nameLine =
+        (cert.dns_names && cert.dns_names.length ? cert.dns_names.join(", ") : null) ||
+        cert.subject_common_name ||
+        cert.primary_hostname ||
+        "—";
+      const after = cert.not_after ? ` Valid until ${cert.not_after}.` : "";
+      textEl.textContent = `Issued for: ${nameLine}.${after}`;
     }
-    securityCertPresent = true;
-    const nameLine =
-      (cert.dns_names && cert.dns_names.length ? cert.dns_names.join(", ") : null) ||
-      cert.subject_common_name ||
-      cert.primary_hostname ||
-      "—";
-    const after = cert.not_after ? ` Valid until ${cert.not_after}.` : "";
-    el.textContent = `Issued for: ${nameLine}.${after}`;
+
+    function setChainHint(cert, hintEl) {
+      if (!hintEl) return;
+      const n = cert && cert.chain_certificate_count;
+      if (cert && cert.present && n != null && n > 1) {
+        hintEl.textContent = `This PEM contains ${n} certificates (full signing chain).`;
+        hintEl.hidden = false;
+      } else {
+        hintEl.textContent = "";
+        hintEl.hidden = true;
+      }
+    }
+
+    fillSummaryText(
+      selfC,
+      selfEl,
+      "No self-signed certificate on file. Use “Generate certificate” below; a copy is kept here even when HTTPS uses Let’s Encrypt.",
+    );
+    fillSummaryText(
+      leC,
+      leEl,
+      "No Let’s Encrypt chain on file. Use “Obtain Let’s Encrypt certificate” below once Let’s Encrypt is configured.",
+    );
+    setChainHint(selfC, selfChainHint);
+    setChainHint(leC, leChainHint);
+
+    if (selfTrustHint) selfTrustHint.hidden = !hasSelf;
+
+    if (activeHint) {
+      if (active && active.present) {
+        const label =
+          certSource === "letsencrypt"
+            ? "Let’s Encrypt"
+            : certSource === "self_signed"
+              ? "self-signed"
+              : "saved";
+        const n = active.chain_certificate_count;
+        const chainWording =
+          n != null && n > 1 ? `${n} public certificates (full chain)` : "one public certificate";
+        activeHint.textContent = `The HTTPS listener is configured to use the ${label} source; the active PEM on disk contains ${chainWording}.`;
+        activeHint.hidden = false;
+      } else {
+        activeHint.textContent = "";
+        activeHint.hidden = true;
+      }
+    }
+
+    const httpsOn = !!payload.https_enabled;
+    let activeSelf = false;
+    let activeLe = false;
+    if (httpsOn && active && active.present) {
+      if (active.is_self_signed === true) {
+        activeSelf = true;
+      } else if (active.is_self_signed === false) {
+        activeLe = true;
+      } else if (certSource === "self_signed") {
+        activeSelf = true;
+      } else if (certSource === "letsencrypt") {
+        activeLe = true;
+      }
+    }
+    if (pillSelf) pillSelf.hidden = !activeSelf;
+    if (pillLe) pillLe.hidden = !activeLe;
   }
 
-  async function downloadSecurityTlsPublicCert() {
+  async function downloadSecurityTlsChainPem(source, filename) {
     try {
-      const r = await fetch("/api/settings/security/tls-public-certificate.pem", {
+      const q = new URLSearchParams({ source });
+      const r = await fetch(`/api/settings/security/tls-certificate-chain.pem?${q.toString()}`, {
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -699,21 +858,37 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "ground-control-tls-public.pem";
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setSecurityStatus("Public certificate downloaded.", "ok");
+      setSecurityStatus("Certificate chain downloaded.", "ok");
     } catch (e) {
       setSecurityStatus(e.message || "Download failed.", "error");
     }
+  }
+
+  function readSecurityTlsHostnamesText() {
+    return (document.getElementById("settings-security-tls-hostnames")?.value || "").trim() || "localhost";
+  }
+
+  function parseSecurityHostnamesList() {
+    const raw = readSecurityTlsHostnamesText();
+    const lines = raw
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return lines.length ? lines : ["localhost"];
   }
 
   function readSecurityFormPayload() {
     const httpPort = parseInt(document.getElementById("settings-security-http-port")?.value, 10);
     const httpsRaw = document.getElementById("settings-security-https-port")?.value?.trim();
     const httpsPortParsed = httpsRaw === "" ? NaN : parseInt(httpsRaw, 10);
+    const certMethod =
+      document.getElementById("settings-security-form")?.querySelector('input[name="cert_method"]:checked')?.value ||
+      "self_signed";
     return {
       http_enabled: !!document.getElementById("settings-security-http-enabled")?.checked,
       https_enabled: !!document.getElementById("settings-security-https-enabled")?.checked,
@@ -722,7 +897,8 @@
       https_port: Number.isFinite(httpsPortParsed) ? httpsPortParsed : null,
       listen_interface: document.getElementById("settings-security-listen-interface")?.value || "0.0.0.0",
       allowed_ranges: document.getElementById("settings-security-allowed-ranges")?.value || "",
-      tls_hostname: document.getElementById("settings-security-tls-hostname")?.value?.trim() || "",
+      tls_hostnames: readSecurityTlsHostnamesText(),
+      cert_source: certMethod === "letsencrypt" ? "letsencrypt" : "self_signed",
     };
   }
 
@@ -750,11 +926,315 @@
     const form = document.getElementById("settings-security-form");
     const v = form?.querySelector('input[name="cert_method"]:checked')?.value || "self_signed";
     const selfEl = document.getElementById("settings-security-cert-self");
-    const httpEl = document.getElementById("settings-security-cert-lehttp");
-    const dnsEl = document.getElementById("settings-security-cert-ledns");
+    const leEl = document.getElementById("settings-security-cert-le");
     if (selfEl) selfEl.hidden = v !== "self_signed";
-    if (httpEl) httpEl.hidden = v !== "letsencrypt_http";
-    if (dnsEl) dnsEl.hidden = v !== "letsencrypt_dns";
+    if (leEl) leEl.hidden = v !== "letsencrypt";
+  }
+
+  let securityLetsencryptReady = false;
+
+  function syncSecurityLetsencryptAvailability() {
+    const leRadio = document.getElementById("settings-security-cert-le-radio");
+    const hint = document.getElementById("settings-security-le-hint");
+    const obtainBtn = document.getElementById("settings-security-obtain-le");
+    if (leRadio) {
+      leRadio.disabled = !securityLetsencryptReady;
+      if (!securityLetsencryptReady && leRadio.checked) {
+        const self = document.querySelector('#settings-security-form input[name="cert_method"][value="self_signed"]');
+        if (self) self.checked = true;
+        syncSecurityCertPanel();
+      }
+    }
+    if (hint) hint.hidden = securityLetsencryptReady;
+    if (obtainBtn) obtainBtn.disabled = !securityLetsencryptReady;
+  }
+
+  let letsEncryptPluginsCache = [];
+
+  function setLetsEncryptTopStatus(message, kind) {
+    const st = document.getElementById("settings-le-top-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.remove("is-error", "is-ok");
+    if (kind === "error") st.classList.add("is-error");
+    else if (kind === "ok") st.classList.add("is-ok");
+  }
+
+  function setLetsEncryptFooterStatus(message, kind) {
+    const st = document.getElementById("settings-le-footer-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.remove("is-error", "is-ok");
+    if (kind === "error") st.classList.add("is-error");
+    else if (kind === "ok") st.classList.add("is-ok");
+  }
+
+  let letsEncryptQueuePollTimer = null;
+
+  function stopLetsEncryptQueuePoll() {
+    if (letsEncryptQueuePollTimer != null) {
+      clearInterval(letsEncryptQueuePollTimer);
+      letsEncryptQueuePollTimer = null;
+    }
+  }
+
+  function renderLetsEncryptQueuePayload(data) {
+    const idle = document.getElementById("settings-le-queue-idle");
+    const detail = document.getElementById("settings-le-queue-detail");
+    const runBlk = document.getElementById("settings-le-queue-running-block");
+    const runLab = document.getElementById("settings-le-queue-running-label");
+    const runMeta = document.getElementById("settings-le-queue-running-meta");
+    const waitWrap = document.getElementById("settings-le-queue-waiting-wrap");
+    const waitUl = document.getElementById("settings-le-queue-waiting");
+    if (!idle || !detail) return;
+    const running = data && data.running;
+    const queued = (data && data.queued) || [];
+    const busy = !!(running || queued.length);
+    idle.hidden = busy;
+    detail.hidden = !busy;
+    if (!busy) return;
+    if (running && runBlk && runLab && runMeta) {
+      runBlk.hidden = false;
+      runLab.textContent = running.label || running.operation || "Certbot job";
+      const doms = Array.isArray(running.domains)
+        ? running.domains.join(", ")
+        : String(running.domains || "");
+      const lines = [`Domains: ${doms || "—"}`, `Requested by: ${running.requested_by || "—"}`];
+      if (running.dry_run === true) lines.push("Dry run");
+      runMeta.textContent = lines.join("\n");
+    } else if (runBlk && runLab && runMeta) {
+      runBlk.hidden = true;
+      runLab.textContent = "";
+      runMeta.textContent = "";
+    }
+    if (waitUl && waitWrap) {
+      waitUl.innerHTML = "";
+      if (queued.length) {
+        waitWrap.hidden = false;
+        queued.forEach((q) => {
+          const li = document.createElement("li");
+          const domPart = Array.isArray(q.domains) ? q.domains.join(", ") : String(q.domains || "");
+          const parts = [q.label || q.operation, domPart, q.requested_by].filter((x) => x && String(x).trim());
+          li.textContent = parts.join(" · ");
+          waitUl.appendChild(li);
+        });
+      } else {
+        waitWrap.hidden = true;
+      }
+    }
+  }
+
+  async function refreshLetsEncryptQueueOnce() {
+    if (!isAdmin()) return;
+    try {
+      const data = await apiRequestJson("/api/settings/letsencrypt/queue");
+      renderLetsEncryptQueuePayload(data);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function startLetsEncryptQueuePoll() {
+    stopLetsEncryptQueuePoll();
+    refreshLetsEncryptQueueOnce().catch(() => {});
+    letsEncryptQueuePollTimer = setInterval(() => {
+      refreshLetsEncryptQueueOnce().catch(() => {});
+    }, 2000);
+  }
+
+  function syncLeDnsBlockVisible() {
+    const dns = document.getElementById("settings-le-form")?.querySelector('input[name="le_validation"]:checked')
+      ?.value;
+    const block = document.getElementById("settings-le-dns-block");
+    if (block) block.hidden = dns !== "dns";
+  }
+
+  function renderLeDnsFieldsForPlugin(pluginId) {
+    const wrap = document.getElementById("settings-le-dns-fields");
+    if (!wrap) return;
+    const spec = letsEncryptPluginsCache.find((p) => p.id === pluginId);
+    wrap.innerHTML = "";
+    if (!spec || !Array.isArray(spec.fields)) return;
+    spec.fields.forEach((f) => {
+      const id = `settings-le-cred-${f.key.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+      const lab = document.createElement("label");
+      lab.className = "settings-form__field";
+      const span = document.createElement("span");
+      span.className = "settings-form__label";
+      span.textContent = f.label + (f.required ? "" : " (optional)");
+      lab.appendChild(span);
+      let input;
+      if (f.type === "textarea") {
+        input = document.createElement("textarea");
+        input.className = "settings-form__input settings-form__textarea";
+        input.rows = 6;
+        input.spellcheck = false;
+      } else {
+        input = document.createElement("input");
+        input.className = "settings-form__input";
+        input.type = f.type === "password" ? "password" : "text";
+        input.autocomplete = "new-password";
+      }
+      input.id = id;
+      input.dataset.leCredKey = f.key;
+      if (f.placeholder) input.placeholder = f.placeholder;
+      const hint = f.required ? "" : " Leave blank to keep the saved value.";
+      const sub = document.createElement("span");
+      sub.className = "settings-security__hint muted";
+      sub.textContent =
+        f.key === "dns_google_credentials_json"
+          ? "Paste the service account JSON key. Leave blank to keep the saved key." + hint
+          : hint;
+      lab.appendChild(input);
+      if (sub.textContent) lab.appendChild(sub);
+      wrap.appendChild(lab);
+    });
+  }
+
+  function populateLePluginSelect(selectedId) {
+    const sel = document.getElementById("settings-le-dns-plugin");
+    if (!sel) return;
+    sel.innerHTML = "";
+    letsEncryptPluginsCache.forEach((p) => {
+      const o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = p.label;
+      sel.appendChild(o);
+    });
+    if (selectedId && letsEncryptPluginsCache.some((p) => p.id === selectedId)) sel.value = selectedId;
+    renderLeDnsFieldsForPlugin(sel.value);
+  }
+
+  function readLetsEncryptCredentialsPayload() {
+    const out = {};
+    document.querySelectorAll("#settings-le-dns-fields [data-le-cred-key]").forEach((el) => {
+      const k = el.dataset.leCredKey;
+      if (k) out[k] = el.value || "";
+    });
+    return out;
+  }
+
+  function applyLetsEncryptCredentialShapes(shapes) {
+    if (!shapes || typeof shapes !== "object") return;
+    document.querySelectorAll("#settings-le-dns-fields [data-le-cred-key]").forEach((el) => {
+      const k = el.dataset.leCredKey;
+      const sh = shapes[k];
+      if (sh && sh.configured && el.type !== "textarea") {
+        el.placeholder = "•••••••• (saved; type to replace)";
+      }
+    });
+  }
+
+  async function loadLetsEncryptSettings() {
+    if (!isAdmin()) return;
+    setLetsEncryptTopStatus("Loading…", null);
+    setLetsEncryptFooterStatus("", null);
+    try {
+      const data = await apiRequestJson("/api/settings/letsencrypt");
+      letsEncryptPluginsCache = Array.isArray(data.plugins) ? data.plugins : [];
+      const st = data.settings || {};
+      const emailEl = document.getElementById("settings-le-email");
+      if (emailEl) emailEl.value = st.email != null ? String(st.email) : "";
+      const httpR = document.querySelector('#settings-le-form input[name="le_validation"][value="http"]');
+      const dnsR = document.querySelector('#settings-le-form input[name="le_validation"][value="dns"]');
+      if (st.validation_method === "dns") {
+        if (dnsR) dnsR.checked = true;
+      } else if (httpR) httpR.checked = true;
+      populateLePluginSelect(st.dns_plugin || "cloudflare");
+      const sel = document.getElementById("settings-le-dns-plugin");
+      if (sel) {
+        sel.onchange = () => renderLeDnsFieldsForPlugin(sel.value);
+      }
+      applyLetsEncryptCredentialShapes(data.credential_fields);
+      syncLeDnsBlockVisible();
+      const certbotOk = !!data.certbot_available;
+      const setupOk = !!data.setup_complete;
+      setLetsEncryptTopStatus(
+        certbotOk
+          ? setupOk
+            ? "Certbot is available and setup looks complete."
+            : "Certbot found. Enter email and DNS credentials (if using DNS), then save."
+          : "Certbot is not available in this Python environment. Reinstall the app dependencies (certbot is included), or set GROUND_CONTROL_CERTBOT_PATH.",
+        certbotOk ? (setupOk ? "ok" : null) : "error",
+      );
+    } catch (e) {
+      setLetsEncryptTopStatus(e.message || "Could not load Let’s Encrypt settings.", "error");
+    }
+  }
+
+  async function saveLetsEncryptSettingsClick() {
+    if (!isAdmin()) return;
+    const btn = document.getElementById("settings-le-save");
+    if (btn) btn.disabled = true;
+    setLetsEncryptFooterStatus("Saving…", null);
+    try {
+      const validation =
+        document.getElementById("settings-le-form")?.querySelector('input[name="le_validation"]:checked')?.value ||
+        "http";
+      const plugin = document.getElementById("settings-le-dns-plugin")?.value || "cloudflare";
+      const email = document.getElementById("settings-le-email")?.value?.trim() || "";
+      const credentials = validation === "dns" ? readLetsEncryptCredentialsPayload() : {};
+      const data = await apiRequestJson("/api/settings/letsencrypt", {
+        method: "POST",
+        body: JSON.stringify({
+          validation_method: validation,
+          dns_plugin: plugin,
+          email,
+          credentials,
+        }),
+      });
+      letsEncryptPluginsCache = Array.isArray(data.plugins) ? data.plugins : letsEncryptPluginsCache;
+      applyLetsEncryptCredentialShapes(data.credential_fields);
+      loadSecuritySettings().catch(() => {});
+      setLetsEncryptFooterStatus("Saved.", "ok");
+      setLetsEncryptTopStatus(
+        data.setup_complete ? "Setup complete. You can use Let’s Encrypt on the Security tab." : "Saved; finish required fields for a complete setup.",
+        data.setup_complete ? "ok" : null,
+      );
+    } catch (e) {
+      setLetsEncryptFooterStatus(e.message || "Save failed.", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function runLetsEncryptDryRun() {
+    if (!isAdmin()) return;
+    const domain = document.getElementById("settings-le-test-domain")?.value?.trim() || "";
+    const logEl = document.getElementById("settings-le-test-log");
+    if (!domain) {
+      setLetsEncryptTopStatus("Enter a test domain.", "error");
+      return;
+    }
+    setLetsEncryptTopStatus("Running Certbot dry run…", null);
+    if (logEl) logEl.hidden = true;
+    try {
+      const data = await apiRequestJson("/api/settings/letsencrypt/test", {
+        method: "POST",
+        body: JSON.stringify({ domain }),
+      });
+      if (logEl) {
+        logEl.textContent = data.log || "(no output)";
+        logEl.hidden = false;
+      }
+      setLetsEncryptTopStatus("Dry run succeeded.", "ok");
+    } catch (e) {
+      let msg = e.message || "Dry run failed.";
+      let detail = null;
+      try {
+        detail = JSON.parse(msg);
+      } catch {
+        /* plain string */
+      }
+      if (detail && typeof detail === "object" && detail.log) {
+        if (logEl) {
+          logEl.textContent = detail.log;
+          logEl.hidden = false;
+        }
+        msg = detail.message || "Certbot dry run failed.";
+      }
+      setLetsEncryptTopStatus(msg, "error");
+    }
   }
 
   async function loadSecuritySettings() {
@@ -762,7 +1242,8 @@
     setSecurityStatus("Loading…", null);
     try {
       const data = await apiRequestJson("/api/settings/security");
-      renderSecurityCertificateSummary(data.certificate);
+      renderSecurityTlsCertificatePanels(data);
+      applySecurityFieldSourceWarnings(data.security_field_sources);
       const httpEn = document.getElementById("settings-security-http-enabled");
       const httpsEn = document.getElementById("settings-security-https-enabled");
       if (httpEn) httpEn.checked = !!data.http_enabled;
@@ -780,13 +1261,21 @@
       if (lif) lif.value = data.listen_interface || "0.0.0.0";
       const ar = document.getElementById("settings-security-allowed-ranges");
       if (ar) ar.value = data.allowed_ranges || "";
-      const tlsH = document.getElementById("settings-security-tls-hostname");
-      if (tlsH) tlsH.value = (data.tls_hostname && String(data.tls_hostname).trim()) || "localhost";
+      const tlsTa = document.getElementById("settings-security-tls-hostnames");
+      if (tlsTa) {
+        const th = data.tls_hostnames != null ? String(data.tls_hostnames).trim() : "";
+        tlsTa.value = th || "localhost";
+      }
+      securityLetsencryptReady = !!data.letsencrypt_ready;
+      const cs = data.cert_source === "letsencrypt" ? "letsencrypt" : "self_signed";
+      const cr = document.querySelector(`#settings-security-form input[name="cert_method"][value="${cs}"]`);
+      if (cr) cr.checked = true;
       syncSecurityFormControls();
       syncSecurityCertPanel();
+      syncSecurityLetsencryptAvailability();
       setSecurityStatus("", null);
     } catch (e) {
-      renderSecurityCertificateSummary(null);
+      renderSecurityTlsCertificatePanels(null);
       securityCertPresent = false;
       syncSecurityFormControls();
       setSecurityStatus(e.message || "Could not load security settings.", "error");
@@ -814,7 +1303,8 @@
         method: "POST",
         body: JSON.stringify(payload),
       });
-      if (result.certificate) renderSecurityCertificateSummary(result.certificate);
+      renderSecurityTlsCertificatePanels(result);
+      applySecurityFieldSourceWarnings(result.security_field_sources);
       syncSecurityFormControls();
       setSecurityStatus(result.message || "Applied.", "ok");
     } catch (err) {
@@ -899,7 +1389,7 @@
     if (tr) tr.setAttribute("aria-expanded", open ? "true" : "false");
     if (modal) modal.classList.toggle("settings-modal--test-fw-source-open", open);
     if (open) {
-      window.requestAnimationFrame(() => {
+      globalThis.requestAnimationFrame(() => {
         document.getElementById("settings-test-fw-source-search")?.focus();
       });
     }
@@ -986,7 +1476,7 @@
       testFwSourceInventory = normTestFwSourceInventory(rows);
     } catch {
       testFwSourceInventory = normTestFwSourceInventory(
-        typeof window.gcNavFirewallsJson !== "undefined" ? window.gcNavFirewallsJson : [],
+        typeof globalThis.gcNavFirewallsJson !== "undefined" ? globalThis.gcNavFirewallsJson : [],
       );
     }
     const sel = getTestFwSourceSelectedId();
@@ -1061,8 +1551,8 @@
     setTestFirewallsStatus(`Creating ${count} test firewall${count === 1 ? "" : "s"}…`, null);
     const progressMsg =
       count === 1 ? "Adding 1 test firewall…" : `Adding ${count} test firewalls…`;
-    if (typeof window.gcGlobalBannerShowProgress === "function") {
-      window.gcGlobalBannerShowProgress(progressMsg);
+    if (typeof globalThis.gcGlobalBannerShowProgress === "function") {
+      globalThis.gcGlobalBannerShowProgress(progressMsg);
     }
     try {
       const srcId = getTestFwSourceSelectedId();
@@ -1078,16 +1568,16 @@
         `Added ${created} test firewall${created === 1 ? "" : "s"}.`,
         "ok",
       );
-      if (typeof window.gcGlobalBannerShowResult === "function") {
+      if (typeof globalThis.gcGlobalBannerShowResult === "function") {
         const doneMsg =
           created === 1 ? "Added 1 test firewall." : `Added ${created} test firewalls.`;
-        window.gcGlobalBannerShowResult(true, doneMsg);
+        globalThis.gcGlobalBannerShowResult(true, doneMsg);
       }
       hydrateTestFwSourcePicker().catch(() => {});
     } catch (e) {
       setTestFirewallsStatus(e.message || "Could not add test firewalls.", "error");
-      if (typeof window.gcGlobalBannerShowResult === "function") {
-        window.gcGlobalBannerShowResult(false, e.message || "Could not add test firewalls.");
+      if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+        globalThis.gcGlobalBannerShowResult(false, e.message || "Could not add test firewalls.");
       }
     } finally {
       if (addBtn) addBtn.disabled = false;
@@ -1100,27 +1590,27 @@
     if (!isAdmin()) return;
     const addBtn = document.getElementById("settings-test-firewalls-add");
     const cleanupBtn = document.getElementById("settings-test-firewalls-cleanup");
-    if (!window.confirm("Remove all test firewalls?")) return;
+    if (!globalThis.confirm("Remove all test firewalls?")) return;
     closeSettingsModal();
     if (addBtn) addBtn.disabled = true;
     if (cleanupBtn) cleanupBtn.disabled = true;
     setTestFirewallsStatus("Removing test firewalls…", null);
-    if (typeof window.gcGlobalBannerShowProgress === "function") {
-      window.gcGlobalBannerShowProgress("Removing test firewalls…");
+    if (typeof globalThis.gcGlobalBannerShowProgress === "function") {
+      globalThis.gcGlobalBannerShowProgress("Removing test firewalls…");
     }
     try {
       const data = await apiRequestJson("/api/settings/test-firewalls", { method: "DELETE" });
       setTestFirewallCurrentCount(parseInt(data?.total_test_firewalls, 10) || 0);
       const deleted = parseInt(data?.deleted, 10) || 0;
       setTestFirewallsStatus(`Removed ${deleted} test firewall${deleted === 1 ? "" : "s"}.`, "ok");
-      if (typeof window.gcGlobalBannerShowResult === "function") {
-        window.gcGlobalBannerShowResult(true, "Test firewalls cleaned up.");
+      if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+        globalThis.gcGlobalBannerShowResult(true, "Test firewalls cleaned up.");
       }
       hydrateTestFwSourcePicker().catch(() => {});
     } catch (e) {
       setTestFirewallsStatus(e.message || "Could not clean up test firewalls.", "error");
-      if (typeof window.gcGlobalBannerShowResult === "function") {
-        window.gcGlobalBannerShowResult(false, e.message || "Could not clean up test firewalls.");
+      if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+        globalThis.gcGlobalBannerShowResult(false, e.message || "Could not clean up test firewalls.");
       }
     } finally {
       if (addBtn) addBtn.disabled = false;
@@ -1129,7 +1619,578 @@
     }
   }
 
+  function setDmStatus(message, kind) {
+    const st = document.getElementById("settings-dm-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.remove("is-error", "is-ok");
+    if (kind === "error") st.classList.add("is-error");
+    else if (kind === "ok") st.classList.add("is-ok");
+  }
+
+  function setDmFooterStatus(message, kind) {
+    const st = document.getElementById("settings-dm-footer-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.remove("is-error", "is-ok");
+    if (kind === "error") st.classList.add("is-error");
+    else if (kind === "ok") st.classList.add("is-ok");
+  }
+
+  function setBackupStatus(message, kind) {
+    const st = document.getElementById("settings-backup-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.remove("is-error", "is-ok");
+    if (kind === "error") st.classList.add("is-error");
+    else if (kind === "ok") st.classList.add("is-ok");
+  }
+
+  function parseContentDispositionFilename(header) {
+    if (!header || typeof header !== "string") return null;
+    const m =
+      /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(header.trim());
+    if (!m) return null;
+    const raw = (m[1] || m[2] || m[3] || "").trim();
+    try {
+      return decodeURIComponent(raw.replace(/^"+|"+$/g, ""));
+    } catch {
+      return raw.replace(/^"+|"+$/g, "");
+    }
+  }
+
+  function syncBackupPwUi() {
+    const panel = document.getElementById("settings-panel-backup");
+    const pwOk = panel?.dataset?.backupPwConfigured === "1";
+    const changing = panel?.dataset?.backupPwChanging === "1";
+    const summary = document.getElementById("settings-backup-pw-summary");
+    const edit = document.getElementById("settings-backup-pw-edit");
+    const cancelBtn = document.getElementById("settings-backup-pw-cancel");
+    if (summary) summary.hidden = !pwOk || changing;
+    if (edit) edit.hidden = !!(pwOk && !changing);
+    if (cancelBtn) cancelBtn.hidden = !(pwOk && changing);
+  }
+
+  /** Hide password fields until status loads (unless user is mid “change”). */
+  function prepareBackupPasswordPanelBeforeLoad() {
+    const panel = document.getElementById("settings-panel-backup");
+    if (panel?.dataset?.backupPwChanging === "1") return;
+    const summary = document.getElementById("settings-backup-pw-summary");
+    const edit = document.getElementById("settings-backup-pw-edit");
+    if (summary) summary.hidden = true;
+    if (edit) edit.hidden = true;
+  }
+
+  function applyBackupPanelFromStatus(data) {
+    const ready = !!(data && data.ready);
+    const pwOk = !!(data && data.password_configured);
+    const needsPwReset = !!(data && data.password_needs_reset);
+    const panel = document.getElementById("settings-panel-backup");
+    if (panel) {
+      panel.dataset.backupPwConfigured = pwOk ? "1" : "0";
+      if (!pwOk) panel.dataset.backupPwChanging = "0";
+    }
+    const unreadable = document.getElementById("settings-backup-pw-unreadable");
+    if (unreadable) unreadable.hidden = !needsPwReset;
+
+    const dl = document.getElementById("settings-backup-download");
+    const rl = document.getElementById("settings-backup-restore-last");
+    const lastLine = document.getElementById("settings-backup-last-line");
+    const createBtn = document.getElementById("settings-backup-create");
+
+    if (dl) dl.disabled = !ready;
+    if (rl) {
+      rl.hidden = !ready;
+      rl.disabled = !ready;
+    }
+    if (createBtn) createBtn.disabled = !pwOk;
+
+    if (lastLine) {
+      if (ready) {
+        let when = null;
+        if (data.generated_at) {
+          const d = new Date(data.generated_at);
+          when = Number.isNaN(d.getTime()) ? String(data.generated_at) : d.toLocaleString();
+        }
+        const szN = data.size_bytes != null ? Number(data.size_bytes) : NaN;
+        const szMb =
+          Number.isFinite(szN) && szN >= 0 ? (szN / (1024 * 1024)).toFixed(1) : null;
+        if (when && szMb) lastLine.textContent = `Last backup: ${when} ${szMb} MB`;
+        else if (when) lastLine.textContent = `Last backup: ${when}`;
+        else if (szMb) lastLine.textContent = `Last backup: ${szMb} MB`;
+        else lastLine.textContent = "Last backup: available";
+      } else {
+        lastLine.textContent = "Last backup: Never";
+      }
+    }
+
+    syncBackupPwUi();
+  }
+
+  function setBackupGenerating(on) {
+    const prog = document.getElementById("settings-backup-progress");
+    const createBtn = document.getElementById("settings-backup-create");
+    const panel = document.getElementById("settings-panel-backup");
+    const pwOk = panel?.dataset?.backupPwConfigured === "1";
+    if (prog) {
+      prog.classList.toggle("is-visible", !!on);
+      prog.setAttribute("aria-busy", on ? "true" : "false");
+    }
+    if (createBtn) {
+      createBtn.disabled = !!on || !pwOk;
+      createBtn.setAttribute("aria-busy", on ? "true" : "false");
+    }
+  }
+
+  function setBackupPwFormStatus(message, kind) {
+    const st = document.getElementById("settings-backup-pw-form-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.remove("is-error", "is-ok");
+    if (kind === "error") st.classList.add("is-error");
+    else if (kind === "ok") st.classList.add("is-ok");
+  }
+
+  function clearBackupPasswordFields() {
+    const a = document.getElementById("settings-backup-pw-new");
+    const b = document.getElementById("settings-backup-pw-confirm");
+    if (a) a.value = "";
+    if (b) b.value = "";
+  }
+
+  function syncRestoreBackupPasswordToggleUi() {
+    const inp = document.getElementById("settings-backup-restore-password");
+    const btn = document.getElementById("settings-backup-restore-password-toggle");
+    const showIcon = btn?.querySelector(".settings-backup__pw-toggle-icon--show");
+    const hideIcon = btn?.querySelector(".settings-backup__pw-toggle-icon--hide");
+    if (!inp || !btn || !showIcon || !hideIcon) return;
+    const revealed = inp.type === "text";
+    showIcon.hidden = revealed;
+    hideIcon.hidden = !revealed;
+    btn.setAttribute("aria-pressed", revealed ? "true" : "false");
+    btn.setAttribute("aria-label", revealed ? "Hide password" : "Show password");
+  }
+
+  function beginBackupPasswordChange() {
+    const panel = document.getElementById("settings-panel-backup");
+    if (panel) panel.dataset.backupPwChanging = "1";
+    clearBackupPasswordFields();
+    setBackupPwFormStatus("", null);
+    syncBackupPwUi();
+    document.getElementById("settings-backup-pw-new")?.focus();
+  }
+
+  function cancelBackupPasswordChange() {
+    const panel = document.getElementById("settings-panel-backup");
+    if (panel) panel.dataset.backupPwChanging = "0";
+    clearBackupPasswordFields();
+    setBackupPwFormStatus("", null);
+    syncBackupPwUi();
+  }
+
+  async function saveBackupPassword() {
+    if (!isAdmin()) return;
+    const newPw = document.getElementById("settings-backup-pw-new")?.value || "";
+    const conf = document.getElementById("settings-backup-pw-confirm")?.value || "";
+    const btn = document.getElementById("settings-backup-pw-save");
+    if (btn) btn.disabled = true;
+    setBackupPwFormStatus("Saving…", null);
+    try {
+      const body = { password: newPw, password_confirm: conf };
+      await apiRequestJson("/api/settings/backup/password", { method: "POST", body: JSON.stringify(body) });
+      const panel = document.getElementById("settings-panel-backup");
+      if (panel) panel.dataset.backupPwChanging = "0";
+      clearBackupPasswordFields();
+      setBackupPwFormStatus("Backup password saved.", "ok");
+      await loadBackupStatus();
+    } catch (e) {
+      setBackupPwFormStatus(e.message || "Could not save password.", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function loadBackupStatus() {
+    if (!isAdmin()) return;
+    try {
+      const data = await apiRequestJson("/api/settings/backup/status");
+      applyBackupPanelFromStatus(data || { ready: false });
+    } catch {
+      applyBackupPanelFromStatus({ ready: false, password_configured: false });
+    }
+  }
+
+  async function createSettingsBackup() {
+    if (!isAdmin()) return;
+    setBackupGenerating(true);
+    setBackupStatus("", null);
+    try {
+      await apiRequestJson("/api/settings/backup/generate", { method: "POST", body: "{}" });
+      setBackupStatus("Backup generated. You can download it or restore from this server.", "ok");
+      await loadBackupStatus();
+    } catch (e) {
+      setBackupStatus(e.message || "Could not create backup.", "error");
+    } finally {
+      setBackupGenerating(false);
+    }
+  }
+
+  async function downloadSettingsBackup() {
+    if (!isAdmin()) return;
+    const dl = document.getElementById("settings-backup-download");
+    if (dl?.disabled) {
+      setBackupStatus("Create a backup on this server before downloading.", "error");
+      return;
+    }
+    setBackupStatus("", null);
+    try {
+      const r = await fetch("/api/settings/backup/download", { credentials: "same-origin" });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (!r.ok) {
+        let msg = r.statusText;
+        try {
+          const j = await r.json();
+          if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      const blob = await r.blob();
+      const cd = r.headers.get("Content-Disposition");
+      let name = parseContentDispositionFilename(cd) || "ground-control-backup.gcbak";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      setBackupStatus("Download started.", "ok");
+    } catch (e) {
+      setBackupStatus(e.message || "Download failed.", "error");
+    }
+  }
+
+  async function restoreSettingsBackupFromServer() {
+    if (!isAdmin()) return;
+    const rl = document.getElementById("settings-backup-restore-last");
+    if (rl?.disabled || rl?.hidden) {
+      setBackupStatus("Create a backup on this server first.", "error");
+      return;
+    }
+    const ok = globalThis.confirm(
+      "Restore merge from the last backup created on this server? Matching database rows will be replaced with the backup version, and files from that backup will be written over existing TLS / Let’s Encrypt / policy files.",
+    );
+    if (!ok) return;
+    const btn = document.getElementById("settings-backup-restore-last");
+    if (btn) btn.disabled = true;
+    setBackupStatus("Restoring…", null);
+    const rp = (document.getElementById("settings-backup-restore-password")?.value || "").trim();
+    const payload = { password: rp.length ? rp : null };
+    try {
+      const r = await fetch("/api/settings/backup/restore-last", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        const d = data && data.detail;
+        throw new Error(typeof d === "string" ? d : r.statusText || "Restore failed.");
+      }
+      const fr = data && data.files_restored != null ? Number(data.files_restored) : 0;
+      setBackupStatus(
+        `Restore completed (${fr} file(s) written). Restart the app if you changed certificates or listen settings.`,
+        "ok",
+      );
+    } catch (e) {
+      setBackupStatus(e.message || "Restore failed.", "error");
+    } finally {
+      await loadBackupStatus();
+    }
+  }
+
+  async function restoreSettingsBackupMerge() {
+    if (!isAdmin()) return;
+    const inp = document.getElementById("settings-backup-file");
+    const file = inp?.files?.[0];
+    if (!file) {
+      setBackupStatus("Choose a backup file first.", "error");
+      return;
+    }
+    const btn = document.getElementById("settings-backup-restore");
+    if (btn) btn.disabled = true;
+    setBackupStatus("Restoring…", null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      fd.append(
+        "password",
+        (document.getElementById("settings-backup-restore-password")?.value || "").trim(),
+      );
+      const r = await fetch("/api/settings/backup/restore", {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        const d = data && data.detail;
+        throw new Error(typeof d === "string" ? d : r.statusText || "Restore failed.");
+      }
+      const fr = data && data.files_restored != null ? Number(data.files_restored) : 0;
+      setBackupStatus(
+        `Restore completed (${fr} file(s) written). Restart the app if you changed certificates or listen settings.`,
+        "ok",
+      );
+    } catch (e) {
+      setBackupStatus(e.message || "Restore failed.", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function renderFirewallCacheTable(rows, totals) {
+    const tbody = document.getElementById("settings-dm-firewall-cache-body");
+    if (!tbody) return;
+    const list = Array.isArray(rows) ? rows : [];
+    const t = totals && typeof totals === "object" ? totals : null;
+    const hasRows = list.length > 0;
+    const totOrphan = t ? Number(t.orphaned_record_count) || 0 : 0;
+    const totManaged = t ? Number(t.managed_record_count) || 0 : 0;
+    if (!hasRows && totOrphan === 0 && totManaged === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="muted">No cached firewall configuration.</td></tr>';
+      return;
+    }
+    const bodyHtml = list
+      .map((row) => {
+        const et = escapeHtml(row.entity_type || "—");
+        const mr = Number(row.managed_record_count);
+        const or = Number(row.orphaned_record_count);
+        const mrStr = Number.isFinite(mr) ? String(Math.max(0, Math.floor(mr))) : "—";
+        const orStr = Number.isFinite(or) ? String(Math.max(0, Math.floor(or))) : "—";
+        const ms = escapeHtml(row.managed_approx_storage || "—");
+        const os = escapeHtml(row.orphaned_approx_storage || "—");
+        return `<tr>
+          <td><code class="settings-about__code">${et}</code></td>
+          <td class="settings-dm-col-num">${mrStr}</td>
+          <td>${ms}</td>
+          <td class="settings-dm-col-num">${orStr}</td>
+          <td>${os}</td>
+        </tr>`;
+      })
+      .join("");
+    let foot = "";
+    if (t) {
+      const tmr = Number(t.managed_record_count);
+      const tor = Number(t.orphaned_record_count);
+      foot = `<tr class="settings-dm-cache-totals">
+        <td>Total</td>
+        <td class="settings-dm-col-num">${Number.isFinite(tmr) ? String(Math.max(0, Math.floor(tmr))) : "—"}</td>
+        <td>${escapeHtml(t.managed_approx_storage || "—")}</td>
+        <td class="settings-dm-col-num">${Number.isFinite(tor) ? String(Math.max(0, Math.floor(tor))) : "—"}</td>
+        <td>${escapeHtml(t.orphaned_approx_storage || "—")}</td>
+      </tr>`;
+    }
+    tbody.innerHTML = bodyHtml + foot;
+  }
+
+  function applyDataManagementPayload(data) {
+    renderDataManagementTable(data?.categories || []);
+    renderFirewallCacheTable(data?.firewall_cache_by_entity, data?.firewall_cache_totals);
+  }
+
+  function renderDataManagementTable(categories) {
+    const tbody = document.getElementById("settings-data-management-body");
+    if (!tbody) return;
+    const rows = Array.isArray(categories) ? categories : [];
+    if (rows.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="muted">No data categories returned.</td></tr>';
+      return;
+    }
+    const mib = 1024 * 1024;
+    tbody.innerHTML = rows
+      .map((cat) => {
+        const id = escapeHtml(cat.id || "");
+        const label = escapeHtml(cat.label || cat.id || "—");
+        const n = Number(cat.record_count);
+        const countStr = Number.isFinite(n) ? String(Math.max(0, Math.floor(n))) : "—";
+        const storage = escapeHtml(cat.approx_storage || "—");
+        const age =
+          cat.oldest_record_age_days != null && Number.isFinite(Number(cat.oldest_record_age_days))
+            ? escapeHtml(String(Math.max(0, Math.floor(Number(cat.oldest_record_age_days)))))
+            : "—";
+        const maxB = Number(cat.max_bytes);
+        const mibVal =
+          Number.isFinite(maxB) && maxB > 0 ? Math.max(1, Math.round(maxB / mib)) : 1024;
+        const maxAge =
+          cat.max_age_days != null && Number.isFinite(Number(cat.max_age_days))
+            ? Math.max(1, Math.floor(Number(cat.max_age_days)))
+            : 365;
+        const rowKey = String(cat.id || "").replace(/[^a-z0-9_-]/gi, "") || "row";
+        return `<tr data-dm-id="${id}">
+          <td>${label}</td>
+          <td class="settings-dm-col-num">${countStr}</td>
+          <td>${storage}</td>
+          <td class="settings-dm-col-age">${age}</td>
+          <td>
+            <input type="number" class="settings-form__input settings-dm-input-mib" min="1" step="1" value="${mibVal}" aria-label="Max storage in mebibytes (${rowKey})" />
+          </td>
+          <td>
+            <input type="number" class="settings-form__input settings-dm-input-days" min="1" step="1" value="${maxAge}" aria-label="Max age in days (${rowKey})" />
+          </td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  async function loadDataManagement() {
+    if (!isAdmin()) return;
+    setDmStatus("Loading…", null);
+    setDmFooterStatus("", null);
+    try {
+      const data = await apiRequestJson("/api/settings/data-management");
+      applyDataManagementPayload(data);
+      setDmStatus("", null);
+    } catch (e) {
+      applyDataManagementPayload({});
+      setDmStatus(e.message || "Could not load data management.", "error");
+    }
+  }
+
+  async function saveDataManagementLimits() {
+    if (!isAdmin()) return;
+    const tbody = document.getElementById("settings-data-management-body");
+    if (!tbody) return;
+    const limits = {};
+    let bad = false;
+    tbody.querySelectorAll("tr[data-dm-id]").forEach((tr) => {
+      const id = tr.dataset.dmId;
+      const mibInp = tr.querySelector(".settings-dm-input-mib");
+      const daysInp = tr.querySelector(".settings-dm-input-days");
+      const mibParsed = parseInt(mibInp?.value, 10);
+      const daysParsed = parseInt(daysInp?.value, 10);
+      if (!id || !Number.isFinite(mibParsed) || mibParsed < 1 || !Number.isFinite(daysParsed) || daysParsed < 1) {
+        bad = true;
+      } else {
+        limits[id] = { max_bytes: mibParsed * 1024 * 1024, max_age_days: daysParsed };
+      }
+    });
+    if (bad || Object.keys(limits).length === 0) {
+      setDmFooterStatus("Enter valid limits (MiB ≥ 1, days ≥ 1).", "error");
+      return;
+    }
+    const saveBtn = document.getElementById("settings-dm-save");
+    if (saveBtn) saveBtn.disabled = true;
+    setDmFooterStatus("Saving…", null);
+    try {
+      const data = await apiRequestJson("/api/settings/data-management", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limits }),
+      });
+      applyDataManagementPayload(data);
+      setDmFooterStatus("Saved.", "ok");
+      setDmStatus("", null);
+    } catch (e) {
+      setDmFooterStatus(e.message || "Could not save limits.", "error");
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  }
+
+  function formatHistoryPurgeSummary(purged) {
+    if (!purged || typeof purged !== "object") return "";
+    const parts = [];
+    const add = (key, label) => {
+      const n = parseInt(purged[key], 10);
+      if (Number.isFinite(n) && n > 0) parts.push(`${label}: ${n}`);
+    };
+    add("cache_updates", "Cache updates");
+    add("sync_logs", "Sync logs");
+    add("task_queue_history", "Task queue");
+    add("access_logs", "Access logs");
+    return parts.length ? `Removed ${parts.join("; ")}.` : "Nothing to remove; data is already within limits.";
+  }
+
+  async function runHistoryRetentionCleanup() {
+    if (!isAdmin()) return;
+    if (
+      !globalThis.confirm(
+        "Run retention cleanup now? Rows older than the configured max age, or over the max size (oldest removed first), will be deleted permanently.",
+      )
+    ) {
+      return;
+    }
+    const btn = document.getElementById("settings-dm-run-history-retention");
+    if (btn) btn.disabled = true;
+    setDmStatus("Running cleanup…", null);
+    try {
+      const data = await apiRequestJson("/api/settings/data-management/run-history-retention", {
+        method: "POST",
+        body: "{}",
+      });
+      applyDataManagementPayload(data);
+      setDmStatus(formatHistoryPurgeSummary(data?.purged), "ok");
+    } catch (e) {
+      setDmStatus(e.message || "Cleanup failed.", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function cleanupOrphanedFirewallCache() {
+    if (!isAdmin()) return;
+    if (
+      !globalThis.confirm(
+        "Delete all cached firewall configuration rows that no longer reference a firewall? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    const btn = document.getElementById("settings-dm-cleanup-orphaned-cache");
+    if (btn) btn.disabled = true;
+    setDmStatus("Removing orphaned cache rows…", null);
+    try {
+      const data = await apiRequestJson("/api/settings/data-management/cleanup-orphaned-firewall-cache", {
+        method: "POST",
+        body: "{}",
+      });
+      applyDataManagementPayload(data);
+      const n = parseInt(data?.deleted, 10);
+      const msg = Number.isFinite(n)
+        ? n === 0
+          ? "No orphaned cache rows found."
+          : `Removed ${n} orphaned cache row${n === 1 ? "" : "s"}.`
+        : "Cleanup finished.";
+      setDmStatus(msg, "ok");
+    } catch (e) {
+      setDmStatus(e.message || "Could not clean up orphaned data.", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   function setSettingsSection(section) {
+    if (section !== "letsencrypt") {
+      stopLetsEncryptQueuePoll();
+    }
     if (section !== "test") {
       setTestFwSourceDropdownOpen(false);
     }
@@ -1146,11 +2207,26 @@
     });
     const secFooter = document.getElementById("settings-modal-security-footer");
     if (secFooter) secFooter.hidden = section !== "security";
+    const leFooter = document.getElementById("settings-modal-letsencrypt-footer");
+    if (leFooter) leFooter.hidden = section !== "letsencrypt";
+    const dmFooter = document.getElementById("settings-modal-data-management-footer");
+    if (dmFooter) dmFooter.hidden = section !== "data-management";
     if (section === "users") {
       loadSettingsUsers().catch((err) => console.error(err));
     }
     if (section === "security") {
       loadSecuritySettings().catch((err) => console.error(err));
+    }
+    if (section === "letsencrypt") {
+      loadLetsEncryptSettings().catch((err) => console.error(err));
+      startLetsEncryptQueuePoll();
+    }
+    if (section === "data-management") {
+      loadDataManagement().catch((err) => console.error(err));
+    }
+    if (section === "backup") {
+      prepareBackupPasswordPanelBeforeLoad();
+      loadBackupStatus().catch((err) => console.error(err));
     }
     if (section === "test") {
       loadTestFirewallSummary().catch((err) => console.error(err));
@@ -1232,25 +2308,25 @@
     tbody.querySelectorAll("tr[data-user-id]").forEach((tr) => {
       const m = {};
       tr.querySelectorAll("td[data-gc-col]").forEach((td) => {
-        const k = td.getAttribute("data-gc-col");
+        const k = td.dataset.gcCol;
         if (k) m[k] = (td.textContent || "").trim().replace(/\s+/g, " ");
       });
       maps.push(m);
-      window.gcTableFacets?.setRowFacets(tr, m);
+      globalThis.gcTableFacets?.setRowFacets(tr, m);
     });
     return maps;
   }
 
   function rebuildSettingsUsersFacets(maps) {
     const drawer = document.getElementById("settings-users-filters-drawer");
-    if (!drawer || !window.gcTableFacets) return;
-    window.gcTableFacets.rebuild(drawer, SETTINGS_USER_FACET_COLS, maps, "settings-users");
+    if (!drawer || !globalThis.gcTableFacets) return;
+    globalThis.gcTableFacets.rebuild(drawer, SETTINGS_USER_FACET_COLS, maps, "settings-users");
   }
 
   function settingsUsersFacetAppliedCount() {
     const drawer = document.getElementById("settings-users-filters-drawer");
-    if (!drawer || !window.gcTableFacets) return 0;
-    return window.gcTableFacets.appliedCount(drawer);
+    if (!drawer || !globalThis.gcTableFacets) return 0;
+    return globalThis.gcTableFacets.appliedCount(drawer);
   }
 
   function updateSettingsUsersFacetChrome() {
@@ -1273,9 +2349,9 @@
   function applySettingsUsersFacetFilter() {
     const tbody = document.getElementById("settings-users-body");
     const drawer = document.getElementById("settings-users-filters-drawer");
-    if (!tbody || !drawer || !window.gcTableFacets) return;
+    if (!tbody || !drawer || !globalThis.gcTableFacets) return;
     tbody.querySelectorAll("tr[data-user-id]").forEach((tr) => {
-      tr.hidden = !window.gcTableFacets.rowMatches(tr, drawer);
+      tr.hidden = !globalThis.gcTableFacets.rowMatches(tr, drawer);
     });
   }
 
@@ -1294,7 +2370,7 @@
     const aside = document.getElementById("settings-users-filters-aside");
     if (!aside || settingsUsersFacetAsideBound) return;
     settingsUsersFacetAsideBound = true;
-    window.gcTableFacets?.bindAside(
+    globalThis.gcTableFacets?.bindAside(
       aside,
       () => {
         updateSettingsUsersFacetChrome();
@@ -1314,17 +2390,17 @@
     const drawer = document.getElementById("settings-users-filters-drawer");
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="7" class="muted">No users.</td></tr>';
-      if (drawer && window.gcTableFacets) {
-        window.gcTableFacets.reset(drawer, "settings-users");
+      if (drawer && globalThis.gcTableFacets) {
+        globalThis.gcTableFacets.reset(drawer, "settings-users");
         drawer.innerHTML = "";
       }
       updateSettingsUsersFacetChrome();
-      window.gcTableSort?.bindTable(document.getElementById("settings-users-table"));
+      globalThis.gcTableSort?.bindTable(document.getElementById("settings-users-table"));
       return;
     }
     const adminUi = isAdmin();
     const facetMaps = rows.map(settingsUserFacetMapFromApiRow);
-    if (drawer && window.gcTableFacets) {
+    if (drawer && globalThis.gcTableFacets) {
       rebuildSettingsUsersFacets(facetMaps);
     }
     const rowHtmlJoined = rows
@@ -1355,17 +2431,17 @@
     wrap.innerHTML = rowHtmlJoined;
     const trList = Array.from(wrap.children);
     trList.forEach((tr, i) => {
-      window.gcTableFacets?.setRowFacets(tr, facetMaps[i]);
+      globalThis.gcTableFacets?.setRowFacets(tr, facetMaps[i]);
     });
 
     function finishSettingsUsersTable() {
       if (gen !== settingsUsersLoadGen) return;
       updateSettingsUsersFacetChrome();
       applySettingsUsersFacetFilter();
-      window.gcTableSort?.bindTable(document.getElementById("settings-users-table"));
+      globalThis.gcTableSort?.bindTable(document.getElementById("settings-users-table"));
     }
 
-    const lazy = window.gcTableLazy;
+    const lazy = globalThis.gcTableLazy;
     tbody.innerHTML = "";
     if (!lazy || typeof lazy.appendBefore !== "function" || trList.length <= lazy.DEFAULT_THRESHOLD) {
       trList.forEach((tr) => tbody.appendChild(tr));
@@ -1406,7 +2482,7 @@
     });
     document.getElementById("settings-users-facet-reset")?.addEventListener("click", () => {
       const d = document.getElementById("settings-users-filters-drawer");
-      if (d && window.gcTableFacets) window.gcTableFacets.reset(d, "settings-users");
+      if (d && globalThis.gcTableFacets) globalThis.gcTableFacets.reset(d, "settings-users");
       updateSettingsUsersFacetChrome();
       applySettingsUsersFacetFilter();
     });
@@ -1419,7 +2495,7 @@
     document.getElementById("settings-nav")?.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-settings-section]");
       if (!btn || btn.id === "settings-nav-about") return;
-      const sec = btn.getAttribute("data-settings-section");
+      const sec = btn.dataset.settingsSection;
       if (sec) setSettingsSection(sec);
     });
     document.getElementById("settings-nav-about")?.addEventListener("click", () => setSettingsSection("about"));
@@ -1439,54 +2515,66 @@
     document.getElementById("settings-security-form")?.addEventListener("submit", (e) => {
       submitSecuritySettings(e);
     });
-    document.getElementById("settings-security-download-public-cert")?.addEventListener("click", () => {
-      downloadSecurityTlsPublicCert().catch((err) =>
+    document.getElementById("settings-security-download-self-chain")?.addEventListener("click", () => {
+      downloadSecurityTlsChainPem("self_signed", "ground-control-self-signed-chain.pem").catch((err) =>
+        setSecurityStatus(err.message || "Download failed.", "error"),
+      );
+    });
+    document.getElementById("settings-security-download-le-chain")?.addEventListener("click", () => {
+      downloadSecurityTlsChainPem("letsencrypt", "ground-control-letsencrypt-chain.pem").catch((err) =>
         setSecurityStatus(err.message || "Download failed.", "error"),
       );
     });
     document.getElementById("settings-security-gen-self-signed")?.addEventListener("click", async () => {
-      const host = document.getElementById("settings-security-tls-hostname")?.value?.trim();
-      if (!host) {
-        setSecurityStatus("Enter a TLS hostname first.", "error");
+      const hosts = parseSecurityHostnamesList();
+      if (!hosts.length) {
+        setSecurityStatus("Enter at least one hostname.", "error");
         return;
       }
       try {
         const r = await apiRequestJson("/api/settings/security/generate-self-signed", {
           method: "POST",
-          body: JSON.stringify({ hostname: host }),
+          body: JSON.stringify({ hostnames: hosts }),
         });
-        renderSecurityCertificateSummary(r.certificate);
+        renderSecurityTlsCertificatePanels(r);
         syncSecurityFormControls();
         setSecurityStatus("Certificate generated.", "ok");
       } catch (err) {
         setSecurityStatus(err.message || "Could not generate certificate.", "error");
       }
     });
-    document.getElementById("settings-security-fetch-le-http")?.addEventListener("click", () => {
-      setSecurityStatus(
-        "Let’s Encrypt HTTP-01 issuance will run on the server once this action is connected to the API.",
-        "ok",
-      );
-    });
-    document.getElementById("settings-security-dns-request")?.addEventListener("click", () => {
-      const host =
-        document.getElementById("settings-security-tls-hostname")?.value?.trim() || "your-hostname.example.com";
-      const pre = document.getElementById("settings-security-dns-txt-placeholder");
-      const hint = document.getElementById("settings-security-dns-txt-hint");
-      if (pre) {
-        pre.textContent = `_acme-challenge.${host}    TXT    \"<token-from-server>\"`;
+    document.getElementById("settings-security-obtain-le")?.addEventListener("click", async () => {
+      const hosts = parseSecurityHostnamesList();
+      if (!hosts.length) {
+        setSecurityStatus("Enter at least one hostname.", "error");
+        return;
       }
-      if (hint) hint.hidden = false;
-      setSecurityStatus(
-        "After the server starts a real DNS-01 challenge, use the TXT name and value it returns at your DNS provider.",
-        "ok",
+      try {
+        const r = await apiRequestJson("/api/settings/security/obtain-letsencrypt", {
+          method: "POST",
+          body: JSON.stringify({ hostnames: hosts }),
+        });
+        renderSecurityTlsCertificatePanels(r);
+        syncSecurityFormControls();
+        setSecurityStatus("Let’s Encrypt certificate installed.", "ok");
+      } catch (err) {
+        setSecurityStatus(err.message || "Could not obtain certificate.", "error");
+      }
+    });
+    document.getElementById("settings-security-goto-le")?.addEventListener("click", () => {
+      setSettingsSection("letsencrypt");
+    });
+    document.getElementById("settings-le-form")?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t && t.matches && t.matches('input[name="le_validation"]')) syncLeDnsBlockVisible();
+    });
+    document.getElementById("settings-le-save")?.addEventListener("click", () => {
+      saveLetsEncryptSettingsClick().catch((err) =>
+        setLetsEncryptFooterStatus(err.message || "Save failed.", "error"),
       );
     });
-    document.getElementById("settings-security-dns-verify")?.addEventListener("click", () => {
-      setSecurityStatus(
-        "Certificate issuance after DNS verification will run on the server once this action is connected to the API.",
-        "ok",
-      );
+    document.getElementById("settings-le-test-run")?.addEventListener("click", () => {
+      runLetsEncryptDryRun().catch((err) => setLetsEncryptTopStatus(err.message || "Test failed.", "error"));
     });
     document.getElementById("settings-test-firewalls-add")?.addEventListener("click", () => {
       addTestFirewalls().catch((err) =>
@@ -1498,6 +2586,59 @@
         setTestFirewallsStatus(err.message || "Could not clean up test firewalls.", "error"),
       );
     });
+    document.getElementById("settings-dm-save")?.addEventListener("click", () => {
+      saveDataManagementLimits().catch((err) =>
+        setDmFooterStatus(err.message || "Could not save limits.", "error"),
+      );
+    });
+    document.getElementById("settings-dm-cleanup-orphaned-cache")?.addEventListener("click", () => {
+      cleanupOrphanedFirewallCache().catch((err) =>
+        setDmStatus(err.message || "Could not clean up orphaned data.", "error"),
+      );
+    });
+    document.getElementById("settings-dm-run-history-retention")?.addEventListener("click", () => {
+      runHistoryRetentionCleanup().catch((err) =>
+        setDmStatus(err.message || "Cleanup failed.", "error"),
+      );
+    });
+    document.getElementById("settings-backup-pw-save")?.addEventListener("click", () => {
+      saveBackupPassword().catch((err) =>
+        setBackupPwFormStatus(err.message || "Could not save password.", "error"),
+      );
+    });
+    document.getElementById("settings-backup-pw-cancel")?.addEventListener("click", () => {
+      cancelBackupPasswordChange();
+    });
+    document.getElementById("settings-backup-pw-change")?.addEventListener("click", () => {
+      beginBackupPasswordChange();
+    });
+    document.getElementById("settings-backup-create")?.addEventListener("click", () => {
+      createSettingsBackup().catch((err) =>
+        setBackupStatus(err.message || "Could not create backup.", "error"),
+      );
+    });
+    document.getElementById("settings-backup-download")?.addEventListener("click", () => {
+      downloadSettingsBackup().catch((err) =>
+        setBackupStatus(err.message || "Download failed.", "error"),
+      );
+    });
+    document.getElementById("settings-backup-restore-last")?.addEventListener("click", () => {
+      restoreSettingsBackupFromServer().catch((err) =>
+        setBackupStatus(err.message || "Restore failed.", "error"),
+      );
+    });
+    document.getElementById("settings-backup-restore")?.addEventListener("click", () => {
+      restoreSettingsBackupMerge().catch((err) =>
+        setBackupStatus(err.message || "Restore failed.", "error"),
+      );
+    });
+    document.getElementById("settings-backup-restore-password-toggle")?.addEventListener("click", () => {
+      const inp = document.getElementById("settings-backup-restore-password");
+      if (!inp) return;
+      inp.type = inp.type === "password" ? "text" : "password";
+      syncRestoreBackupPasswordToggleUi();
+    });
+    syncRestoreBackupPasswordToggleUi();
     bindTestFwSourcePicker();
     syncSecurityFormControls();
     syncSecurityCertPanel();
@@ -1566,7 +2707,7 @@
     document.getElementById("settings-users-body")?.addEventListener("click", async (e) => {
       const profileBtn = e.target.closest("button.user-profile-btn");
       if (profileBtn) {
-        const id = profileBtn.getAttribute("data-id");
+        const id = profileBtn.dataset.id;
         if (!id) return;
         const row = profileBtn.closest("tr");
         openUserEditProfileDialogFromRow(row, id);
@@ -1574,11 +2715,11 @@
       }
       const roleBtn = e.target.closest("button.user-role-btn");
       if (roleBtn) {
-        const id = roleBtn.getAttribute("data-id");
+        const id = roleBtn.dataset.id;
         if (!id) return;
         const row = roleBtn.closest("tr");
         const current = row?.querySelector(".settings-user-cell--role")?.textContent?.trim() || "user";
-        const choice = window.prompt(`Role for this user: type "admin" or "user"`, current);
+        const choice = globalThis.prompt(`Role for this user: type "admin" or "user"`, current);
         if (choice == null) return;
         const r = choice.trim().toLowerCase();
         if (r !== "admin" && r !== "user") {
@@ -1603,9 +2744,9 @@
       }
       const pwBtn = e.target.closest("button.user-password-btn");
       if (pwBtn) {
-        const id = pwBtn.getAttribute("data-id");
+        const id = pwBtn.dataset.id;
         if (!id) return;
-        const pw = window.prompt("New password (min. 10 characters)");
+        const pw = globalThis.prompt("New password (min. 10 characters)");
         if (pw == null) return;
         if (pw.length < 10) {
           notify("Password too short", "Password must be at least 10 characters.");
@@ -1624,15 +2765,15 @@
       }
       const delBtn = e.target.closest("button.user-delete-btn");
       if (delBtn) {
-        const id = delBtn.getAttribute("data-id");
+        const id = delBtn.dataset.id;
         if (!id) return;
-        if (!window.confirm("Remove this user? They will no longer be able to sign in.")) return;
+        if (!globalThis.confirm("Remove this user? They will no longer be able to sign in.")) return;
         try {
           await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
             method: "DELETE",
           });
           if (id === currentSessionUser?.id) {
-            window.location.href = "/";
+            globalThis.location.href = "/";
             return;
           }
           await loadSettingsUsers();

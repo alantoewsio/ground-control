@@ -5,8 +5,8 @@
   "use strict";
 
   function bannerResult(ok, msg) {
-    if (typeof window.gcGlobalBannerShowResult === "function") {
-      window.gcGlobalBannerShowResult(ok, msg);
+    if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+      globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       alert(msg);
     }
@@ -19,27 +19,27 @@
   }
 
   function val(id) {
-    var el = document.getElementById(id);
+    let el = document.getElementById(id);
     return el ? String(el.value || "").trim() : "";
   }
 
   function checked(id) {
-    var el = document.getElementById(id);
+    let el = document.getElementById(id);
     return !!(el && el.checked);
   }
 
   function setVal(id, v) {
-    var el = document.getElementById(id);
+    let el = document.getElementById(id);
     if (el) el.value = v != null ? String(v) : "";
   }
 
   function setChecked(id, on) {
-    var el = document.getElementById(id);
+    let el = document.getElementById(id);
     if (el) el.checked = !!on;
   }
 
   function radioVal(name) {
-    var el = document.querySelector('input[name="' + name + '"]:checked');
+    let el = document.querySelector('input[name="' + name + '"]:checked');
     return el ? String(el.value || "").trim() : "";
   }
 
@@ -55,8 +55,8 @@
     return String(x).trim();
   }
 
-  var ACCESS_TIME_SCHEDULE_DEFAULT = "All the time";
-  var ACCESS_TIME_SCHEDULE_CHOICES = [
+  let ACCESS_TIME_SCHEDULE_DEFAULT = "All the time";
+  let ACCESS_TIME_SCHEDULE_CHOICES = [
     "All the time",
     "Work hours (5 Day week)",
     "Work hours (6 Day week)",
@@ -67,36 +67,36 @@
   ];
 
   function atScheduleClearDynamicOption() {
-    var sel = document.getElementById("gc-pe-at-schedule");
+    let sel = document.getElementById("gc-pe-at-schedule");
     if (!sel) return;
-    var o = sel.querySelector('option[data-gc-at-schedule-dynamic="1"]');
+    let o = sel.querySelector('option[data-gc-at-schedule-dynamic="1"]');
     if (o) o.remove();
   }
 
   function atScheduleCanonicalFromRaw(raw) {
     raw = String(raw || "").trim();
     if (!raw) return ACCESS_TIME_SCHEDULE_DEFAULT;
-    var lower = raw.toLowerCase();
-    for (var i = 0; i < ACCESS_TIME_SCHEDULE_CHOICES.length; i++) {
+    let lower = raw.toLowerCase();
+    for (let i = 0; i < ACCESS_TIME_SCHEDULE_CHOICES.length; i++) {
       if (ACCESS_TIME_SCHEDULE_CHOICES[i].toLowerCase() === lower) return ACCESS_TIME_SCHEDULE_CHOICES[i];
     }
     return raw;
   }
 
   function setAccessTimeScheduleValue(raw) {
-    var sel = document.getElementById("gc-pe-at-schedule");
+    let sel = document.getElementById("gc-pe-at-schedule");
     if (!sel) return;
     atScheduleClearDynamicOption();
-    var canon = atScheduleCanonicalFromRaw(raw);
-    var inList = false;
-    for (var j = 0; j < ACCESS_TIME_SCHEDULE_CHOICES.length; j++) {
+    let canon = atScheduleCanonicalFromRaw(raw);
+    let inList = false;
+    for (let j = 0; j < ACCESS_TIME_SCHEDULE_CHOICES.length; j++) {
       if (ACCESS_TIME_SCHEDULE_CHOICES[j] === canon) {
         inList = true;
         break;
       }
     }
     if (!inList && canon) {
-      var opt = document.createElement("option");
+      let opt = document.createElement("option");
       opt.value = canon;
       opt.textContent = canon;
       opt.setAttribute("data-gc-at-schedule-dynamic", "1");
@@ -105,7 +105,7 @@
     setVal("gc-pe-at-schedule", canon);
   }
 
-  var SCHED_DAY_OPTIONS = [
+  let SCHED_DAY_OPTIONS = [
     { v: "", l: "Select day…" },
     { v: "Sunday", l: "Sunday" },
     { v: "Monday", l: "Monday" },
@@ -120,9 +120,9 @@
   ];
 
   function schedNormalizeDaysApi(raw) {
-    var s = String(raw || "").trim();
+    let s = String(raw || "").trim();
     if (!s) return "";
-    var compact = s.replace(/\s+/g, "").toLowerCase();
+    let compact = s.replace(/\s+/g, "").toLowerCase();
     if (compact === "weekdays" || s === "WeekDays") return "Week Days";
     if (compact === "weekdaysincludingsaturday") return "Weekdays Including Saturday";
     if (compact === "alldaysofweek" || compact === "alldaysoftheweek") return "All Days of week";
@@ -130,55 +130,55 @@
   }
 
   function schedNormalizeTime(t) {
-    var s = String(t || "").trim();
+    let s = String(t || "").trim();
     if (!s) return "";
     if (s === "23:59" || s === "23:59:00") return "23:59";
-    var m = s.match(/^(\d{1,2}):(\d{2})/);
+    let m = s.match(/^(\d{1,2}):(\d{2})/);
     if (!m) return "";
-    var h = parseInt(m[1], 10);
-    var min = parseInt(m[2], 10);
+    let h = parseInt(m[1], 10);
+    let min = parseInt(m[2], 10);
     if (isNaN(h) || isNaN(min)) return "";
-    var q = Math.round((h * 60 + min) / 15);
-    var tmin = q * 15;
+    let q = Math.round((h * 60 + min) / 15);
+    let tmin = q * 15;
     if (tmin >= 24 * 60) return "23:59";
-    var nh = Math.floor(tmin / 60);
-    var nm = tmin % 60;
+    let nh = Math.floor(tmin / 60);
+    let nm = tmin % 60;
     return (nh < 10 ? "0" : "") + nh + ":" + (nm < 10 ? "0" : "") + nm;
   }
 
   function schedApiDatetimeToLocalInput(s) {
-    var t = String(s || "").trim();
+    let t = String(s || "").trim();
     if (!t) return "";
-    var m = t.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+    let m = t.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
     if (!m) return "";
     return m[1] + "T" + m[2] + ":" + m[3];
   }
 
   function schedLocalDatetimeToApi(s) {
-    var t = String(s || "").trim();
+    let t = String(s || "").trim();
     if (!t) return "";
-    var m = t.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+    let m = t.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
     if (!m) return t;
     return m[1] + " " + m[2] + ":" + m[3] + ":00";
   }
 
   function schedMakeTimeSelect(extraClass, value) {
-    var sel = document.createElement("select");
+    let sel = document.createElement("select");
     sel.className = "gc-if-flyout__input gc-if-flyout__select " + (extraClass || "");
-    var o0 = document.createElement("option");
+    let o0 = document.createElement("option");
     o0.value = "";
     o0.textContent = "—";
     sel.appendChild(o0);
-    var want = schedNormalizeTime(value);
-    var found = false;
-    var q;
+    let want = schedNormalizeTime(value);
+    let found = false;
+    let q;
     for (q = 0; q < 96; q++) {
-      var h = (q / 4) | 0;
-      var min = (q % 4) * 15;
-      var hh = h < 10 ? "0" + h : String(h);
-      var mm = min < 10 ? "0" + min : String(min);
-      var val = hh + ":" + mm;
-      var opt = document.createElement("option");
+      let h = (q / 4) | 0;
+      let min = (q % 4) * 15;
+      let hh = h < 10 ? "0" + h : String(h);
+      let mm = min < 10 ? "0" + min : String(min);
+      let val = hh + ":" + mm;
+      let opt = document.createElement("option");
       opt.value = val;
       opt.textContent = val;
       if (want === val) {
@@ -187,7 +187,7 @@
       }
       sel.appendChild(opt);
     }
-    var o59 = document.createElement("option");
+    let o59 = document.createElement("option");
     o59.value = "23:59";
     o59.textContent = "23:59";
     if (want === "23:59") {
@@ -196,7 +196,7 @@
     }
     sel.appendChild(o59);
     if (want && !found) {
-      var ox = document.createElement("option");
+      let ox = document.createElement("option");
       ox.value = want;
       ox.textContent = want;
       ox.selected = true;
@@ -207,27 +207,27 @@
 
   function schedAppendDetailRow(tbody, initial) {
     initial = initial || {};
-    var tr = document.createElement("tr");
+    let tr = document.createElement("tr");
     tr.setAttribute("data-gc-pe-sched-detail-row", "1");
-    var tdD = document.createElement("td");
-    var selD = document.createElement("select");
+    let tdD = document.createElement("td");
+    let selD = document.createElement("select");
     selD.className = "gc-if-flyout__input gc-if-flyout__select gc-pe-sched-detail-days";
-    var dayVal = schedNormalizeDaysApi(initial.Days);
+    let dayVal = schedNormalizeDaysApi(initial.Days);
     SCHED_DAY_OPTIONS.forEach(function (o) {
-      var opt = document.createElement("option");
+      let opt = document.createElement("option");
       opt.value = o.v;
       opt.textContent = o.l;
       if (o.v === dayVal) opt.selected = true;
       selD.appendChild(opt);
     });
     tdD.appendChild(selD);
-    var tdS = document.createElement("td");
+    let tdS = document.createElement("td");
     tdS.appendChild(schedMakeTimeSelect("gc-pe-sched-detail-start", initial.StartTime));
-    var tdE = document.createElement("td");
+    let tdE = document.createElement("td");
     tdE.appendChild(schedMakeTimeSelect("gc-pe-sched-detail-stop", initial.StopTime));
-    var tdR = document.createElement("td");
+    let tdR = document.createElement("td");
     tdR.className = "gc-pe-sched-detail-table__actions";
-    var btn = document.createElement("button");
+    let btn = document.createElement("button");
     btn.type = "button";
     btn.className = "gc-pe-sched-detail-remove";
     btn.setAttribute("aria-label", "Remove period");
@@ -245,9 +245,9 @@
   }
 
   function schedRowIsEmpty(tr) {
-    var days = tr.querySelector(".gc-pe-sched-detail-days");
-    var st = tr.querySelector(".gc-pe-sched-detail-start");
-    var sp = tr.querySelector(".gc-pe-sched-detail-stop");
+    let days = tr.querySelector(".gc-pe-sched-detail-days");
+    let st = tr.querySelector(".gc-pe-sched-detail-start");
+    let sp = tr.querySelector(".gc-pe-sched-detail-stop");
     return (
       (!days || !String(days.value || "").trim()) &&
       (!st || !String(st.value || "").trim()) &&
@@ -256,7 +256,7 @@
   }
 
   function schedPruneExtraEmptyRows(tbody) {
-    var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]"));
+    let rows = Array.prototype.slice.call(tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]"));
     while (
       rows.length >= 2 &&
       schedRowIsEmpty(rows[rows.length - 1]) &&
@@ -269,21 +269,21 @@
 
   function schedEnsureTrailingBlank(tbody) {
     if (!tbody) return;
-    var rows = tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]");
+    let rows = tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]");
     if (!rows.length) {
       schedAppendDetailRow(tbody, {});
       return;
     }
-    var last = rows[rows.length - 1];
+    let last = rows[rows.length - 1];
     if (!schedRowIsEmpty(last)) schedAppendDetailRow(tbody, {});
     schedPruneExtraEmptyRows(tbody);
   }
 
   function schedClearAndLoadDetails(details) {
-    var tbody = document.getElementById("gc-pe-sched-detail-tbody");
+    let tbody = document.getElementById("gc-pe-sched-detail-tbody");
     if (!tbody) return;
     tbody.innerHTML = "";
-    var list = Array.isArray(details) ? details : details && typeof details === "object" ? [details] : [];
+    let list = Array.isArray(details) ? details : details && typeof details === "object" ? [details] : [];
     if (!list.length) {
       schedAppendDetailRow(tbody, {});
       schedEnsureTrailingBlank(tbody);
@@ -300,34 +300,34 @@
   }
 
   function schedCollectDetailRows() {
-    var tbody = document.getElementById("gc-pe-sched-detail-tbody");
+    let tbody = document.getElementById("gc-pe-sched-detail-tbody");
     if (!tbody) return [];
-    var out = [];
+    let out = [];
     tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]").forEach(function (tr) {
-      var days = tr.querySelector(".gc-pe-sched-detail-days");
-      var st = tr.querySelector(".gc-pe-sched-detail-start");
-      var sp = tr.querySelector(".gc-pe-sched-detail-stop");
-      var d = days && days.value ? String(days.value).trim() : "";
-      var a = st && st.value ? String(st.value).trim() : "";
-      var b = sp && sp.value ? String(sp.value).trim() : "";
+      let days = tr.querySelector(".gc-pe-sched-detail-days");
+      let st = tr.querySelector(".gc-pe-sched-detail-start");
+      let sp = tr.querySelector(".gc-pe-sched-detail-stop");
+      let d = days && days.value ? String(days.value).trim() : "";
+      let a = st && st.value ? String(st.value).trim() : "";
+      let b = sp && sp.value ? String(sp.value).trim() : "";
       if (d && a && b) out.push({ Days: d, StartTime: a, StopTime: b });
     });
     return out;
   }
 
   function syncSchedTypeVisibility() {
-    var one = radioVal("gc-pe-sched-type") === "OneTime";
-    var ot = document.getElementById("gc-pe-sched-onetime-wrap");
-    var rec = document.getElementById("gc-pe-sched-recurring-wrap");
+    let one = radioVal("gc-pe-sched-type") === "OneTime";
+    let ot = document.getElementById("gc-pe-sched-onetime-wrap");
+    let rec = document.getElementById("gc-pe-sched-recurring-wrap");
     if (ot) ot.hidden = !one;
     if (rec) rec.hidden = one;
   }
 
   function schedRemoveDetailRow(btn) {
-    var tr = btn && btn.closest ? btn.closest("tr") : null;
-    var tbody = tr && tr.parentElement;
+    let tr = btn && btn.closest ? btn.closest("tr") : null;
+    let tbody = tr && tr.parentElement;
     if (!tbody) return;
-    var rows = tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]");
+    let rows = tbody.querySelectorAll("tr[data-gc-pe-sched-detail-row]");
     if (rows.length <= 1) {
       tr.querySelectorAll("select").forEach(function (s) {
         s.value = "";
@@ -346,7 +346,7 @@
       }
       return "";
     }
-    var det =
+    let det =
       payload.ScheduleDetails &&
       payload.ScheduleDetails.ScheduleDetail &&
       Array.isArray(payload.ScheduleDetails.ScheduleDetail)
@@ -360,10 +360,10 @@
 
   function collectPeFirewallIds(ms) {
     if (!ms) return [];
-    var out = [];
+    let out = [];
     ms.querySelectorAll('input[type="checkbox"][data-gc-fw-id]').forEach(function (cb) {
       if (!cb.checked) return;
-      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      let n = parseInt(String(cb.dataset.gcFwId || ""), 10);
       if (!isNaN(n) && n > 0) out.push(n);
     });
     return out;
@@ -379,9 +379,9 @@
   }
 
   function vpnCollectDhGroups() {
-    var optsRoot = document.getElementById("gc-pe-vpn-dh-options");
+    let optsRoot = document.getElementById("gc-pe-vpn-dh-options");
     if (!optsRoot) return [];
-    var out = [];
+    let out = [];
     optsRoot.querySelectorAll('input[type="checkbox"][data-gc-vpn-dh]:checked').forEach(function (cb) {
       out.push(cb.value);
     });
@@ -389,20 +389,20 @@
   }
 
   function vpnSyncDhTriggerText() {
-    var n = vpnCollectDhGroups().length;
-    var sp = document.getElementById("gc-pe-vpn-dh-trigger-text");
+    let n = vpnCollectDhGroups().length;
+    let sp = document.getElementById("gc-pe-vpn-dh-trigger-text");
     if (sp) sp.textContent = n === 0 ? "Select DH groups…" : n + " selected";
   }
 
   function vpnCloseDhDropdown() {
-    var dropdown = document.getElementById("gc-pe-vpn-dh-dropdown");
-    var trigger = document.getElementById("gc-pe-vpn-dh-trigger");
+    let dropdown = document.getElementById("gc-pe-vpn-dh-dropdown");
+    let trigger = document.getElementById("gc-pe-vpn-dh-trigger");
     if (dropdown) dropdown.hidden = true;
     if (trigger) trigger.setAttribute("aria-expanded", "false");
   }
 
   function vpnClearDhMultiselectDynamic() {
-    var optsRoot = document.getElementById("gc-pe-vpn-dh-options");
+    let optsRoot = document.getElementById("gc-pe-vpn-dh-options");
     if (!optsRoot) return;
     optsRoot.querySelectorAll(".gc-pe-vpn-dh-option[data-gc-vpn-dh-dynamic]").forEach(function (lab) {
       lab.remove();
@@ -410,8 +410,8 @@
   }
 
   function vpnFindDhCheckbox(optsRoot, v) {
-    var cbs = optsRoot.querySelectorAll('input[type="checkbox"][data-gc-vpn-dh]');
-    var i;
+    let cbs = optsRoot.querySelectorAll('input[type="checkbox"][data-gc-vpn-dh]');
+    let i;
     for (i = 0; i < cbs.length; i++) {
       if (cbs[i].value === v) return cbs[i];
     }
@@ -419,7 +419,7 @@
   }
 
   function vpnHydrateDhMultiselect(dhl) {
-    var optsRoot = document.getElementById("gc-pe-vpn-dh-options");
+    let optsRoot = document.getElementById("gc-pe-vpn-dh-options");
     if (!optsRoot) return;
     vpnClearDhMultiselectDynamic();
     optsRoot.querySelectorAll('input[type="checkbox"][data-gc-vpn-dh]').forEach(function (cb) {
@@ -427,14 +427,14 @@
     });
     if (!Array.isArray(dhl)) dhl = [];
     dhl.forEach(function (raw) {
-      var v = textScalar(raw);
+      let v = textScalar(raw);
       if (!v) return;
-      var cb = vpnFindDhCheckbox(optsRoot, v);
+      let cb = vpnFindDhCheckbox(optsRoot, v);
       if (cb) {
         cb.checked = true;
         return;
       }
-      var lab = document.createElement("label");
+      let lab = document.createElement("label");
       lab.className = "gc-multiselect__option gc-pe-vpn-dh-option";
       lab.setAttribute("data-gc-vpn-dh-dynamic", "1");
       cb = document.createElement("input");
@@ -442,7 +442,7 @@
       cb.value = v;
       cb.setAttribute("data-gc-vpn-dh", "1");
       cb.checked = true;
-      var tx = document.createElement("span");
+      let tx = document.createElement("span");
       tx.textContent = v;
       lab.appendChild(cb);
       lab.appendChild(tx);
@@ -452,12 +452,12 @@
   }
 
   function vpnInitPeVpnDhMs() {
-    var msRoot = document.getElementById("gc-pe-vpn-dh-root");
-    if (!msRoot || msRoot.getAttribute("data-gc-pe-vpn-dh-ui") === "1") return;
+    let msRoot = document.getElementById("gc-pe-vpn-dh-root");
+    if (!msRoot || msRoot.dataset.gcPeVpnDhUi === "1") return;
     msRoot.setAttribute("data-gc-pe-vpn-dh-ui", "1");
-    var trigger = document.getElementById("gc-pe-vpn-dh-trigger");
-    var dropdown = document.getElementById("gc-pe-vpn-dh-dropdown");
-    var optsRoot = document.getElementById("gc-pe-vpn-dh-options");
+    let trigger = document.getElementById("gc-pe-vpn-dh-trigger");
+    let dropdown = document.getElementById("gc-pe-vpn-dh-dropdown");
+    let optsRoot = document.getElementById("gc-pe-vpn-dh-options");
     function setOpen(open) {
       if (dropdown) dropdown.hidden = !open;
       if (trigger) trigger.setAttribute("aria-expanded", open ? "true" : "false");
@@ -476,7 +476,7 @@
     }
     if (optsRoot) {
       optsRoot.addEventListener("change", function (e) {
-        var t = e.target;
+        let t = e.target;
         if (t && t.matches && t.matches('input[type="checkbox"][data-gc-vpn-dh]')) {
           vpnSyncDhTriggerText();
         }
@@ -484,7 +484,7 @@
     }
     document.addEventListener("click", function (e) {
       if (!dropdown || dropdown.hidden) return;
-      var node = e.target;
+      let node = e.target;
       if (!(node instanceof Node)) return;
       if (!msRoot.contains(node)) setOpen(false);
     });
@@ -496,7 +496,7 @@
   }
 
   function vpnClearSelectDynamic(selId) {
-    var sel = document.getElementById(selId);
+    let sel = document.getElementById(selId);
     if (!sel) return;
     sel.querySelectorAll("option[data-gc-vpn-opt-dynamic]").forEach(function (o) {
       o.remove();
@@ -504,15 +504,15 @@
   }
 
   function vpnEnsureSelectValue(selId, raw) {
-    var v = textScalar(raw);
-    var sel = document.getElementById(selId);
+    let v = textScalar(raw);
+    let sel = document.getElementById(selId);
     if (!sel) return;
     if (v === "") {
       setVal(selId, "");
       return;
     }
-    var found = false;
-    var i;
+    let found = false;
+    let i;
     for (i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === v) {
         found = true;
@@ -520,7 +520,7 @@
       }
     }
     if (!found) {
-      var opt = document.createElement("option");
+      let opt = document.createElement("option");
       opt.value = v;
       opt.textContent = v;
       opt.setAttribute("data-gc-vpn-opt-dynamic", "1");
@@ -530,33 +530,33 @@
   }
 
   function vpnNormalizePfsApi(raw) {
-    var s = String(raw == null ? "" : raw).trim();
+    let s = String(raw == null ? "" : raw).trim();
     if (!s) return "";
-    var compact = s.toLowerCase().replace(/\s+/g, "").replace(/_/g, "");
+    let compact = s.toLowerCase().replace(/\s+/g, "").replace(/_/g, "");
     if (compact === "sameasphase1" || compact === "sameasphasei") return "SameasPhase-I";
     if (compact === "none") return "None";
     return s;
   }
 
   function syncVpnDpdUi() {
-    var on = checked("gc-pe-vpn-dpd");
+    let on = checked("gc-pe-vpn-dpd");
     ["gc-pe-vpn-dpd-every", "gc-pe-vpn-dpd-wait", "gc-pe-vpn-dpd-act"].forEach(function (id) {
-      var el = document.getElementById(id);
+      let el = document.getElementById(id);
       if (el) el.disabled = !on;
     });
   }
 
   function collectPayload(et) {
     if (et === "schedule") {
-      var type = radioVal("gc-pe-sched-type");
-      var o = {
+      let type = radioVal("gc-pe-sched-type");
+      let o = {
         Name: val("gc-pe-sched-name"),
         Description: val("gc-pe-sched-desc") || null,
         Type: type,
       };
       if (type === "OneTime") {
-        var sdOne = schedLocalDatetimeToApi(val("gc-pe-sched-start"));
-        var edOne = schedLocalDatetimeToApi(val("gc-pe-sched-end"));
+        let sdOne = schedLocalDatetimeToApi(val("gc-pe-sched-start"));
+        let edOne = schedLocalDatetimeToApi(val("gc-pe-sched-end"));
         o.StartDate = sdOne || null;
         o.EndDate = edOne || null;
         o.ScheduleDetails = {
@@ -567,7 +567,7 @@
       } else {
         o.StartDate = null;
         o.EndDate = null;
-        var detList = schedCollectDetailRows();
+        let detList = schedCollectDetailRows();
         o.ScheduleDetails = {
           StartDate: null,
           EndDate: null,
@@ -585,8 +585,8 @@
       };
     }
     if (et === "surfing_quota_policy") {
-      var cycSq = val("gc-pe-sq-cycle");
-      var oSq = {
+      let cycSq = val("gc-pe-sq-cycle");
+      let oSq = {
         Name: val("gc-pe-sq-name"),
         Description: val("gc-pe-sq-desc") || null,
         CycleType: cycSq,
@@ -596,16 +596,16 @@
         oSq.CycleHours = null;
         oSq.CycleMinutes = "0";
       } else {
-        var chSq = val("gc-pe-sq-ch");
+        let chSq = val("gc-pe-sq-ch");
         oSq.CycleHours = chSq === "" ? null : chSq;
-        var cmSq = val("gc-pe-sq-cm");
+        let cmSq = val("gc-pe-sq-cm");
         oSq.CycleMinutes = cmSq === "" ? "0" : cmSq;
       }
       if (checked("gc-pe-sq-val-unl")) {
         oSq.Validity = "Unlimited";
       } else {
-        var moSq = parseInt(val("gc-pe-sq-val-months"), 10);
-        var daysSq = moSq * 30;
+        let moSq = parseInt(val("gc-pe-sq-val-months"), 10);
+        let daysSq = moSq * 30;
         if (daysSq > SQ_VALIDITY_MAX_DAYS) daysSq = SQ_VALIDITY_MAX_DAYS;
         oSq.Validity = String(daysSq);
       }
@@ -619,9 +619,9 @@
       return oSq;
     }
     if (et === "data_transfer_policy") {
-      var rest = radioVal("gc-pe-dt-restrict");
-      var cyc = radioVal("gc-pe-dt-cyclic");
-      var o = {
+      let rest = radioVal("gc-pe-dt-restrict");
+      let cyc = radioVal("gc-pe-dt-cyclic");
+      let o = {
         Name: val("gc-pe-dt-name"),
         Description: val("gc-pe-dt-desc") || null,
         RestrictionBasedOn: rest,
@@ -645,8 +645,8 @@
       return o;
     }
     if (et === "vpn_profile") {
-      var dhs = vpnCollectDhGroups();
-      var p1 = {
+      let dhs = vpnCollectDhGroups();
+      let p1 = {
         KeyLife: val("gc-pe-vpn-p1-kl"),
         ReKeyMargin: val("gc-pe-vpn-p1-rm"),
         "RandomizeRe-KeyingMarginBy": val("gc-pe-vpn-p1-rnd"),
@@ -661,8 +661,8 @@
         p1.WaitForResponseUpto = val("gc-pe-vpn-dpd-wait");
         p1.ActionWhenPeerUnreachable = val("gc-pe-vpn-dpd-act");
       }
-      var pfsV = val("gc-pe-vpn-p2-pfs");
-      var p2 = {
+      let pfsV = val("gc-pe-vpn-p2-pfs");
+      let p2 = {
         PFSGroup: pfsV === "" ? null : pfsV,
         KeyLife: val("gc-pe-vpn-p2-kl"),
         EncryptionAlgorithm1: val("gc-pe-vpn-p2-enc"),
@@ -687,17 +687,17 @@
     if (et === "schedule") {
       setVal("gc-pe-sched-name", textScalar(p.Name));
       setVal("gc-pe-sched-desc", textScalar(p.Description));
-      var ty = textScalar(p.Type) || "Recurring";
+      let ty = textScalar(p.Type) || "Recurring";
       setRadio("gc-pe-sched-type", ty);
-      var sdRoot = p.ScheduleDetails && typeof p.ScheduleDetails === "object" ? p.ScheduleDetails : {};
-      var startApi = textScalar(p.StartDate) || textScalar(sdRoot.StartDate);
-      var endApi = textScalar(p.EndDate) || textScalar(sdRoot.EndDate);
+      let sdRoot = p.ScheduleDetails && typeof p.ScheduleDetails === "object" ? p.ScheduleDetails : {};
+      let startApi = textScalar(p.StartDate) || textScalar(sdRoot.StartDate);
+      let endApi = textScalar(p.EndDate) || textScalar(sdRoot.EndDate);
       setVal("gc-pe-sched-start", schedApiDatetimeToLocalInput(startApi));
       setVal("gc-pe-sched-end", schedApiDatetimeToLocalInput(endApi));
-      var sd = p.ScheduleDetails;
-      var dlist = [];
+      let sd = p.ScheduleDetails;
+      let dlist = [];
       if (sd && typeof sd === "object") {
-        var d = sd.ScheduleDetail;
+        let d = sd.ScheduleDetail;
         if (Array.isArray(d)) dlist = d.filter(Boolean);
         else if (d && typeof d === "object") dlist = [d];
       }
@@ -708,7 +708,7 @@
     if (et === "access_time_policy") {
       setVal("gc-pe-at-name", textScalar(p.Name));
       setVal("gc-pe-at-desc", textScalar(p.Description));
-      var st = textScalar(p.Strategy) || "Allow";
+      let st = textScalar(p.Strategy) || "Allow";
       if (st === "Y" || st === "y") st = "Allow";
       if (st === "N" || st === "n") st = "Deny";
       setVal("gc-pe-at-strategy", st.indexOf("Deny") >= 0 ? "Deny" : "Allow");
@@ -721,14 +721,14 @@
       setVal("gc-pe-sq-cycle", textScalar(p.CycleType) || "Cyclic");
       sqHydratePeriod(textScalar(p.PerDay));
       setVal("gc-pe-sq-ch", textScalar(p.CycleHours));
-      var cmH = textScalar(p.CycleMinutes);
+      let cmH = textScalar(p.CycleMinutes);
       setVal("gc-pe-sq-cm", cmH === "" ? "0" : cmH);
-      var vSq = textScalar(p.Validity);
-      var vUnl = sqScalarUnlimited(vSq);
+      let vSq = textScalar(p.Validity);
+      let vUnl = sqScalarUnlimited(vSq);
       setChecked("gc-pe-sq-val-unl", vUnl);
       setVal("gc-pe-sq-val-months", vUnl ? "" : sqValidityDaysToMonths(vSq));
-      var mxSq = textScalar(p.MaximumHours);
-      var mxUnl = sqScalarUnlimited(mxSq);
+      let mxSq = textScalar(p.MaximumHours);
+      let mxUnl = sqScalarUnlimited(mxSq);
       setChecked("gc-pe-sq-mxh-unl", mxUnl);
       setVal("gc-pe-sq-mxh-hours", mxUnl ? "" : mxSq);
       setVal("gc-pe-sq-mxh-min", mxUnl ? "" : textScalar(p.Minutes));
@@ -738,13 +738,13 @@
     if (et === "data_transfer_policy") {
       setVal("gc-pe-dt-name", textScalar(p.Name));
       setVal("gc-pe-dt-desc", textScalar(p.Description));
-      var rb = textScalar(p.RestrictionBasedOn) || "TotalDataTransfer";
+      let rb = textScalar(p.RestrictionBasedOn) || "TotalDataTransfer";
       setRadio("gc-pe-dt-restrict", rb.indexOf("Individual") >= 0 ? "IndividualDataTransfer" : "TotalDataTransfer");
-      var ct = textScalar(p.CycleType) || "Cyclic";
+      let ct = textScalar(p.CycleType) || "Cyclic";
       setRadio("gc-pe-dt-cyclic", ct.indexOf("Non") >= 0 ? "NonCyclic" : "Cyclic");
       setVal("gc-pe-dt-period", textScalar(p.CyclePeriod) || "Day");
       setVal("gc-pe-dt-cycmb", textScalar(p.CycleDataTransferInMB));
-      var maxU = textScalar(p.MaximumDataTransfer) === "Unlimited";
+      let maxU = textScalar(p.MaximumDataTransfer) === "Unlimited";
       setChecked("gc-pe-dt-max-unl", maxU);
       setVal("gc-pe-dt-maxmb", textScalar(p.MaximumDataTransferInMB));
       setChecked("gc-pe-dt-cu-unl", textScalar(p.CycleUploadDataTransfer) === "Unlimited");
@@ -765,14 +765,14 @@
       setVal("gc-pe-vpn-rekey", textScalar(p.AllowReKeying) || "Enable");
       setVal("gc-pe-vpn-tries", textScalar(p.KeyNegotiationTries) || "0");
       setVal("gc-pe-vpn-authmode", textScalar(p.AuthenticationMode) || "MainMode");
-      var p1 = p.Phase1 && typeof p.Phase1 === "object" ? p.Phase1 : p;
+      let p1 = p.Phase1 && typeof p.Phase1 === "object" ? p.Phase1 : p;
       setVal("gc-pe-vpn-p1-kl", textScalar(p1.KeyLife) || "5400");
       setVal("gc-pe-vpn-p1-rm", textScalar(p1.ReKeyMargin) || "360");
       setVal("gc-pe-vpn-p1-rnd", textScalar(p1["RandomizeRe-KeyingMarginBy"]) || "50");
-      var sg = p1.SupportedDHGroups;
-      var dhl = [];
+      let sg = p1.SupportedDHGroups;
+      let dhl = [];
       if (sg && typeof sg === "object") {
-        var dg = sg.DHGroup;
+        let dg = sg.DHGroup;
         if (Array.isArray(dg)) dhl = dg.map(textScalar).filter(Boolean);
         else if (dg) dhl = [textScalar(dg)];
       }
@@ -781,12 +781,12 @@
       vpnClearSelectDynamic("gc-pe-vpn-p1-auth");
       vpnEnsureSelectValue("gc-pe-vpn-p1-enc", textScalar(p1.EncryptionAlgorithm1) || "AES256");
       vpnEnsureSelectValue("gc-pe-vpn-p1-auth", textScalar(p1.AuthenticationAlgorithm1) || "SHA2_256");
-      var dpd = textScalar(p1.DeadPeerDetection) === "Enable";
+      let dpd = textScalar(p1.DeadPeerDetection) === "Enable";
       setChecked("gc-pe-vpn-dpd", dpd);
       setVal("gc-pe-vpn-dpd-every", textScalar(p1.CheckPeerAfterEvery) || "30");
       setVal("gc-pe-vpn-dpd-wait", textScalar(p1.WaitForResponseUpto) || "120");
       setVal("gc-pe-vpn-dpd-act", textScalar(p1.ActionWhenPeerUnreachable) || "ReInitiate");
-      var p2 = p.Phase2 && typeof p.Phase2 === "object" ? p.Phase2 : {};
+      let p2 = p.Phase2 && typeof p.Phase2 === "object" ? p.Phase2 : {};
       vpnClearSelectDynamic("gc-pe-vpn-p2-pfs");
       vpnClearSelectDynamic("gc-pe-vpn-p2-enc");
       vpnClearSelectDynamic("gc-pe-vpn-p2-auth");
@@ -799,55 +799,55 @@
   }
 
   function syncDtSectionVisibility() {
-    var indiv = radioVal("gc-pe-dt-restrict") === "IndividualDataTransfer";
-    var nonCyc = radioVal("gc-pe-dt-cyclic") === "NonCyclic";
-    var iw = document.getElementById("gc-pe-dt-indiv-wrap");
-    var tw = document.getElementById("gc-pe-dt-total-wrap");
-    var mw = document.getElementById("gc-pe-dt-max-wrap");
+    let indiv = radioVal("gc-pe-dt-restrict") === "IndividualDataTransfer";
+    let nonCyc = radioVal("gc-pe-dt-cyclic") === "NonCyclic";
+    let iw = document.getElementById("gc-pe-dt-indiv-wrap");
+    let tw = document.getElementById("gc-pe-dt-total-wrap");
+    let mw = document.getElementById("gc-pe-dt-max-wrap");
     if (iw) iw.hidden = !indiv;
     if (tw) tw.hidden = indiv || nonCyc;
     if (mw) mw.hidden = indiv;
   }
 
-  var SQ_VALIDITY_MAX_DAYS = 3660;
-  var SQ_VALIDITY_MAX_MONTHS = 122;
+  let SQ_VALIDITY_MAX_DAYS = 3660;
+  let SQ_VALIDITY_MAX_MONTHS = 122;
 
   function sqPeriodClearDynamicOption() {
-    var sel = document.getElementById("gc-pe-sq-period");
+    let sel = document.getElementById("gc-pe-sq-period");
     if (!sel) return;
-    var o = sel.querySelector('option[data-gc-sq-period-dynamic="1"]');
+    let o = sel.querySelector('option[data-gc-sq-period-dynamic="1"]');
     if (o) o.remove();
   }
 
   function sqPeriodCanonical(raw) {
-    var s = String(raw || "").trim();
+    let s = String(raw || "").trim();
     if (!s) return "Monthly";
-    var lower = s.toLowerCase();
+    let lower = s.toLowerCase();
     if (lower === "days" || lower === "day") return "Days";
     if (lower === "weekly" || lower === "week") return "Weekly";
     if (lower === "monthly" || lower === "month") return "Monthly";
     if (lower === "yearly" || lower === "year") return "Yearly";
-    var opts = ["Days", "Weekly", "Monthly", "Yearly"];
-    for (var i = 0; i < opts.length; i++) {
+    let opts = ["Days", "Weekly", "Monthly", "Yearly"];
+    for (let i = 0; i < opts.length; i++) {
       if (opts[i].toLowerCase() === lower) return opts[i];
     }
     return s;
   }
 
   function sqHydratePeriod(raw) {
-    var sel = document.getElementById("gc-pe-sq-period");
+    let sel = document.getElementById("gc-pe-sq-period");
     if (!sel) return;
     sqPeriodClearDynamicOption();
-    var canon = sqPeriodCanonical(raw);
-    var known = false;
-    for (var j = 0; j < sel.options.length; j++) {
+    let canon = sqPeriodCanonical(raw);
+    let known = false;
+    for (let j = 0; j < sel.options.length; j++) {
       if (sel.options[j].value === canon) {
         known = true;
         break;
       }
     }
     if (!known && canon) {
-      var opt = document.createElement("option");
+      let opt = document.createElement("option");
       opt.value = canon;
       opt.textContent = canon;
       opt.setAttribute("data-gc-sq-period-dynamic", "1");
@@ -857,37 +857,37 @@
   }
 
   function sqScalarUnlimited(raw) {
-    var s = String(raw == null ? "" : raw).trim();
+    let s = String(raw == null ? "" : raw).trim();
     if (!s) return true;
-    var l = s.toLowerCase();
+    let l = s.toLowerCase();
     return l === "unlimited" || s === "-11";
   }
 
   function sqValidityDaysToMonths(daysStr) {
-    var d = parseInt(String(daysStr || "").trim(), 10);
+    let d = parseInt(String(daysStr || "").trim(), 10);
     if (isNaN(d) || d <= 0) return "";
-    var m = Math.round(d / 30);
+    let m = Math.round(d / 30);
     if (d > 0 && m < 1) m = 1;
     if (m > SQ_VALIDITY_MAX_MONTHS) m = SQ_VALIDITY_MAX_MONTHS;
     return String(m);
   }
 
   function syncSqCycleHmVisibility() {
-    var wrap = document.getElementById("gc-pe-sq-cycle-hm-wrap");
+    let wrap = document.getElementById("gc-pe-sq-cycle-hm-wrap");
     if (!wrap) return;
     wrap.hidden = val("gc-pe-sq-cycle") === "NonCyclic";
   }
 
   function syncSqValUnlimitedUi() {
-    var unl = checked("gc-pe-sq-val-unl");
-    var el = document.getElementById("gc-pe-sq-val-months");
+    let unl = checked("gc-pe-sq-val-unl");
+    let el = document.getElementById("gc-pe-sq-val-months");
     if (el) el.disabled = unl;
   }
 
   function syncSqMxhUnlimitedUi() {
-    var unl = checked("gc-pe-sq-mxh-unl");
+    let unl = checked("gc-pe-sq-mxh-unl");
     ["gc-pe-sq-mxh-hours", "gc-pe-sq-mxh-min"].forEach(function (id) {
-      var el = document.getElementById(id);
+      let el = document.getElementById(id);
       if (el) el.disabled = unl;
     });
   }
@@ -899,37 +899,37 @@
   }
 
   function validateSurfingQuotaFlyout() {
-    var cyc = val("gc-pe-sq-cycle");
+    let cyc = val("gc-pe-sq-cycle");
     if (cyc !== "NonCyclic") {
-      var ch = val("gc-pe-sq-ch");
+      let ch = val("gc-pe-sq-ch");
       if (ch !== "" && !/^[1-9]\d*$/.test(ch)) {
         return "Cycle hours must be blank or a positive integer.";
       }
-      var cm = val("gc-pe-sq-cm");
+      let cm = val("gc-pe-sq-cm");
       if (cm === "") {
         return "Enter cycle minutes (0–59).";
       }
       if (!/^\d+$/.test(cm)) {
         return "Cycle minutes must be an integer from 0 to 59.";
       }
-      var cmi = parseInt(cm, 10);
+      let cmi = parseInt(cm, 10);
       if (cmi < 0 || cmi > 59) {
         return "Cycle minutes must be from 0 to 59.";
       }
     }
     if (!checked("gc-pe-sq-val-unl")) {
-      var mo = val("gc-pe-sq-val-months");
+      let mo = val("gc-pe-sq-val-months");
       if (!/^[1-9]\d*$/.test(mo)) {
         return "Enter validity months (1–" + SQ_VALIDITY_MAX_MONTHS + ") or enable Unlimited.";
       }
-      var m = parseInt(mo, 10);
+      let m = parseInt(mo, 10);
       if (m < 1 || m > SQ_VALIDITY_MAX_MONTHS) {
         return "Validity months must be from 1 to " + SQ_VALIDITY_MAX_MONTHS + ".";
       }
     }
     if (!checked("gc-pe-sq-mxh-unl")) {
-      var hh = val("gc-pe-sq-mxh-hours");
-      var mm = val("gc-pe-sq-mxh-min");
+      let hh = val("gc-pe-sq-mxh-hours");
+      let mm = val("gc-pe-sq-mxh-min");
       if (!/^\d+$/.test(hh)) {
         return "Enter maximum hours (non-negative integer) or enable Unlimited.";
       }
@@ -939,7 +939,7 @@
       if (!/^\d+$/.test(mm)) {
         return "Maximum minutes must be an integer from 0 to 59.";
       }
-      var mi = parseInt(mm, 10);
+      let mi = parseInt(mm, 10);
       if (mi < 0 || mi > 59) {
         return "Maximum minutes must be from 0 to 59.";
       }
@@ -947,11 +947,11 @@
     return "";
   }
 
-  var mode = "add";
-  var currentTabCfg = null;
+  let mode = "add";
+  let currentTabCfg = null;
   /** @type {{ config_entry_id: number, firewall_id: number }[]} */
-  var peEditTargets = [];
-  var URLS = {};
+  let peEditTargets = [];
+  let URLS = {};
 
   function openFlyout(root, open) {
     if (!root) return;
@@ -964,20 +964,20 @@
     document.querySelectorAll(".gc-pe-section").forEach(function (s) {
       s.hidden = true;
     });
-    var sid = sectionIdForEntityType(et);
-    var sec = sid ? document.getElementById(sid) : null;
+    let sid = sectionIdForEntityType(et);
+    let sec = sid ? document.getElementById(sid) : null;
     if (sec) sec.hidden = false;
   }
 
   function init(cfg) {
     URLS = (cfg && cfg.urls) || {};
-    var onSaved = cfg && cfg.onSaved;
-    var root = document.getElementById("gc-pe-flyout");
-    var form = document.getElementById("gc-pe-form");
-    var title = document.getElementById("gc-pe-flyout-title");
-    var fwField = document.getElementById("gc-pe-fw-field");
-    var msRoot = fwField ? fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms") : null;
-    var bodyRoot = root ? root.querySelector(".gc-if-flyout__form-body") : null;
+    let onSaved = cfg && cfg.onSaved;
+    let root = document.getElementById("gc-pe-flyout");
+    let form = document.getElementById("gc-pe-form");
+    let title = document.getElementById("gc-pe-flyout-title");
+    let fwField = document.getElementById("gc-pe-fw-field");
+    let msRoot = fwField ? fwField.querySelector(".gc-hs-ip-host-flyout__fw-ms") : null;
+    let bodyRoot = root ? root.querySelector(".gc-if-flyout__form-body") : null;
 
     document.querySelectorAll('input[name="gc-pe-dt-restrict"]').forEach(function (r) {
       r.addEventListener("change", syncDtSectionVisibility);
@@ -988,7 +988,7 @@
     document.querySelectorAll('input[name="gc-pe-sched-type"]').forEach(function (r) {
       r.addEventListener("change", syncSchedTypeVisibility);
     });
-    var schedTbody = document.getElementById("gc-pe-sched-detail-tbody");
+    let schedTbody = document.getElementById("gc-pe-sched-detail-tbody");
     if (schedTbody) {
       schedTbody.addEventListener("change", function () {
         schedEnsureTrailingBlank(schedTbody);
@@ -997,20 +997,20 @@
         schedEnsureTrailingBlank(schedTbody);
       });
       schedTbody.addEventListener("click", function (e) {
-        var btn = e.target && e.target.closest ? e.target.closest(".gc-pe-sched-detail-remove") : null;
+        let btn = e.target && e.target.closest ? e.target.closest(".gc-pe-sched-detail-remove") : null;
         if (!btn) return;
         e.preventDefault();
         schedRemoveDetailRow(btn);
       });
     }
 
-    var sqCycleEl = document.getElementById("gc-pe-sq-cycle");
+    let sqCycleEl = document.getElementById("gc-pe-sq-cycle");
     if (sqCycleEl) sqCycleEl.addEventListener("change", syncSqCycleHmVisibility);
-    var sqValUnlEl = document.getElementById("gc-pe-sq-val-unl");
+    let sqValUnlEl = document.getElementById("gc-pe-sq-val-unl");
     if (sqValUnlEl) sqValUnlEl.addEventListener("change", syncSqValUnlimitedUi);
-    var sqMxhUnlEl = document.getElementById("gc-pe-sq-mxh-unl");
+    let sqMxhUnlEl = document.getElementById("gc-pe-sq-mxh-unl");
     if (sqMxhUnlEl) sqMxhUnlEl.addEventListener("change", syncSqMxhUnlimitedUi);
-    var vpnDpdEl = document.getElementById("gc-pe-vpn-dpd");
+    let vpnDpdEl = document.getElementById("gc-pe-vpn-dpd");
     if (vpnDpdEl) vpnDpdEl.addEventListener("change", syncVpnDpdUi);
 
     function close() {
@@ -1020,16 +1020,16 @@
       peEditTargets = [];
     }
 
-    var closeBtn = document.getElementById("gc-pe-flyout-close");
-    var cancelBtn = document.getElementById("gc-pe-cancel");
-    var backdropEl = root ? root.querySelector(".gc-if-flyout__backdrop") : null;
+    let closeBtn = document.getElementById("gc-pe-flyout-close");
+    let cancelBtn = document.getElementById("gc-pe-cancel");
+    let backdropEl = root ? root.querySelector(".gc-if-flyout__backdrop") : null;
     if (closeBtn) closeBtn.addEventListener("click", close);
     if (cancelBtn) cancelBtn.addEventListener("click", close);
     if (backdropEl) backdropEl.addEventListener("click", close);
 
     if (!root || !form) {
-      window.gcProfileEntityFlyoutOpenCreate = function () {};
-      window.gcProfileEntityFlyoutOpenFromTr = function () {};
+      globalThis.gcProfileEntityFlyoutOpenCreate = function () {};
+      globalThis.gcProfileEntityFlyoutOpenFromTr = function () {};
       return;
     }
 
@@ -1038,21 +1038,21 @@
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       if (!currentTabCfg) return;
-      var et = currentTabCfg.entityType;
+      let et = currentTabCfg.entityType;
       if (et === "surfing_quota_policy") {
-        var sqErr0 = validateSurfingQuotaFlyout();
+        let sqErr0 = validateSurfingQuotaFlyout();
         if (sqErr0) {
           bannerResult(false, sqErr0);
           return;
         }
       }
-      var payload = collectPayload(et);
+      let payload = collectPayload(et);
       if (!payload.Name) {
         bannerResult(false, "Name is required.");
         return;
       }
       if (et === "schedule") {
-        var sErr = validateScheduleClientPayload(String(payload.Type || ""), payload);
+        let sErr = validateScheduleClientPayload(String(payload.Type || ""), payload);
         if (sErr) {
           bannerResult(false, sErr);
           return;
@@ -1060,7 +1060,7 @@
       }
 
       if (mode === "add") {
-        var ids = msRoot ? collectPeFirewallIds(msRoot) : [];
+        let ids = msRoot ? collectPeFirewallIds(msRoot) : [];
         if (!ids.length) {
           bannerResult(false, "Select at least one firewall.");
           return;
@@ -1086,7 +1086,7 @@
           })
           .then(function (x) {
             if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+              let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
               bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
               return;
             }
@@ -1101,23 +1101,23 @@
         return;
       }
 
-      var selFw = msRoot ? collectPeFirewallIds(msRoot) : [];
+      let selFw = msRoot ? collectPeFirewallIds(msRoot) : [];
       if (!selFw.length) {
         bannerResult(false, "Select at least one firewall.");
         return;
       }
-      var fwToCe = {};
+      let fwToCe = {};
       peEditTargets.forEach(function (t) {
         if (!t || t.firewall_id == null || t.config_entry_id == null) return;
-        var fid = parseInt(String(t.firewall_id), 10);
-        var ce = parseInt(String(t.config_entry_id), 10);
+        let fid = parseInt(String(t.firewall_id), 10);
+        let ce = parseInt(String(t.config_entry_id), 10);
         if (!isNaN(fid) && fid > 0 && !isNaN(ce) && ce > 0) fwToCe[fid] = ce;
       });
-      var updateEntryIds = [];
+      let updateEntryIds = [];
       selFw.forEach(function (fid) {
         if (fwToCe[fid]) updateEntryIds.push(fwToCe[fid]);
       });
-      var createFwIds = selFw.filter(function (fid) {
+      let createFwIds = selFw.filter(function (fid) {
         return !fwToCe[fid];
       });
 
@@ -1159,7 +1159,7 @@
           })
           .then(function (x) {
             if (!x.ok) {
-              var emC = (x.j && (x.j.detail || x.j.message)) || "Could not queue creates.";
+              let emC = (x.j && (x.j.detail || x.j.message)) || "Could not queue creates.";
               bannerResult(false, typeof emC === "string" ? emC : JSON.stringify(emC));
               return;
             }
@@ -1202,7 +1202,7 @@
         })
         .then(function (x) {
           if (!x.ok) {
-            var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+            let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
             bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
@@ -1221,12 +1221,12 @@
 
     function enableAllNameFields() {
       ["gc-pe-sched-name", "gc-pe-at-name", "gc-pe-sq-name", "gc-pe-dt-name", "gc-pe-vpn-name"].forEach(function (id) {
-        var el = document.getElementById(id);
+        let el = document.getElementById(id);
         if (el) el.disabled = false;
       });
     }
 
-    window.gcProfileEntityFlyoutOpenCreate = function (tabCfg) {
+    globalThis.gcProfileEntityFlyoutOpenCreate = function (tabCfg) {
       currentTabCfg = tabCfg;
       mode = "add";
       peEditTargets = [];
@@ -1240,19 +1240,19 @@
         msRoot.setAttribute("data-fw-initial-selected", "[]");
         msRoot.setAttribute("data-fw-assigned-ids", "[]");
       }
-      if (bodyRoot && msRoot && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-        window.gcHsHydrateFlyoutFirewallPicker(bodyRoot, { row: {} });
+      if (bodyRoot && msRoot && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(bodyRoot, { row: {} });
       }
-      var sel =
-        typeof window.gcGetSelectedFirewallIds === "function"
-          ? window.gcGetSelectedFirewallIds()
+      let sel =
+        typeof globalThis.gcGetSelectedFirewallIds === "function"
+          ? globalThis.gcGetSelectedFirewallIds()
           : [];
       if (msRoot && sel && sel.length) {
         try {
           msRoot.setAttribute("data-fw-initial-selected", JSON.stringify(sel));
         } catch (e1) {}
-        if (bodyRoot && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-          window.gcHsHydrateFlyoutFirewallPicker(bodyRoot, { row: {} });
+        if (bodyRoot && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+          globalThis.gcHsHydrateFlyoutFirewallPicker(bodyRoot, { row: {} });
         }
       }
       syncDtSectionVisibility();
@@ -1261,17 +1261,17 @@
       openFlyout(root, true);
     };
 
-    window.gcProfileEntityFlyoutOpenFromTr = function (tr, tabCfg) {
+    globalThis.gcProfileEntityFlyoutOpenFromTr = function (tr, tabCfg) {
       if (!tr || !tr._gcNetRow || !tabCfg) return;
-      var row = tr._gcNetRow;
+      let row = tr._gcNetRow;
       currentTabCfg = tabCfg;
       mode = "edit";
       if (title) title.textContent = "Edit";
       if (fwField) fwField.hidden = false;
       showSection(tabCfg.entityType);
-      var p = row.payload && typeof row.payload === "object" ? row.payload : {};
+      let p = row.payload && typeof row.payload === "object" ? row.payload : {};
       hydrate(tabCfg.entityType, p);
-      var targets = row[tabCfg.editTargets];
+      let targets = row[tabCfg.editTargets];
       peEditTargets = [];
       if (Array.isArray(targets) && targets.length) {
         targets.forEach(function (t) {
@@ -1287,7 +1287,7 @@
           firewall_id: Number(row.firewall_id),
         });
       }
-      var assignedFw = [];
+      let assignedFw = [];
       peEditTargets.forEach(function (x) {
         if (x.firewall_id > 0) assignedFw.push(x.firewall_id);
       });
@@ -1298,10 +1298,10 @@
           msRoot.setAttribute("data-fw-assigned-ids", JSON.stringify(assignedFw));
         } catch (eFwAttr) {}
       }
-      if (bodyRoot && msRoot && typeof window.gcHsHydrateFlyoutFirewallPicker === "function") {
-        window.gcHsHydrateFlyoutFirewallPicker(bodyRoot, { row: row });
+      if (bodyRoot && msRoot && typeof globalThis.gcHsHydrateFlyoutFirewallPicker === "function") {
+        globalThis.gcHsHydrateFlyoutFirewallPicker(bodyRoot, { row: row });
       }
-      var nameEl = document.getElementById(
+      let nameEl = document.getElementById(
         tabCfg.entityType === "schedule"
           ? "gc-pe-sched-name"
           : tabCfg.entityType === "access_time_policy"
@@ -1314,13 +1314,13 @@
       );
       if (nameEl) nameEl.disabled = true;
       openFlyout(root, true);
-      if (bodyRoot && typeof window.gcCombineFlyoutApplyConflictChrome === "function") {
-        var combineOpts = { columnLabels: {}, fieldPickHandlers: {} };
+      if (bodyRoot && typeof globalThis.gcCombineFlyoutApplyConflictChrome === "function") {
+        let combineOpts = { columnLabels: {}, fieldPickHandlers: {} };
         if (tabCfg.combineFlyoutColumnLabels && typeof tabCfg.combineFlyoutColumnLabels === "object") {
           combineOpts.columnLabels = tabCfg.combineFlyoutColumnLabels;
         }
         if (tabCfg.entityType !== "access_time_policy" && tabCfg.combineDetailCol) {
-          var dcol = tabCfg.combineDetailCol;
+          let dcol = tabCfg.combineDetailCol;
           combineOpts.fieldPickHandlers[dcol] = function (raw) {
             try {
               hydrate(tabCfg.entityType, JSON.parse(String(raw)));
@@ -1333,11 +1333,11 @@
           };
           combineOpts.columnLabels[dcol] = "Definition from firewall";
         }
-        window.gcCombineFlyoutApplyConflictChrome(bodyRoot, row, combineOpts);
+        globalThis.gcCombineFlyoutApplyConflictChrome(bodyRoot, row, combineOpts);
       }
       if (tabCfg.entityType === "schedule") syncSchedTypeVisibility();
     };
   }
 
-  window.gcProfileEntityFlyoutInit = init;
+  globalThis.gcProfileEntityFlyoutInit = init;
 })();

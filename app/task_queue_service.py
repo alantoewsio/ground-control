@@ -141,6 +141,9 @@ from app.webfilter_policy_merge import (
 # Stored on ``task_queue_completed.outcome`` when a row is discarded from the queue.
 TASK_QUEUE_OUTCOME_REMOVED = "removed_from_queue"
 
+# Max IDs per list in batch / task-queue API bodies (mitigates unbounded work; Sonar S6680).
+TASK_QUEUE_BATCH_IDS_MAX = 500
+
 _TEST_SINGLETON_ENTITY_TYPES = frozenset(
     {
         ENTITY_IPS_SWITCH,

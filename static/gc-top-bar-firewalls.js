@@ -1,18 +1,18 @@
 (function () {
   "use strict";
 
-  var firewallInventory = [];
-  var configurationInventory = [];
+  let firewallInventory = [];
+  let configurationInventory = [];
 
   function normalizeConfigurationInventoryRows(arr) {
-    var out = [];
+    let out = [];
     if (!Array.isArray(arr)) return out;
     arr.forEach(function (row) {
       if (!row || row.id == null) return;
-      var cid = parseInt(String(row.id), 10);
+      let cid = parseInt(String(row.id), 10);
       if (isNaN(cid) || cid <= 0) return;
-      var lbl = String(row.label != null ? row.label : "").trim() || String(cid);
-      var tags = [];
+      let lbl = String(row.label != null ? row.label : "").trim() || String(cid);
+      let tags = [];
       if (Array.isArray(row.tags)) {
         row.tags.forEach(function (t) {
           if (typeof t === "string" && t.trim()) tags.push(t.trim());
@@ -33,21 +33,21 @@
   }
 
   function normalizeInventoryRows(arr) {
-    var out = [];
+    let out = [];
     if (!Array.isArray(arr)) return out;
     arr.forEach(function (fw) {
       if (!fw || fw.id == null) return;
-      var fid = parseInt(String(fw.id), 10);
+      let fid = parseInt(String(fw.id), 10);
       if (isNaN(fid) || fid <= 0) return;
-      var lbl = String(fw.label != null ? fw.label : "").trim() || String(fid);
-      var tags = [];
+      let lbl = String(fw.label != null ? fw.label : "").trim() || String(fid);
+      let tags = [];
       if (Array.isArray(fw.tags)) {
         fw.tags.forEach(function (t) {
           if (typeof t === "string" && t.trim()) tags.push(t.trim());
         });
       }
-      var desc = fw.description != null ? String(fw.description).trim() : "";
-      var urls = null;
+      let desc = fw.description != null ? String(fw.description).trim() : "";
+      let urls = null;
       if (fw.urls && typeof fw.urls === "object") {
         urls = {
           webadmin: String(fw.urls.webadmin || ""),
@@ -73,11 +73,11 @@
   }
 
   function distinctOrderedTags(fws) {
-    var seen = {};
-    var collected = [];
+    let seen = {};
+    let collected = [];
     (fws || []).forEach(function (fw) {
       (fw.tags || []).forEach(function (t) {
-        var k = tagKey(t);
+        let k = tagKey(t);
         if (!k || seen[k]) return;
         seen[k] = true;
         collected.push(String(t).trim());
@@ -90,22 +90,22 @@
   }
 
   function computeEffectiveIds(fws, selectedFwIds, selectedTags) {
-    var set = {};
-    var tagWant = {};
+    let set = {};
+    let tagWant = {};
     (selectedTags || []).forEach(function (t) {
-      var k = tagKey(t);
+      let k = tagKey(t);
       if (k) tagWant[k] = true;
     });
     (selectedFwIds || []).forEach(function (id) {
-      var n = parseInt(String(id), 10);
+      let n = parseInt(String(id), 10);
       if (!isNaN(n) && n > 0) set[String(n)] = true;
     });
     (fws || []).forEach(function (fw) {
       if (!fw || fw.id == null) return;
-      var tags = fw.tags || [];
-      for (var i = 0; i < tags.length; i++) {
+      let tags = fw.tags || [];
+      for (let i = 0; i < tags.length; i++) {
         if (tagWant[tagKey(tags[i])]) {
-          var n = parseInt(String(fw.id), 10);
+          let n = parseInt(String(fw.id), 10);
           if (!isNaN(n) && n > 0) set[String(n)] = true;
           break;
         }
@@ -121,13 +121,13 @@
   }
 
   function readExplicitFwIdsFromDom() {
-    var root = document.getElementById("gc-net-fw-multiselect");
+    let root = document.getElementById("gc-net-fw-multiselect");
     if (!root) return [];
-    var ids = [];
+    let ids = [];
     /* Scope to top-bar root only — do not require [data-gc-fw-ms] (avoids empty reads if markup shifts). */
     root.querySelectorAll(".gc-net-fw-cb--fw:checked").forEach(function (cb) {
-      var raw = String(cb.value || "");
-      var n =
+      let raw = String(cb.value || "");
+      let n =
         raw.indexOf("f:") === 0 ? parseInt(raw.slice(2), 10) : parseInt(raw, 10);
       if (!isNaN(n)) ids.push(n);
     });
@@ -135,12 +135,12 @@
   }
 
   function readExplicitConfigurationIdsFromDom() {
-    var root = document.getElementById("gc-net-fw-multiselect");
+    let root = document.getElementById("gc-net-fw-multiselect");
     if (!root) return [];
-    var ids = [];
+    let ids = [];
     root.querySelectorAll(".gc-net-fw-cb--cfg:checked").forEach(function (cb) {
-      var raw = String(cb.value || "");
-      var n =
+      let raw = String(cb.value || "");
+      let n =
         raw.indexOf("c:") === 0 ? parseInt(raw.slice(2), 10) : parseInt(raw, 10);
       if (!isNaN(n)) ids.push(n);
     });
@@ -148,11 +148,11 @@
   }
 
   function readExplicitTagsFromDom() {
-    var root = document.getElementById("gc-net-fw-multiselect");
+    let root = document.getElementById("gc-net-fw-multiselect");
     if (!root) return [];
-    var tags = [];
+    let tags = [];
     root.querySelectorAll(".gc-net-fw-tag-cb:checked").forEach(function (cb) {
-      var v = String(cb.value || "").trim();
+      let v = String(cb.value || "").trim();
       if (v) tags.push(v);
     });
     return tags;
@@ -166,7 +166,7 @@
     );
   }
 
-  window.gcGetSelectedFirewallIds = getSelectedFirewallIds;
+  globalThis.gcGetSelectedFirewallIds = getSelectedFirewallIds;
 
   function getSelectedConfigurationIds() {
     return readExplicitConfigurationIdsFromDom()
@@ -176,7 +176,7 @@
       });
   }
 
-  window.gcGetSelectedConfigurationIds = getSelectedConfigurationIds;
+  globalThis.gcGetSelectedConfigurationIds = getSelectedConfigurationIds;
 
   function exclusiveViewStorageKeyForUser(uid) {
     return "ground-control-cfg-exclusive-view-v1:" + String(uid);
@@ -185,13 +185,13 @@
   function readExclusiveConfigurationIdsFromLs(uid) {
     if (uid == null || uid === "") return [];
     try {
-      var raw = localStorage.getItem(exclusiveViewStorageKeyForUser(uid));
+      let raw = localStorage.getItem(exclusiveViewStorageKeyForUser(uid));
       if (!raw) return [];
-      var o = JSON.parse(raw);
+      let o = JSON.parse(raw);
       if (!o || o.v !== 1 || !Array.isArray(o.ids)) return [];
-      var out = [];
+      let out = [];
       o.ids.forEach(function (x) {
-        var n = parseInt(String(x), 10);
+        let n = parseInt(String(x), 10);
         if (!isNaN(n) && n > 0) out.push(n);
       });
       return out.filter(function (n, i, a) {
@@ -210,29 +210,29 @@
     }
   }
 
-  window.gcGetExclusiveConfigurationIds = function () {
-    var c = window.GC_TOP_BAR_FIREWALLS;
+  globalThis.gcGetExclusiveConfigurationIds = function () {
+    let c = globalThis.GC_TOP_BAR_FIREWALLS;
     if (!c || c.userId == null) return [];
     return readExclusiveConfigurationIdsFromLs(c.userId);
   };
 
-  window.gcGetEffectiveConfigurationIds = function () {
-    var selFn = window.gcGetSelectedConfigurationIds;
-    var selected = typeof selFn === "function" ? selFn() || [] : [];
+  globalThis.gcGetEffectiveConfigurationIds = function () {
+    let selFn = globalThis.gcGetSelectedConfigurationIds;
+    let selected = typeof selFn === "function" ? selFn() || [] : [];
     if (!Array.isArray(selected)) selected = [];
     selected = selected.filter(function (n, i, a) {
       return a.indexOf(n) === i;
     });
     if (isGcDashboardPage()) return selected;
-    var c = window.GC_TOP_BAR_FIREWALLS;
+    let c = globalThis.GC_TOP_BAR_FIREWALLS;
     if (!c || c.userId == null) return selected;
-    var excl = readExclusiveConfigurationIdsFromLs(c.userId);
+    let excl = readExclusiveConfigurationIdsFromLs(c.userId);
     if (!excl.length) return selected;
-    var want = {};
+    let want = {};
     excl.forEach(function (id) {
       want[String(id)] = true;
     });
-    var filtered = selected.filter(function (id) {
+    let filtered = selected.filter(function (id) {
       return want[String(id)];
     });
     /* Stale exclusive IDs (e.g. after changing checkbox selection) would hide all rows; fall back. */
@@ -240,42 +240,42 @@
     return filtered;
   };
 
-  var ICON_CIRCLE_MINUS =
+  let ICON_CIRCLE_MINUS =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path fill="currentColor" d="M8 11.25h8v1.5H8z"/></svg>';
 
-  var ICON_EYE_EXCLUSIVE =
+  let ICON_EYE_EXCLUSIVE =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
 
   (function syncFirewallInventoryFromPageJson() {
-    var fws = typeof window !== "undefined" ? window.gcNavFirewallsJson : null;
-    var norm = normalizeInventoryRows(Array.isArray(fws) ? fws : []);
+    let fws = typeof globalThis !== "undefined" ? globalThis.gcNavFirewallsJson : null;
+    let norm = normalizeInventoryRows(Array.isArray(fws) ? fws : []);
     firewallInventory = norm;
     try {
-      window.gcNavFirewallsJson = norm;
+      globalThis.gcNavFirewallsJson = norm;
     } catch (eNav) {}
   })();
 
   (function syncConfigurationInventoryFromPageJson() {
-    var cfgs =
-      typeof window !== "undefined" ? window.gcNavConfigurationsJson : null;
-    var norm = normalizeConfigurationInventoryRows(Array.isArray(cfgs) ? cfgs : []);
+    let cfgs =
+      typeof globalThis !== "undefined" ? globalThis.gcNavConfigurationsJson : null;
+    let norm = normalizeConfigurationInventoryRows(Array.isArray(cfgs) ? cfgs : []);
     configurationInventory = norm;
     try {
-      window.gcNavConfigurationsJson = norm;
+      globalThis.gcNavConfigurationsJson = norm;
     } catch (eCfg) {}
   })();
 
-  window.gcGetFirewallNavInventory = function () {
+  globalThis.gcGetFirewallNavInventory = function () {
     return (firewallInventory || []).map(function (x) {
       return { id: x.id, label: x.label };
     });
   };
 
-  window.gcGetFirewallOnlineByLabel = function (label) {
-    var want = String(label == null ? "" : label).trim().toLowerCase();
+  globalThis.gcGetFirewallOnlineByLabel = function (label) {
+    let want = String(label == null ? "" : label).trim().toLowerCase();
     if (!want) return null;
-    for (var i = 0; i < firewallInventory.length; i++) {
-      var fw = firewallInventory[i];
+    for (let i = 0; i < firewallInventory.length; i++) {
+      let fw = firewallInventory[i];
       if (!fw) continue;
       if (String(fw.label == null ? "" : fw.label).trim().toLowerCase() === want) {
         return fw.online === true;
@@ -284,37 +284,37 @@
     return null;
   };
 
-  window.gcSkipGlobalFirewallTableFilter = function () {
-    var shell = document.getElementById("app-shell");
+  globalThis.gcSkipGlobalFirewallTableFilter = function () {
+    let shell = document.getElementById("app-shell");
     return !!(shell && shell.hasAttribute("data-gc-skip-fw-table-filter"));
   };
 
   /* Compact action icons for “In scope” rows (inventory table uses 18px). */
-  var ICON_WEBADMIN =
+  let ICON_WEBADMIN =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>';
-  var ICON_SSH =
+  let ICON_SSH =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5a2 2 0 012-2h12a2 2 0 012 2v4H4V5zm0 6h16v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8zm3.5 2.5l2 2-2 2 1.06 1.06L11.56 14 8.56 11l-1.06 1.06zm4.5 4.5h5v1.5h-5V14z"/></svg>';
-  var ICON_MONITOR =
+  let ICON_MONITOR =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3 17h2v-7H3v7zm4 0h2V7H7v10zm4 0h2v-4h-2v4zm4 0h2v-8h-2v8zm4 0h2V3h-2v14z"/></svg>';
-  var ICON_CONFIG_VIEWER =
+  let ICON_CONFIG_VIEWER =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>';
-  var ICON_SYNC =
+  let ICON_SYNC =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
-  var ICON_TEST =
+  let ICON_TEST =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>';
   /* Lucide "wrench" (stroke reads clearly at 18px; fill="none" avoids muddy blob). */
-  var ICON_INVENTORY_WRENCH =
+  let ICON_INVENTORY_WRENCH =
     '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
 
-  var LS_KEY_SYNC_ENTITIES = "ground-control-fw-sync-entities-v1";
-  var CONFIG_SYNC_PROGRESS_MSG = "Syncing configuration cache from the firewall…";
+  let LS_KEY_SYNC_ENTITIES = "ground-control-fw-sync-entities-v1";
+  let CONFIG_SYNC_PROGRESS_MSG = "Syncing configuration cache from the firewall…";
 
   function getEnabledSyncEntityIdsForNav() {
     try {
-      var raw = localStorage.getItem(LS_KEY_SYNC_ENTITIES);
-      var p = raw ? JSON.parse(raw) : {};
+      let raw = localStorage.getItem(LS_KEY_SYNC_ENTITIES);
+      let p = raw ? JSON.parse(raw) : {};
       if (!p || typeof p !== "object") return [];
-      var out = [];
+      let out = [];
       Object.keys(p).forEach(function (k) {
         if (p[k] && String(k).trim()) out.push(String(k).trim());
       });
@@ -325,7 +325,7 @@
   }
 
   function configSyncBannerMessageNav(res) {
-    var body = res.body || {};
+    let body = res.body || {};
     if (res.status === 404) return { ok: false, text: "Firewall not found." };
     if (res.status === 202 && body.accepted) {
       return {
@@ -336,9 +336,9 @@
     }
     if (body.skipped) return { ok: false, text: body.message || "Nothing selected." };
     if (body.ok) {
-      var a = body.added || 0;
-      var c = body.changed || 0;
-      var d = body.deleted || 0;
+      let a = body.added || 0;
+      let c = body.changed || 0;
+      let d = body.deleted || 0;
       if (a + c + d === 0) return { ok: true, text: "Sync finished — no changes." };
       return {
         ok: true,
@@ -349,7 +349,7 @@
   }
 
   function navDispatchConfigCacheSynced(fwId) {
-    var n = parseInt(fwId, 10);
+    let n = parseInt(fwId, 10);
     if (isNaN(n) || n < 1) return;
     try {
       document.dispatchEvent(
@@ -376,19 +376,19 @@
   }
 
   function runNavConfigSync(btn) {
-    var syncUrl = btn.getAttribute("data-gc-nav-fw-sync");
+    let syncUrl = btn.dataset.gcNavFwSync;
     if (!syncUrl) return;
-    var fwId = btn.getAttribute("data-gc-nav-fw-id");
-    var batch =
-      typeof window.gcGlobalBannerSyncBegin === "function" &&
-      typeof window.gcGlobalBannerSyncEnd === "function";
-    var bid = batch ? window.gcGlobalBannerSyncBegin(CONFIG_SYNC_PROGRESS_MSG) : 0;
-    var ids = getEnabledSyncEntityIdsForNav();
+    let fwId = btn.dataset.gcNavFwId;
+    let batch =
+      typeof globalThis.gcGlobalBannerSyncBegin === "function" &&
+      typeof globalThis.gcGlobalBannerSyncEnd === "function";
+    let bid = batch ? globalThis.gcGlobalBannerSyncBegin(CONFIG_SYNC_PROGRESS_MSG) : 0;
+    let ids = getEnabledSyncEntityIdsForNav();
     if (ids.length < 1) {
-      var noTypes = "Open the firewall panel and enable at least one sync type.";
-      if (batch) window.gcGlobalBannerSyncEnd(bid, false, noTypes);
-      else if (typeof window.gcGlobalBannerShowResult === "function") {
-        window.gcGlobalBannerShowResult(false, noTypes);
+      let noTypes = "Open the firewall panel and enable at least one sync type.";
+      if (batch) globalThis.gcGlobalBannerSyncEnd(bid, false, noTypes);
+      else if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+        globalThis.gcGlobalBannerShowResult(false, noTypes);
       }
       return;
     }
@@ -398,20 +398,20 @@
       .then(function (res) {
         btn.classList.remove("btn-icon--busy");
         btn.disabled = false;
-        var msg = configSyncBannerMessageNav(res);
-        var body = res.body || {};
+        let msg = configSyncBannerMessageNav(res);
+        let body = res.body || {};
         if (res.status === 202 && body.accepted) {
-          if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
-            window.gcGlobalBannerTrackBackgroundSync(msg.text);
+          if (typeof globalThis.gcGlobalBannerTrackBackgroundSync === "function") {
+            globalThis.gcGlobalBannerTrackBackgroundSync(msg.text);
           } else if (batch) {
-            window.gcGlobalBannerSyncEnd(bid, true, msg.text);
-          } else if (typeof window.gcGlobalBannerShowResult === "function") {
-            window.gcGlobalBannerShowResult(true, msg.text);
+            globalThis.gcGlobalBannerSyncEnd(bid, true, msg.text);
+          } else if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+            globalThis.gcGlobalBannerShowResult(true, msg.text);
           }
         } else {
-          if (batch) window.gcGlobalBannerSyncEnd(bid, msg.ok, msg.text);
-          else if (typeof window.gcGlobalBannerShowResult === "function") {
-            window.gcGlobalBannerShowResult(msg.ok, msg.text);
+          if (batch) globalThis.gcGlobalBannerSyncEnd(bid, msg.ok, msg.text);
+          else if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+            globalThis.gcGlobalBannerShowResult(msg.ok, msg.text);
           }
           if (msg.ok && !body.skipped && fwId && res.status !== 202) {
             navDispatchConfigCacheSynced(fwId);
@@ -421,18 +421,18 @@
       .catch(function () {
         btn.classList.remove("btn-icon--busy");
         btn.disabled = false;
-        if (batch) window.gcGlobalBannerSyncEnd(bid, false, "Request failed.");
-        else if (typeof window.gcGlobalBannerShowResult === "function") {
-          window.gcGlobalBannerShowResult(false, "Request failed.");
+        if (batch) globalThis.gcGlobalBannerSyncEnd(bid, false, "Request failed.");
+        else if (typeof globalThis.gcGlobalBannerShowResult === "function") {
+          globalThis.gcGlobalBannerShowResult(false, "Request failed.");
         }
       });
   }
 
   function runNavFirewallTest(btn, selectedPanelEl) {
-    var testUrl = btn.getAttribute("data-gc-nav-fw-test");
-    var fwId = btn.getAttribute("data-gc-nav-fw-id");
+    let testUrl = btn.dataset.gcNavFwTest;
+    let fwId = btn.dataset.gcNavFwId;
     if (!testUrl || !selectedPanelEl || !fwId) return;
-    var out = selectedPanelEl.querySelector('[data-gc-nav-fw-test-out="' + fwId + '"]');
+    let out = selectedPanelEl.querySelector('[data-gc-nav-fw-test-out="' + fwId + '"]');
     if (out) {
       out.hidden = false;
       out.textContent = "Testing…";
@@ -446,8 +446,8 @@
       })
       .then(function (_ref) {
         if (!out) return;
-        var body = _ref.body || {};
-        var success = _ref.ok && body.ok;
+        let body = _ref.body || {};
+        let success = _ref.ok && body.ok;
         out.textContent = body.message || (success ? "OK" : "Failed");
         out.className = "gc-net-fw-selected__test-msg " + (success ? "ok" : "err");
       })
@@ -459,7 +459,7 @@
       });
   }
 
-  var cfg = window.GC_TOP_BAR_FIREWALLS;
+  let cfg = globalThis.GC_TOP_BAR_FIREWALLS;
   if (!cfg || !cfg.userId) return;
 
   function storageKey() {
@@ -470,17 +470,17 @@
     return "ground-control-network-fw-ids-v1:" + String(cfg.userId);
   }
 
-  var root = document.getElementById("gc-net-fw-multiselect");
-  var ms = root ? root.querySelector("[data-gc-fw-ms]") : null;
-  var trigger = document.getElementById("gc-net-fw-trigger");
-  var dropdown = document.getElementById("gc-net-fw-dropdown");
-  var textEl = document.getElementById("gc-net-fw-trigger-text");
-  var search = document.getElementById("gc-net-fw-search");
-  var optsRoot = document.getElementById("gc-net-fw-options");
-  var emptyEl = document.getElementById("gc-net-fw-empty");
-  var selectedPanel = document.getElementById("gc-net-fw-selected-panel");
+  let root = document.getElementById("gc-net-fw-multiselect");
+  let ms = root ? root.querySelector("[data-gc-fw-ms]") : null;
+  let trigger = document.getElementById("gc-net-fw-trigger");
+  let dropdown = document.getElementById("gc-net-fw-dropdown");
+  let textEl = document.getElementById("gc-net-fw-trigger-text");
+  let search = document.getElementById("gc-net-fw-search");
+  let optsRoot = document.getElementById("gc-net-fw-options");
+  let emptyEl = document.getElementById("gc-net-fw-empty");
+  let selectedPanel = document.getElementById("gc-net-fw-selected-panel");
 
-  var ok = !!(root && ms && trigger && dropdown && textEl && optsRoot);
+  let ok = !!(root && ms && trigger && dropdown && textEl && optsRoot);
 
   function persistExclusiveConfigurationIds(ids) {
     try {
@@ -497,13 +497,13 @@
 
   function syncExclusiveToggleButtonStates() {
     if (!ms) return;
-    var active = {};
+    let active = {};
     loadExclusiveConfigurationIds().forEach(function (id) {
       active[String(id)] = true;
     });
     ms.querySelectorAll("[data-gc-cfg-exclusive-toggle]").forEach(function (btn) {
-      var id = btn.getAttribute("data-gc-cfg-exclusive-toggle");
-      var on = !!active[String(id)];
+      let id = btn.dataset.gcCfgExclusiveToggle;
+      let on = !!active[String(id)];
       btn.setAttribute("aria-pressed", on ? "true" : "false");
       btn.classList.toggle("gc-top-bar-fw__cfg-exclusive--on", on);
       btn.title = on
@@ -513,16 +513,16 @@
   }
 
   function toggleExclusiveConfigurationId(cid) {
-    var n = parseInt(String(cid), 10);
+    let n = parseInt(String(cid), 10);
     if (isNaN(n) || n < 1) return;
-    var cur = loadExclusiveConfigurationIds();
-    var set = {};
+    let cur = loadExclusiveConfigurationIds();
+    let set = {};
     cur.forEach(function (x) {
       set[String(x)] = true;
     });
     if (set[String(n)]) delete set[String(n)];
     else set[String(n)] = true;
-    var next = Object.keys(set)
+    let next = Object.keys(set)
       .map(function (k) {
         return parseInt(k, 10);
       })
@@ -540,8 +540,8 @@
           detail: {
             exclusiveConfigurationIds: next.slice(),
             effectiveConfigurationIds:
-              typeof window.gcGetEffectiveConfigurationIds === "function"
-                ? window.gcGetEffectiveConfigurationIds()
+              typeof globalThis.gcGetEffectiveConfigurationIds === "function"
+                ? globalThis.gcGetEffectiveConfigurationIds()
                 : getSelectedConfigurationIds(),
           },
         }),
@@ -551,20 +551,20 @@
   }
 
   function removeExplicitFirewallFromSelection(fwId) {
-    var n = parseInt(String(fwId), 10);
+    let n = parseInt(String(fwId), 10);
     if (isNaN(n) || !ms) return;
     ms.querySelectorAll(".gc-net-fw-cb--fw").forEach(function (cb) {
-      var raw = String(cb.value || "");
-      var idStr = raw.indexOf("f:") === 0 ? raw.slice(2) : raw;
+      let raw = String(cb.value || "");
+      let idStr = raw.indexOf("f:") === 0 ? raw.slice(2) : raw;
       if (parseInt(idStr, 10) === n) cb.checked = false;
     });
     onMsCheckboxChange();
   }
 
   function emitChange() {
-    var effCfg =
-      typeof window.gcGetEffectiveConfigurationIds === "function"
-        ? window.gcGetEffectiveConfigurationIds()
+    let effCfg =
+      typeof globalThis.gcGetEffectiveConfigurationIds === "function"
+        ? globalThis.gcGetEffectiveConfigurationIds()
         : getSelectedConfigurationIds();
     document.dispatchEvent(
       new CustomEvent("gc-firewall-selection-changed", {
@@ -586,20 +586,20 @@
   }
 
   function persist() {
-    var firewallIds = [];
-    var configurationIds = [];
+    let firewallIds = [];
+    let configurationIds = [];
     ms.querySelectorAll(".gc-net-fw-cb:checked").forEach(function (cb) {
-      var raw = String(cb.value || "");
+      let raw = String(cb.value || "");
       if (raw.indexOf("c:") === 0) {
-        var c = parseInt(raw.slice(2), 10);
+        let c = parseInt(raw.slice(2), 10);
         if (!isNaN(c)) configurationIds.push(c);
       } else {
-        var f =
+        let f =
           raw.indexOf("f:") === 0 ? parseInt(raw.slice(2), 10) : parseInt(raw, 10);
         if (!isNaN(f)) firewallIds.push(f);
       }
     });
-    var tags = [];
+    let tags = [];
     ms.querySelectorAll(".gc-net-fw-tag-cb:checked").forEach(function (cb) {
       tags.push(cb.value);
     });
@@ -618,9 +618,9 @@
 
   function loadFilterState() {
     try {
-      var raw = localStorage.getItem(storageKey());
+      let raw = localStorage.getItem(storageKey());
       if (raw) {
-        var o = JSON.parse(raw);
+        let o = JSON.parse(raw);
         if (o && o.v === 3 && Array.isArray(o.firewallIds) && Array.isArray(o.tags)) {
           if (!Array.isArray(o.configurationIds)) o.configurationIds = [];
           return o;
@@ -634,9 +634,9 @@
           };
         }
       }
-      var leg = localStorage.getItem(legacyStorageKey());
+      let leg = localStorage.getItem(legacyStorageKey());
       if (leg) {
-        var ids = JSON.parse(leg);
+        let ids = JSON.parse(leg);
         if (Array.isArray(ids))
           return { v: 3, firewallIds: ids, configurationIds: [], tags: [] };
       }
@@ -645,20 +645,20 @@
   }
 
   function syncTriggerText() {
-    var nFw = ms.querySelectorAll(".gc-net-fw-cb--fw:checked").length;
-    var nCfg = ms.querySelectorAll(".gc-net-fw-cb--cfg:checked").length;
-    var nTag = ms.querySelectorAll(".gc-net-fw-tag-cb:checked").length;
-    var eff = getSelectedFirewallIds().length;
-    var effCfg = getSelectedConfigurationIds().length;
+    let nFw = ms.querySelectorAll(".gc-net-fw-cb--fw:checked").length;
+    let nCfg = ms.querySelectorAll(".gc-net-fw-cb--cfg:checked").length;
+    let nTag = ms.querySelectorAll(".gc-net-fw-tag-cb:checked").length;
+    let eff = getSelectedFirewallIds().length;
+    let effCfg = getSelectedConfigurationIds().length;
     if (nFw === 0 && nTag === 0 && nCfg === 0) {
       textEl.textContent = "No scope selected";
       return;
     }
-    var parts = [];
+    let parts = [];
     if (nTag) parts.push(nTag === 1 ? "1 tag" : nTag + " tags");
     if (nCfg) parts.push(nCfg === 1 ? "1 configuration" : nCfg + " configurations");
     if (nFw) parts.push(nFw === 1 ? "1 firewall" : nFw + " firewalls");
-    var base = parts.join(" · ");
+    let base = parts.join(" · ");
     if (nTag > 0) {
       textEl.textContent =
         base +
@@ -681,39 +681,39 @@
 
   function renderSelectedScopePanel() {
     if (!selectedPanel) return;
-    var ids = getSelectedFirewallIds()
+    let ids = getSelectedFirewallIds()
       .slice()
       .sort(function (a, b) {
         return a - b;
       });
-    var cfgIds = getSelectedConfigurationIds()
+    let cfgIds = getSelectedConfigurationIds()
       .slice()
       .sort(function (a, b) {
         return a - b;
       });
-    var map = {};
+    let map = {};
     firewallInventory.forEach(function (fw) {
       if (fw && fw.id != null) map[String(fw.id)] = fw;
     });
-    var cmap = {};
+    let cmap = {};
     configurationInventory.forEach(function (c) {
       if (c && c.id != null) cmap[String(c.id)] = c;
     });
-    var explicitFw = {};
+    let explicitFw = {};
     readExplicitFwIdsFromDom().forEach(function (fid) {
       explicitFw[String(fid)] = true;
     });
-    var inner = document.createElement("div");
+    let inner = document.createElement("div");
     inner.className = "gc-net-fw-selected__inner";
-    var head = document.createElement("div");
+    let head = document.createElement("div");
     head.className = "gc-net-fw-selected__head";
-    var sec = document.createElement("span");
+    let sec = document.createElement("span");
     sec.className = "gc-top-bar-fw__section-label gc-net-fw-selected__head-title";
     sec.textContent = "In scope";
     head.appendChild(sec);
-    var invUrl = cfg.inventoryUrl ? String(cfg.inventoryUrl).trim() : "";
+    let invUrl = cfg.inventoryUrl ? String(cfg.inventoryUrl).trim() : "";
     if (invUrl) {
-      var inv = document.createElement("a");
+      let inv = document.createElement("a");
       inv.className = "gc-net-fw-selected__inventory-link";
       inv.href = invUrl;
       inv.title = "Firewall inventory";
@@ -723,7 +723,7 @@
     }
     inner.appendChild(head);
     if (ids.length === 0 && cfgIds.length === 0) {
-      var empty = document.createElement("p");
+      let empty = document.createElement("p");
       empty.className = "gc-net-fw-selected__empty muted";
       empty.textContent = "Nothing in scope.";
       inner.appendChild(empty);
@@ -731,21 +731,21 @@
       selectedPanel.appendChild(inner);
       return;
     }
-    var list = document.createElement("div");
+    let list = document.createElement("div");
     list.className = "gc-net-fw-selected__list";
     cfgIds.forEach(function (cid) {
-      var crow = cmap[String(cid)];
-      var clabel = crow ? crow.label : "Configuration #" + cid;
-      var row = document.createElement("div");
+      let crow = cmap[String(cid)];
+      let clabel = crow ? crow.label : "Configuration #" + cid;
+      let row = document.createElement("div");
       row.className = "gc-net-fw-selected__row";
       row.setAttribute("data-gc-nav-cfg-id", String(cid));
-      var rowHead = document.createElement("div");
+      let rowHead = document.createElement("div");
       rowHead.className = "gc-net-fw-selected__row-head";
-      var nameEl = document.createElement("span");
+      let nameEl = document.createElement("span");
       nameEl.className = "gc-net-fw-selected__name mono";
       nameEl.textContent = clabel;
       rowHead.appendChild(nameEl);
-      var kind = document.createElement("span");
+      let kind = document.createElement("span");
       kind.className = "muted gc-net-fw-selected__cfg-badge";
       kind.textContent = "Configuration";
       rowHead.appendChild(kind);
@@ -753,17 +753,17 @@
       list.appendChild(row);
     });
     ids.forEach(function (id) {
-      var fw = map[String(id)];
-      var label = fw ? fw.label : "#" + id;
-      var desc = fw && fw.description ? String(fw.description) : "";
-      var urls = fw && fw.urls ? fw.urls : null;
-      var row = document.createElement("div");
+      let fw = map[String(id)];
+      let label = fw ? fw.label : "#" + id;
+      let desc = fw && fw.description ? String(fw.description) : "";
+      let urls = fw && fw.urls ? fw.urls : null;
+      let row = document.createElement("div");
       row.className = "gc-net-fw-selected__row";
       row.setAttribute("data-gc-nav-fw-id", String(id));
-      var rowHead = document.createElement("div");
+      let rowHead = document.createElement("div");
       rowHead.className = "gc-net-fw-selected__row-head";
       if (explicitFw[String(id)]) {
-        var rm = document.createElement("button");
+        let rm = document.createElement("button");
         rm.type = "button";
         rm.className = "gc-top-bar-fw__explicit-remove";
         rm.setAttribute("data-gc-nav-fw-explicit-remove", String(id));
@@ -772,15 +772,15 @@
         rm.innerHTML = ICON_CIRCLE_MINUS;
         rowHead.appendChild(rm);
       }
-      var nameEl = document.createElement("span");
+      let nameEl = document.createElement("span");
       nameEl.className = "gc-net-fw-selected__name mono";
       nameEl.textContent = label;
       if (desc) nameEl.title = desc;
       rowHead.appendChild(nameEl);
-      var actions = document.createElement("div");
+      let actions = document.createElement("div");
       actions.className = "gc-net-fw-selected__actions";
       if (urls && urls.webadmin) {
-        var wa = document.createElement("a");
+        let wa = document.createElement("a");
         wa.className = "btn-icon gc-net-fw-selected__action-icon";
         wa.href = urls.webadmin;
         wa.target = "_blank";
@@ -791,7 +791,7 @@
         actions.appendChild(wa);
       }
       if (urls && urls.ssh) {
-        var sh = document.createElement("a");
+        let sh = document.createElement("a");
         sh.className = "btn-icon gc-net-fw-selected__action-icon";
         sh.href = urls.ssh;
         sh.target = "_blank";
@@ -802,7 +802,7 @@
         actions.appendChild(sh);
       }
       if (urls && urls.monitor) {
-        var mo = document.createElement("a");
+        let mo = document.createElement("a");
         mo.className = "btn-icon gc-net-fw-selected__action-icon";
         mo.href = urls.monitor;
         mo.title = "Monitor history";
@@ -810,7 +810,7 @@
         mo.innerHTML = ICON_MONITOR;
         actions.appendChild(mo);
       }
-      var cv = document.createElement("button");
+      let cv = document.createElement("button");
       cv.type = "button";
       cv.className = "btn-icon gc-config-viewer-open gc-net-fw-selected__action-icon";
       cv.title = "View cached configuration";
@@ -821,7 +821,7 @@
       cv.innerHTML = ICON_CONFIG_VIEWER;
       actions.appendChild(cv);
       if (urls && urls.sync) {
-        var sy = document.createElement("button");
+        let sy = document.createElement("button");
         sy.type = "button";
         sy.className = "btn-icon gc-net-fw-selected__action-icon";
         sy.setAttribute("data-gc-nav-fw-sync", urls.sync);
@@ -832,7 +832,7 @@
         actions.appendChild(sy);
       }
       if (urls && urls.test) {
-        var te = document.createElement("button");
+        let te = document.createElement("button");
         te.type = "button";
         te.className = "btn-icon gc-net-fw-selected__action-icon";
         te.setAttribute("data-gc-nav-fw-test", urls.test);
@@ -844,7 +844,7 @@
       }
       rowHead.appendChild(actions);
       row.appendChild(rowHead);
-      var testMsg = document.createElement("span");
+      let testMsg = document.createElement("span");
       testMsg.className = "gc-net-fw-selected__test-msg";
       testMsg.hidden = true;
       testMsg.setAttribute("data-gc-nav-fw-test-out", String(id));
@@ -858,45 +858,45 @@
 
   function renderMsOptions() {
     optsRoot.innerHTML = "";
-    var tags = distinctOrderedTags(firewallInventory);
+    let tags = distinctOrderedTags(firewallInventory);
     if (tags.length > 0) {
-      var sec = document.createElement("div");
+      let sec = document.createElement("div");
       sec.className = "gc-top-bar-fw__section-label";
       sec.textContent = "Tags";
       optsRoot.appendChild(sec);
       tags.forEach(function (tag) {
-        var lab = document.createElement("label");
+        let lab = document.createElement("label");
         lab.className =
           "gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__tag-option";
-        var cb = document.createElement("input");
+        let cb = document.createElement("input");
         cb.type = "checkbox";
         cb.className = "gc-net-fw-tag-cb";
         cb.value = tag;
         cb.setAttribute("data-gc-fw-tag", tag);
         cb.addEventListener("change", onMsCheckboxChange);
-        var pill = document.createElement("span");
+        let pill = document.createElement("span");
         pill.className = "gc-hs-ip-host-flyout__fw-pill";
         pill.textContent = tag;
         lab.appendChild(cb);
         lab.appendChild(pill);
         optsRoot.appendChild(lab);
       });
-      var div = document.createElement("div");
+      let div = document.createElement("div");
       div.className = "gc-top-bar-fw__divider";
       div.setAttribute("role", "separator");
       optsRoot.appendChild(div);
     }
     if (configurationInventory.length > 0) {
-      var secCfg = document.createElement("div");
+      let secCfg = document.createElement("div");
       secCfg.className = "gc-top-bar-fw__section-label";
       secCfg.textContent = "Configurations";
       optsRoot.appendChild(secCfg);
       configurationInventory.forEach(function (it) {
-        var cid = it.id;
-        var label = String(it.label != null ? it.label : "").trim() || String(cid);
-        var rowWrap = document.createElement("div");
+        let cid = it.id;
+        let label = String(it.label != null ? it.label : "").trim() || String(cid);
+        let rowWrap = document.createElement("div");
         rowWrap.className = "gc-top-bar-fw__cfg-option-row";
-        var eyeBtn = document.createElement("button");
+        let eyeBtn = document.createElement("button");
         eyeBtn.type = "button";
         eyeBtn.className = "gc-top-bar-fw__cfg-exclusive";
         eyeBtn.setAttribute("data-gc-cfg-exclusive-toggle", String(cid));
@@ -906,19 +906,19 @@
           "Exclusive view: narrow data to this configuration (selections stay the same).";
         eyeBtn.innerHTML = ICON_EYE_EXCLUSIVE;
         rowWrap.appendChild(eyeBtn);
-        var lab = document.createElement("label");
+        let lab = document.createElement("label");
         lab.className =
           "gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__cfg-option";
-        var cb = document.createElement("input");
+        let cb = document.createElement("input");
         cb.type = "checkbox";
         cb.className = "gc-net-fw-cb gc-net-fw-cb--cfg";
         cb.value = "c:" + String(cid);
         cb.setAttribute("data-gc-cfg-id", String(cid));
         cb.setAttribute("data-gc-cfg-label", label);
         cb.addEventListener("change", onMsCheckboxChange);
-        var textWrap = document.createElement("span");
+        let textWrap = document.createElement("span");
         textWrap.className = "gc-hs-ip-host-flyout__hg-opt-text";
-        var nameEl = document.createElement("span");
+        let nameEl = document.createElement("span");
         nameEl.className = "gc-hs-ip-host-flyout__hg-opt-name mono";
         nameEl.textContent = label;
         textWrap.appendChild(nameEl);
@@ -930,24 +930,24 @@
     }
     if (firewallInventory.length > 0) {
       if (tags.length > 0 || configurationInventory.length > 0) {
-        var divFw = document.createElement("div");
+        let divFw = document.createElement("div");
         divFw.className = "gc-top-bar-fw__divider";
         divFw.setAttribute("role", "separator");
         optsRoot.appendChild(divFw);
       }
       if (tags.length > 0) {
-        var secFw = document.createElement("div");
+        let secFw = document.createElement("div");
         secFw.className = "gc-top-bar-fw__section-label";
         secFw.textContent = "Firewalls";
         optsRoot.appendChild(secFw);
       }
       firewallInventory.forEach(function (it) {
-        var id = it.id;
-        var label = String(it.label != null ? it.label : "").trim() || String(id);
-        var d = it.description != null ? String(it.description).trim() : "";
-        var lab = document.createElement("label");
+        let id = it.id;
+        let label = String(it.label != null ? it.label : "").trim() || String(id);
+        let d = it.description != null ? String(it.description).trim() : "";
+        let lab = document.createElement("label");
         lab.className = "gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__fw-option";
-        var cb = document.createElement("input");
+        let cb = document.createElement("input");
         cb.type = "checkbox";
         cb.className = "gc-net-fw-cb gc-net-fw-cb--fw";
         cb.value = "f:" + String(id);
@@ -955,9 +955,9 @@
         cb.setAttribute("data-gc-fw-label", label);
         if (d) cb.setAttribute("data-gc-fw-desc", d);
         cb.addEventListener("change", onMsCheckboxChange);
-        var textWrap = document.createElement("span");
+        let textWrap = document.createElement("span");
         textWrap.className = "gc-hs-ip-host-flyout__hg-opt-text";
-        var nameEl = document.createElement("span");
+        let nameEl = document.createElement("span");
         nameEl.className = "gc-hs-ip-host-flyout__hg-opt-name mono";
         nameEl.textContent = label;
         if (d) nameEl.title = d;
@@ -968,7 +968,7 @@
       });
     }
     if (emptyEl) {
-      var showEmpty =
+      let showEmpty =
         firewallInventory.length === 0 && configurationInventory.length === 0;
       emptyEl.hidden = !showEmpty;
       if (showEmpty) {
@@ -980,29 +980,29 @@
   }
 
   function restoreCheckboxesFromState(st) {
-    var wantFw = {};
+    let wantFw = {};
     (st.firewallIds || []).forEach(function (x) {
-      var n = parseInt(String(x), 10);
+      let n = parseInt(String(x), 10);
       if (!isNaN(n)) wantFw[String(n)] = true;
     });
-    var wantCfg = {};
+    let wantCfg = {};
     (st.configurationIds || []).forEach(function (x) {
-      var n = parseInt(String(x), 10);
+      let n = parseInt(String(x), 10);
       if (!isNaN(n)) wantCfg[String(n)] = true;
     });
-    var wantTag = {};
+    let wantTag = {};
     (st.tags || []).forEach(function (t) {
       wantTag[tagKey(t)] = true;
     });
     ms.querySelectorAll(".gc-net-fw-cb--fw").forEach(function (cb) {
-      var raw = String(cb.value || "");
-      var idStr =
+      let raw = String(cb.value || "");
+      let idStr =
         raw.indexOf("f:") === 0 ? raw.slice(2) : raw;
       cb.checked = !!wantFw[idStr];
     });
     ms.querySelectorAll(".gc-net-fw-cb--cfg").forEach(function (cb) {
-      var raw = String(cb.value || "");
-      var idStr = raw.indexOf("c:") === 0 ? raw.slice(2) : raw;
+      let raw = String(cb.value || "");
+      let idStr = raw.indexOf("c:") === 0 ? raw.slice(2) : raw;
       cb.checked = !!wantCfg[idStr];
     });
     ms.querySelectorAll(".gc-net-fw-tag-cb").forEach(function (cb) {
@@ -1017,19 +1017,19 @@
   }
 
   function runFwFilter() {
-    var q = norm(search ? search.value : "");
+    let q = norm(search ? search.value : "");
     ms.querySelectorAll(".gc-top-bar-fw__tag-option").forEach(function (lab) {
-      var cb = lab.querySelector("[data-gc-fw-tag]");
-      var tg = cb ? norm(cb.getAttribute("data-gc-fw-tag") || "") : "";
-      var match = !q || tg.indexOf(q) !== -1;
+      let cb = lab.querySelector("[data-gc-fw-tag]");
+      let tg = cb ? norm(cb.dataset.gcFwTag || "") : "";
+      let match = !q || tg.indexOf(q) !== -1;
       lab.style.display = match ? "" : "none";
     });
     ms.querySelectorAll(".gc-top-bar-fw__fw-option").forEach(function (lab) {
-      var cb = lab.querySelector("[data-gc-fw-id]");
-      var nm = cb ? norm(cb.getAttribute("data-gc-fw-label") || "") : "";
-      var ds = cb ? norm(cb.getAttribute("data-gc-fw-desc") || "") : "";
-      var idStr = cb ? norm(String(cb.getAttribute("data-gc-fw-id") || "")) : "";
-      var match =
+      let cb = lab.querySelector("[data-gc-fw-id]");
+      let nm = cb ? norm(cb.dataset.gcFwLabel || "") : "";
+      let ds = cb ? norm(cb.dataset.gcFwDesc || "") : "";
+      let idStr = cb ? norm(String(cb.dataset.gcFwId || "")) : "";
+      let match =
         !q ||
         nm.indexOf(q) !== -1 ||
         idStr.indexOf(q) !== -1 ||
@@ -1037,11 +1037,11 @@
       lab.style.display = match ? "" : "none";
     });
     ms.querySelectorAll(".gc-top-bar-fw__cfg-option-row").forEach(function (row) {
-      var lab = row.querySelector(".gc-top-bar-fw__cfg-option");
-      var cb = lab ? lab.querySelector("[data-gc-cfg-id]") : null;
-      var nm = cb ? norm(cb.getAttribute("data-gc-cfg-label") || "") : "";
-      var idStr = cb ? norm(String(cb.getAttribute("data-gc-cfg-id") || "")) : "";
-      var match = !q || nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1;
+      let lab = row.querySelector(".gc-top-bar-fw__cfg-option");
+      let cb = lab ? lab.querySelector("[data-gc-cfg-id]") : null;
+      let nm = cb ? norm(cb.dataset.gcCfgLabel || "") : "";
+      let idStr = cb ? norm(String(cb.dataset.gcCfgId || "")) : "";
+      let match = !q || nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1;
       row.style.display = match ? "" : "none";
     });
   }
@@ -1055,8 +1055,8 @@
     }
   }
 
-  var refreshTimer = null;
-  var slowRefreshTimer = null;
+  let refreshTimer = null;
+  let slowRefreshTimer = null;
 
   function scheduleInventoryRefresh() {
     if (!cfg.navRefreshUrl && !cfg.navConfigurationsUrl) return;
@@ -1078,7 +1078,7 @@
 
   function doInventoryRefresh() {
     if (!cfg || (!cfg.navRefreshUrl && !cfg.navConfigurationsUrl)) return;
-    var pFw = cfg.navRefreshUrl
+    let pFw = cfg.navRefreshUrl
       ? fetch(cfg.navRefreshUrl, {
           credentials: "same-origin",
           headers: {
@@ -1089,7 +1089,7 @@
           return r.ok ? r.json() : Promise.reject();
         })
       : Promise.resolve(null);
-    var pCfg = cfg.navConfigurationsUrl
+    let pCfg = cfg.navConfigurationsUrl
       ? fetch(cfg.navConfigurationsUrl, {
           credentials: "same-origin",
           headers: {
@@ -1117,13 +1117,13 @@
   }
 
   function applyNavInventories(fwRaw, cfgRaw) {
-    var st = {
+    let st = {
       v: 3,
       firewallIds: readExplicitFwIdsFromDom(),
       configurationIds: readExplicitConfigurationIdsFromDom(),
       tags: readExplicitTagsFromDom(),
     };
-    var rootNav = document.getElementById("gc-net-fw-multiselect");
+    let rootNav = document.getElementById("gc-net-fw-multiselect");
     if (
       st.firewallIds.length === 0 &&
       st.configurationIds.length === 0 &&
@@ -1133,24 +1133,24 @@
     ) {
       st = loadFilterState();
     }
-    var beforeEff = sortedFirewallIdStr(
+    let beforeEff = sortedFirewallIdStr(
       computeEffectiveIds(firewallInventory, st.firewallIds, st.tags),
     );
-    var beforeCfg = sortedFirewallIdStr(st.configurationIds || []);
+    let beforeCfg = sortedFirewallIdStr(st.configurationIds || []);
     if (fwRaw != null) {
-      var nextFw = normalizeInventoryRows(Array.isArray(fwRaw) ? fwRaw : []);
+      let nextFw = normalizeInventoryRows(Array.isArray(fwRaw) ? fwRaw : []);
       /* Empty refresh must not wipe inventory: tag-based scope needs per-firewall tags to resolve. */
       if (nextFw.length === 0 && firewallInventory.length > 0) {
         /* keep firewallInventory + gcNavFirewallsJson */
       } else {
         firewallInventory = nextFw;
         try {
-          window.gcNavFirewallsJson = firewallInventory;
+          globalThis.gcNavFirewallsJson = firewallInventory;
         } catch (e) {}
       }
     }
     if (cfgRaw != null) {
-      var nextCfg = normalizeConfigurationInventoryRows(
+      let nextCfg = normalizeConfigurationInventoryRows(
         Array.isArray(cfgRaw) ? cfgRaw : [],
       );
       if (nextCfg.length === 0 && configurationInventory.length > 0) {
@@ -1158,7 +1158,7 @@
       } else {
         configurationInventory = nextCfg;
         try {
-          window.gcNavConfigurationsJson = configurationInventory;
+          globalThis.gcNavConfigurationsJson = configurationInventory;
         } catch (e2) {}
       }
     }
@@ -1167,12 +1167,12 @@
     syncTriggerText();
     renderSelectedScopePanel();
     persist();
-    var afterEff = sortedFirewallIdStr(getSelectedFirewallIds());
-    var afterCfg = sortedFirewallIdStr(getSelectedConfigurationIds());
+    let afterEff = sortedFirewallIdStr(getSelectedFirewallIds());
+    let afterCfg = sortedFirewallIdStr(getSelectedConfigurationIds());
     if (beforeEff !== afterEff || beforeCfg !== afterCfg) emitChange();
   }
 
-  window.gcApplyNavFirewallsJson = function (data) {
+  globalThis.gcApplyNavFirewallsJson = function (data) {
     applyNavInventories(data, null);
   };
 
@@ -1203,36 +1203,36 @@
 
   if (ms) {
     ms.addEventListener("click", function (e) {
-      var t = e.target;
+      let t = e.target;
       if (!(t instanceof Element)) return;
-      var eye = t.closest("[data-gc-cfg-exclusive-toggle]");
+      let eye = t.closest("[data-gc-cfg-exclusive-toggle]");
       if (eye) {
         e.preventDefault();
         e.stopPropagation();
-        toggleExclusiveConfigurationId(eye.getAttribute("data-gc-cfg-exclusive-toggle"));
+        toggleExclusiveConfigurationId(eye.dataset.gcCfgExclusiveToggle);
       }
     });
   }
 
   if (selectedPanel) {
     selectedPanel.addEventListener("click", function (e) {
-      var t = e.target;
+      let t = e.target;
       if (!(t instanceof Element)) return;
-      var rmFw = t.closest("[data-gc-nav-fw-explicit-remove]");
+      let rmFw = t.closest("[data-gc-nav-fw-explicit-remove]");
       if (rmFw) {
         e.preventDefault();
         e.stopPropagation();
-        removeExplicitFirewallFromSelection(rmFw.getAttribute("data-gc-nav-fw-explicit-remove"));
+        removeExplicitFirewallFromSelection(rmFw.dataset.gcNavFwExplicitRemove);
         return;
       }
-      var syncBtn = t.closest("[data-gc-nav-fw-sync]");
+      let syncBtn = t.closest("[data-gc-nav-fw-sync]");
       if (syncBtn) {
         e.preventDefault();
         e.stopPropagation();
         runNavConfigSync(syncBtn);
         return;
       }
-      var testBtn = t.closest("[data-gc-nav-fw-test]");
+      let testBtn = t.closest("[data-gc-nav-fw-test]");
       if (testBtn) {
         e.preventDefault();
         e.stopPropagation();
@@ -1242,7 +1242,7 @@
   }
 
   document.addEventListener("click", function (e) {
-    var t = e.target;
+    let t = e.target;
     if (!(t instanceof Node) || !root.contains(t)) setOpen(false);
   });
 
@@ -1259,17 +1259,17 @@
     doInventoryRefresh();
   });
 
-  var fws = window.gcNavFirewallsJson;
+  let fws = globalThis.gcNavFirewallsJson;
   firewallInventory = normalizeInventoryRows(Array.isArray(fws) ? fws : []);
   try {
-    window.gcNavFirewallsJson = firewallInventory;
+    globalThis.gcNavFirewallsJson = firewallInventory;
   } catch (e2) {}
-  var cfgs0 = window.gcNavConfigurationsJson;
+  let cfgs0 = globalThis.gcNavConfigurationsJson;
   configurationInventory = normalizeConfigurationInventoryRows(
     Array.isArray(cfgs0) ? cfgs0 : [],
   );
   try {
-    window.gcNavConfigurationsJson = configurationInventory;
+    globalThis.gcNavConfigurationsJson = configurationInventory;
   } catch (e3) {}
   renderMsOptions();
   restoreCheckboxesFromState(loadFilterState());

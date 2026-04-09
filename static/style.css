@@ -4754,9 +4754,21 @@ a.btn-icon {
 
 .gc-combine-row-partial-scope-icon {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
   color: var(--accent, #1565c0);
   line-height: 0;
-  cursor: default;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.gc-combine-row-partial-scope-icon:hover {
+  background: rgba(21, 101, 192, 0.1);
 }
 
 .gc-combine-row-partial-scope-svg {
