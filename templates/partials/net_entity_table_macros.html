@@ -10,7 +10,7 @@
       </aside>
 {% endmacro %}
 
-{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true) %}
+{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true, secondary_btn_class="btn btn--secondary gc-net-entity-toolbar-secondary") %}
         <div class="table-wrap gc-net-if-table-wrap">
           <div class="firewalls-page__head">
             <h2>{{ title }}</h2>
@@ -116,7 +116,7 @@
                   </button>
                   {% endif %}
                   {% if secondary_btn_id and secondary_btn_label %}
-                  <button type="button" class="btn btn--secondary gc-net-entity-toolbar-secondary" id="{{ secondary_btn_id }}" disabled>
+                  <button type="button" class="{{ secondary_btn_class }}" id="{{ secondary_btn_id }}" disabled>
                     {{ secondary_btn_label }}
                   </button>
                   {% endif %}

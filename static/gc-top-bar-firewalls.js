@@ -300,8 +300,9 @@
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>';
   let ICON_SYNC =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
+  /* MDI hat-fedora — detective / “inspect” (Apache-2.0, pictogrammers.com) */
   let ICON_TEST =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>';
+    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.11,11.92C19.13,11.71 19.14,11.5 19.14,11.29C19.14,7.86 17.71,4.14 16.28,4.14C14.85,4.14 13.42,5.57 12,5.57C10.57,5.57 9.14,4.14 7.71,4.14C6.28,4.14 4.86,7.79 4.86,11.29C4.86,11.5 4.86,11.71 4.88,11.92C7.22,12.45 9.6,12.72 12,12.71C14.45,12.71 16.83,12.44 19.11,11.92M3.45,18.18C9,19.85 14.96,19.86 20.54,18.18C20.96,18.04 21.33,17.77 21.59,17.41C21.85,17.05 22,16.61 22,16.17C22,15.72 21.86,15.29 21.61,14.92C21.35,14.56 21,14.29 20.56,14.14C17.86,15 15,15.45 12,15.45C9,15.45 6.13,15 3.43,14.14C3,14.29 2.65,14.57 2.39,14.93C2.14,15.29 2,15.72 2,16.17C2,17.11 2.61,17.9 3.45,18.18Z"/></svg>';
   /* Lucide "wrench" (stroke reads clearly at 18px; fill="none" avoids muddy blob). */
   let ICON_INVENTORY_WRENCH =
     '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
@@ -450,6 +451,25 @@
         let success = _ref.ok && body.ok;
         out.textContent = body.message || (success ? "OK" : "Failed");
         out.className = "gc-net-fw-selected__test-msg " + (success ? "ok" : "err");
+        if (typeof body.inventory_online === "boolean") {
+          let on = body.inventory_online;
+          let pill = selectedPanelEl.querySelector('[data-gc-nav-fw-status="' + fwId + '"]');
+          if (pill) {
+            pill.classList.toggle("gc-firewall-pill-status--online", on);
+            pill.classList.toggle("gc-firewall-pill-status--offline", !on);
+            pill.textContent = on ? "\u2713" : "-";
+            pill.setAttribute("aria-label", on ? "Firewall online" : "Firewall offline");
+          }
+          for (let i = 0; i < firewallInventory.length; i++) {
+            if (String(firewallInventory[i].id) === String(fwId)) {
+              firewallInventory[i].online = on;
+              break;
+            }
+          }
+          try {
+            globalThis.gcNavFirewallsJson = firewallInventory;
+          } catch (eInv) {}
+        }
       })
       .catch(function () {
         if (out) {
@@ -772,11 +792,24 @@
         rm.innerHTML = ICON_CIRCLE_MINUS;
         rowHead.appendChild(rm);
       }
+      let online = !!(fw && fw.online);
+      let statusEl = document.createElement("span");
+      statusEl.className =
+        "gc-firewall-pill-status " +
+        (online ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline");
+      statusEl.setAttribute("role", "img");
+      statusEl.setAttribute("aria-label", online ? "Firewall online" : "Firewall offline");
+      statusEl.setAttribute("data-gc-nav-fw-status", String(id));
+      statusEl.textContent = online ? "\u2713" : "-";
       let nameEl = document.createElement("span");
       nameEl.className = "gc-net-fw-selected__name mono";
       nameEl.textContent = label;
       if (desc) nameEl.title = desc;
-      rowHead.appendChild(nameEl);
+      let labelCluster = document.createElement("span");
+      labelCluster.className = "gc-net-fw-selected__label-cluster";
+      labelCluster.appendChild(statusEl);
+      labelCluster.appendChild(nameEl);
+      rowHead.appendChild(labelCluster);
       let actions = document.createElement("div");
       actions.className = "gc-net-fw-selected__actions";
       if (urls && urls.webadmin) {
@@ -837,8 +870,8 @@
         te.className = "btn-icon gc-net-fw-selected__action-icon";
         te.setAttribute("data-gc-nav-fw-test", urls.test);
         te.setAttribute("data-gc-nav-fw-id", String(id));
-        te.title = "Test connection";
-        te.setAttribute("aria-label", "Test connection");
+        te.title = "Test API connection";
+        te.setAttribute("aria-label", "Test API connection");
         te.innerHTML = ICON_TEST;
         actions.appendChild(te);
       }

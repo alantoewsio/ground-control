@@ -1,0 +1,51 @@
+{# Netflow configuration flyout — server list editor (Configure Netflow / NetFlowConfiguration). #}
+<div id="gc-netflow-flyout" class="gc-if-flyout gc-netflow-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-netflow-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-netflow-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <div class="gc-if-flyout__panel-form">
+      <header class="gc-if-flyout__header">
+        <p id="gc-netflow-flyout-fw" class="gc-ips-cfg-flyout__fw muted"></p>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <form id="gc-netflow-flyout-form" class="gc-netflow-flyout__form" autocomplete="off" novalidate>
+          <h2 id="gc-netflow-flyout-title" class="gc-if-flyout__title">Netflow configuration</h2>
+          <p class="muted gc-netflow-flyout__hint">
+            Changes are queued to the task dock and sent as <strong>Configure Netflow</strong>. Sync
+            <strong>Netflow configuration</strong> from Inventory so rows appear here.
+          </p>
+          <div class="gc-netflow-servers-wrap">
+            <table class="data-table data-table--dense gc-netflow-servers-table" aria-label="Servers">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">IP or domain</th>
+                  <th scope="col">Port</th>
+                  <th scope="col" class="gc-netflow-servers-table__actions" aria-label="Remove row"></th>
+                </tr>
+              </thead>
+              <tbody id="gc-netflow-flyout-tbody"></tbody>
+            </table>
+          </div>
+        </form>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="button" class="btn btn--secondary" id="gc-netflow-flyout-cancel">Cancel</button>
+        <button type="submit" form="gc-netflow-flyout-form" class="btn primary" id="gc-netflow-flyout-save">
+          Queue save
+        </button>
+      </footer>
+    </div>
+  </div>
+</div>

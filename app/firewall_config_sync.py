@@ -30,6 +30,7 @@ from app.models import (
     FirewallConfigEntry,
     FirewallConfigSyncRun,
 )
+from app.netflow_configuration_merge import netflow_servers_from_payload
 from app.ref_countries import refresh_ref_countries_from_country_group_items
 from app.secrets_database import get_firewall_password_encrypted
 
@@ -68,6 +69,8 @@ ENTITY_SURFING_QUOTA_POLICY = "surfing_quota_policy"
 ENTITY_DATA_TRANSFER_POLICY = "data_transfer_policy"
 ENTITY_DECRYPTION_PROFILE = "decryption_profile"
 ENTITY_VPN_PROFILE = "vpn_profile"
+ENTITY_HA_CONFIGURE = "ha_configure"
+ENTITY_NETFLOW_CONFIGURATION = "netflow_configuration"
 
 _DEFAULT_SYNC_IDS = (ENTITY_INTERFACE, ENTITY_VLAN, ENTITY_ZONE)
 
@@ -112,6 +115,32 @@ def _spec_get(method: str) -> SophosFetch:
 def _spec_tag(xml_tag: str) -> SophosFetch:
     def _run(fw: SophosFirewall) -> Any:
         return fw.client.get_tag(xml_tag)
+
+    return _run
+
+
+def _spec_netflow_configuration_get() -> SophosFetch:
+    """
+    GET Netflow settings.
+
+    xml-api-docs use ``NetFlowConfiguration``; some firmware builds expect ``NetflowConfiguration``
+    in the request/response envelope. Try both so sync is not silently skipped (soft-fail) or empty.
+    """
+
+    def _run(fw: SophosFirewall) -> Any:
+        last_err: SophosFirewallAPIError | None = None
+        for tag in ("NetFlowConfiguration", "NetflowConfiguration"):
+            try:
+                return fw.client.get_tag(tag)
+            except SophosFirewallZeroRecords:
+                raise
+            except SophosFirewallAPIError as exc:
+                last_err = exc
+        if last_err is not None:
+            raise last_err
+        raise SophosFirewallAPIError(
+            "NetFlow configuration GET failed for all known XML tag spellings."
+        )
 
     return _run
 
@@ -438,6 +467,24 @@ _SYNC_ENTITY_SPECS: tuple[SyncEntitySpec, ...] = (
         "VPNProfile",
         _spec_tag("VPNProfile"),
     ),
+    # ``Response/HAConfigure`` per xml-api-docs/Configure/System_Services/HAConfigure.md
+    SyncEntitySpec(
+        ENTITY_HA_CONFIGURE,
+        "HA configuration",
+        "HAConfigure",
+        _spec_tag("HAConfigure"),
+        (),
+        singleton=True,
+    ),
+    # ``Response/NetFlowConfiguration`` per xml-api-docs/System/Administration/NetflowConfiguration.md
+    SyncEntitySpec(
+        ENTITY_NETFLOW_CONFIGURATION,
+        "Netflow configuration",
+        "NetFlowConfiguration",
+        _spec_netflow_configuration_get(),
+        (),
+        singleton=True,
+    ),
 )
 
 _SYNC_BY_ID: dict[str, SyncEntitySpec] = {s.id: s for s in _SYNC_ENTITY_SPECS}
@@ -464,6 +511,8 @@ _SOFT_FAIL_SYNC_IDS: frozenset[str] = frozenset(
         ENTITY_DATA_TRANSFER_POLICY,
         ENTITY_DECRYPTION_PROFILE,
         ENTITY_VPN_PROFILE,
+        ENTITY_HA_CONFIGURE,
+        ENTITY_NETFLOW_CONFIGURATION,
     }
 )
 
@@ -516,6 +565,32 @@ def _canonical_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
 
 
+def _netflow_sync_item_has_collectors(item: dict[str, Any]) -> bool:
+    """True when the parsed Netflow payload includes at least one non-empty collector (name or host)."""
+    for row in netflow_servers_from_payload(item):
+        if (row.get("ServerName") or "").strip() or (row.get("NetflowServer") or "").strip():
+            return True
+    return False
+
+
+def _coalesce_netflow_configuration_sync_items(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Normalize Netflow GET results so an empty appliance becomes one explicit ``{"Server": []}`` row.
+
+    After all collectors are removed, the API may raise "zero records", omit ``Server``, or return
+    placeholder ``Server`` rows with blank name/host. Any of those would otherwise fail to match the
+    cached non-empty JSON, leaving stale rows in ``firewall_config_entries``.
+    """
+    if not items:
+        return [{"Server": []}]
+    if len(items) == 1 and isinstance(items[0], dict):
+        if not _netflow_sync_item_has_collectors(items[0]):
+            return [{"Server": []}]
+    return items
+
+
 def _normalize_items(data: dict[str, Any] | None, response_key: str) -> list[dict[str, Any]]:
     if not isinstance(data, dict):
         return []
@@ -547,6 +622,8 @@ def _safe_fetch_items(
     try:
         data = spec.fetch(fw)
     except SophosFirewallZeroRecords:
+        if spec.id == ENTITY_NETFLOW_CONFIGURATION:
+            return _coalesce_netflow_configuration_sync_items([])
         return []
     except SophosFirewallAPIError:
         if spec.id in _SOFT_FAIL_SYNC_IDS:
@@ -556,7 +633,10 @@ def _safe_fetch_items(
         return _normalize_user_group_response(
             data if isinstance(data, dict) else None
         )
-    return _normalize_items(data, spec.response_key)
+    items = _normalize_items(data, spec.response_key)
+    if spec.id == ENTITY_NETFLOW_CONFIGURATION:
+        items = _coalesce_netflow_configuration_sync_items(items)
+    return items
 
 
 def _fetch_remote_payloads(

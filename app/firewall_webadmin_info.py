@@ -19,6 +19,7 @@ from app.url_helpers import (
     https_admin_url_for_firewall,
     https_admin_url_for_upstream_request,
 )
+from app.webadmin_sso_login import webadmin_follow_credential_login_if_needed_sync
 
 _ASSIGNMENT_RE = re.compile(
     r"^\s*(?:var\s+)?(?P<name>[A-Za-z_$][\w$.]*)\s*=\s*(?P<value>.+?)\s*;\s*$"
@@ -268,6 +269,18 @@ def collect_firewall_webadmin_device_info(
             timeout=timeout_obj,
         ) as client:
             client.get(f"{connect_base}/", headers=common_headers)
+            login_jsp = f"{connect_base}/webconsole/webpages/login.jsp"
+            lr = client.get(
+                login_jsp,
+                headers={**common_headers, "Referer": f"{connect_base}/"},
+            )
+            webadmin_follow_credential_login_if_needed_sync(
+                client,
+                connect_base,
+                common_headers,
+                lr.text or "",
+                login_jsp_referer=login_jsp,
+            )
             login_resp = client.post(
                 f"{connect_base}/webconsole/Controller",
                 headers={

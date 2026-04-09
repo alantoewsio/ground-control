@@ -33,6 +33,7 @@ from app.webadmin_proxy_rewrite import (
     rewrite_javascript_for_proxy,
     should_attempt_rewrite,
 )
+from app.webadmin_sso_login import webadmin_follow_credential_login_if_needed_async
 
 _HOP_BY_HOP = frozenset(
     {
@@ -530,6 +531,20 @@ async def try_auto_login_webadmin(
             timeout=timeout,
         ) as client:
             r0 = await client.get(f"{upstream_base}/", headers=common_headers)
+            await r0.aread()
+            login_jsp_url = f"{upstream_base}/webconsole/webpages/login.jsp"
+            r_login = await client.get(
+                login_jsp_url,
+                headers={**common_headers, "Referer": f"{upstream_base}/"},
+            )
+            login_html = (await r_login.aread()).decode("utf-8", errors="replace")
+            r_cred = await webadmin_follow_credential_login_if_needed_async(
+                client,
+                upstream_base,
+                common_headers,
+                login_html,
+                login_jsp_referer=login_jsp_url,
+            )
             r1 = await client.post(
                 f"{upstream_base}/webconsole/Controller",
                 headers={
@@ -577,7 +592,9 @@ async def try_auto_login_webadmin(
 
             # Apply upstream cookies to browser with proxied path/domain.
             cookie_values: list[str] = []
-            for src in (r0, r1, r2):
+            for src in (r0, r_login, r_cred, r1, r2):
+                if src is None:
+                    continue
                 for k, v in src.headers.multi_items():
                     if k.lower() == "set-cookie":
                         cookie_values.append(v)

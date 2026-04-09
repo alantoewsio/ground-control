@@ -8,6 +8,8 @@ from pathlib import Path
 
 RUN_SECRETS_DIR = Path("/run/secrets")
 
+DOCKER_POSTGRES_PASSWORD_SECRET_NAME = "ground_control_postgres_password"
+
 DOCKER_TLS_HOSTNAMES_DEFAULT = "gc.local\nlocalhost\n127.0.0.1"
 
 # Written by the launcher Let's Encrypt panel; hydrated like other secrets but not shown in the core list.
@@ -148,6 +150,14 @@ def _read_secret_file(path: Path) -> str | None:
     if not text.strip():
         return None
     return text
+
+
+def docker_postgres_password_value() -> str | None:
+    """Password for Docker Postgres URLs: env first, then ``/run/secrets`` (same content compose mounts)."""
+    raw = (os.environ.get("GROUND_CONTROL_POSTGRES_PASSWORD") or "").strip()
+    if raw:
+        return raw
+    return _read_secret_file(RUN_SECRETS_DIR / DOCKER_POSTGRES_PASSWORD_SECRET_NAME)
 
 
 def hydrate_docker_secrets_into_environ() -> None:

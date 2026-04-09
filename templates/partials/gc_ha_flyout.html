@@ -1,0 +1,225 @@
+{# HA configuration flyout — layout aligned with Sophos “High availability configuration” (readonly; data from HAConfigure sync). #}
+<div id="gc-ha-flyout" class="gc-if-flyout gc-ha-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" aria-hidden="true"></div>
+  <div
+    class="gc-if-flyout__panel gc-ha-flyout__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-ha-flyout-title"
+    tabindex="-1"
+  >
+    <div
+      class="gc-if-flyout__resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+    ></div>
+    <div class="gc-if-flyout__panel-form">
+      <header class="gc-if-flyout__header">
+        <p id="gc-ha-flyout-fw" class="gc-ips-cfg-flyout__fw muted"></p>
+      </header>
+      <div class="gc-if-flyout__scroll">
+        <div id="gc-ha-flyout-empty" class="gc-ha-flyout__empty muted" hidden>
+          <p>
+            No HA configuration in the cache for this firewall. Run a configuration sync that includes
+            <strong>HA configuration</strong> (Inventory).
+          </p>
+        </div>
+
+        <form id="gc-ha-flyout-form" class="gc-ha-form" autocomplete="off" novalidate hidden>
+          <h2 id="gc-ha-flyout-title" class="gc-ha-form__page-title">High availability configuration</h2>
+
+          <div id="gc-ha-flags-banner" class="gc-ha-form__flags" hidden aria-live="polite"></div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--stack">
+            <div class="gc-ha-form__label">
+              <span class="gc-ha-form__req" aria-hidden="true">*</span> Initial device role
+            </div>
+            <div class="gc-ha-form__control">
+              <fieldset class="gc-ha-form__fieldset" id="gc-ha-fieldset-role">
+                <label class="gc-ha-form__radio">
+                  <input type="radio" name="gc-ha-device-role" value="Active_Passive" disabled />
+                  <span>Primary (active-passive)</span>
+                </label>
+                <label class="gc-ha-form__radio">
+                  <input type="radio" name="gc-ha-device-role" value="Auxilliary" disabled />
+                  <span>Auxiliary</span>
+                </label>
+                <label class="gc-ha-form__radio">
+                  <input type="radio" name="gc-ha-device-role" value="Active_Active" disabled />
+                  <span>Primary (active-active)</span>
+                </label>
+              </fieldset>
+              <p id="gc-ha-role-hint-ap" class="gc-ha-form__hint gc-ha-form__hint--warn" hidden>
+                <span class="gc-ha-form__hint-icon" aria-hidden="true">⚠</span>
+                The licenses of the device you configure initially as the primary device apply to the whole cluster. Make
+                sure this device has the licenses you want.
+              </p>
+              <p id="gc-ha-role-hint-aux" class="gc-ha-form__hint gc-ha-form__hint--warn" hidden>
+                <span class="gc-ha-form__hint-icon" aria-hidden="true">⚠</span>
+                Active-Passive: Licenses of the primary device apply to the cluster. Active-Active: Both devices must
+                have the same licenses.
+              </p>
+              <p id="gc-ha-role-hint-aa" class="gc-ha-form__hint gc-ha-form__hint--warn" hidden>
+                <span class="gc-ha-form__hint-icon" aria-hidden="true">⚠</span>
+                Both devices must have the same licenses.
+              </p>
+              <p id="gc-ha-role-hint-aa-cell" class="gc-ha-form__hint gc-ha-form__hint--danger" hidden>
+                You can’t configure active-active HA if you turn on cellular WAN or set IP assignment to DHCP, Delegated,
+                or PPPoE on any interface.
+              </p>
+            </div>
+          </div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--stack">
+            <div class="gc-ha-form__label">
+              <span class="gc-ha-form__req" aria-hidden="true">*</span> HA configuration mode
+            </div>
+            <div class="gc-ha-form__control">
+              <fieldset class="gc-ha-form__fieldset" id="gc-ha-fieldset-mode">
+                <label class="gc-ha-form__radio">
+                  <input type="radio" name="gc-ha-cfg-mode" value="quick" disabled />
+                  <span>QuickHA mode</span>
+                </label>
+                <label class="gc-ha-form__radio">
+                  <input type="radio" name="gc-ha-cfg-mode" value="interactive" disabled />
+                  <span>Interactive mode</span>
+                </label>
+              </fieldset>
+            </div>
+          </div>
+
+          <div id="gc-ha-row-cluster" class="gc-ha-form__row">
+            <label class="gc-ha-form__label" for="gc-ha-cluster-id">
+              <span class="gc-ha-form__req" aria-hidden="true">*</span> Cluster ID
+            </label>
+            <div class="gc-ha-form__control gc-ha-form__control--cluster">
+              <input type="text" id="gc-ha-cluster-id" class="gc-ha-form__input gc-ha-form__input--narrow mono" readonly />
+              <span class="gc-ha-form__range-hint muted">(0–63)</span>
+            </div>
+          </div>
+
+          <div class="gc-ha-form__row">
+            <label class="gc-ha-form__label" for="gc-ha-node-name">
+              <span class="gc-ha-form__req" aria-hidden="true">*</span> Node name
+            </label>
+            <input type="text" id="gc-ha-node-name" class="gc-ha-form__input gc-ha-form__input--grow mono" readonly />
+          </div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--pass">
+            <label class="gc-ha-form__label" for="gc-ha-passphrase">
+              <span class="gc-ha-form__req" aria-hidden="true">*</span> Passphrase
+            </label>
+            <div class="gc-ha-form__control gc-ha-form__control--pass">
+              <input
+                type="password"
+                id="gc-ha-passphrase"
+                class="gc-ha-form__input gc-ha-form__input--grow mono"
+                readonly
+                autocomplete="new-password"
+              />
+              <button type="button" class="link-btn gc-ha-form__copy-btn" id="gc-ha-pass-copy">Copy</button>
+            </div>
+          </div>
+          <p class="gc-ha-form__help gc-ha-form__help--indented muted">Enter the same passphrase in both HA devices.</p>
+
+          <div class="gc-ha-form__row">
+            <label class="gc-ha-form__label" for="gc-ha-dedicated-link">
+              <span class="gc-ha-form__req" aria-hidden="true">*</span> Dedicated HA link
+            </label>
+            <div class="gc-ha-form__control gc-ha-form__control--grow">
+              <input type="text" id="gc-ha-dedicated-link" class="gc-ha-form__input gc-ha-form__input--grow mono" readonly />
+              <p id="gc-ha-dedicated-link-as-link" class="gc-ha-form__iface-link-wrap" hidden></p>
+            </div>
+          </div>
+          <p class="gc-ha-form__help gc-ha-form__help--indented muted">
+            Supported interfaces: Physical, LAG, VLAN, or unbound interfaces (see firewall documentation).
+          </p>
+
+          <div class="gc-ha-form__row">
+            <label class="gc-ha-form__label" for="gc-ha-peer-ipv4">Dedicated peer HA link IPv4 address</label>
+            <input type="text" id="gc-ha-peer-ipv4" class="gc-ha-form__input gc-ha-form__input--grow mono" readonly />
+          </div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--stack">
+            <div class="gc-ha-form__label">Select ports to be monitored</div>
+            <div class="gc-ha-form__control">
+              <div id="gc-ha-monitor-box" class="gc-ha-form__list-box">
+                <div id="gc-ha-monitor-pills" class="gc-ha-form__list-inner gc-hw-pill-row"></div>
+                <p id="gc-ha-monitor-empty" class="gc-ha-form__list-placeholder muted">No ports listed in sync data.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--stack">
+            <div class="gc-ha-form__label">Peer administration settings</div>
+            <div class="gc-ha-form__control">
+              <p class="gc-ha-form__help muted gc-ha-form__help--peer">
+                Make sure the peer administration port’s IP address is different for each HA device and within the same
+                subnet.
+              </p>
+              <div class="gc-ha-form__table-wrap">
+                <table class="data-table data-table--dense gc-ha-form__peer-table" aria-label="Peer administration">
+                  <thead>
+                    <tr>
+                      <th scope="col">Interface</th>
+                      <th scope="col">IPv4 address</th>
+                      <th scope="col">IPv6 address</th>
+                      <th scope="col">Reserve bridge port</th>
+                    </tr>
+                  </thead>
+                  <tbody id="gc-ha-peer-tbody"></tbody>
+                </table>
+                <p id="gc-ha-peer-empty" class="muted gc-ha-form__peer-empty" hidden>No peer administration rows in sync data.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="gc-ha-form__row">
+            <label class="gc-ha-form__label" for="gc-ha-preferred-primary">Preferred primary device</label>
+            <input
+              type="text"
+              id="gc-ha-preferred-primary"
+              class="gc-ha-form__input gc-ha-form__input--grow"
+              readonly
+            />
+          </div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--stack">
+            <div class="gc-ha-form__label">Keepalive request interval</div>
+            <div class="gc-ha-form__control gc-ha-form__inline-sent">
+              Send a request every
+              <input type="text" id="gc-ha-keepalive-ms" class="gc-ha-form__inline-num mono" readonly />
+              milliseconds <span class="muted">(250–500)</span>
+            </div>
+          </div>
+
+          <div class="gc-ha-form__row gc-ha-form__row--stack">
+            <div class="gc-ha-form__label">Keepalive attempts</div>
+            <div class="gc-ha-form__control gc-ha-form__inline-sent">
+              Make
+              <input type="text" id="gc-ha-keepalive-att" class="gc-ha-form__inline-num mono" readonly />
+              attempts before determining it as device failure <span class="muted">(16–24)</span>
+            </div>
+          </div>
+
+          <div class="gc-ha-form__row">
+            <div class="gc-ha-form__label"></div>
+            <label class="gc-ha-form__check">
+              <input type="checkbox" id="gc-ha-hypervisor-mac" disabled />
+              <span>Use host or hypervisor-assigned MAC address</span>
+            </label>
+          </div>
+
+          <details class="gc-ha-flyout__raw">
+            <summary>Raw sync payload (JSON)</summary>
+            <pre id="gc-ha-raw-pre" class="gc-ha-flyout__pre mono"></pre>
+          </details>
+        </form>
+      </div>
+      <footer class="gc-if-flyout__footer">
+        <button type="button" class="btn btn--secondary" id="gc-ha-flyout-close">Close</button>
+      </footer>
+    </div>
+  </div>
+</div>

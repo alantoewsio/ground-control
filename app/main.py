@@ -43,7 +43,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, tuple_
+from sqlalchemy import and_, func, select, tuple_
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -80,9 +80,11 @@ from app.access_history import (
     create_access_log,
     get_or_create_webadmin_session_id,
     has_webadmin_session_id,
+    mark_webadmin_proxied_start_logged,
     pop_webadmin_session_id,
     request_actor,
     request_client_ip,
+    should_log_webadmin_proxied_start,
 )
 from app.access_launch_tokens import (
     TOKEN_QUERY_PARAM,
@@ -232,6 +234,8 @@ from app.ips_policy_constants import (
     IPS_POLICY_TARGETS,
 )
 from app.ips_policy_table import build_ips_policy_table_payload
+from app.ha_configure_table import build_ha_configure_table_payload
+from app.netflow_configuration_table import build_netflow_configuration_table_payload
 from app.ips_switch import build_ips_switch_table_payload
 from app.ips_trusted_mac_table import build_ips_trusted_mac_table_payload
 from app.models import (
@@ -246,7 +250,11 @@ from app.models import (
     TaskQueue,
 )
 from app.monitor_database import get_monitor_db, init_monitor_db
-from app.monitor_scheduler import start_monitor_scheduler, stop_monitor_scheduler
+from app.monitor_scheduler import (
+    run_immediate_firewall_webadmin_probe,
+    start_monitor_scheduler,
+    stop_monitor_scheduler,
+)
 from app.monitor_series import get_connectivity_series
 from app.profiles_entities_table import (
     build_access_time_policy_table_payload,
@@ -269,7 +277,7 @@ from app.secrets_database import (
     upsert_firewall_password_encrypted,
 )
 from app.secrets_models import DEFAULT_ADMIN_USERNAME, AppUser
-from app.sophos_connect import test_connection
+from app.sophos_connect import test_connection_with_monitor_probe_hint
 from app.task_queue_service import (
     BridgePairCreateCacheConflictError,
     LagCreateCacheConflictError,
@@ -315,6 +323,8 @@ from app.task_queue_service import (
     enqueue_ips_trusted_mac_update,
     enqueue_lag_create,
     enqueue_lag_update,
+    enqueue_netflow_configuration_clear_batch,
+    enqueue_netflow_configuration_update,
     enqueue_network_entity_deletes_batch,
     enqueue_profile_entity_create_batch,
     enqueue_profile_entity_deletes_batch,
@@ -535,13 +545,13 @@ def nav_firewalls_multiselect_json(
             "online": online,
         }
         if request is not None:
+            # Always use /webadmin/launch and /ssh/launch so clicks get a fresh
+            # gc_launch token (same as firewalls inventory template helpers).
             entry["urls"] = {
-                "webadmin": webadmin_entry_url(
-                    request, firewall_id=f.id, host=f.host, port=f.port
+                "webadmin": str(
+                    request.url_for("firewall_webadmin_launch", firewall_id=f.id)
                 ),
-                "ssh": str(
-                    request.url_for("firewall_ssh_terminal_page", firewall_id=f.id)
-                ),
+                "ssh": str(request.url_for("firewall_ssh_launch", firewall_id=f.id)),
                 "monitor": str(
                     request.url_for("firewall_monitor_page", firewall_id=f.id)
                 ),
@@ -629,6 +639,41 @@ def _firewall_cached_sync_entity_map(
         if fid in buckets and et:
             buckets[fid].add(et)
     return {fid: sorted(types) for fid, types in buckets.items()}
+
+
+def _firewall_last_sync_error_by_id(
+    db: Session, firewall_ids: list[int]
+) -> dict[int, str]:
+    """``firewall_id`` → error text when the latest *finished* config sync run has ``status == error``."""
+    if not firewall_ids:
+        return {}
+    sub = (
+        select(
+            FirewallConfigSyncRun.firewall_id.label("fid"),
+            func.max(FirewallConfigSyncRun.finished_at).label("mx"),
+        )
+        .where(
+            FirewallConfigSyncRun.firewall_id.in_(firewall_ids),
+            FirewallConfigSyncRun.finished_at.is_not(None),
+        )
+        .group_by(FirewallConfigSyncRun.firewall_id)
+    ).subquery()
+    rows = db.execute(
+        select(FirewallConfigSyncRun).join(
+            sub,
+            and_(
+                FirewallConfigSyncRun.firewall_id == sub.c.fid,
+                FirewallConfigSyncRun.finished_at == sub.c.mx,
+            ),
+        )
+    ).scalars().all()
+    out: dict[int, str] = {}
+    for r in rows:
+        if r.status != "error":
+            continue
+        msg = (r.error_message or "").strip() or "Configuration sync failed."
+        out[int(r.firewall_id)] = msg
+    return out
 
 
 def _distinct_firewall_tag_suggestions(firewalls: list[Firewall]) -> list[str]:
@@ -854,6 +899,17 @@ class EnqueueDosSettingsUpdateBody(BaseModel):
 class EnqueueSpoofPreventionUpdateBody(BaseModel):
     firewall_id: int = Field(..., gt=0)
     settings: dict[str, Any] = Field(default_factory=dict)
+
+
+class EnqueueNetflowConfigurationUpdateBody(BaseModel):
+    firewall_id: int = Field(..., gt=0)
+    servers: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class EnqueueNetflowConfigurationClearBatchBody(BaseModel):
+    firewall_ids: list[int] = Field(
+        ..., min_length=1, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
 
 
 class EnqueueInterfaceUpdateBody(BaseModel):
@@ -1981,6 +2037,26 @@ def dashboard(
     )
 
 
+@app.get("/designer", response_class=HTMLResponse, name="designer_page")
+def designer_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Static UI reference for complex controls (navigation, tables, flyouts, modals)."""
+    return templates.TemplateResponse(
+        request,
+        "designer.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **template_nav_firewall_context(request, sdb, db),
+            "top_nav_active": "designer",
+        },
+    )
+
+
 def _address_management_template_context(
     request: Request, sdb, db, ipam_page: str
 ) -> dict:
@@ -2380,6 +2456,7 @@ def firewalls_page(
     fw_ids = [f.id for f in firewalls]
     fw_online_map = {int(f.id): firewall_is_online(f) for f in firewalls}
     fw_cached_sync_entities = _firewall_cached_sync_entity_map(db, fw_ids)
+    fw_last_sync_error = _firewall_last_sync_error_by_id(db, fw_ids)
     tab_norm = (tab or "").strip().lower()
     inventory_tab = "configurations" if tab_norm == "configurations" else "firewalls"
     configurations = (
@@ -2404,6 +2481,7 @@ def firewalls_page(
             "firewalls": firewalls,
             "fw_online_map": fw_online_map,
             "fw_cached_sync_entities": fw_cached_sync_entities,
+            "fw_last_sync_error": fw_last_sync_error,
             "inventory_tab": inventory_tab,
             "top_nav_active": "firewalls",
             "configurations": configurations,
@@ -4199,6 +4277,54 @@ def firewalls_protect_web_page(
     )
 
 
+@app.get("/firewalls/configure/system-services", response_class=HTMLResponse)
+def firewalls_configure_system_services_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    return templates.TemplateResponse(
+        request,
+        "firewalls_system_services.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **template_nav_firewall_context(request, sdb, db),
+            "url_api_ha_configure_table": str(
+                request.url_for("api_firewalls_ha_configure_table")
+            ),
+        },
+    )
+
+
+@app.get("/firewalls/system/administration", response_class=HTMLResponse)
+def firewalls_system_administration_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    return templates.TemplateResponse(
+        request,
+        "firewalls_administration.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **template_nav_firewall_context(request, sdb, db),
+            "url_api_netflow_configuration_table": str(
+                request.url_for("api_firewalls_netflow_configuration_table")
+            ),
+            "url_api_task_queue_enqueue_netflow_configuration_update": str(
+                request.url_for("api_task_queue_enqueue_netflow_configuration_update")
+            ),
+            "url_api_task_queue_enqueue_netflow_configuration_clear_batch": str(
+                request.url_for("api_task_queue_enqueue_netflow_configuration_clear_batch")
+            ),
+        },
+    )
+
+
 @app.get("/firewalls/configure/authentication", response_class=HTMLResponse)
 def firewalls_configure_authentication_page(
     request: Request,
@@ -5218,6 +5344,51 @@ def api_task_queue_enqueue_spoof_prevention_update(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, "task_id": task.id if task else None}
+
+
+@app.post(
+    "/api/task-queue/enqueue-netflow-configuration-update",
+    name="api_task_queue_enqueue_netflow_configuration_update",
+)
+def api_task_queue_enqueue_netflow_configuration_update(
+    body: EnqueueNetflowConfigurationUpdateBody,
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Queue Configure Netflow (``NetFlowConfiguration``) from edited server rows."""
+    try:
+        task = enqueue_netflow_configuration_update(
+            db,
+            firewall_id=body.firewall_id,
+            server_rows=body.servers,
+            created_by_user_id=uid,
+            created_by_username=users_service.username_for_user_id(uid),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "task_id": task.id if task else None}
+
+
+@app.post(
+    "/api/task-queue/enqueue-netflow-configuration-clear-batch",
+    name="api_task_queue_enqueue_netflow_configuration_clear_batch",
+)
+def api_task_queue_enqueue_netflow_configuration_clear_batch(
+    body: EnqueueNetflowConfigurationClearBatchBody,
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Queue clearing all Netflow servers on the selected firewalls."""
+    try:
+        tasks = enqueue_netflow_configuration_clear_batch(
+            db,
+            firewall_ids=body.firewall_ids,
+            created_by_user_id=uid,
+            created_by_username=users_service.username_for_user_id(uid),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "task_ids": [t.id for t in tasks], "count": len(tasks)}
 
 
 @app.post(
@@ -6337,6 +6508,38 @@ def api_firewalls_firewall_rules_table(
     """Cached firewall rules (sync ``firewall_rule`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_firewall_rule_table_payload(db, ids)
+
+
+@app.get(
+    "/api/firewalls/configure/system-services/ha-table",
+    name="api_firewalls_ha_configure_table",
+)
+def api_firewalls_ha_configure_table(
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+):
+    """Cached HA configuration (sync ``ha_configure`` from Inventory)."""
+    ids = _parse_firewall_ids_query(firewall_ids)
+    return build_ha_configure_table_payload(db, ids)
+
+
+@app.get(
+    "/api/firewalls/system/administration/netflow-table",
+    name="api_firewalls_netflow_configuration_table",
+)
+def api_firewalls_netflow_configuration_table(
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+):
+    """Selected firewalls with Netflow table rows (cached config when synced; otherwise empty)."""
+    ids = _parse_firewall_ids_query(firewall_ids)
+    return build_netflow_configuration_table_payload(db, ids)
 
 
 @app.get(
@@ -7541,6 +7744,10 @@ async def firewall_webadmin_proxy(
         )
         if not ok:
             raise HTTPException(status_code=403, detail=err or "Invalid launch token.")
+        # Opening the proxy gate here is required for browser SSO / manual login: the launch
+        # token is single-use and entry GET does not request index.jsp, so waiting until
+        # ``_is_webadmin_connected_response`` would leave every subsequent path as 403.
+        get_or_create_webadmin_session_id(request, firewall_id)
     # On entry route, attempt server-side login with stored credentials so users
     # land directly on the dashboard without the WebAdmin login form.
     if request.method.upper() == "GET" and _is_webadmin_entry_path(full_path):
@@ -7558,31 +7765,29 @@ async def firewall_webadmin_proxy(
                     password=dec,
                 )
                 if auto is not None:
-                    if not has_webadmin_session_id(request, firewall_id):
-                        sid = get_or_create_webadmin_session_id(request, firewall_id)
-                        uid, uname = request_actor(request)
-                        create_access_log(
-                            db,
-                            session_id=sid,
-                            firewall_id=row.id,
-                            access_type="webadmin",
-                            event_kind="start",
-                            connected_successfully=True,
-                            initiated_by_user_id=uid,
-                            initiated_by_username=uname,
-                            client_ip=request_client_ip(request),
-                            details="auto-login",
-                        )
+                    sid = get_or_create_webadmin_session_id(request, firewall_id)
+                    uid, uname = request_actor(request)
+                    create_access_log(
+                        db,
+                        session_id=sid,
+                        firewall_id=row.id,
+                        access_type="webadmin",
+                        event_kind="start",
+                        connected_successfully=True,
+                        initiated_by_user_id=uid,
+                        initiated_by_username=uname,
+                        client_ip=request_client_ip(request),
+                        details="auto-login",
+                    )
+                    mark_webadmin_proxied_start_logged(request, firewall_id)
                     return auto
     proxied = await stream_firewall_webadmin(request, row, full_path)
 
-    if not has_webadmin_session_id(
-        request, firewall_id
-    ) and _is_webadmin_connected_response(
+    if _is_webadmin_connected_response(
         method=request.method,
         full_path=full_path,
         status_code=int(proxied.status_code or 0),
-    ):
+    ) and should_log_webadmin_proxied_start(request, firewall_id):
         sid = get_or_create_webadmin_session_id(request, firewall_id)
         uid, uname = request_actor(request)
         create_access_log(
@@ -7597,6 +7802,7 @@ async def firewall_webadmin_proxy(
             client_ip=request_client_ip(request),
             details="proxied-login",
         )
+        mark_webadmin_proxied_start_logged(request, firewall_id)
 
     if _is_webadmin_logout_request(method=request.method, full_path=full_path):
         sid_end = pop_webadmin_session_id(request, firewall_id)
@@ -8198,7 +8404,14 @@ def test_firewall(
                 "message": "Simulated connection failure (test firewall).",
             }
         latency = random.randint(20, 200)
-        return {"ok": True, "message": f"Connected (simulated) in {latency} ms."}
+        out: dict[str, object] = {
+            "ok": True,
+            "message": f"Connected (simulated) in {latency} ms.",
+        }
+        tcp = run_immediate_firewall_webadmin_probe(firewall_id)
+        if tcp is not None:
+            out["inventory_online"] = tcp
+        return out
     enc = get_firewall_password_encrypted(sdb, firewall_id)
     if not enc:
         return JSONResponse(
@@ -8213,7 +8426,7 @@ def test_firewall(
             content={"ok": False, "message": str(exc)},
         )
     api_to = normalize_firewall_api_timeout_seconds(row.api_request_timeout_seconds)
-    ok, message = test_connection(
+    ok, message, run_probe = test_connection_with_monitor_probe_hint(
         host=row.host,
         port=row.port,
         username=row.username,
@@ -8221,7 +8434,12 @@ def test_firewall(
         verify_ssl=row.verify_ssl,
         request_timeout_seconds=api_to,
     )
-    return {"ok": ok, "message": message}
+    payload: dict[str, object] = {"ok": ok, "message": message}
+    if run_probe:
+        inv = run_immediate_firewall_webadmin_probe(firewall_id)
+        if inv is not None:
+            payload["inventory_online"] = inv
+    return payload
 
 
 @app.delete("/firewalls/{firewall_id}")

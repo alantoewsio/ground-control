@@ -7,8 +7,10 @@ from starlette.requests import Request
 from app.access_history import (
     create_access_log,
     get_or_create_webadmin_session_id,
+    mark_webadmin_proxied_start_logged,
     pop_webadmin_session_id,
     request_client_ip,
+    should_log_webadmin_proxied_start,
 )
 from app.models import AccessSessionLog, Base, Firewall
 
@@ -35,6 +37,16 @@ def test_webadmin_session_id_create_and_pop_roundtrip():
     popped = pop_webadmin_session_id(req, 105)
     assert popped == sid
     assert pop_webadmin_session_id(req, 105) is None
+
+
+def test_webadmin_proxied_login_audit_roundtrip():
+    req = _request_with_session()
+    assert should_log_webadmin_proxied_start(req, 7) is True
+    mark_webadmin_proxied_start_logged(req, 7)
+    assert should_log_webadmin_proxied_start(req, 7) is False
+    get_or_create_webadmin_session_id(req, 7)
+    pop_webadmin_session_id(req, 7)
+    assert should_log_webadmin_proxied_start(req, 7) is True
 
 
 def test_request_client_ip_prefers_x_forwarded_for():

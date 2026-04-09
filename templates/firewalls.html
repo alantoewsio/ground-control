@@ -138,6 +138,16 @@
         </div>
       </div>
     </dialog>
+    <dialog class="modal" id="gc-fw-tags-view-dialog" aria-labelledby="gc-fw-tags-view-dialog-title">
+      <div class="form modal-form">
+        <h3 id="gc-fw-tags-view-dialog-title" class="modal-title">Tags</h3>
+        <p id="gc-fw-tags-view-dialog-lead" class="muted"></p>
+        <ul id="gc-fw-tags-view-dialog-list" class="gc-fw-tags-view-dialog__list"></ul>
+        <div class="modal-actions">
+          <button type="button" class="btn primary" id="gc-fw-tags-view-dialog-close">Close</button>
+        </div>
+      </div>
+    </dialog>
     <dialog class="modal" id="gc-fw-tags-dialog" aria-labelledby="gc-fw-tags-dialog-title">
       <div class="form modal-form">
         <h3 id="gc-fw-tags-dialog-title" class="modal-title">Set tags on selected firewalls</h3>
@@ -321,6 +331,7 @@
                   <th class="th-check" scope="col">
                     <input type="checkbox" id="gc-fw-select-all" title="Select all" aria-label="Select all visible firewalls" />
                   </th>
+                  <th class="th-fw-sync-err" scope="col" aria-label="Configuration sync error indicator"></th>
                   <th scope="col" data-gc-col="name">Name</th>
                   <th scope="col" data-gc-col="description">Description</th>
                   <th scope="col" data-gc-col="host">Host</th>
@@ -343,6 +354,7 @@
                 {% set fw_tags = fw.tags_list() %}
                 {% set fw_tags_sorted = fw.tags_sorted() %}
                 {% set fw_tags_search = (fw_tags | join(' ')) | lower %}
+                {% set sync_err = (fw_last_sync_error or {}).get(fw.id) %}
                 <tr
                   class="gc-fw-data-row gc-fw-row--clickable"
                   data-fw-id="{{ fw.id }}"
@@ -385,6 +397,18 @@
                   <td class="td-check" data-select-stop="1">
                     <input type="checkbox" class="gc-fw-row-select" value="{{ fw.id }}" aria-label="Select firewall" />
                   </td>
+                  <td
+                    class="td-fw-sync-err"
+                    data-select-stop="1"
+                    {% if sync_err %}title="{{ sync_err | e }}"{% endif %}
+                  >
+                    <span class="gc-fw-sync-err-wrap"{% if not sync_err %} hidden{% endif %}>
+                      <span
+                        class="gc-fw-sync-err-icon"
+                        {% if sync_err %}aria-label="Last configuration sync failed: {{ sync_err | e }}"{% else %}aria-hidden="true"{% endif %}
+                        >!</span>
+                    </span>
+                  </td>
                   <td data-gc-col="name" class="gc-net-firewall-pills">
                     {% set fw_label = fw.name or "—" %}
                     {% if fw_label != "—" %}
@@ -417,15 +441,24 @@
                       <span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span>
                     </span>
                   </td>
-                  <td data-gc-col="tags" class="gc-fw-user-tags">
-                    <div class="gc-fw-sync-pills">
-                      {% if fw_tags_sorted %}
-                      {% for t in fw_tags_sorted %}
-                      <span class="gc-user-tag-pill" title="{{ t | e }}">{{ t | e }}</span>
-                      {% endfor %}
-                      {% else %}
-                      <span class="muted">—</span>
-                      {% endif %}
+                  <td data-gc-col="tags" class="gc-fw-user-tags" data-gc-fw-tags-cell>
+                    <div class="gc-fw-user-tags__clip">
+                      <div class="gc-fw-user-tags__row" data-gc-fw-tags-row>
+                        {% if fw_tags_sorted %}
+                        {% for t in fw_tags_sorted %}
+                        <span class="gc-user-tag-pill" data-gc-fw-tag-pill title="{{ t | e }}">{{ t | e }}</span>
+                        {% endfor %}
+                        <button
+                          type="button"
+                          class="gc-user-tag-pill gc-fw-user-tags__more"
+                          data-gc-fw-tags-more
+                          hidden
+                          aria-label="Show all tags"
+                        ></button>
+                        {% else %}
+                        <span class="muted">—</span>
+                        {% endif %}
+                      </div>
                     </div>
                   </td>
                   <td data-gc-col="sync" class="gc-fw-sync-pills gc-col-hidden"></td>
@@ -509,13 +542,13 @@
                       class="btn-icon test-btn"
                       data-id="{{ fw.id }}"
                       data-test-url="{{ request.url_for('gc_test_firewall', firewall_id=fw.id) | string }}"
-                      title="Test connection"
-                      aria-label="Test connection"
+                      title="Test API connection (runs even when inventory shows offline). After success or an authentication error, reachability is rechecked for the online indicator."
+                      aria-label="Test API connection"
                     >
                       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                         <path
                           fill="currentColor"
-                          d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"
+                          d="M19.11,11.92C19.13,11.71 19.14,11.5 19.14,11.29C19.14,7.86 17.71,4.14 16.28,4.14C14.85,4.14 13.42,5.57 12,5.57C10.57,5.57 9.14,4.14 7.71,4.14C6.28,4.14 4.86,7.79 4.86,11.29C4.86,11.5 4.86,11.71 4.88,11.92C7.22,12.45 9.6,12.72 12,12.71C14.45,12.71 16.83,12.44 19.11,11.92M3.45,18.18C9,19.85 14.96,19.86 20.54,18.18C20.96,18.04 21.33,17.77 21.59,17.41C21.85,17.05 22,16.61 22,16.17C22,15.72 21.86,15.29 21.61,14.92C21.35,14.56 21,14.29 20.56,14.14C17.86,15 15,15.45 12,15.45C9,15.45 6.13,15 3.43,14.14C3,14.29 2.65,14.57 2.39,14.93C2.14,15.29 2,15.72 2,16.17C2,17.11 2.61,17.9 3.45,18.18Z"
                         />
                       </svg>
                     </button>
@@ -1304,6 +1337,7 @@
           el.classList.toggle("gc-col-hidden", !on);
         });
       });
+      gcFwScheduleTagCellLayout();
     }
 
     function syncFilterEmptyColspan() {
@@ -1934,6 +1968,133 @@
         }
       }
       updateSelectionChrome();
+      gcFwScheduleTagCellLayout();
+    }
+
+    function gcFwParseTagsJson(raw) {
+      var tags = [];
+      try {
+        var data = JSON.parse(raw || "[]");
+        if (!Array.isArray(data)) return tags;
+        data.forEach(function (x) {
+          if (typeof x === "string") {
+            var t = x.trim();
+            if (t) tags.push(t);
+          } else if (x && typeof x === "object") {
+            var n = typeof x.name === "string" ? x.name : typeof x.n === "string" ? x.n : "";
+            n = (n || "").trim();
+            if (n) tags.push(n);
+          }
+        });
+      } catch (e) {}
+      tags.sort(function (a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: "base" });
+      });
+      return tags;
+    }
+
+    var _gcFwTagLayoutRaf = 0;
+    function gcFwScheduleTagCellLayout() {
+      if (_gcFwTagLayoutRaf) return;
+      _gcFwTagLayoutRaf = requestAnimationFrame(function () {
+        _gcFwTagLayoutRaf = 0;
+        gcFwLayoutAllTagCells();
+      });
+    }
+
+    function gcFwLayoutAllTagCells() {
+      document.querySelectorAll("[data-gc-fw-tags-cell]").forEach(function (cell) {
+        var tr = cell.closest("tr");
+        if (tr && tr.hidden) return;
+        gcFwLayoutOneTagCell(cell);
+      });
+    }
+
+    function gcFwLayoutOneTagCell(cell) {
+      var clip = cell.querySelector(".gc-fw-user-tags__clip");
+      var row = cell.querySelector("[data-gc-fw-tags-row]");
+      var more = cell.querySelector("[data-gc-fw-tags-more]");
+      var pills = Array.prototype.slice.call(cell.querySelectorAll("[data-gc-fw-tag-pill]"));
+      if (!clip || !row || !more || !pills.length) return;
+
+      function applyVisibleCount(k) {
+        var n = pills.length;
+        var i;
+        for (i = 0; i < n; i++) {
+          if (i < k) {
+            pills[i].removeAttribute("hidden");
+            pills[i].style.display = "";
+          } else {
+            pills[i].setAttribute("hidden", "");
+            pills[i].style.display = "none";
+          }
+        }
+        if (k < n) {
+          more.removeAttribute("hidden");
+          more.style.display = "";
+          var rest = n - k;
+          more.textContent = "+" + String(rest);
+          more.setAttribute("aria-label", "Show all " + n + " tags (" + rest + " not shown in table)");
+        } else {
+          more.setAttribute("hidden", "");
+          more.style.display = "none";
+          more.textContent = "";
+        }
+      }
+
+      var cw = clip.clientWidth;
+      if (cw <= 0) return;
+
+      var n = pills.length;
+      applyVisibleCount(n);
+      if (row.scrollWidth <= cw + 1) return;
+
+      var lo = 0;
+      var hi = n - 1;
+      var best = 0;
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        applyVisibleCount(mid);
+        if (row.scrollWidth <= cw + 1) {
+          best = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      applyVisibleCount(best);
+    }
+
+    function gcFwOpenTagsViewModal(tr) {
+      if (!tr) return;
+      var raw = tr.getAttribute("data-fw-tags-json") || "[]";
+      var tags = gcFwParseTagsJson(raw);
+      var lead = document.getElementById("gc-fw-tags-view-dialog-lead");
+      var listEl = document.getElementById("gc-fw-tags-view-dialog-list");
+      var nm = (tr.getAttribute("data-fw-name") || "").trim();
+      var host = (tr.getAttribute("data-fw-host") || "").trim();
+      var label = nm || host || "Firewall";
+      if (lead) lead.textContent = label;
+      if (listEl) {
+        listEl.innerHTML = "";
+        if (!tags.length) {
+          var empty = document.createElement("li");
+          empty.className = "muted";
+          empty.textContent = "No tags";
+          listEl.appendChild(empty);
+        } else {
+          tags.forEach(function (t) {
+            var li = document.createElement("li");
+            var sp = document.createElement("span");
+            sp.className = "gc-user-tag-pill";
+            sp.textContent = t;
+            li.appendChild(sp);
+            listEl.appendChild(li);
+          });
+        }
+      }
+      var dlg = document.getElementById("gc-fw-tags-view-dialog");
+      if (dlg && typeof dlg.showModal === "function") dlg.showModal();
     }
 
     function setFiltersAsideCollapsed(collapsed) {
@@ -2041,11 +2202,31 @@
         if (e.target.classList && e.target.classList.contains("gc-fw-row-select")) updateSelectionChrome();
       });
 
+    document.getElementById("gc-fw-tbody") &&
+      document.getElementById("gc-fw-tbody").addEventListener("click", function (e) {
+        var more = e.target && e.target.closest && e.target.closest("[data-gc-fw-tags-more]");
+        if (!more || more.hidden) return;
+        e.stopPropagation();
+        e.preventDefault();
+        var tr = more.closest("tr.gc-fw-data-row");
+        gcFwOpenTagsViewModal(tr);
+      });
+
     rebuildFirewallFacets(function () {
       refreshInventorySyncColumn();
       applyRowFilter();
       updateFacetChrome();
     });
+
+    (function () {
+      var tbl = document.getElementById("gc-fw-table");
+      if (tbl && typeof ResizeObserver !== "undefined") {
+        var ro = new ResizeObserver(function () {
+          gcFwScheduleTagCellLayout();
+        });
+        ro.observe(tbl);
+      }
+    })();
 
     function filterColMenuList() {
       var q = (document.getElementById("gc-fw-cols-filter") && document.getElementById("gc-fw-cols-filter").value || "")
@@ -2449,6 +2630,39 @@
     }
     buildSyncToggleRows();
 
+    function fwInventorySyncErrorDetailText(res) {
+      var body = res.body || {};
+      if (res.status === 404) return "Firewall not found.";
+      if (res.status === 202 && body.accepted) return "";
+      if (body.skipped) return "";
+      if (body.ok) return "";
+      var d = body.detail ? String(body.detail) : "";
+      var e = body.error ? String(body.error) : "";
+      if (e && d) return e + ": " + d;
+      return e || d || "Sync failed.";
+    }
+
+    function setFwInventoryRowSyncError(tr, message) {
+      if (!tr) return;
+      var td = tr.querySelector(".td-fw-sync-err");
+      if (!td) return;
+      var wrap = td.querySelector(".gc-fw-sync-err-wrap");
+      var icon = td.querySelector(".gc-fw-sync-err-icon");
+      if (!wrap || !icon) return;
+      var m = (message || "").trim();
+      if (!m) {
+        wrap.hidden = true;
+        td.removeAttribute("title");
+        icon.setAttribute("aria-hidden", "true");
+        icon.removeAttribute("aria-label");
+        return;
+      }
+      wrap.hidden = false;
+      td.setAttribute("title", m);
+      icon.removeAttribute("aria-hidden");
+      icon.setAttribute("aria-label", "Last configuration sync failed: " + m);
+    }
+
     function configSyncBannerMessage(res) {
       var body = res.body || {};
       if (res.status === 404) return { ok: false, text: "Firewall not found." };
@@ -2606,6 +2820,13 @@
           }
           var msg = configSyncBannerMessage(res);
           var body = res.body || {};
+          var ef = document.getElementById("edit-fw-id");
+          var flyoutRow =
+            ef && ef.value
+              ? document.querySelector(
+                  '#gc-fw-tbody tr.gc-fw-data-row[data-fw-id="' + ef.value + '"]',
+                )
+              : null;
           if (res.status === 202 && body.accepted) {
             if (typeof window.gcGlobalBannerTrackBackgroundSync === "function") {
               window.gcGlobalBannerTrackBackgroundSync(msg.text);
@@ -2620,8 +2841,11 @@
               window.gcGlobalBannerShowResult(msg.ok, msg.text);
             }
             if (msg.ok && !body.skipped && res.status !== 202) {
-              var ef = document.getElementById("edit-fw-id");
               if (ef && ef.value) gcDispatchConfigCacheSynced(ef.value);
+              setFwInventoryRowSyncError(flyoutRow, "");
+            } else {
+              var flyDet = fwInventorySyncErrorDetailText(res);
+              if (flyDet) setFwInventoryRowSyncError(flyoutRow, flyDet);
             }
           }
         })
@@ -2634,6 +2858,14 @@
           else if (typeof window.gcGlobalBannerShowResult === "function") {
             window.gcGlobalBannerShowResult(false, "Request failed.");
           }
+          var ef2 = document.getElementById("edit-fw-id");
+          var flyoutRow2 =
+            ef2 && ef2.value
+              ? document.querySelector(
+                  '#gc-fw-tbody tr.gc-fw-data-row[data-fw-id="' + ef2.value + '"]',
+                )
+              : null;
+          setFwInventoryRowSyncError(flyoutRow2, "Request failed.");
         });
     }
 
@@ -2736,15 +2968,21 @@
             if (msg.ok && !body.skipped) {
               ok++;
               if (res.status === 202) asyncOk++;
-              else gcDispatchConfigCacheSynced(tr.getAttribute("data-fw-id"));
+              else {
+                gcDispatchConfigCacheSynced(tr.getAttribute("data-fw-id"));
+                setFwInventoryRowSyncError(tr, "");
+              }
             } else {
               fail++;
               lastFail = msg.text;
+              var rowErr = fwInventorySyncErrorDetailText(res);
+              if (rowErr) setFwInventoryRowSyncError(tr, rowErr);
             }
           })
           .catch(function () {
             fail++;
             lastFail = "Request failed.";
+            setFwInventoryRowSyncError(tr, "Request failed.");
           })
           .then(function () {
             step();
@@ -2835,7 +3073,13 @@
       tr.addEventListener("click", function (e) {
         var t = e.target;
         var el = t instanceof Element ? t : t && t.parentElement;
-        if (el && el.closest("input, button, a, label, .td-check, .gc-table-toggle")) return;
+        if (
+          el &&
+          el.closest(
+            "input, button, a, label, .td-check, .td-fw-sync-err, .gc-table-toggle, .gc-fw-user-tags",
+          )
+        )
+          return;
         openEditFromRow(tr);
       });
     });
@@ -2864,6 +3108,19 @@
             var success = _ref.ok && body.ok;
             out.textContent = body.message || (success ? "OK" : "Failed");
             out.className = "test-result " + (success ? "ok" : "err");
+            if (typeof body.inventory_online === "boolean") {
+              var tr = btn.closest("tr.gc-fw-data-row");
+              var pill = tr && tr.querySelector(".gc-firewall-pill-status");
+              if (pill) {
+                pill.classList.toggle("gc-firewall-pill-status--online", body.inventory_online);
+                pill.classList.toggle("gc-firewall-pill-status--offline", !body.inventory_online);
+                pill.textContent = body.inventory_online ? "\u2713" : "-";
+                pill.setAttribute(
+                  "aria-label",
+                  "Firewall " + (body.inventory_online ? "online" : "offline"),
+                );
+              }
+            }
           })
           .catch(function () {
             if (out) {
@@ -2918,6 +3175,10 @@
               }
               if (msg.ok && !body.skipped && row && res.status !== 202) {
                 gcDispatchConfigCacheSynced(row.getAttribute("data-fw-id"));
+                setFwInventoryRowSyncError(row, "");
+              } else {
+                var rowDet = fwInventorySyncErrorDetailText(res);
+                if (rowDet) setFwInventoryRowSyncError(row, rowDet);
               }
             }
           })
@@ -2928,6 +3189,7 @@
             else if (typeof window.gcGlobalBannerShowResult === "function") {
               window.gcGlobalBannerShowResult(false, "Request failed.");
             }
+            setFwInventoryRowSyncError(row, "Request failed.");
           });
       });
     });
@@ -2959,6 +3221,20 @@
     if (delDialog) {
       delDialog.addEventListener("click", function (e) {
         if (e.target === delDialog) closeDelDialog();
+      });
+    }
+
+    var tagsViewDialog = document.getElementById("gc-fw-tags-view-dialog");
+    var tagsViewClose = document.getElementById("gc-fw-tags-view-dialog-close");
+    function closeTagsViewDialog() {
+      if (tagsViewDialog) tagsViewDialog.close();
+    }
+    if (tagsViewClose && tagsViewDialog) {
+      tagsViewClose.addEventListener("click", closeTagsViewDialog);
+    }
+    if (tagsViewDialog) {
+      tagsViewDialog.addEventListener("click", function (e) {
+        if (e.target === tagsViewDialog) closeTagsViewDialog();
       });
     }
 

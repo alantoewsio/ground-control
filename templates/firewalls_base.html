@@ -201,14 +201,20 @@
         </span>
         <span class="app-nav__label">Authentication</span>
       </a>
-      <span class="app-nav__item app-nav__item--placeholder" aria-disabled="true">
+      <a
+        href="/firewalls/configure/system-services"
+        class="app-nav__item{% if fw_subnav_active == 'system_services' %} is-active{% endif %}"
+      >
         <span class="app-nav__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M6 11h12v2H6z" />
+            <path
+              fill="currentColor"
+              d="M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h16v2H4v-2z"
+            />
           </svg>
         </span>
         <span class="app-nav__label">System Services</span>
-      </span>
+      </a>
       <p class="app-nav__section">System</p>
       <span class="app-nav__item app-nav__item--placeholder" aria-disabled="true">
         <span class="app-nav__icon" aria-hidden="true">
@@ -246,14 +252,20 @@
         </span>
         <span class="app-nav__label">Hosts &amp; Services</span>
       </a>
-      <span class="app-nav__item app-nav__item--placeholder" aria-disabled="true">
+      <a
+        href="/firewalls/system/administration"
+        class="app-nav__item{% if fw_subnav_active == 'administration' %} is-active{% endif %}"
+      >
         <span class="app-nav__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M6 11h12v2H6z" />
+            <path
+              fill="currentColor"
+              d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"
+            />
           </svg>
         </span>
         <span class="app-nav__label">Administration</span>
-      </span>
+      </a>
       <span class="app-nav__item app-nav__item--placeholder" aria-disabled="true">
         <span class="app-nav__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16">

@@ -56,6 +56,25 @@ def test_test_connection_conn_error():
         assert ok is False
 
 
+def test_test_connection_probe_hint_auth_failure_triggers_probe():
+    with patch("app.sophos_connect.SophosFirewall") as SF:
+        inst = SF.return_value
+        inst.login.side_effect = SophosFirewallAuthFailure("bad")
+        ok, msg, probe = sophos_connect.test_connection_with_monitor_probe_hint(
+            "h", 4444, "u", "p", True, request_timeout_seconds=30
+        )
+        assert ok is False and probe is True
+        assert "Authentication" in msg
+
+
+def test_test_connection_probe_hint_conn_error_no_probe():
+    with patch("app.sophos_connect.SophosFirewall") as SF:
+        inst = SF.return_value
+        inst.login.side_effect = requests.exceptions.ConnectionError("nope")
+        ok, msg, probe = sophos_connect.test_connection_with_monitor_probe_hint("h", 4444, "u", "p", False)
+        assert ok is False and probe is False
+
+
 def test_test_connection_success_shapes():
     with patch("app.sophos_connect.SophosFirewall") as SF:
         inst = SF.return_value

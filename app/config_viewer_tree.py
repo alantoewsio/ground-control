@@ -165,6 +165,15 @@ _ENTITY_TAB: dict[str, tuple[str, str, str, str, str, str]] = {
         "groups",
         "Groups",
     ),
+    # Configure · System Services
+    "ha_configure": (
+        "configure",
+        "Configure",
+        "system_services",
+        "System Services",
+        "ha",
+        "HA",
+    ),
     # System · Profiles (tabs match Profiles page + decryption cache)
     "schedule": (
         "system",
@@ -295,7 +304,7 @@ _ENTITY_TAB: dict[str, tuple[str, str, str, str, str, str]] = {
         "service_group",
         "Service group",
     ),
-    # System · Administration (sidebar placeholder; cached admin objects)
+    # System · Administration (Netflow UI at /firewalls/system/administration; other tabs config-cache only)
     "admin_authen": (
         "system",
         "System",
@@ -368,6 +377,14 @@ _ENTITY_TAB: dict[str, tuple[str, str, str, str, str, str]] = {
         "snmpv3_user",
         "SNMPv3 user",
     ),
+    "netflow_configuration": (
+        "system",
+        "System",
+        "administration",
+        "Administration",
+        "netflow",
+        "Netflow",
+    ),
 }
 
 _SECTION_ORDER = ["monitor", "protect", "configure", "system"]
@@ -375,7 +392,7 @@ _SECTION_ORDER = ["monitor", "protect", "configure", "system"]
 _GROUP_ORDER: dict[str, list[str]] = {
     "monitor": [],
     "protect": ["firewall", "intrusion_prevention", "web"],
-    "configure": ["network", "authentication"],
+    "configure": ["network", "authentication", "system_services"],
     "system": ["profiles", "hosts_services", "administration"],
 }
 
@@ -388,6 +405,7 @@ _TAB_ORDER: dict[str, dict[str, list[str]]] = {
     "configure": {
         "network": ["interfaces", "vlan", "zones"],
         "authentication": ["users", "groups"],
+        "system_services": ["ha"],
     },
     "system": {
         "profiles": [
@@ -415,6 +433,7 @@ _TAB_ORDER: dict[str, dict[str, list[str]]] = {
             "admin_settings",
             "backup",
             "dns_forwarders",
+            "netflow_configuration",
             "notification",
             "notification_list",
             "reports_retention",

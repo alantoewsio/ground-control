@@ -6,23 +6,20 @@
     Syncs tray + launcher-build dependencies, then runs PyInstaller using launcher.spec.
     Output: dist\launcher.exe
 
-    After building, copy launcher.exe to the repository root (same folder as main.py) so
-    native/Docker commands and app.config resolve paths correctly. Use -CopyToRepoRoot.
+    After a successful build, the script stops any running Ground Control launcher instances
+    (launcher.exe whose path is the repo root or dist copy), copies dist\launcher.exe to
+    the repository root (overwriting launcher.exe there), then starts that copy in the
+    background so the tray app runs from the correct working directory next to main.py.
 
 .PARAMETER Console
     Build with a console window (stderr visible). Sets GROUND_CONTROL_LAUNCHER_CONSOLE for launcher.spec;
     PyInstaller does not allow --console when a .spec file is used.
 
-.PARAMETER CopyToRepoRoot
-    Copy dist\launcher.exe to the repo root as launcher.exe
-
 .EXAMPLE
     .\scripts\build_launcher.ps1
-    .\scripts\build_launcher.ps1 -CopyToRepoRoot
 #>
 param(
-    [switch]$Console,
-    [switch]$CopyToRepoRoot
+    [switch]$Console
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,6 +28,54 @@ Set-Location $RepoRoot
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Error "uv is required. Install from https://github.com/astral-sh/uv"
+}
+
+function Stop-GroundControlLauncherInstances {
+    param(
+        [string]$BuiltExecutable,
+        [string]$RootExecutable
+    )
+    $targetPaths = [System.Collections.ArrayList]@()
+    foreach ($candidate in @($RootExecutable, $BuiltExecutable)) {
+        if (-not $candidate) { continue }
+        try {
+            $full = [System.IO.Path]::GetFullPath($candidate)
+            $dup = $false
+            foreach ($existing in $targetPaths) {
+                if ([string]::Equals($full, $existing, [StringComparison]::OrdinalIgnoreCase)) {
+                    $dup = $true
+                    break
+                }
+            }
+            if (-not $dup) { [void]$targetPaths.Add($full) }
+        } catch {
+            # ignore invalid paths
+        }
+    }
+    if ($targetPaths.Count -eq 0) { return }
+
+    $procs = Get-CimInstance Win32_Process -Filter "Name = 'launcher.exe'" -ErrorAction SilentlyContinue
+    if (-not $procs) { return }
+    foreach ($p in @($procs)) {
+        $exePath = $p.ExecutablePath
+        if (-not $exePath) { continue }
+        try {
+            $norm = [System.IO.Path]::GetFullPath($exePath)
+        } catch {
+            continue
+        }
+        $hit = $false
+        foreach ($tp in $targetPaths) {
+            if ([string]::Equals($norm, $tp, [StringComparison]::OrdinalIgnoreCase)) {
+                $hit = $true
+                break
+            }
+        }
+        if ($hit) {
+            Write-Host "Stopping running launcher (PID $($p.ProcessId)): $norm"
+            Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 Write-Host "Repository: $RepoRoot"
@@ -72,11 +117,16 @@ if (-not (Test-Path $built)) {
 
 Write-Host "Built: $built"
 
-if ($CopyToRepoRoot) {
-    $dest = Join-Path $RepoRoot "launcher.exe"
-    Copy-Item -Path $built -Destination $dest -Force
-    Write-Host "Copied to repo root: $dest"
-}
+$dest = Join-Path $RepoRoot "launcher.exe"
+Write-Host "Stopping any running Ground Control launcher (repo root or dist)..."
+Stop-GroundControlLauncherInstances -BuiltExecutable $built -RootExecutable $dest
+Start-Sleep -Seconds 1
+
+Copy-Item -Path $built -Destination $dest -Force
+Write-Host "Copied to repo root (overwrite): $dest"
+
+Write-Host "Starting launcher from repo root (background)..."
+Start-Process -FilePath $dest -WorkingDirectory $RepoRoot | Out-Null
 
 Write-Host ""
-Write-Host "Run the launcher from the repository root (next to main.py), or set GROUND_CONTROL_REPO_ROOT."
+Write-Host "Done. Tray launcher should be running from the repository root."

@@ -2511,18 +2511,26 @@ function gcCreateNetworkEntityTable(cfg) {
         }
         td.classList.add("gc-table-action-cell");
       } else {
-        let li =
-          c.id !== COL_TYPE &&
-            globalThis.gcTableNormalizeListCellItems &&
-            globalThis.gcTableListCellPreviewHtml &&
-            globalThis.gcTableBindListCell
-            ? globalThis.gcTableNormalizeListCellItems(v, HS_MULTIVALUE_SEP)
+        let gch =
+          row.gc_cell_html && typeof row.gc_cell_html === "object"
+            ? row.gc_cell_html[c.id]
             : null;
-        if (li) {
-          html = globalThis.gcTableListCellPreviewHtml(li, zonePillHtml);
-          listExpand = { items: li, pillFn: zonePillHtml };
+        if (gch != null && String(gch).trim() !== "") {
+          html = String(gch);
         } else {
-          html = formatCellHtml(c.id, v);
+          let li =
+            c.id !== COL_TYPE &&
+              globalThis.gcTableNormalizeListCellItems &&
+              globalThis.gcTableListCellPreviewHtml &&
+              globalThis.gcTableBindListCell
+              ? globalThis.gcTableNormalizeListCellItems(v, HS_MULTIVALUE_SEP)
+              : null;
+          if (li) {
+            html = globalThis.gcTableListCellPreviewHtml(li, zonePillHtml);
+            listExpand = { items: li, pillFn: zonePillHtml };
+          } else {
+            html = formatCellHtml(c.id, v);
+          }
         }
       }
       if (c.id === COL_ADDR && row.ipam_cidr_cell === "conflict") {
@@ -2539,6 +2547,9 @@ function gcCreateNetworkEntityTable(cfg) {
           html;
       }
       td.innerHTML = html;
+      if (row.gc_cell_sort && row.gc_cell_sort[c.id] != null && String(row.gc_cell_sort[c.id]).trim() !== "") {
+        td.setAttribute("data-sort-value", String(row.gc_cell_sort[c.id]).trim().toLowerCase());
+      }
       if (listExpand) {
         td.setAttribute("data-sort-value", listExpand.items.join(" ").toLowerCase());
         globalThis.gcTableBindListCell(

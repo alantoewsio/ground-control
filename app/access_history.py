@@ -10,6 +10,23 @@ from app.models import AccessSessionLog
 from app.users_service import username_for_user_id
 
 _WEBADMIN_SESSION_KEY = "gc_webadmin_access_session_ids"
+# One "proxied-login" audit row per firewall per GC browser session (avoid duplicates after gate opens).
+_WEBADMIN_PROXIED_LOGIN_AUDIT_KEY = "gc_webadmin_proxied_login_audit"
+
+
+def should_log_webadmin_proxied_start(conn: HTTPConnection, firewall_id: int) -> bool:
+    box = conn.session.get(_WEBADMIN_PROXIED_LOGIN_AUDIT_KEY)
+    if not isinstance(box, dict):
+        return True
+    return not bool(box.get(str(int(firewall_id))))
+
+
+def mark_webadmin_proxied_start_logged(conn: HTTPConnection, firewall_id: int) -> None:
+    box = conn.session.get(_WEBADMIN_PROXIED_LOGIN_AUDIT_KEY)
+    if not isinstance(box, dict):
+        box = {}
+    box[str(int(firewall_id))] = True
+    conn.session[_WEBADMIN_PROXIED_LOGIN_AUDIT_KEY] = box
 
 
 def request_client_ip(conn: HTTPConnection) -> str | None:
@@ -86,6 +103,10 @@ def pop_webadmin_session_id(conn: HTTPConnection, firewall_id: int) -> str | Non
     raw = box.pop(key, None)
     conn.session[_WEBADMIN_SESSION_KEY] = box
     sid = str(raw or "").strip()
+    abox = conn.session.get(_WEBADMIN_PROXIED_LOGIN_AUDIT_KEY)
+    if isinstance(abox, dict) and key in abox:
+        abox.pop(key, None)
+        conn.session[_WEBADMIN_PROXIED_LOGIN_AUDIT_KEY] = abox
     return sid or None
 
 

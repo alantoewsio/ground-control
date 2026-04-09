@@ -67,3 +67,16 @@ def test_hydrate_reads_postgres_password_secret(tmp_path: Path, monkeypatch: pyt
 
     hydrate_docker_secrets_into_environ()
     assert os.environ.get("GROUND_CONTROL_POSTGRES_PASSWORD") == "from_secret_file"
+
+
+def test_docker_postgres_password_value_reads_secret_file_without_hydrate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "ground_control_postgres_password").write_text("file_only\n", encoding="utf-8")
+    monkeypatch.setattr("app.docker_secrets.RUN_SECRETS_DIR", secrets_dir)
+    monkeypatch.delenv("GROUND_CONTROL_POSTGRES_PASSWORD", raising=False)
+    from app.docker_secrets import docker_postgres_password_value
+
+    assert docker_postgres_password_value() == "file_only"

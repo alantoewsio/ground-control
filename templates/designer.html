@@ -1,0 +1,709 @@
+{% extends "base.html" %}
+{% set top_nav_active = "designer" %}
+{% block title %}Designer · Ground Control{% endblock %}
+{% block page_title %}Designer{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Reference layouts for composite UI controls used across Ground Control. These sandboxes are static; the live top bar, settings modal, and auth overlay remain functional.
+</p>
+{% endblock %}
+{% block content %}
+<main class="layout single gc-designer">
+  <p class="gc-designer__lead muted">
+    Use this page to compare styling, spacing, and states while building new screens. Class names match production templates and scripts under
+    <code class="mono">templates/</code> and <code class="mono">static/</code>.
+  </p>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-buttons">
+    <h2 id="gc-designer-h-buttons" class="gc-designer__h2">Buttons and links</h2>
+    <p class="gc-designer__note">Dashboard, settings, tables, flyouts, task queue.</p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row">
+        <button type="button" class="btn primary">Primary</button>
+        <button type="button" class="btn btn--secondary">Secondary</button>
+        <button type="button" class="btn btn--secondary" disabled>Disabled</button>
+        <button type="button" class="icon-btn" title="Icon" aria-label="Icon action">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+          </svg>
+        </button>
+        <a href="#" class="link-btn" onclick="return false;">Link button</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-forms">
+    <h2 id="gc-designer-h-forms" class="gc-designer__h2">Settings-style fields</h2>
+    <p class="gc-designer__note">Settings modal, auth overlay, many flyouts reuse these patterns.</p>
+    <div class="gc-designer__sandbox">
+      <form class="settings-form" autocomplete="off" onsubmit="return false;">
+        <label class="settings-form__field">
+          <span class="settings-form__label">Text</span>
+          <input type="text" class="settings-form__input" value="Sample value" />
+        </label>
+        <label class="settings-form__field">
+          <span class="settings-form__label">Password</span>
+          <input type="password" class="settings-form__input" value="hunter2hunter" />
+        </label>
+        <p class="settings-form__status muted" role="status">Status line (errors, hints).</p>
+      </form>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-panels">
+    <h2 id="gc-designer-h-panels" class="gc-designer__h2">Panels and stats</h2>
+    <p class="gc-designer__note">Dashboard widgets; generic <code class="mono">panel</code> containers.</p>
+    <div class="gc-designer__sandbox">
+      <div class="dashboard-page__stats" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr))">
+        <article class="dashboard-page__stat panel">
+          <h3 class="dashboard-page__stat-label">Sample metric</h3>
+          <p class="dashboard-page__stat-value">128</p>
+          <p class="dashboard-page__stat-note muted">Footnote copy</p>
+        </article>
+        <article class="dashboard-page__stat panel">
+          <h3 class="dashboard-page__stat-label">Another</h3>
+          <p class="dashboard-page__stat-value">—</p>
+          <p class="dashboard-page__stat-note muted">Placeholder dash</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-banner">
+    <h2 id="gc-designer-h-banner" class="gc-designer__h2">Global banner</h2>
+    <p class="gc-designer__note">
+      <code class="mono">#gc-global-banner</code> in <code class="mono">base.html</code> — driven by
+      <code class="mono">gc-global-banner.js</code>.
+    </p>
+    <div class="gc-designer__sandbox gc-designer__sandbox--stack">
+      <div
+        class="gc-global-banner gc-global-banner--success"
+        role="status"
+        style="position: relative; top: auto"
+      >
+        <div class="gc-global-banner__inner">
+          <div class="gc-global-banner__top">
+            <span class="gc-global-banner__icon" aria-hidden="true">
+              <svg class="gc-global-banner__glyph" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </span>
+            <span class="gc-global-banner__text">Success reference (saved, queue cleared, etc.).</span>
+            <button type="button" class="gc-global-banner__close" aria-label="Dismiss">×</button>
+          </div>
+        </div>
+      </div>
+      <div
+        class="gc-global-banner gc-global-banner--error"
+        role="status"
+        style="position: relative; top: auto"
+      >
+        <div class="gc-global-banner__inner">
+          <div class="gc-global-banner__top">
+            <span class="gc-global-banner__icon" aria-hidden="true">
+              <svg class="gc-global-banner__glyph" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+              </svg>
+            </span>
+            <span class="gc-global-banner__text">Error reference (API failure, validation).</span>
+            <button type="button" class="gc-global-banner__close" aria-label="Dismiss">×</button>
+          </div>
+        </div>
+      </div>
+      <div
+        class="gc-global-banner gc-global-banner--progress"
+        role="status"
+        style="position: relative; top: auto"
+      >
+        <div class="gc-global-banner__inner">
+          <div class="gc-global-banner__top">
+            <span class="gc-global-banner__icon" aria-hidden="true"></span>
+            <span class="gc-global-banner__text">Progress reference (background sync).</span>
+            <button type="button" class="gc-global-banner__close" hidden aria-label="Dismiss">×</button>
+          </div>
+          <div class="gc-global-banner__bar">
+            <div class="gc-global-banner__bar-track" aria-hidden="true">
+              <div class="gc-global-banner__bar-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-ms">
+    <h2 id="gc-designer-h-ms" class="gc-designer__h2">Firewall multiselect (top bar pattern)</h2>
+    <p class="gc-designer__note">
+      Live control is in the header. This duplicate uses the same classes as
+      <code class="mono">base.html</code> / <code class="mono">gc-top-bar-firewalls.js</code> (search, sections, options).
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-multiselect gc-multiselect--top-bar gc-net-fw-multiselect" id="gc-designer-fw-ms-root">
+        <span class="gc-multiselect__label" id="gc-designer-fw-ms-label">Firewalls</span>
+        <div class="gc-multiselect__control">
+          <div
+            class="gc-hs-ip-host-flyout__fw-ms"
+            data-gc-fw-ms="1"
+            data-fw-picker-mode="add"
+            data-fw-initial-selected="[]"
+            data-fw-assigned-ids="[]"
+          >
+            <div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">
+              <button
+                type="button"
+                class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger"
+                id="gc-designer-fw-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="true"
+                aria-labelledby="gc-designer-fw-ms-label gc-designer-fw-trigger"
+              >
+                <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text">FW-A, FW-B</span>
+                <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
+              </button>
+              <div
+                class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown gc-net-fw-dropdown--split"
+                id="gc-designer-fw-dropdown"
+              >
+                <div class="gc-net-fw-dropdown__body">
+                  <div class="gc-net-fw-dropdown__selected" aria-label="Selected (sample)">
+                    <div class="gc-top-bar-fw__section-label gc-net-fw-selected__head-title">Selected</div>
+                    <ul class="gc-net-fw-selected__list">
+                      <li>
+                        <span class="gc-zone-pill gc-firewall-pill" style="--gc-zone-h: 200">
+                          <span class="gc-firewall-pill-status gc-firewall-pill-status--online" aria-hidden="true">✓</span>
+                          FW-A
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div class="gc-net-fw-dropdown__picker">
+                    <div class="gc-hs-ip-host-flyout__fw-search-wrap">
+                      <input
+                        type="search"
+                        class="gc-if-flyout__input gc-hs-ip-host-flyout__fw-search"
+                        placeholder="Search tags, firewalls, or configurations"
+                        autocomplete="off"
+                        aria-label="Search"
+                      />
+                    </div>
+                    <div class="gc-top-bar-fw__section-label">Tags</div>
+                    <label class="gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__tag-option">
+                      <input type="checkbox" />
+                      <span class="gc-hs-ip-host-flyout__fw-pill">production</span>
+                    </label>
+                    <div class="gc-top-bar-fw__divider" aria-hidden="true"></div>
+                    <div class="gc-top-bar-fw__section-label">Configurations</div>
+                    <div class="gc-top-bar-fw__cfg-option-row">
+                      <button type="button" class="gc-top-bar-fw__cfg-exclusive" title="Exclusive" aria-label="Exclusive">◎</button>
+                      <label class="gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__cfg-option">
+                        <input type="checkbox" />
+                        <span>Standard office</span>
+                      </label>
+                    </div>
+                    <div class="gc-top-bar-fw__divider" aria-hidden="true"></div>
+                    <div class="gc-top-bar-fw__section-label">Firewalls</div>
+                    <label class="gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__fw-option">
+                      <input type="checkbox" checked />
+                      <span class="gc-zone-pill gc-firewall-pill" style="--gc-zone-h: 200">
+                        <span class="gc-firewall-pill-status gc-firewall-pill-status--online" aria-hidden="true">✓</span>
+                        FW-A
+                      </span>
+                    </label>
+                    <label class="gc-multiselect__option gc-hs-ip-host-flyout__fw-option gc-top-bar-fw__fw-option">
+                      <input type="checkbox" />
+                      <span class="gc-zone-pill gc-firewall-pill" style="--gc-zone-h: 40">
+                        <span class="gc-firewall-pill-status gc-firewall-pill-status--offline" aria-hidden="true">-</span>
+                        FW-B
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-toolbar">
+    <h2 id="gc-designer-h-toolbar" class="gc-designer__h2">Network-style toolbar</h2>
+    <p class="gc-designer__note">
+      Firewalls · Network, Hosts &amp; Services, configurations mirrors — filters, combined view, sync, search, column picker, page sync.
+    </p>
+    <div class="gc-designer__sandbox gc-designer__sandbox--clip gc-network-page">
+      <div class="table-wrap gc-net-if-table-wrap">
+        <div class="toolbar">
+          <div class="toolbar__sheet">
+            <div class="toolbar__line toolbar__line--main">
+              <div class="toolbar__filters">
+                <div class="filters__head">
+                  <button type="button" class="filters__toggle" aria-expanded="false" aria-label="Filters">
+                    <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                    </svg>
+                    <span class="filters__title-label">Filters</span>
+                  </button>
+                  <div class="filters__head-actions">
+                    <span class="filters__facet-count" aria-live="polite">3 facets</span>
+                    <button type="button" class="filters__facet-reset link-btn">Reset</button>
+                  </div>
+                </div>
+              </div>
+              <nav class="gc-net-entity-quick-type" aria-label="Quick filter by type">
+                <button type="button" class="gc-net-entity-quick-type__btn" aria-pressed="true">Interfaces</button>
+                <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                <button type="button" class="gc-net-entity-quick-type__btn" aria-pressed="false">Bridge Pairs</button>
+                <span class="gc-net-entity-quick-type__sep" aria-hidden="true">·</span>
+                <button type="button" class="gc-net-entity-quick-type__btn" aria-pressed="false">LAG</button>
+              </nav>
+              <div class="toolbar__fw-toolbar-end">
+                <div class="gc-net-zone-toolbar-combine">
+                  <label class="gc-toolbar-combine gc-toolbar-combine--warning" title="Yellow when scopes disagree">
+                    <span class="gc-toolbar-combine__text">Combined View</span>
+                    <input type="checkbox" class="gc-toolbar-combine__input" checked autocomplete="off" />
+                    <span class="gc-toolbar-combine__track" aria-hidden="true"
+                      ><span class="gc-toolbar-combine__thumb"></span
+                    ></span>
+                  </label>
+                </div>
+                <div class="gc-toolbar-combine-sync">
+                  <button type="button" class="btn btn--secondary gc-toolbar-combine-sync__btn">Sync selected</button>
+                </div>
+                <button type="button" class="btn primary gc-net-entity-toolbar-primary">Add VLAN</button>
+                <button type="button" class="btn btn--secondary gc-net-entity-toolbar-secondary" disabled>Remove</button>
+                <div class="gc-toolbar-add-dropdown">
+                  <button type="button" class="btn primary gc-toolbar-add-dropdown__trigger" aria-expanded="true">
+                    Add Interface
+                    <span class="gc-toolbar-add-dropdown__chev" aria-hidden="true">▾</span>
+                  </button>
+                  <div class="gc-toolbar-add-dropdown__menu" role="menu">
+                    <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem">Bridge</button>
+                    <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem">LAG</button>
+                    <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem">VLAN</button>
+                  </div>
+                </div>
+                <div class="toolbar__search-cluster">
+                  <button type="button" class="btn-icon gc-table-page-sync-btn" title="Sync cache" aria-label="Sync cache">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                      />
+                    </svg>
+                  </button>
+                  <div class="search-field">
+                    <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                      />
+                    </svg>
+                    <input type="search" class="search-field__input" placeholder="Search" autocomplete="off" aria-label="Search" />
+                  </div>
+                  <span class="toolbar__cols-icon" role="button" tabindex="0" title="Columns" aria-label="Columns">
+                    <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                      />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table data-table--dense">
+            <thead>
+              <tr>
+                <th scope="col" class="gc-th-sortable" aria-sort="ascending">Name</th>
+                <th scope="col" class="gc-th-sortable">Zone</th>
+                <th scope="col">Firewalls</th>
+                <th scope="col">Lists</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <label style="display: inline-flex; align-items: center; gap: 6px">
+                    <input type="checkbox" aria-label="Select row" />
+                    <span class="gc-combine-row-conflict-icon" title="Field drift" aria-label="Conflict">
+                      <svg class="gc-combine-row-conflict-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z" />
+                      </svg>
+                    </span>
+                    Port1
+                  </label>
+                </td>
+                <td><span class="gc-zone-pill" style="--gc-zone-h: 140">LAN</span></td>
+                <td class="gc-net-firewall-pills">
+                  <span class="gc-zone-pill gc-firewall-pill" style="--gc-zone-h: 200">
+                    <span class="gc-firewall-pill-status gc-firewall-pill-status--online" aria-hidden="true">✓</span>
+                    FW-A
+                  </span>
+                </td>
+                <td class="gc-table-cell--list">
+                  <span class="gc-table-value-pill">192.168.1.0/24</span>
+                  <span class="gc-table-value-pill gc-table-value-pill--more">+3</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <footer class="table-footer">
+          <span class="table-footer__count" aria-live="polite">1 row (sample)</span>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-facet">
+    <h2 id="gc-designer-h-facet" class="gc-designer__h2">Facet drawer shell</h2>
+    <p class="gc-designer__note">Network / entity tables mount facet UI into <code class="mono">#…-filters-drawer</code>.</p>
+    <div class="gc-designer__sandbox">
+      <aside class="filters" aria-label="Filters" style="max-width: 280px">
+        <div class="filters__drawer" style="position: relative; display: block; border: 1px dashed var(--border); padding: 12px; border-radius: 6px">
+          <p class="muted" style="margin: 0">Facet groups render here (<code class="mono">gc-table-facets.js</code>).</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-cols">
+    <h2 id="gc-designer-h-cols" class="gc-designer__h2">Column picker modal</h2>
+    <p class="gc-designer__note"><code class="mono">fw-cols-modal</code> + <code class="mono">toolbar__cols-item</code> (see <code class="mono">net_entity_table_macros.html</code>).</p>
+    <div class="gc-designer__sandbox" style="position: relative; min-height: 280px">
+      <div class="fw-cols-modal" style="position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none">
+        <div class="fw-cols-modal__backdrop" style="position: absolute; inset: 0; opacity: 0.35; pointer-events: none"></div>
+        <div class="fw-cols-modal__panel" role="dialog" aria-modal="true" aria-labelledby="gc-designer-cols-title" style="pointer-events: auto; max-width: 360px; width: 100%">
+          <div class="fw-cols-modal__header">
+            <h2 id="gc-designer-cols-title" class="fw-cols-modal__title">Table columns</h2>
+            <button type="button" class="fw-cols-modal__close" aria-label="Close">×</button>
+          </div>
+          <input type="search" class="fw-cols-modal__filter" placeholder="Filter columns" aria-label="Filter columns" />
+          <ul class="fw-cols-modal__list">
+            <li class="toolbar__cols-item" data-col-id="name">
+              <label class="toolbar__cols-label"><input type="checkbox" checked /> <span>Name</span></label>
+            </li>
+            <li class="toolbar__cols-item" data-col-id="zone">
+              <label class="toolbar__cols-label"><input type="checkbox" checked /> <span>Zone</span></label>
+            </li>
+            <li class="toolbar__cols-item" data-col-id="hidden">
+              <label class="toolbar__cols-label"><input type="checkbox" /> <span>Hardware</span></label>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-combine">
+    <h2 id="gc-designer-h-combine" class="gc-designer__h2">Combined-view diff modal</h2>
+    <p class="gc-designer__note">Zones / interfaces compare — <code class="mono">gc-net-zone-combine-modal</code>, body from <code class="mono">gcBuildRowCombineDiffBodyHtml</code>.</p>
+    <div class="gc-designer__sandbox" style="position: relative; min-height: 320px">
+      <div class="gc-net-zone-combine-modal" style="position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none">
+        <div class="gc-net-zone-combine-modal__backdrop" style="position: absolute; inset: 0; opacity: 0.35; pointer-events: none" tabindex="-1" aria-hidden="true"></div>
+        <div
+          class="gc-net-zone-combine-modal__panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gc-designer-combine-title"
+          style="pointer-events: auto; max-width: 480px; width: 100%"
+        >
+          <header class="gc-net-zone-combine-modal__header">
+            <h2 id="gc-designer-combine-title" class="gc-net-zone-combine-modal__title">Access control by firewall</h2>
+            <button type="button" class="gc-net-zone-combine-modal__close" aria-label="Close"><span aria-hidden="true">×</span></button>
+          </header>
+          <div class="gc-net-zone-combine-modal__body">
+            <section class="gc-net-zone-modal__zone">
+              <h3 class="gc-net-zone-modal__zn">Server LAN</h3>
+              <h4 class="gc-net-zone-modal__col">Dynamic routing</h4>
+              <ul class="gc-net-zone-modal__fw-list">
+                <li class="gc-net-zone-modal__fw-row">
+                  <span class="gc-zone-pill gc-firewall-pill" style="--gc-zone-h: 200">
+                    <span class="gc-firewall-pill-status gc-firewall-pill-status--online" aria-hidden="true">✓</span>
+                    FW-A
+                  </span>
+                  <span class="gc-net-zone-modal__fw-val"><span class="gc-net-zone-modal__scalar">RIP</span></span>
+                </li>
+                <li class="gc-net-zone-modal__fw-row">
+                  <span class="gc-zone-pill gc-firewall-pill" style="--gc-zone-h: 40">
+                    <span class="gc-firewall-pill-status gc-firewall-pill-status--offline" aria-hidden="true">-</span>
+                    FW-B
+                  </span>
+                  <span class="gc-net-zone-modal__fw-val"><span class="gc-net-zone-modal__scalar">OSPF</span></span>
+                </li>
+              </ul>
+            </section>
+          </div>
+          <footer class="gc-net-zone-combine-modal__footer">
+            <button type="button" class="btn btn--secondary">Close</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-listmodal">
+    <h2 id="gc-designer-h-listmodal" class="gc-designer__h2">Cell list popover modal</h2>
+    <p class="gc-designer__note">
+      Multivalue table cells — <code class="mono">fw-cols-modal gc-table-list-modal</code> built in
+      <code class="mono">gc-table-cells.js</code>.
+    </p>
+    <div class="gc-designer__sandbox" style="position: relative; min-height: 240px">
+      <div class="fw-cols-modal gc-table-list-modal" style="position: absolute; left: 12px; top: 12px; pointer-events: none">
+        <div class="fw-cols-modal__panel gc-table-list-modal__panel" role="dialog" aria-modal="true" style="pointer-events: auto; max-width: 340px">
+          <div class="fw-cols-modal__header">
+            <h2 class="fw-cols-modal__title">Addresses</h2>
+            <button type="button" class="fw-cols-modal__close" aria-label="Close">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </svg>
+            </button>
+          </div>
+          <input type="search" class="fw-cols-modal__filter gc-table-list-modal__search" placeholder="Search" aria-label="Search" autocomplete="off" />
+          <ul class="fw-cols-modal__list gc-table-list-modal__list">
+            <li class="gc-table-list-modal__item gc-table-list-modal__item--activate">
+              <span class="gc-table-value-pill mono">10.0.0.1</span>
+            </li>
+            <li class="gc-table-list-modal__item gc-table-list-modal__item--activate">
+              <span class="gc-table-value-pill mono">10.0.0.2</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-flyout">
+    <h2 id="gc-designer-h-flyout" class="gc-designer__h2">Interface flyout shell</h2>
+    <p class="gc-designer__note"><code class="mono">gc-if-flyout</code> — Network · Interfaces, many entity editors.</p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__sample-flyout-host">
+        <div class="gc-if-flyout" aria-hidden="false">
+          <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-designer-if-title" tabindex="-1">
+            <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize"></div>
+            <header class="gc-if-flyout__header">
+              <h2 id="gc-designer-if-title" class="gc-if-flyout__title">Edit interface</h2>
+            </header>
+            <form class="gc-if-flyout__panel-form" novalidate onsubmit="return false;">
+              <div class="gc-if-flyout__scroll">
+                <div class="gc-if-flyout__form-body">
+                  <p class="gc-if-flyout__section-label">General settings</p>
+                  <div class="gc-if-flyout__field">
+                    <label class="gc-if-flyout__label" for="gc-designer-if-name">Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
+                    <input type="text" id="gc-designer-if-name" class="gc-if-flyout__input" value="Port1" autocomplete="off" />
+                  </div>
+                  <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
+                    <span class="gc-if-flyout__label">Hardware</span>
+                    <span class="gc-if-flyout__readonly-val mono">eth0</span>
+                  </div>
+                  <div class="gc-if-flyout__field">
+                    <label class="gc-if-flyout__label" for="gc-designer-if-zone">Network zone</label>
+                    <select id="gc-designer-if-zone" class="gc-if-flyout__input gc-if-flyout__select">
+                      <option>LAN</option>
+                      <option>DMZ</option>
+                    </select>
+                  </div>
+                  <hr class="gc-if-flyout__rule" />
+                  <div class="gc-if-flyout__check-head">
+                    <label class="gc-if-flyout__check-label">
+                      <input type="checkbox" checked />
+                      <span>IPv4 configuration</span>
+                    </label>
+                  </div>
+                  <fieldset class="gc-if-flyout__fieldset">
+                    <legend class="gc-if-flyout__legend">IP assignment</legend>
+                    <div class="gc-if-flyout__radios">
+                      <label><input type="radio" name="gc-designer-ipv4" value="static" /> Static</label>
+                      <label><input type="radio" name="gc-designer-ipv4" value="dhcp" checked /> DHCP</label>
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+              <footer class="gc-if-flyout__footer">
+                <button type="button" class="btn btn--secondary">Cancel</button>
+                <button type="submit" class="btn primary">Save</button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-conflict-flyout">
+    <h2 id="gc-designer-h-conflict-flyout" class="gc-designer__h2">Combined-view field conflict (flyout)</h2>
+    <p class="gc-designer__note">
+      <code class="mono">gc-combine-flyout-conflict-scope</code>, <code class="mono">gc-combine-flyout-conflict-trigger</code> — Zones, profiles, Web policy, etc.
+      <span class="gc-designer__kbd">Shift+click</span> combine toggle skips modal on real pages.
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-if-flyout__form-body" style="max-width: 420px">
+        <div class="gc-if-flyout__field gc-combine-flyout-conflict-scope gc-zone-flyout__layout-conflict">
+          <div class="gc-combine-flyout-conflict-label-row">
+            <span class="gc-if-flyout__label">Access / layout</span>
+            <button type="button" class="gc-combine-flyout-conflict-trigger" title="Compare scopes">
+              <span class="muted">3 values</span>
+              <svg class="gc-combine-flyout-conflict-trigger__svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M7 14l5-5 5 5H7z" />
+              </svg>
+            </button>
+          </div>
+          <p class="muted gc-zone-flyout__layout-conflict-hint">Scopes disagree — pick a value or edit per firewall.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-h-ips">
+    <h2 id="gc-designer-h-ips" class="gc-designer__h2">IPS policy nested sheet</h2>
+    <p class="gc-designer__note"><code class="mono">gc-ips-pol-subflyout</code> rule editor inside <code class="mono">gc_ips_policy_flyout.html</code>.</p>
+    <div class="gc-designer__sandbox gc-designer__sandbox--clip">
+      <div class="gc-ips-pol-flyout__stack" style="min-height: 220px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden">
+        <div class="gc-ips-pol-flyout--rule-open" style="display: contents">
+          <div class="gc-ips-pol-subflyout gc-ips-pol-subflyout--sheet" aria-hidden="false">
+            <header class="gc-ips-pol-subflyout__head">
+              <h3 class="gc-ips-pol-subflyout__title">Edit rule</h3>
+            </header>
+            <div class="gc-if-flyout__scroll">
+              <div class="gc-if-flyout__form-body">
+                <div class="gc-if-flyout__field">
+                  <label class="gc-if-flyout__label" for="gc-designer-ips-name">Rule name</label>
+                  <input type="text" id="gc-designer-ips-name" class="gc-if-flyout__input" value="Block outbound SMB" autocomplete="off" />
+                </div>
+                <div class="gc-ips-pol-dim-block" data-gc-ips-dim="category">
+                  <p class="gc-if-flyout__section-label">Category</p>
+                  <label class="gc-if-flyout__check-label">
+                    <input type="checkbox" checked />
+                    <span>All</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <footer class="gc-ips-pol-subflyout__footer">
+              <button type="button" class="btn btn--secondary">Cancel</button>
+              <button type="button" class="btn primary">Apply rule</button>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-ha">
+    <h2 id="gc-designer-ha" class="gc-designer__h2">HA configuration flyout (form rows)</h2>
+    <p class="gc-designer__note"><code class="mono">gc-ha-flyout</code> / <code class="mono">gc-ha-form</code> — System Services · HA (<code class="mono">gc_ha_flyout.html</code>).</p>
+    <div class="gc-designer__sandbox gc-designer__sandbox--clip">
+      <div class="gc-ha-form" style="max-width: 520px">
+        <h2 class="gc-ha-form__page-title">High availability configuration</h2>
+        <div class="gc-ha-form__row">
+          <label class="gc-ha-form__label" for="gc-designer-ha-cluster">Cluster ID</label>
+          <div class="gc-ha-form__control gc-ha-form__control--cluster">
+            <input type="text" id="gc-designer-ha-cluster" class="gc-ha-form__input gc-ha-form__input--narrow mono" value="7" readonly />
+            <span class="gc-ha-form__range-hint muted">(0–63)</span>
+          </div>
+        </div>
+        <div class="gc-ha-form__row">
+          <label class="gc-ha-form__label" for="gc-designer-ha-node">Node name</label>
+          <input type="text" id="gc-designer-ha-node" class="gc-ha-form__input gc-ha-form__input--grow mono" value="primary-fw" readonly />
+        </div>
+        <p class="gc-ha-form__hint gc-ha-form__hint--warn">
+          <span class="gc-ha-form__hint-icon" aria-hidden="true">⚠</span>
+          Sample hint styling (licensing / HA mode warnings on the real page).
+        </p>
+        <details class="gc-ha-flyout__raw">
+          <summary>Raw XML (sample)</summary>
+          <pre class="gc-ha-flyout__pre mono">&lt;HAConfigure&gt;…&lt;/HAConfigure&gt;</pre>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-netflow">
+    <h2 id="gc-designer-netflow" class="gc-designer__h2">Netflow editor table (flyout)</h2>
+    <p class="gc-designer__note"><code class="mono">gc-netflow-flyout</code> — Administration · Netflow.</p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-netflow-flyout__form" style="max-width: 520px">
+        <h2 class="gc-if-flyout__title" style="margin-top: 0">Netflow configuration</h2>
+        <p class="muted gc-netflow-flyout__hint">Collectors and ports match the appliance XML shape.</p>
+        <table class="data-table data-table--dense">
+          <thead>
+            <tr>
+              <th scope="col">Server</th>
+              <th scope="col">Port</th>
+              <th scope="col">V9</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="text" class="gc-if-flyout__input mono" value="10.0.0.50" style="width: 100%; box-sizing: border-box" /></td>
+              <td><input type="text" class="gc-if-flyout__input mono" value="2055" style="width: 5rem" /></td>
+              <td><input type="checkbox" checked aria-label="V9" /></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-ipam">
+    <h2 id="gc-designer-ipam" class="gc-designer__h2">IPAM pills</h2>
+    <p class="gc-designer__note">Address Management — assignment and pool rows (<code class="mono">gc-ipam.js</code>).</p>
+    <div class="gc-designer__sandbox gc-designer__row">
+      <span class="gc-ipam-pill">Pool-A · VLAN10</span>
+      <span class="gc-ipam-pill gc-ipam-pill--conflict" title="Conflict">Overlapping VRF</span>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-tq">
+    <h2 id="gc-designer-tq" class="gc-designer__h2">Task queue dock (strip + toolbar)</h2>
+    <p class="gc-designer__note">Bottom dock in <code class="mono">base.html</code>; opened by <code class="mono">gc-task-queue-dock-open</code>.</p>
+    <div class="gc-designer__sandbox gc-designer__sandbox--stack">
+      <div class="gc-task-queue-bottom-tab" style="position: relative" aria-hidden="false">
+        <button type="button" class="gc-task-queue-bottom-tab__main">
+          <span class="gc-task-queue-bottom-tab__label">Task queue (3 pending)</span>
+        </button>
+        <button type="button" class="icon-btn gc-task-queue-bottom-tab__approve-all" title="Approve all" aria-label="Approve all">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path fill="currentColor" d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19.01l1.41-1.41L1.83 12 .41 13.41z" />
+          </svg>
+        </button>
+      </div>
+      <div class="gc-task-queue-dock__head" style="position: relative; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px">
+        <p class="gc-task-queue-dock__tab-label" style="margin: 0 0 8px">Task queue</p>
+        <div class="gc-task-queue-dock__head-middle" style="flex-wrap: wrap; gap: 8px">
+          <button type="button" class="filters__toggle gc-task-queue-dock__filters-toggle" aria-expanded="false">
+            <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+            </svg>
+            <span class="filters__title-label">Filters</span>
+          </button>
+          <button type="button" class="btn task-queue-toolbar-btn task-queue-toolbar-btn--approve">Approve All</button>
+          <button type="button" class="btn task-queue-toolbar-btn task-queue-toolbar-btn--approve" disabled>Approve Selected</button>
+          <button type="button" class="btn task-queue-toolbar-btn task-queue-toolbar-btn--reject" disabled>Reject Selected</button>
+          <div class="toolbar__search-cluster task-queue-toolbar__search-cluster">
+            <div class="search-field">
+              <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+              </svg>
+              <input type="search" class="search-field__input" placeholder="Search" aria-label="Search" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-more">
+    <h2 id="gc-designer-more" class="gc-designer__h2">Also used in the app (open a real page)</h2>
+    <p class="gc-designer__note">
+      Full markup for Web filter policy, authentication identities, profiles entity picker, bridge/LAG/VLAN/alias/zone flyouts, IPS DoS/spoof/custom-signature/trusted-MAC sheets, configuration inventory modals, and the settings modal lives in
+      <code class="mono">templates/partials/</code>. The top bar “24h” sparkline uses <code class="mono">top-bar-connected-mini</code> and
+      <code class="mono">gc-topbar-connected-mini.js</code>.
+    </p>
+  </section>
+</main>
+{% endblock %}

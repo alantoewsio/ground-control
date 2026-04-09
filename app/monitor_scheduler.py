@@ -25,6 +25,8 @@ from app.monitor_rollup import (
     run_rollup_for_previous_complete_utc_hour,
     run_rollup_for_previous_utc_day,
 )
+from app.firewall_config_sync import list_sync_entity_catalog, run_firewall_config_sync
+from app.secrets_database import SecretsSessionLocal
 from app.tls_certificate_renewal import run_tls_certificate_renewal_job
 
 _log = logging.getLogger(__name__)
@@ -88,6 +90,136 @@ def _probe_worker(
         docker_firewall_tcp_host(target.host), target.port, timeout_sec=timeout_sec
     )
     return ProbeResult(target.firewall_id, ms, err)
+
+
+def run_immediate_firewall_webadmin_probe(firewall_id: int) -> bool | None:
+    """
+    One-off TCP probe for a single firewall (same path as the scheduled monitor).
+
+    When monitoring is enabled, appends a ``FirewallWebadminPing`` row. On TCP success,
+    updates ``Firewall.last_online_at`` so inventory online/offline reflects the result.
+
+    Returns:
+        ``True`` if TCP connect succeeded, ``False`` if it failed, ``None`` if no firewall row.
+    """
+    timeout_sec = config.monitor_tcp_timeout_seconds()
+    with SessionLocal() as db:
+        row = db.get(Firewall, int(firewall_id))
+        if not row:
+            return None
+        target = _FirewallProbeTarget(
+            int(row.id),
+            str(row.host),
+            int(row.port),
+            bool(row.is_test),
+        )
+        monitor_on = bool(row.monitor_enabled)
+
+    pr = _probe_worker(target, timeout_sec=timeout_sec)
+
+    if monitor_on:
+        with MonitorSessionLocal() as mdb:
+            mdb.add(
+                FirewallWebadminPing(
+                    firewall_id=pr.firewall_id,
+                    response_ms=pr.response_ms,
+                    error_message=pr.error_message,
+                )
+            )
+            mdb.commit()
+
+    if pr.response_ms is not None:
+        now = _utc_now()
+        with SessionLocal() as db2:
+            db2.query(Firewall).filter(Firewall.id == int(firewall_id)).update(
+                {Firewall.last_online_at: now}, synchronize_session=False
+            )
+            db2.commit()
+        return True
+    return False
+
+
+def _daily_full_sync_one_firewall(firewall_id: int, all_entity_ids: list[str]) -> None:
+    db = None
+    sdb = None
+    try:
+        db = SessionLocal()
+        sdb = SecretsSessionLocal()
+        result = run_firewall_config_sync(
+            db,
+            sdb,
+            firewall_id,
+            entities=all_entity_ids,
+            entities_explicit=True,
+        )
+        if result.get("ok") or result.get("skipped"):
+            return
+        err = result.get("error") or result.get("detail") or result
+        _log.warning(
+            "Daily full firewall sync failed (firewall_id=%s): %s",
+            firewall_id,
+            err,
+        )
+    except Exception:
+        _log.exception("Daily full firewall sync raised (firewall_id=%s)", firewall_id)
+    finally:
+        if sdb is not None:
+            sdb.close()
+        if db is not None:
+            db.close()
+
+
+def run_daily_full_firewall_config_sync_job() -> int:
+    """
+    Full catalog config-sync for each non-test firewall, in a thread pool (separate DB sessions per worker).
+
+    Runs on a daily UTC cron. Skipped under pytest, when disabled via config, or when the catalog is empty.
+    Returns the number of firewalls queued for sync.
+    """
+    if config.under_pytest():
+        return 0
+    if not config.daily_full_firewall_sync_enabled():
+        return 0
+
+    catalog = list_sync_entity_catalog()
+    all_entity_ids = [x["id"] for x in catalog]
+    if not all_entity_ids:
+        _log.warning("Daily full firewall sync: empty entity catalog; skipping.")
+        return 0
+
+    with SessionLocal() as db:
+        fw_ids = [
+            int(r[0])
+            for r in db.query(Firewall.id)
+            .filter(Firewall.is_test.is_(False))
+            .order_by(Firewall.id)
+            .all()
+        ]
+
+    if not fw_ids:
+        return 0
+
+    n = len(fw_ids)
+    cap = config.daily_full_firewall_sync_max_workers()
+    max_workers = min(cap, n, _MAX_WORKERS_CAP)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [
+            pool.submit(_daily_full_sync_one_firewall, fid, all_entity_ids)
+            for fid in fw_ids
+        ]
+        for fut in as_completed(futures):
+            try:
+                fut.result()
+            except Exception:
+                _log.exception("Daily full firewall sync worker future failed")
+
+    _log.info(
+        "Daily full firewall config sync completed for %s firewall(s) (max_workers=%s).",
+        n,
+        max_workers,
+    )
+    return n
 
 
 def run_history_retention_job() -> None:
@@ -248,12 +380,24 @@ def start_monitor_scheduler() -> None:
             max_instances=1,
             coalesce=True,
         )
+        _ds_h, _ds_m = config.daily_full_firewall_sync_at_utc()
+        sched.add_job(
+            run_daily_full_firewall_config_sync_job,
+            CronTrigger(hour=_ds_h, minute=_ds_m, timezone=_UTC),
+            id="daily_full_firewall_config_sync",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
         sched.start()
         _scheduler = sched
         _log.info(
             "Firewall webadmin monitor scheduler started "
             "(1-minute tick; per-firewall probe interval from inventory; "
-            "daily history retention at 04:07 UTC; TLS auto-renewal check at 03:41 UTC)."
+            "daily history retention at 04:07 UTC; TLS auto-renewal check at 03:41 UTC; "
+            "daily full inventory sync at %02d:%02d UTC when enabled).",
+            _ds_h,
+            _ds_m,
         )
 
         def _backfill_rollups() -> None:

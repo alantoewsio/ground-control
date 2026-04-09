@@ -129,7 +129,9 @@ def register_authenticated_session(
     ip = _request_client_ip(request)
     with _active_session_lock:
         prev = _active_sessions.get(tok)
-        logged_in_at = float(prev["logged_in_at"]) if prev and "logged_in_at" in prev else now
+        logged_in_at = (
+            float(prev["logged_in_at"]) if prev and "logged_in_at" in prev else now
+        )
         _active_sessions[tok] = {
             "user_id": str(user_id).strip(),
             "username": (username or "").strip() or None,
@@ -273,7 +275,7 @@ def list_active_admin_sessions() -> list[dict[str, object]]:
     keep: list[tuple[str, dict[str, object]]] = []
     out: list[dict[str, object]] = []
     with _active_session_lock:
-        for tok, row in list(_active_sessions.items()):
+        for tok, row in _active_sessions.items():
             uid = str(row.get("user_id") or "").strip()
             if not uid:
                 _active_sessions.pop(tok, None)
@@ -308,9 +310,7 @@ def list_active_admin_sessions() -> list[dict[str, object]]:
                 "last_activity_at": datetime.fromtimestamp(
                     last_activity_at, tz=timezone.utc
                 ).isoformat(),
-                "last_activity_seconds_ago": max(
-                    0, int(round(now - last_activity_at))
-                ),
+                "last_activity_seconds_ago": max(0, int(round(now - last_activity_at))),
             }
         )
 

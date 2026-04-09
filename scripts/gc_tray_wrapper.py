@@ -9,9 +9,9 @@ Console with ANSI-colored output when the child emits escape sequences (``FORCE_
 
 Runs in the repository root context. **Native** mode stops listeners on the configured
 HTTP/HTTPS ports (matching scripts/restart-dev.ps1), then launches ``uv run python main.py``
-(or ``python main.py`` when ``uv`` is unavailable). **Docker** mode runs
-``docker compose build`` then ``docker compose up -d --force-recreate`` for ``ground-control``
-in this repo (Start and Restart both rebuild the image); the console shows ``docker compose logs -f`` output.
+(or ``python main.py`` when ``uv`` is unavailable). **Docker** mode: **Start** runs ``docker compose up -d`` (no image build). **Restart** runs
+``docker compose restart`` on the service. Use **Rebuild** for ``docker compose build`` plus
+``up -d --force-recreate``; the console shows ``docker compose logs -f`` output.
 
 Install launcher extras: ``uv sync --group tray``
 Run: ``uv run --group tray python scripts/gc_tray_wrapper.py``
@@ -21,6 +21,10 @@ macOS installs ``~/Library/LaunchAgents/com.groundcontrol.tray.plist`` and runs 
 
 **Close dashboard:** the window close button minimizes to the tray; hold **Ctrl** (Windows / Linux with X11)
 or **Command** (macOS) while clicking close to **quit the launcher** entirely.
+
+**Update:** when the checkout is a Git repo with an upstream, the dashboard polls ``git fetch`` periodically;
+if the remote branch is ahead of ``HEAD``, an **Update** control (left of the theme toggle) enables and runs
+``git pull --ff-only`` then ``scripts/build_launcher.ps1`` (Windows PowerShell, or ``pwsh`` elsewhere).
 """
 
 from __future__ import annotations
@@ -103,8 +107,18 @@ _DOCKER_SECRETS_DIR = _REPO_ROOT / ".gc_docker_secrets"
 # Toolbar run-mode radios show "Native" / "Docker"; tooltips carry the full descriptions.
 _RUN_MODE_TOOLTIP_NATIVE = "Run natively (Python / uv on this machine)"
 _RUN_MODE_TOOLTIP_DOCKER = (
-    "Run in Docker (compose build + up — Start/Restart recreates the container)"
+    "Run in Docker (Start: compose up — no build; Restart: compose restart; Rebuild: build + recreate)"
 )
+_TOOLTIP_RESTART = "Restart without rebuilding (Docker: compose restart; native: stop then start)"
+_TOOLTIP_DOCKER_REBUILD = (
+    "Rebuild image and recreate container (compose build + up --force-recreate). "
+    "Only enabled in Docker run mode."
+)
+_TOOLTIP_UPDATE = (
+    "Pull the latest changes from GitHub and rebuild the launcher (restarts the tray app when done)"
+)
+_GIT_FETCH_TIMEOUT_SEC = 120.0
+_GIT_UPDATE_POLL_INTERVAL_MS = 300_000
 
 
 def _parse_docker_inspect_started_at(raw: str) -> float | None:
@@ -231,7 +245,7 @@ def _control_or_command_held_for_window_close() -> bool:
     return _x11_control_modifier_down()
 
 
-def _read_gc_postgres_password_from_dotenv() -> str | None:
+def _read_postgres_password_from_dotenv_file() -> str | None:
     env_path = _REPO_ROOT / ".env"
     if not env_path.is_file():
         return None
@@ -239,18 +253,20 @@ def _read_gc_postgres_password_from_dotenv() -> str | None:
         text = env_path.read_text(encoding="utf-8")
     except OSError:
         return None
+    prefixes = ("GC_POSTGRES_PASSWORD=", "GROUND_CONTROL_POSTGRES_PASSWORD=")
     for line in text.splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
-        if s.startswith("GC_POSTGRES_PASSWORD="):
-            val = s.split("=", 1)[1].strip().strip('"').strip("'")
-            return val or None
+        for pref in prefixes:
+            if s.startswith(pref):
+                val = s.split("=", 1)[1].strip().strip('"').strip("'")
+                return val or None
     return None
 
 
 def _migrate_postgres_password_secret_from_dotenv() -> None:
-    """If the Postgres secret file is empty, copy ``GC_POSTGRES_PASSWORD`` from project ``.env`` once.
+    """If the Postgres secret file is empty, copy a password from project ``.env`` once.
 
     Older setups used ``GC_POSTGRES_PASSWORD`` in ``.env`` with compose interpolation; migrating
     into ``.gc_docker_secrets/`` keeps existing volumes reachable without embedding passwords in YAML.
@@ -261,7 +277,7 @@ def _migrate_postgres_password_secret_from_dotenv() -> None:
             return
     except OSError:
         return
-    val = _read_gc_postgres_password_from_dotenv()
+    val = _read_postgres_password_from_dotenv_file()
     if not val:
         return
     try:
@@ -270,9 +286,35 @@ def _migrate_postgres_password_secret_from_dotenv() -> None:
         pass
 
 
+def _sync_postgres_secret_from_host_environ() -> None:
+    """If the secret file is still empty, copy from the host environment (Launcher loads ``.env`` via app.config)."""
+    secret_path = _DOCKER_SECRETS_DIR / "ground_control_postgres_password"
+    try:
+        if secret_path.read_text(encoding="utf-8").strip():
+            return
+    except OSError:
+        return
+    for key in ("GROUND_CONTROL_POSTGRES_PASSWORD", "GC_POSTGRES_PASSWORD"):
+        val = (os.environ.get(key) or "").strip()
+        if val:
+            try:
+                secret_path.write_text(val + "\n", encoding="utf-8")
+            except OSError:
+                pass
+            return
+
+
 def _ensure_docker_secrets_stub_files() -> None:
     """Ensure compose secret file paths exist (empty = no override in the container)."""
     _DOCKER_SECRETS_DIR.mkdir(parents=True, exist_ok=True)
+    # If this path is a directory (e.g. mistaken mkdir), Compose mounts a dir and the app sees an
+    # empty password. Replace with a regular file so the secret mounts correctly.
+    _pg_secret = _DOCKER_SECRETS_DIR / "ground_control_postgres_password"
+    try:
+        if _pg_secret.is_dir():
+            shutil.rmtree(_pg_secret)
+    except OSError:
+        pass
     for spec in DOCKER_SECRET_SPECS:
         p = _DOCKER_SECRETS_DIR / spec.file_name
         if not p.exists():
@@ -282,6 +324,7 @@ def _ensure_docker_secrets_stub_files() -> None:
         if not p.exists():
             p.write_bytes(b"")
     _migrate_postgres_password_secret_from_dotenv()
+    _sync_postgres_secret_from_host_environ()
 
 
 def _docker_compose_publish_env() -> dict[str, str]:
@@ -502,7 +545,7 @@ def _resolve_listen_ports() -> tuple[int, int]:
 
 
 def _web_management_browser_url() -> str:
-    """HTTPS admin URL from saved security state when TLS is on; otherwise HTTP (same host/port)."""
+    """``https://`` URL using configured TLS hostname (Security) and HTTPS listen port (saved state or env default)."""
     from app.security_settings import load_security_ui_state, primary_tls_hostname
     from app.url_helpers import https_admin_url_for_firewall
 
@@ -510,9 +553,8 @@ def _web_management_browser_url() -> str:
     host = primary_tls_hostname(st).strip() or "127.0.0.1"
     if host in ("0.0.0.0", "::", "*"):
         host = "127.0.0.1"
-    if st.https_enabled and st.https_port is not None:
-        return https_admin_url_for_firewall(host, st.https_port)
-    return f"http://{host}:{st.http_port}/"
+    port = st.https_port if st.https_port is not None else gc_config.https_listen_port()
+    return https_admin_url_for_firewall(host, port)
 
 
 def _host_logical_cpu_count() -> int:
@@ -586,6 +628,65 @@ def _subprocess_no_window_kw() -> dict[str, int]:
         return {}
     cf = _windows_subprocess_creationflags()
     return {"creationflags": cf} if cf else {}
+
+
+def _git_remote_has_newer_commits(repo: Path) -> tuple[bool, str]:
+    """``git fetch`` from ``origin`` and return whether ``@{upstream}`` is ahead of ``HEAD``.
+
+    On failure (not a repo, no upstream, network error), returns ``(False, reason)``.
+    """
+    if not shutil.which("git"):
+        return False, "git not on PATH"
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            **_subprocess_no_window_kw(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+    if r.returncode != 0 or (r.stdout or "").strip().lower() != "true":
+        return False, "not a git checkout"
+    try:
+        fe = subprocess.run(
+            ["git", "-C", str(repo), "fetch", "origin", "--prune"],
+            capture_output=True,
+            text=True,
+            timeout=_GIT_FETCH_TIMEOUT_SEC,
+            **_subprocess_no_window_kw(),
+        )
+    except subprocess.TimeoutExpired:
+        return False, "git fetch timed out"
+    except OSError as e:
+        return False, str(e)
+    if fe.returncode != 0:
+        err = (fe.stderr or fe.stdout or "").strip()
+        return False, (err[:400] if err else "git fetch failed")
+    ur = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", "HEAD@{upstream}"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        **_subprocess_no_window_kw(),
+    )
+    if ur.returncode != 0:
+        return False, "no upstream tracking branch"
+    cnt = subprocess.run(
+        ["git", "-C", str(repo), "rev-list", "--count", "HEAD..@{upstream}"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        **_subprocess_no_window_kw(),
+    )
+    if cnt.returncode != 0:
+        return False, "could not compare to upstream"
+    try:
+        n = int((cnt.stdout or "").strip())
+    except ValueError:
+        return False, "bad rev-list output"
+    return n > 0, ""
 
 
 def _build_launch_command() -> list[str]:
@@ -878,25 +979,32 @@ def _render_status_hourglass_rgba(
     return im.resize((out_w, out_h), _PIL_LANCZOS)
 
 
-def _make_dashboard_toolbar_photos(master: Any) -> tuple[Any, Any, Any]:
+def _make_dashboard_toolbar_photos(master: Any) -> tuple[Any, Any, Any, Any]:
     """Small RGBA icons for ttk toolbar; supersampled in PIL then LANCZOS downscaled for smooth edges."""
     out = 18
     s = 4
     W = out * s
     photos: list[Any] = []
-    for kind in ("start", "stop", "restart"):
+    for kind in ("start", "stop", "restart", "rebuild"):
         im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
         d = ImageDraw.Draw(im)
         if kind == "start":
             d.polygon([(3 * s, 2 * s), (3 * s, 16 * s), (15 * s, 9 * s)], fill=(34, 197, 94, 255))
         elif kind == "stop":
             d.rounded_rectangle((3 * s, 3 * s, 15 * s, 15 * s), radius=2 * s, fill=(239, 68, 68, 255))
-        else:
+        elif kind == "restart":
             d.arc((2 * s, 2 * s, 16 * s, 16 * s), start=45, end=305, fill=(59, 130, 246, 255), width=max(2, int(2 * s)))
             d.polygon([(12 * s, 3 * s), (15 * s, 6 * s), (12 * s, 8 * s)], fill=(59, 130, 246, 255))
+        else:
+            # Restart arc (amber) + stacked lines = rebuild from source
+            d.arc((2 * s, 2 * s, 16 * s, 16 * s), start=45, end=305, fill=(245, 158, 11, 255), width=max(2, int(2 * s)))
+            d.polygon([(12 * s, 3 * s), (15 * s, 6 * s), (12 * s, 8 * s)], fill=(245, 158, 11, 255))
+            lw = max(2, int(1.5 * s))
+            d.line([(4 * s, 14 * s), (10 * s, 14 * s)], fill=(251, 191, 36, 255), width=lw)
+            d.line([(5 * s, 11 * s), (10 * s, 11 * s)], fill=(252, 211, 77, 255), width=lw)
         im_small = im.resize((out, out), _PIL_LANCZOS)
         photos.append(ImageTk.PhotoImage(im_small, master=master))
-    return photos[0], photos[1], photos[2]
+    return photos[0], photos[1], photos[2], photos[3]
 
 
 def _make_console_chrome_photos(master: Any, *, dark: bool) -> tuple[Any, Any]:
@@ -1282,6 +1390,12 @@ class GcTrayApp:
         self._log_lines_lock = threading.Lock()
         self._theme_user_pinned: bool = False
         self._btn_theme: Any = None
+        self._btn_update: Any = None
+        self._git_update_available: bool = False
+        self._git_update_apply_in_progress: bool = False
+        self._git_fetch_thread_running: bool = False
+        self._git_fetch_lock = threading.Lock()
+        self._git_update_poll_job: str | None = None
         self._lnk_web_mgmt: Any = None
         self._status_canvas: Any = None
         self._status_label: Any = None
@@ -1320,6 +1434,7 @@ class GcTrayApp:
         self._photo_btn_start: Any = None
         self._photo_btn_stop: Any = None
         self._photo_btn_restart: Any = None
+        self._photo_btn_rebuild: Any = None
         self._photo_console_clear: Any = None
         self._photo_console_copy: Any = None
         self._console_copy_tooltip_job: str | None = None
@@ -1479,17 +1594,40 @@ class GcTrayApp:
         cpu = _cpu_percent_of_total_capacity(cpu)
         return cpu, ram
 
-    def _docker_up_thread(self) -> None:
+    def _docker_up_thread(self, *, rebuild: bool) -> None:
         try:
             if not _docker_compose_argv():
                 self._schedule(lambda: self._finish_docker_start(False, "docker compose not available (install Docker / add to PATH)."))
                 return
             build_argv = _docker_compose_argv("build", _DOCKER_COMPOSE_SERVICE)
-            up_argv = _docker_compose_argv("up", "-d", "--force-recreate", _DOCKER_COMPOSE_SERVICE)
-            if not build_argv or not up_argv:
+            up_recreate_argv = _docker_compose_argv("up", "-d", "--force-recreate", _DOCKER_COMPOSE_SERVICE)
+            up_argv = _docker_compose_argv("up", "-d", _DOCKER_COMPOSE_SERVICE)
+            if rebuild:
+                if not build_argv or not up_recreate_argv:
+                    self._schedule(lambda: self._finish_docker_start(False, "docker compose not available (install Docker / add to PATH)."))
+                    return
+            elif not up_argv:
                 self._schedule(lambda: self._finish_docker_start(False, "docker compose not available (install Docker / add to PATH)."))
                 return
             _ensure_docker_secrets_stub_files()
+            try:
+                pg_secret_text = (
+                    (_DOCKER_SECRETS_DIR / "ground_control_postgres_password").read_text(encoding="utf-8").strip()
+                )
+            except OSError:
+                pg_secret_text = ""
+            if not pg_secret_text:
+                self._schedule(
+                    lambda: self._finish_docker_start(
+                        False,
+                        "PostgreSQL password is missing: open Settings → Docker secrets, set "
+                        "'PostgreSQL password' (use Generate if needed), click Save Docker secrets, then start again. "
+                        "Or add your password to .gc_docker_secrets/ground_control_postgres_password. "
+                        "If the password is only in .env as GROUND_CONTROL_POSTGRES_PASSWORD or "
+                        "GC_POSTGRES_PASSWORD, restart the Launcher once so it can copy it into that file.",
+                    )
+                )
+                return
             env = os.environ.copy()
             env.update(_docker_compose_publish_env())
             run_kw: dict[str, Any] = {
@@ -1499,13 +1637,18 @@ class GcTrayApp:
                 "env": env,
                 **_subprocess_no_window_kw(),
             }
-            r_b = subprocess.run(build_argv, timeout=1200, **run_kw)
-            b_tail = "\n".join(x for x in ((r_b.stdout or "").strip(), (r_b.stderr or "").strip()) if x)
-            if r_b.returncode != 0:
-                msg = b_tail or ("docker compose build exited with code %s" % r_b.returncode)
-                self._schedule(lambda m=msg: self._finish_docker_start(False, m))
-                return
-            r_u = subprocess.run(up_argv, timeout=600, **run_kw)
+            b_tail = ""
+            if rebuild:
+                r_b = subprocess.run(build_argv, timeout=1200, **run_kw)
+                b_tail = "\n".join(x for x in ((r_b.stdout or "").strip(), (r_b.stderr or "").strip()) if x)
+                if r_b.returncode != 0:
+                    msg = b_tail or ("docker compose build exited with code %s" % r_b.returncode)
+                    self._schedule(lambda m=msg: self._finish_docker_start(False, m))
+                    return
+                up_use = up_recreate_argv
+            else:
+                up_use = up_argv
+            r_u = subprocess.run(up_use, timeout=600, **run_kw)
             u_tail = "\n".join(x for x in ((r_u.stdout or "").strip(), (r_u.stderr or "").strip()) if x)
             ok = r_u.returncode == 0
             msg = "\n\n".join(x for x in (b_tail, u_tail) if x) if ok else (u_tail or b_tail or ("docker compose up exited with code %s" % r_u.returncode))
@@ -1528,6 +1671,48 @@ class GcTrayApp:
             self._enqueue_log_note(f"\n=== Docker compose failed: {message} ===\n")
         self._refresh_dashboard_buttons()
         self._update_status_indicator()
+
+    def _finish_docker_restart_only(self, ok: bool, message: str) -> None:
+        self._invalidate_runtime_probe_cache()
+        with self._lock:
+            self._starting = False
+        if ok:
+            self._reset_console_ansi()
+            self._enqueue_log_note(
+                f"\n=== Docker service restarted at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                "(compose logs below) ===\n"
+            )
+            self._ensure_docker_log_stream()
+        else:
+            self._enqueue_log_note(f"\n=== Docker compose restart failed: {message} ===\n")
+        self._refresh_dashboard_buttons()
+        self._update_status_indicator()
+
+    def _docker_restart_thread(self) -> None:
+        try:
+            argv = _docker_compose_argv("restart", _DOCKER_COMPOSE_SERVICE)
+            if not argv:
+                self._schedule(
+                    lambda: self._finish_docker_restart_only(False, "docker compose not available (install Docker / add to PATH).")
+                )
+                return
+            env = os.environ.copy()
+            env.update(_docker_compose_publish_env())
+            r = subprocess.run(
+                argv,
+                cwd=_REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                env=env,
+                **_subprocess_no_window_kw(),
+            )
+            tail = "\n".join(x for x in ((r.stdout or "").strip(), (r.stderr or "").strip()) if x)
+            ok = r.returncode == 0
+            msg = tail or ("docker compose restart exited with code %s" % r.returncode)
+            self._schedule(lambda ok=ok, msg=msg: self._finish_docker_restart_only(ok, msg))
+        except Exception as e:  # noqa: BLE001
+            self._schedule(lambda e=e: self._finish_docker_restart_only(False, str(e)))
 
     def _service_running_for_status(self) -> bool:
         """True if HTTP/HTTPS listeners exist or our native child / compose service is up."""
@@ -1739,6 +1924,16 @@ class GcTrayApp:
                 return False
         return self._service_running_for_status()
 
+    def _can_rebuild_docker(self) -> bool:
+        with self._lock:
+            if self._starting or self._stopping:
+                return False
+            if self._run_mode != "docker":
+                return False
+        if not _DOCKER_COMPOSE_FILE.is_file():
+            return False
+        return bool(_docker_compose_argv())
+
     def _build_menu(self) -> Menu:
         return Menu(
             MenuItem(_TRAY_MENU_OPEN, self._menu_open_charts, default=True),
@@ -1764,6 +1959,143 @@ class GcTrayApp:
 
     def _schedule(self, fn: object) -> None:
         self._root.after(0, fn)  # type: ignore[arg-type]
+
+    def _git_update_poll_loop(self) -> None:
+        self._start_git_update_check()
+        self._git_update_poll_job = self._root.after(_GIT_UPDATE_POLL_INTERVAL_MS, self._git_update_poll_loop)
+
+    def _start_git_update_check(self) -> None:
+        if not shutil.which("git"):
+            self._git_update_available = False
+            self._schedule(self._apply_git_update_button_state)
+            return
+        with self._git_fetch_lock:
+            if self._git_fetch_thread_running:
+                return
+            self._git_fetch_thread_running = True
+
+        def work() -> None:
+            has_newer, _detail = _git_remote_has_newer_commits(_REPO_ROOT)
+
+            def done() -> None:
+                with self._git_fetch_lock:
+                    self._git_fetch_thread_running = False
+                self._git_update_available = has_newer
+                self._apply_git_update_button_state()
+
+            self._schedule(done)
+
+        threading.Thread(target=work, name="gc-git-fetch", daemon=True).start()
+
+    def _apply_git_update_button_state(self) -> None:
+        btn = self._btn_update
+        if btn is None:
+            return
+        try:
+            if not btn.winfo_exists():
+                return
+        except self._tk.TclError:
+            return
+        if self._git_update_apply_in_progress:
+            btn.configure(state=self._tk.DISABLED)
+            return
+        btn.configure(
+            state=(self._tk.NORMAL if self._git_update_available else self._tk.DISABLED),
+        )
+
+    def _launcher_build_argv(self) -> list[str] | None:
+        ps1 = _REPO_ROOT / "scripts" / "build_launcher.ps1"
+        if not ps1.is_file():
+            return None
+        if sys.platform == "win32":
+            return [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ps1),
+            ]
+        pwsh = shutil.which("pwsh")
+        if not pwsh:
+            return None
+        return [pwsh, "-NoProfile", "-File", str(ps1)]
+
+    def _launcher_build_popen_kw(self) -> dict[str, Any]:
+        if sys.platform == "win32" and hasattr(subprocess, "CREATE_NEW_CONSOLE"):
+            return {"creationflags": int(subprocess.CREATE_NEW_CONSOLE)}
+        return {}
+
+    def _on_update_click(self) -> None:
+        if not self._git_update_available or self._git_update_apply_in_progress:
+            return
+        from tkinter import messagebox
+
+        if self._dash_win is None:
+            return
+        if not messagebox.askokcancel(
+            "Update launcher",
+            "Pull the latest changes from GitHub and rebuild the launcher?\n\n"
+            "The launcher will restart when the build finishes.",
+            parent=self._dash_win,
+        ):
+            return
+        self._git_update_apply_in_progress = True
+        self._apply_git_update_button_state()
+
+        def work() -> None:
+            try:
+                pull = subprocess.run(
+                    ["git", "-C", str(_REPO_ROOT), "pull", "--ff-only"],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    **_subprocess_no_window_kw(),
+                )
+            except (OSError, subprocess.TimeoutExpired) as e:
+
+                def err_ui() -> None:
+                    self._git_update_apply_in_progress = False
+                    messagebox.showerror("Git pull failed", str(e), parent=self._dash_win)
+                    self._apply_git_update_button_state()
+                    self._start_git_update_check()
+
+                self._schedule(err_ui)
+                return
+
+            def after_pull() -> None:
+                if pull.returncode != 0:
+                    self._git_update_apply_in_progress = False
+                    err = (pull.stderr or pull.stdout or "").strip()
+                    messagebox.showerror(
+                        "Git pull failed",
+                        (err[:1200] if err else "Unknown error"),
+                        parent=self._dash_win,
+                    )
+                    self._apply_git_update_button_state()
+                    self._start_git_update_check()
+                    return
+                self._enqueue_log_note("\n=== Pulled latest from GitHub; starting launcher build ===\n")
+                argv = self._launcher_build_argv()
+                if argv is None:
+                    self._git_update_apply_in_progress = False
+                    messagebox.showerror(
+                        "Build",
+                        "Could not run scripts/build_launcher.ps1 (missing script or PowerShell / pwsh).",
+                        parent=self._dash_win,
+                    )
+                    self._apply_git_update_button_state()
+                    return
+                try:
+                    subprocess.Popen(argv, cwd=str(_REPO_ROOT), **self._launcher_build_popen_kw())
+                except OSError as e:
+                    self._git_update_apply_in_progress = False
+                    messagebox.showerror("Build", str(e), parent=self._dash_win)
+                    self._apply_git_update_button_state()
+
+            self._schedule(after_pull)
+
+        threading.Thread(target=work, name="gc-git-pull", daemon=True).start()
 
     def _refresh_tray_menu(self) -> None:
         """pystray does not always re-run dynamic *enabled* callables when the menu opens; refresh explicitly."""
@@ -1796,6 +2128,12 @@ class GcTrayApp:
 
     def _quit_all(self) -> None:
         """Exit the Ground Control Launcher process (stops Ground Control, removes the launcher icon, ends Tk)."""
+        if self._git_update_poll_job is not None:
+            try:
+                self._root.after_cancel(self._git_update_poll_job)
+            except self._tk.TclError:
+                pass
+            self._git_update_poll_job = None
         self.stop_gc()
         self._metrics_stop.set()
         if self._icon:
@@ -2302,14 +2640,16 @@ class GcTrayApp:
             if mode == "native" and self._child_running():
                 return
         if mode == "docker":
-            if self._docker_container_running(force=True):
-                self._stop_docker_logs_pump()
-                self._enqueue_log_note("\n=== Rebuilding Docker image and recreating container ===\n")
             with self._lock:
                 self._starting = True
             self._refresh_dashboard_buttons()
             self._update_status_indicator()
-            threading.Thread(target=self._docker_up_thread, name="gc-docker-up", daemon=True).start()
+            self._enqueue_log_note("\n=== Starting Ground Control (Docker, compose up — no image build) ===\n")
+            threading.Thread(
+                target=lambda: self._docker_up_thread(rebuild=False),
+                name="gc-docker-up",
+                daemon=True,
+            ).start()
             return
 
         with self._lock:
@@ -2379,12 +2719,41 @@ class GcTrayApp:
         self._update_status_indicator()
 
     def restart_gc(self) -> None:
-        """Match restart-dev.ps1: free HTTP/HTTPS ports, then start the app (native); compose rebuild for Docker."""
+        """Native: stop then start. Docker: ``docker compose restart`` (no image rebuild)."""
         with self._lock:
             if self._starting or self._stopping:
                 return
+            mode = self._run_mode
+        if mode == "docker":
+            if not self._docker_container_running(force=True):
+                return
+            with self._lock:
+                self._starting = True
+            self._refresh_dashboard_buttons()
+            self._update_status_indicator()
+            self._enqueue_log_note("\n=== Docker compose restart (no image rebuild) ===\n")
+            threading.Thread(target=self._docker_restart_thread, name="gc-docker-restart", daemon=True).start()
+            return
         self.stop_gc()
         self.start_gc()
+
+    def docker_rebuild_gc(self) -> None:
+        """Docker only: ``docker compose build`` then ``up -d --force-recreate``."""
+        with self._lock:
+            if self._starting or self._stopping:
+                return
+            if self._run_mode != "docker":
+                return
+        with self._lock:
+            self._starting = True
+        self._refresh_dashboard_buttons()
+        self._update_status_indicator()
+        self._enqueue_log_note("\n=== Rebuilding Docker image and recreating container ===\n")
+        threading.Thread(
+            target=lambda: self._docker_up_thread(rebuild=True),
+            name="gc-docker-rebuild",
+            daemon=True,
+        ).start()
 
     def _tree_metrics(self, root_pid: int) -> tuple[float, float, int]:
         """Return (cpu % of total host capacity, rss_mb sum, thread count) for root and descendants."""
@@ -2455,6 +2824,7 @@ class GcTrayApp:
             self._dash_win.deiconify()
             self._dash_win.lift()
             self._dash_win.focus_force()
+            self._start_git_update_check()
             self._refresh_dashboard_buttons()
             self._update_status_indicator()
             if autostart_supported() and self._autostart_var is not None:
@@ -2521,11 +2891,22 @@ class GcTrayApp:
         self._btn_theme.pack(side=self._tk.RIGHT)
         self._btn_theme.bind("<Button-3>", self._on_theme_context_menu)
         self._btn_theme.bind("<Control-Button-1>", self._on_theme_context_menu)
+        self._btn_update = ttk.Button(
+            theme_wrap,
+            text="Update",
+            command=self._on_update_click,
+            state=self._tk.DISABLED,
+        )
+        self._btn_update.pack(side=self._tk.RIGHT, padx=(0, 6))
+        self._bind_hover_tooltip(self._btn_update, _TOOLTIP_UPDATE)
 
         if self._photo_btn_start is None:
-            self._photo_btn_start, self._photo_btn_stop, self._photo_btn_restart = _make_dashboard_toolbar_photos(
-                self._root
-            )
+            (
+                self._photo_btn_start,
+                self._photo_btn_stop,
+                self._photo_btn_restart,
+                self._photo_btn_rebuild,
+            ) = _make_dashboard_toolbar_photos(self._root)
         self._btn_start = ttk.Button(
             btn_row,
             text="Start",
@@ -2547,8 +2928,17 @@ class GcTrayApp:
             compound=self._tk.LEFT,
             command=self.restart_gc,
         )
-        for b in (self._btn_start, self._btn_stop, self._btn_restart):
+        self._btn_rebuild = ttk.Button(
+            btn_row,
+            text="Restart+rebuild",
+            image=self._photo_btn_rebuild,
+            compound=self._tk.LEFT,
+            command=self.docker_rebuild_gc,
+        )
+        for b in (self._btn_start, self._btn_stop, self._btn_restart, self._btn_rebuild):
             b.pack(side=self._tk.LEFT, padx=(0, 6))
+        self._bind_hover_tooltip(self._btn_restart, _TOOLTIP_RESTART)
+        self._bind_hover_tooltip(self._btn_rebuild, _TOOLTIP_DOCKER_REBUILD)
 
         if self._run_mode_var is None:
             self._run_mode_var = self._tk.StringVar(value=self._run_mode)
@@ -2773,6 +3163,7 @@ class GcTrayApp:
             mode_new = self._run_mode
         if mode_new == "docker" and self._docker_container_running():
             self._ensure_docker_log_stream()
+        self._start_git_update_check()
 
     def _on_dashboard_wm_delete(self) -> None:
         """Close button: minimize to tray; Ctrl/Cmd + close quits the launcher."""
@@ -2860,6 +3251,7 @@ class GcTrayApp:
         merged["run_mode"] = want
         _save_tray_settings(merged)
         self._sync_settings_docker_section()
+        self._refresh_dashboard_buttons()
 
     def _read_docker_secret_disk_text(self, file_name: str) -> str:
         p = _DOCKER_SECRETS_DIR / file_name
@@ -3550,8 +3942,13 @@ class GcTrayApp:
                 self._btn_start.config(state=(self._tk.NORMAL if self._can_start() else self._tk.DISABLED))
                 self._btn_stop.config(state=(self._tk.NORMAL if self._can_stop() else self._tk.DISABLED))
                 self._btn_restart.config(state=(self._tk.NORMAL if self._can_restart() else self._tk.DISABLED))
+                if getattr(self, "_btn_rebuild", None) is not None:
+                    self._btn_rebuild.config(
+                        state=(self._tk.NORMAL if self._can_rebuild_docker() else self._tk.DISABLED)
+                    )
             except self._tk.TclError:
                 pass
+        self._apply_git_update_button_state()
         self._refresh_tray_menu()
 
     def _on_notebook_tab_changed(self, _event: Any = None) -> None:
@@ -3945,6 +4342,7 @@ class GcTrayApp:
         threading.Thread(target=tray_thread, name="pystray", daemon=True).start()
         self._root.after(100, self._drain_log_queue_loop)
         self._root.after(600, self._tray_menu_refresh_loop)
+        self._root.after(2500, self._git_update_poll_loop)
         self._root.after(8000, self._poll_os_theme_loop)
         try:
             self._root.mainloop()

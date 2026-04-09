@@ -878,6 +878,19 @@
       },
     });
 
+    (function applyIfSearchFromQuery() {
+      try {
+        var u = new URL(window.location.href);
+        var q = (u.searchParams.get("if_search") || "").trim();
+        if (!q || !tableIf || typeof tableIf.applyRowFilter !== "function") return;
+        var inp = document.getElementById("gc-net-if-search");
+        if (inp && !String(inp.value || "").trim()) {
+          inp.value = q;
+          tableIf.applyRowFilter();
+        }
+      } catch (e) {}
+    })();
+
     (function bindNetIfDeleteSelected() {
       var btn = document.getElementById("gc-net-if-delete-selected");
       if (!btn || !tableIf) return;

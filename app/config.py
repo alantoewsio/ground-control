@@ -30,9 +30,11 @@ def _docker_postgres_sqlalchemy_url(database_name: str) -> str | None:
     import os
     from urllib.parse import quote_plus
 
+    from app.docker_secrets import docker_postgres_password_value
+
     if not in_docker_deployment():
         return None
-    pw = (os.environ.get("GROUND_CONTROL_POSTGRES_PASSWORD") or "").strip()
+    pw = docker_postgres_password_value()
     if not pw:
         return None
     host = (os.environ.get("GROUND_CONTROL_POSTGRES_HOST") or "postgres").strip() or "postgres"
@@ -57,8 +59,10 @@ def _database_url_impl(
         return built
     if in_docker_deployment():
         raise RuntimeError(
-            f"Docker deployment requires a non-empty Docker secret ground_control_postgres_password "
-            f"(hydrated as GROUND_CONTROL_POSTGRES_PASSWORD) or an explicit {env_key}."
+            "Docker deployment needs a Postgres password: set Launcher → Settings → Docker secrets → "
+            "PostgreSQL password (Save Docker secrets), or put a single line in "
+            f".gc_docker_secrets/ground_control_postgres_password on the host (compose mounts it to "
+            f"/run/secrets/). You can also set {env_key} or GROUND_CONTROL_POSTGRES_PASSWORD explicitly."
         )
     return f"sqlite:///{BASE_DIR / sqlite_relative_name}"
 
@@ -159,6 +163,43 @@ def tls_auto_renewal_enabled() -> bool:
 
     raw = (os.environ.get("GROUND_CONTROL_TLS_AUTO_RENEW") or "1").strip().lower()
     return raw not in ("0", "false", "no", "off")
+
+
+def daily_full_firewall_sync_enabled() -> bool:
+    """Scheduled daily full inventory sync for all firewalls. Env: GROUND_CONTROL_DAILY_FULL_SYNC (default on)."""
+    import os
+
+    raw = (os.environ.get("GROUND_CONTROL_DAILY_FULL_SYNC") or "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def daily_full_firewall_sync_at_utc() -> tuple[int, int]:
+    """Cron time (hour, minute) in UTC. Env: GROUND_CONTROL_DAILY_FULL_SYNC_AT=HH:MM (default 02:15)."""
+    import os
+
+    raw = (os.environ.get("GROUND_CONTROL_DAILY_FULL_SYNC_AT") or "02:15").strip()
+    parts = raw.split(":")
+    if len(parts) == 2:
+        try:
+            h = int(parts[0].strip(), 10)
+            m = int(parts[1].strip(), 10)
+            if 0 <= h <= 23 and 0 <= m <= 59:
+                return h, m
+        except ValueError:
+            pass
+    return 2, 15
+
+
+def daily_full_firewall_sync_max_workers() -> int:
+    """Max parallel full syncs (thread pool). Env: GROUND_CONTROL_DAILY_FULL_SYNC_MAX_WORKERS (default 8, max 64)."""
+    import os
+
+    raw = (os.environ.get("GROUND_CONTROL_DAILY_FULL_SYNC_MAX_WORKERS") or "8").strip()
+    try:
+        n = int(raw, 10)
+    except ValueError:
+        return 8
+    return max(1, min(n, 64))
 
 
 SESSION_SECRET_ENV = "GROUND_CONTROL_SESSION_SECRET"

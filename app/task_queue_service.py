@@ -66,6 +66,7 @@ from app.firewall_config_sync import (
     ENTITY_IPS_POLICY,
     ENTITY_IPS_SWITCH,
     ENTITY_LAG,
+    ENTITY_NETFLOW_CONFIGURATION,
     ENTITY_SCHEDULE,
     ENTITY_SPOOF_PREVENTION,
     ENTITY_SURFING_QUOTA_POLICY,
@@ -111,6 +112,8 @@ from app.ips_dos_spoof_task import (
     merge_dos_settings_payload,
     merge_spoof_prevention_payload,
 )
+from app.netflow_configuration_merge import merge_netflow_configuration_payload
+from app.netflow_sophos_update import apply_netflow_configuration_set
 from app.ips_policy_merge import (
     policy_from_client_dict,
     task_payload_for_update,
@@ -150,6 +153,7 @@ _TEST_SINGLETON_ENTITY_TYPES = frozenset(
         ENTITY_IPS_SWITCH,
         ENTITY_DOS_SETTINGS,
         ENTITY_SPOOF_PREVENTION,
+        ENTITY_NETFLOW_CONFIGURATION,
     }
 )
 
@@ -865,6 +869,8 @@ def sync_catalog_ids_for_task_entity(entity_type: str) -> list[str]:
         return ["decryption_profile"]
     if entity_type == ENTITY_VPN_PROFILE:
         return ["vpn_profile"]
+    if entity_type == ENTITY_NETFLOW_CONFIGURATION:
+        return ["netflow_configuration"]
     sync_map: dict[str, str] = {
         "acl_rule": "acl_rule",
         "admin_authen": "admin_authen",
@@ -1856,6 +1862,81 @@ def enqueue_dos_settings_update(
     db.commit()
     db.refresh(task)
     return task
+
+
+def enqueue_netflow_configuration_update(
+    db: Session,
+    *,
+    firewall_id: int,
+    server_rows: list[dict[str, Any]],
+    created_by_user_id: str | None = None,
+    created_by_username: str | None = None,
+) -> TaskQueue | None:
+    entry = _firewall_singleton_config_entry(
+        db, firewall_id=firewall_id, entity_type=ENTITY_NETFLOW_CONFIGURATION
+    )
+    base: dict[str, Any] = {}
+    if entry is not None:
+        try:
+            base = json.loads(entry.payload_json)
+        except (json.JSONDecodeError, TypeError):
+            base = {}
+        if not isinstance(base, dict):
+            base = {}
+    rows = server_rows if isinstance(server_rows, list) else []
+    merged = merge_netflow_configuration_payload(base, rows)
+    if _task_payload_matches_cache(entry, merged):
+        return None
+    external_name = entry.external_name if entry is not None else "__config__"
+    task = TaskQueue(
+        firewall_id=firewall_id,
+        entity_type=ENTITY_NETFLOW_CONFIGURATION,
+        external_name=external_name,
+        status="pending",
+        error_message=None,
+        payload_json=json.dumps(merged, separators=(",", ":"), default=str),
+        created_by_user_id=created_by_user_id,
+        created_by_username=created_by_username,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def enqueue_netflow_configuration_clear_batch(
+    db: Session,
+    *,
+    firewall_ids: list[int],
+    created_by_user_id: str | None = None,
+    created_by_username: str | None = None,
+) -> list[TaskQueue]:
+    """Queue Configure Netflow with an empty ``Server`` list for each firewall."""
+    seen: set[int] = set()
+    ids: list[int] = []
+    for raw in firewall_ids:
+        try:
+            n = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if n <= 0 or n in seen:
+            continue
+        seen.add(n)
+        ids.append(n)
+    if not ids:
+        raise ValueError("No firewalls selected")
+    tasks: list[TaskQueue] = []
+    for fid in ids:
+        t = enqueue_netflow_configuration_update(
+            db,
+            firewall_id=fid,
+            server_rows=[],
+            created_by_user_id=created_by_user_id,
+            created_by_username=created_by_username,
+        )
+        if t is not None:
+            tasks.append(t)
+    return tasks
 
 
 def enqueue_spoof_prevention_update(
@@ -4797,6 +4878,8 @@ def process_task(
         xml_tag = "DoSSettings"
     elif task.entity_type == ENTITY_SPOOF_PREVENTION:
         xml_tag = "SpoofPrevention"
+    elif task.entity_type == ENTITY_NETFLOW_CONFIGURATION:
+        xml_tag = "NetFlowConfiguration"
     elif task.entity_type == ENTITY_IPS_POLICY:
         xml_tag = "IPSPolicy"
     elif task.entity_type == ENTITY_WEBFILTER_POLICY:
@@ -5051,6 +5134,8 @@ def process_task(
             fw.update("DoSSettings", update_params, name=None)
         elif task.entity_type == ENTITY_SPOOF_PREVENTION:
             fw.update("SpoofPrevention", update_params, name=None)
+        elif task.entity_type == ENTITY_NETFLOW_CONFIGURATION:
+            apply_netflow_configuration_set(fw, update_params)
         else:
             task.status = "error"
             task.error_message = f"Unsupported entity type for send: {task.entity_type}"
@@ -5256,6 +5341,8 @@ def _task_record_action_for_list(db: Session, task: TaskQueue) -> str:
         return "edit"
     if et == ENTITY_DOS_SETTINGS or et == ENTITY_SPOOF_PREVENTION:
         return "edit"
+    if et == ENTITY_NETFLOW_CONFIGURATION:
+        return "edit"
     if et in HS_XML_TAG:
         has_row = _firewall_has_hs_cache_entry(
             db, firewall_id=fw_id, entity_type=et, external_name=ext
@@ -5279,6 +5366,7 @@ _TASK_QUEUE_ENTITY_TYPES_ALWAYS_EDIT = frozenset(
         ENTITY_IPS_SWITCH,
         ENTITY_DOS_SETTINGS,
         ENTITY_SPOOF_PREVENTION,
+        ENTITY_NETFLOW_CONFIGURATION,
         *GENERIC_SYNC_SINGLETON_ENTITY_TYPES,
     }
 )

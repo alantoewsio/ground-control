@@ -1,0 +1,78 @@
+{% extends "firewalls_base.html" %}
+{% set fw_subnav_active = "administration" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% block title %}Administration · Firewalls · Ground Control{% endblock %}
+{% block page_title %}Administration{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Administration</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Cached <strong>Netflow configuration</strong> from the firewall API (<code>NetFlowConfiguration</code>). Enable
+  <strong>Netflow configuration</strong> in Inventory sync, then use the toolbar sync control to refresh. Use
+  <strong>Configure Netflow</strong> to queue updates from the flyout.
+</p>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page gc-system-admin-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ net_filters_aside("gc-netflow", false) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        <div class="gc-tabs" role="tablist" aria-label="Administration views" id="gc-admin-tablist">
+          <button
+            type="button"
+            class="gc-tabs__tab is-active"
+            role="tab"
+            aria-selected="true"
+            data-gc-admin-tab="netflow"
+            id="gc-tab-admin-netflow"
+          >
+            Netflow
+          </button>
+        </div>
+        <div class="gc-tab-panels">
+          <div
+            class="gc-tab-panel is-active"
+            role="tabpanel"
+            id="gc-panel-admin-netflow"
+            aria-labelledby="gc-tab-admin-netflow"
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-netflow",
+                "Netflow",
+                "Search",
+                show_combine=false,
+                primary_btn_id="gc-netflow-configure",
+                primary_btn_label="Configure",
+              )
+            }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ net_cols_modal("gc-netflow") }}
+{% include "partials/gc_netflow_flyout.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.GC_NETFLOW_TABLE_URL = {{ url_api_netflow_configuration_table | tojson }};
+  window.GC_NETFLOW_ENQUEUE_UPDATE_URL = {{ url_api_task_queue_enqueue_netflow_configuration_update | tojson }};
+</script>
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-system-admin-netflow.js"></script>
+{% endblock %}
