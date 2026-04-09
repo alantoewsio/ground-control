@@ -6,8 +6,9 @@
 #
 # Example (matches defaults): docker compose up -d --build
 #
-# PostgreSQL: default password is gc_docker_pg (override with GC_POSTGRES_PASSWORD). Use a URL-safe
-# password if you change it (avoid @ : / in the value, or URL-encode the password in the three URLs).
+# PostgreSQL: set GC_POSTGRES_PASSWORD in a project-root .env file (see env.docker.example). Docker
+# Compose substitutes it here — do not commit real passwords. Use a URL-safe value (avoid @ : / in
+# the password, or URL-encode it in the three URLs below).
 
 services:
   postgres:
@@ -15,7 +16,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ground_control
-      POSTGRES_PASSWORD: ${GC_POSTGRES_PASSWORD:-gc_docker_pg}
+      POSTGRES_PASSWORD: ${GC_POSTGRES_PASSWORD}
       POSTGRES_DB: ground_control
     volumes:
       - ground_control_pgdata:/var/lib/postgresql/data
@@ -37,9 +38,9 @@ services:
       GROUND_CONTROL_DOCKER: "1"
       GROUND_CONTROL_PERSIST_DIR: "/data"
       GROUND_CONTROL_BIND_ADDRESS: "0.0.0.0"
-      GROUND_CONTROL_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control
-      GROUND_CONTROL_MONITOR_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_monitor
-      GROUND_CONTROL_SECRETS_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_secrets
+      GROUND_CONTROL_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD}@postgres:5432/ground_control
+      GROUND_CONTROL_MONITOR_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD}@postgres:5432/ground_control_monitor
+      GROUND_CONTROL_SECRETS_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD}@postgres:5432/ground_control_secrets
     ports:
       - "${GC_PUBLISH_HTTP:-8000}:${GC_CONTAINER_HTTP:-8000}"
       - "${GC_PUBLISH_HTTPS:-8443}:${GC_CONTAINER_HTTPS:-8443}"
