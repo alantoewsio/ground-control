@@ -14,8 +14,13 @@ _STATE_NAME = ".gc_backup_settings.json"
 
 def _state_path() -> Path:
     pr = config.persist_root()
-    base = pr if pr is not None else config.BASE_DIR
-    return base / _STATE_NAME
+    base = (pr if pr is not None else config.BASE_DIR).resolve()
+    candidate = (base / _STATE_NAME).resolve()
+    try:
+        candidate.relative_to(base)
+    except ValueError as exc:
+        raise RuntimeError("Invalid persist root for backup settings path") from exc
+    return candidate
 
 
 def _load_raw() -> dict[str, Any]:
