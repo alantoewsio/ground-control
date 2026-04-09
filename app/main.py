@@ -1338,8 +1338,11 @@ class GenerateSelfSignedTlsBody(BaseModel):
     hostname: str = Field(min_length=1, max_length=253)
 
 
+TEST_FIREWALL_GENERATE_COUNT_MAX = 1000
+
+
 class TestFirewallGenerateBody(BaseModel):
-    count: int = Field(default=10, ge=1, le=1000)
+    count: int = Field(default=10, ge=1, le=TEST_FIREWALL_GENERATE_COUNT_MAX)
     source_firewall_id: int | None = Field(default=None, gt=0)
     test_lan_pool_cidr: str = Field(
         default="172.16.0.0/12", min_length=1, max_length=128
@@ -7013,7 +7016,8 @@ def _create_test_firewalls(
         )
     pool = ensure_test_fw_lan_pool(db, test_lan_pool_cidr)
     out: list[Firewall] = []
-    for _ in range(count):
+    bounded = min(max(int(count), 0), TEST_FIREWALL_GENERATE_COUNT_MAX)
+    for _ in range(bounded):
         fw = Firewall(
             name=_generate_test_firewall_name(),
             description="Synthetic test firewall",
