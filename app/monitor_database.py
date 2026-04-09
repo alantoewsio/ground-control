@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import config
-from app.db_utils import enable_wal_mode
+from app.db_utils import enable_wal_mode, repair_postgresql_serials_to_max_id
 from app.monitor_models import MonitorBase
 
 _monitor_url = config.monitor_database_url()
@@ -27,6 +27,10 @@ MonitorSessionLocal = sessionmaker(
 
 def init_monitor_db() -> None:
     MonitorBase.metadata.create_all(bind=_monitor_engine)
+    repair_postgresql_serials_to_max_id(
+        _monitor_engine,
+        tables=("firewall_webadmin_pings", "firewall_connectivity_rollups"),
+    )
 
 
 def get_monitor_db() -> Generator[Session, None, None]:

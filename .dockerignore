@@ -16,6 +16,7 @@ mocks
 xml-api-docs
 scripts/*
 !scripts/docker_healthcheck.py
+!scripts/docker_tcp_probe.py
 
 *.db
 *.db-shm

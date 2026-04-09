@@ -10,6 +10,7 @@
 name: SonarQube Cloud
 
 on:
+  workflow_dispatch:
   push:
     branches: [master, main]
   pull_request:
@@ -37,15 +38,31 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      # continue-on-error: pytest failures must not skip the Sonar step, or SonarCloud never
+      # receives coverage.xml / updated analysis params (the job still fails at the end).
       - name: Tests with coverage (Cobertura XML)
+        id: coverage_tests
+        continue-on-error: true
         run: >
           uv run pytest
           --cov=app --cov=main
+          --cov-config=pyproject.toml
           --cov-report=xml --cov-report=term-missing
           --cov-branch
           -q
 
+      - name: Verify coverage report for Sonar
+        run: test -f coverage.xml
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v7
+        with:
+          args: >
+            -Dsonar.python.version=3.12
+            -Dsonar.python.coverage.reportPaths=coverage.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Fail if tests failed
+        if: steps.coverage_tests.outcome == 'failure'
+        run: exit 1

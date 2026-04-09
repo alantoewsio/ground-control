@@ -23,6 +23,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app import crypto
+from app.docker_firewall_egress import docker_firewall_tcp_host
 from app.auth_identity_tasks import (
     firewall_has_admin_profile_cache_row,
     firewall_has_user_cache_row,
@@ -4769,7 +4770,7 @@ def process_task(
     fw = SophosFirewall(
         username=fw_row.username,
         password=password,
-        hostname=fw_row.host,
+        hostname=docker_firewall_tcp_host(fw_row.host),
         port=fw_row.port,
         verify=fw_row.verify_ssl,
     )

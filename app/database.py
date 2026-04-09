@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import config
-from app.db_utils import enable_wal_mode
+from app.db_utils import enable_wal_mode, repair_postgresql_serials_to_max_id
 from app.models import Base
 
 _engine = create_engine(
@@ -473,12 +473,22 @@ def _migrate_sqlite_ipam_cidr_vrf_unique() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_ipam_prefixes_vrf_bucket ON ipam_prefixes (vrf_bucket)"
             )
         )
+        fw_rows = conn.execute(text("SELECT id FROM firewalls")).all()
+        valid_fw_ids = {int(row[0]) for row in fw_rows if row[0] is not None}
         for r in rows:
             vb = ""
             if has_vb_col and r.get("vrf_bucket") is not None:
                 vb = str(r["vrf_bucket"]).strip()
             if not vb:
                 vb = vrf_key(r["vrf"])
+            afw = r["assigned_to_firewall_id"]
+            if afw is not None:
+                try:
+                    afw_int = int(afw)
+                except (TypeError, ValueError):
+                    afw = None
+                else:
+                    afw = afw_int if afw_int in valid_fw_ids else None
             conn.execute(
                 text(
                     """
@@ -499,7 +509,7 @@ def _migrate_sqlite_ipam_cidr_vrf_unique() -> None:
                     "vrf": r["vrf"],
                     "vrf_bucket": vb,
                     "prefix_type": r["prefix_type"],
-                    "afw": r["assigned_to_firewall_id"],
+                    "afw": afw,
                     "acu": r["assigned_to_custom"],
                     "desc": r["description"],
                     "ca": r["created_at"],
@@ -651,6 +661,21 @@ def init_db() -> None:
     _migrate_postgres_ipam_pool_unmanaged()
     _migrate_postgres_ref_countries_code_width()
     _seed_default_ipam_vrf()
+    repair_postgresql_serials_to_max_id(
+        _engine,
+        tables=(
+            "firewalls",
+            "firewall_config_entries",
+            "task_queue",
+            "task_queue_completed",
+            "configurations",
+            "configuration_config_entries",
+            "ipam_prefixes",
+            "ipam_vrfs",
+            "firewall_config_changelog",
+            "access_session_logs",
+        ),
+    )
 
 
 def _seed_default_ipam_vrf() -> None:

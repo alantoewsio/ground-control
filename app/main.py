@@ -52,7 +52,15 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import HTTPConnection
 from starlette.responses import PlainTextResponse, Response
 
-from app import background_activity, config, crypto, security_settings, users_service
+from app import (
+    background_activity,
+    config,
+    crypto,
+    data_management,
+    security_settings,
+    users_service,
+)
+from app.history_retention import run_history_retention_sweep
 from app.backup_crypto import encrypt_backup_archive
 from app.backup_password import (
     backup_password_is_configured,
@@ -333,6 +341,7 @@ from app.task_queue_service import (
     task_queue_compare_payload,
 )
 from app.test_firewall_interface_seed import (
+    SyntheticFwPortLayout,
     random_port_layout,
     synthetic_interface_config_entry_tuples,
 )
@@ -1082,6 +1091,7 @@ templates.env.globals["webadmin_browser_url"] = _template_webadmin_browser_url
 templates.env.globals["ssh_browser_url"] = _template_ssh_browser_url
 templates.env.globals["http_listen_port"] = config.http_listen_port
 templates.env.globals["https_listen_port"] = config.https_listen_port
+templates.env.globals["gc_running_in_docker"] = config.in_docker_deployment()
 
 _GC_OPENAPI_COMMON_ERRORS: dict[int, dict[str, str]] = {
     400: {"description": "Bad request — invalid input or business rule failure."},
@@ -1230,7 +1240,8 @@ class ProtectApiMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api/"):
             return await call_next(request)
         public = (
-            (method, path) == ("GET", "/api/auth/status")
+            (method, path) == ("GET", "/api/health")
+            or (method, path) == ("GET", "/api/auth/status")
             or (method, path) == ("POST", "/api/auth/login")
             or (method, path) == ("POST", "/api/auth/setup-admin-password")
             or (method, path) == ("POST", "/api/auth/logout")
@@ -1331,11 +1342,17 @@ class SecuritySettingsBody(BaseModel):
     https_port: int | None = Field(default=None, ge=1, le=65535)
     listen_interface: str = Field(default="0.0.0.0", max_length=64)
     allowed_ranges: str = Field(default="", max_length=32000)
-    tls_hostname: str = Field(default="", max_length=253)
+    tls_hostnames: str = Field(default="", max_length=32000)
+    cert_source: str = Field(default="self_signed", pattern="^(self_signed|letsencrypt)$")
 
 
 class GenerateSelfSignedTlsBody(BaseModel):
-    hostname: str = Field(min_length=1, max_length=253)
+    hostname: str | None = Field(default=None, max_length=253)
+    hostnames: list[str] | None = None
+
+
+class DataManagementPatchBody(BaseModel):
+    limits: dict[str, dict[str, Any]]
 
 
 TEST_FIREWALL_GENERATE_COUNT_MAX = 1000
@@ -1347,6 +1364,8 @@ class TestFirewallGenerateBody(BaseModel):
     test_lan_pool_cidr: str = Field(
         default="172.16.0.0/12", min_length=1, max_length=128
     )
+    # Honored only when ``GROUND_CONTROL_UNDER_PYTEST`` (deterministic tests).
+    synthetic_layout_token: str | None = Field(default=None, max_length=40)
 
     @field_validator("test_lan_pool_cidr", mode="before")
     @classmethod
@@ -1592,7 +1611,8 @@ def _security_state_from_body(
         https_port=body.https_port,
         listen_interface=body.listen_interface.strip() or "0.0.0.0",
         allowed_ranges=body.allowed_ranges,
-        tls_hostname=body.tls_hostname.strip(),
+        tls_hostnames=body.tls_hostnames.strip(),
+        cert_source=body.cert_source,
     )
 
 
@@ -1639,13 +1659,22 @@ def api_settings_security_apply(
 def api_settings_security_generate_self_signed(
     body: GenerateSelfSignedTlsBody, _: Annotated[str, Depends(admin_user_id_dep)]
 ):
+    names: list[str] = []
+    if body.hostnames:
+        names = [str(h).strip() for h in body.hostnames if str(h).strip()]
+    elif body.hostname and str(body.hostname).strip():
+        names = [str(body.hostname).strip()]
+    if not names:
+        raise HTTPException(
+            status_code=400, detail="At least one hostname is required."
+        )
     try:
-        security_settings.generate_self_signed_certificate(body.hostname)
+        security_settings.generate_self_signed_certificate(names)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {
         "ok": True,
-        "certificate": security_settings.load_https_certificate_summary(),
+        **security_settings.security_certificate_api_fields(),
     }
 
 
@@ -1670,6 +1699,67 @@ def api_settings_security_download_tls_public_pem(
     )
 
 
+@app.get("/api/settings/security/tls-certificate-chain.pem")
+def api_settings_security_download_tls_chain_pem(
+    source: Annotated[str, Query()],
+    _: Annotated[str, Depends(admin_user_id_dep)],
+):
+    pem = security_settings.read_tls_certificate_chain_pem_bytes(source)
+    if not pem:
+        raise HTTPException(
+            status_code=404, detail="Certificate chain is not available."
+        )
+    return Response(
+        content=pem,
+        media_type="application/x-pem-file",
+        headers={
+            "Content-Disposition": 'attachment; filename="ground-control-tls-chain.pem"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.get("/api/settings/data-management")
+def api_settings_data_management_get(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    return data_management.data_management_get_payload(db)
+
+
+@app.patch("/api/settings/data-management")
+def api_settings_data_management_patch(
+    body: DataManagementPatchBody,
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    merged, errs = data_management.validate_limits_patch(body.limits)
+    if errs:
+        raise HTTPException(status_code=422, detail={"errors": errs})
+    data_management.save_data_management_limits(merged)
+    return data_management.data_management_get_payload(db)
+
+
+@app.post("/api/settings/data-management/run-history-retention")
+def api_settings_data_management_run_history_retention(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    purged = run_history_retention_sweep(db)
+    payload = data_management.data_management_get_payload(db)
+    return {"ok": True, "purged": purged, **payload}
+
+
+@app.post("/api/settings/data-management/cleanup-orphaned-firewall-cache")
+def api_settings_data_management_cleanup_orphaned_firewall_cache(
+    _: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    deleted = data_management.delete_orphaned_firewall_config_entries(db)
+    payload = data_management.data_management_get_payload(db)
+    return {"deleted": deleted, **payload}
+
+
 @app.get("/api/settings/test-firewalls")
 def api_settings_test_firewalls_summary(
     _: Annotated[str, Depends(admin_user_id_dep)],
@@ -1689,6 +1779,9 @@ def api_settings_test_firewalls_generate(
     src_id = body.source_firewall_id
     if src_id is not None and db.get(Firewall, int(src_id)) is None:
         raise HTTPException(status_code=404, detail="Source firewall not found")
+    tok = body.synthetic_layout_token
+    if tok and str(tok).strip() and os.environ.get("GROUND_CONTROL_UNDER_PYTEST") != "1":
+        raise HTTPException(status_code=400, detail="Invalid request.")
     try:
         created = _create_test_firewalls(
             db,
@@ -1696,6 +1789,7 @@ def api_settings_test_firewalls_generate(
             count=int(body.count),
             source_firewall_id=src_id,
             test_lan_pool_cidr=body.test_lan_pool_cidr,
+            synthetic_layout_token=tok,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -6986,6 +7080,20 @@ _TEST_FW_POPULATION_TOP10_COUNTRIES = (
     "Mexico",
 )
 
+def _layout_for_new_test_firewall(
+    synthetic_layout_token: str | None,
+) -> SyntheticFwPortLayout:
+    if (
+        os.environ.get("GROUND_CONTROL_UNDER_PYTEST") == "1"
+        and synthetic_layout_token
+    ):
+        tok = synthetic_layout_token.strip()
+        if tok == "vm4":
+            return SyntheticFwPortLayout(vm=4)
+        if tok == "copper8_fiber2_mgmt1":
+            return SyntheticFwPortLayout(copper=8, fiber=2, mgmt=1)
+    return random_port_layout()
+
 
 def _generate_test_firewall_name() -> str:
     site = random.choice(_TEST_FW_SITES)
@@ -7003,14 +7111,19 @@ def _create_test_firewalls(
     count: int,
     source_firewall_id: int | None = None,
     test_lan_pool_cidr: str = "172.16.0.0/12",
+    synthetic_layout_token: str | None = None,
 ) -> list[Firewall]:
     template_entries: list[FirewallConfigEntry] = []
     if source_firewall_id is not None:
+        tab_types = tuple(ENTITY_TYPES_INTERFACES_TAB)
+        if not tab_types:
+            raise RuntimeError("ENTITY_TYPES_INTERFACES_TAB must not be empty")
+        tab_lower = tuple({str(x).casefold() for x in tab_types})
         template_entries = (
             db.query(FirewallConfigEntry)
             .filter(
                 FirewallConfigEntry.firewall_id == int(source_firewall_id),
-                ~FirewallConfigEntry.entity_type.in_(ENTITY_TYPES_INTERFACES_TAB),
+                func.lower(FirewallConfigEntry.entity_type).not_in(tab_lower),
             )
             .all()
         )
@@ -7042,7 +7155,25 @@ def _create_test_firewalls(
         upsert_firewall_password_encrypted(
             sdb, fw.id, crypto.encrypt_secret(secrets.token_urlsafe(24))
         )
+        _, lan_host_ip, lan_netmask = allocate_test_firewall_lan_assignment(
+            db,
+            pool=pool,
+            firewall_id=int(fw.id),
+            firewall_name=fw.name or "",
+        )
+        layout = _layout_for_new_test_firewall(synthetic_layout_token)
+        synth_tuples = synthetic_interface_config_entry_tuples(
+            layout,
+            lan_host_ipv4=lan_host_ip,
+            lan_netmask=lan_netmask,
+        )
+        synth_iface_names = {name for name, _ in synth_tuples}
         for src in template_entries:
+            if (
+                src.entity_type == ENTITY_INTERFACE
+                and src.external_name in synth_iface_names
+            ):
+                continue
             db.add(
                 FirewallConfigEntry(
                     firewall_id=fw.id,
@@ -7051,18 +7182,7 @@ def _create_test_firewalls(
                     payload_json=src.payload_json,
                 )
             )
-        _, lan_host_ip, lan_netmask = allocate_test_firewall_lan_assignment(
-            db,
-            pool=pool,
-            firewall_id=int(fw.id),
-            firewall_name=fw.name or "",
-        )
-        layout = random_port_layout()
-        for external_name, payload_json in synthetic_interface_config_entry_tuples(
-            layout,
-            lan_host_ipv4=lan_host_ip,
-            lan_netmask=lan_netmask,
-        ):
+        for external_name, payload_json in synth_tuples:
             db.add(
                 FirewallConfigEntry(
                     firewall_id=fw.id,
@@ -7520,7 +7640,13 @@ def firewall_ssh_terminal_page(
     )
     if not ok:
         raise HTTPException(status_code=403, detail=err or "Invalid launch token.")
-    ws_tok = issue_launch_token(request, firewall_id=row.id, access_type="ssh_ws")
+    try:
+        ws_tok = issue_launch_token(request, firewall_id=row.id, access_type="ssh_ws")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=str(exc) or "Cannot issue SSH WebSocket token.",
+        ) from exc
     ssh_ws_path = _url_add_query_param(
         str(request.url_for("firewall_ssh_ws", firewall_id=row.id).path),
         TOKEN_QUERY_PARAM,
@@ -7575,7 +7701,13 @@ def api_firewall_ssh_ws_launch(
         raise HTTPException(status_code=404, detail="Firewall not found")
     if not _is_same_origin_browser_request(request):
         raise HTTPException(status_code=403, detail="Blocked cross-origin request.")
-    tok = issue_launch_token(request, firewall_id=firewall_id, access_type="ssh_ws")
+    try:
+        tok = issue_launch_token(request, firewall_id=firewall_id, access_type="ssh_ws")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=str(exc) or "Cannot issue SSH WebSocket token.",
+        ) from exc
     path = _url_add_query_param(
         str(request.url_for("firewall_ssh_ws", firewall_id=firewall_id).path),
         TOKEN_QUERY_PARAM,

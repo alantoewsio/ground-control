@@ -14,6 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import func
 
 from app import config
+from app.docker_firewall_egress import docker_firewall_tcp_host
 from app.database import SessionLocal
 from app.models import Firewall
 from app.monitor_database import MonitorSessionLocal
@@ -83,7 +84,9 @@ def _probe_worker(
         if random.random() < 0.2:
             return ProbeResult(target.firewall_id, None, "Simulated probe failure")
         return ProbeResult(target.firewall_id, float(random.randint(20, 200)), None)
-    ms, err = tcp_connect_ms(target.host, target.port, timeout_sec=timeout_sec)
+    ms, err = tcp_connect_ms(
+        docker_firewall_tcp_host(target.host), target.port, timeout_sec=timeout_sec
+    )
     return ProbeResult(target.firewall_id, ms, err)
 
 

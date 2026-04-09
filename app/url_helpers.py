@@ -27,6 +27,36 @@ def https_admin_url_for_firewall(host: str, port: int) -> str:
     return f"https://{netloc}/"
 
 
+def firewall_admin_host_header(
+    *,
+    inventory_host: str,
+    port: int,
+    device_hostname: str | None = None,
+) -> str:
+    """Host header for HTTPS to the appliance (inventory host or device hostname)."""
+    name = (device_hostname or inventory_host or "").strip()
+    if name.startswith("[") and name.endswith("]"):
+        inner = name[1:-1].strip()
+        netloc = f"[{inner}]"
+    else:
+        try:
+            ipaddress.IPv6Address(name)
+            netloc = f"[{name}]"
+        except ValueError:
+            netloc = name
+    p = int(port)
+    if p not in (80, 443):
+        return f"{netloc}:{p}"
+    return netloc
+
+
+def https_admin_url_for_upstream_request(host: str, port: int) -> str:
+    """HTTPS URL for server-side WebAdmin/API HTTPX requests (Docker loopback egress remap)."""
+    from app.docker_firewall_egress import docker_firewall_tcp_host
+
+    return https_admin_url_for_firewall(docker_firewall_tcp_host(host), port)
+
+
 def _iter_csv_values(raw: str) -> Iterable[str]:
     for chunk in str(raw or "").replace("\n", ",").split(","):
         item = chunk.strip()

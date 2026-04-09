@@ -9,6 +9,7 @@ from sophosfirewall_python.api_client import (
 )
 from sophosfirewall_python.firewallapi import SophosFirewall
 
+from app.docker_firewall_egress import docker_firewall_tcp_host
 from app.firewall_api_client import patch_sophos_firewall_request_timeout
 
 
@@ -24,10 +25,11 @@ def test_connection(
     """
     Returns (success, message). Uses SophosFirewall.login() per library docs.
     """
+    connect_host = docker_firewall_tcp_host(host)
     fw = SophosFirewall(
         username=username,
         password=password,
-        hostname=host,
+        hostname=connect_host,
         port=port,
         verify=verify_ssl,
     )

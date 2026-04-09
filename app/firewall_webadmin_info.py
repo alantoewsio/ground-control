@@ -14,7 +14,11 @@ from app import crypto
 from app.firewall_api_client import normalize_firewall_api_timeout_seconds
 from app.models import Firewall
 from app.secrets_database import get_firewall_password_encrypted
-from app.url_helpers import https_admin_url_for_firewall
+from app.url_helpers import (
+    firewall_admin_host_header,
+    https_admin_url_for_firewall,
+    https_admin_url_for_upstream_request,
+)
 
 _ASSIGNMENT_RE = re.compile(
     r"^\s*(?:var\s+)?(?P<name>[A-Za-z_$][\w$.]*)\s*=\s*(?P<value>.+?)\s*;\s*$"
@@ -231,6 +235,7 @@ def collect_firewall_webadmin_device_info(
     *,
     verify_ssl: bool,
     timeout: httpx.Timeout | None = None,
+    device_hostname: str | None = None,
 ) -> dict[str, Any]:
     """Silent WebAdmin login + index.jsp parse (no browser redirect flow)."""
     host_txt = (host or "").strip()
@@ -242,8 +247,15 @@ def collect_firewall_webadmin_device_info(
     if not password:
         return {"ok": False, "error": "password is blank"}
 
-    upstream_base = https_admin_url_for_firewall(host_txt, int(port)).rstrip("/")
+    p = int(port)
+    connect_base = https_admin_url_for_upstream_request(host_txt, p).rstrip("/")
+    identity_base = https_admin_url_for_firewall(host_txt, p).rstrip("/")
     common_headers = {
+        "Host": firewall_admin_host_header(
+            inventory_host=host_txt,
+            port=p,
+            device_hostname=device_hostname,
+        ),
         "Accept-Encoding": "identity",
         "User-Agent": "GroundControl-WebAdmin-Metadata/1",
     }
@@ -255,14 +267,14 @@ def collect_firewall_webadmin_device_info(
             follow_redirects=False,
             timeout=timeout_obj,
         ) as client:
-            client.get(f"{upstream_base}/", headers=common_headers)
+            client.get(f"{connect_base}/", headers=common_headers)
             login_resp = client.post(
-                f"{upstream_base}/webconsole/Controller",
+                f"{connect_base}/webconsole/Controller",
                 headers={
                     **common_headers,
                     "X-Requested-With": "XMLHttpRequest",
-                    "Origin": upstream_base,
-                    "Referer": f"{upstream_base}/webconsole/webpages/login.jsp",
+                    "Origin": identity_base,
+                    "Referer": f"{identity_base}/webconsole/webpages/login.jsp",
                 },
                 data={
                     "mode": "151",
@@ -279,10 +291,10 @@ def collect_firewall_webadmin_device_info(
             login_body = login_resp.text
 
             index_resp = client.get(
-                f"{upstream_base}/webconsole/webpages/index.jsp",
+                f"{connect_base}/webconsole/webpages/index.jsp",
                 headers={
                     **common_headers,
-                    "Referer": f"{upstream_base}/webconsole/webpages/login.jsp",
+                    "Referer": f"{identity_base}/webconsole/webpages/login.jsp",
                 },
             )
             loc = (index_resp.headers.get("location") or "").lower()
@@ -346,6 +358,7 @@ def refresh_firewall_webadmin_device_info(
         password,
         verify_ssl=bool(row.verify_ssl),
         timeout=_webadmin_timeout(row),
+        device_hostname=row.device_hostname,
     )
     out: dict[str, Any] = dict(result)
     out["firewall_id"] = firewall_id

@@ -17,6 +17,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
 COPY main.py ./
 COPY scripts/docker_healthcheck.py ./scripts/docker_healthcheck.py
+COPY scripts/docker_tcp_probe.py ./scripts/docker_tcp_probe.py
 COPY templates ./templates
 COPY static ./static
 

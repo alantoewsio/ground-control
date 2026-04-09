@@ -6,9 +6,28 @@
 #
 # Example (matches defaults): docker compose up -d --build
 #
-# PostgreSQL: set GC_POSTGRES_PASSWORD in a project-root .env file (see env.docker.example). Docker
-# Compose substitutes it here — do not commit real passwords. Use a URL-safe value (avoid @ : / in
-# the password, or URL-encode it in the three URLs below).
+# PostgreSQL: set GC_POSTGRES_PASSWORD in a project-root `.env` for real deployments (see
+# env.docker.example). If unset, Compose uses the dev default below so `docker compose up` works
+# without a `.env` file. The password is fixed at first volume init; change it later only by
+# resetting the `ground_control_pgdata` volume or updating Postgres credentials to match.
+#
+# --- Firewall reachability (monitoring, sync, WebAdmin proxy, SSH) ---
+# All of those open TCP connections from *inside* the ground-control container. If the UI works
+# but every firewall fails, it is usually Docker/VPN/DNS — not the app.
+#
+# Quick check (replace HOST/PORT with a firewall IP and web admin port from inventory):
+#   docker compose exec ground-control python scripts/docker_tcp_probe.py HOST PORT
+#   docker compose exec ground-control python scripts/docker_tcp_probe.py HOST PORT --apply-docker-loopback-remap
+# Compare with the same test from Windows:  Test-NetConnection HOST -Port PORT
+# If the host succeeds and the container fails → container LAN routing or name resolution.
+#
+# Common fixes:
+# - Use numeric IPs in firewall inventory when hostnames only resolve on the PC (mDNS .local, etc.).
+# - Pause VPN / corporate tunnel; or allow Docker/WSL virtual interfaces to reach your LAN.
+# - Appliances on 127.0.0.1 / localhost: keep GROUND_CONTROL_DOCKER_EGRESS_HOST + extra_hosts below.
+# - Linux only: you can run the app with host networking so it shares the host route table (see
+#   https://docs.docker.com/network/drivers/host/ — incompatible with published ports as used here;
+#   use only if you understand the tradeoffs).
 
 services:
   postgres:
@@ -16,7 +35,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ground_control
-      POSTGRES_PASSWORD: ${GC_POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${GC_POSTGRES_PASSWORD:-gc_docker_pg}
       POSTGRES_DB: ground_control
     volumes:
       - ground_control_pgdata:/var/lib/postgresql/data
@@ -38,9 +57,13 @@ services:
       GROUND_CONTROL_DOCKER: "1"
       GROUND_CONTROL_PERSIST_DIR: "/data"
       GROUND_CONTROL_BIND_ADDRESS: "0.0.0.0"
-      GROUND_CONTROL_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD}@postgres:5432/ground_control
-      GROUND_CONTROL_MONITOR_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD}@postgres:5432/ground_control_monitor
-      GROUND_CONTROL_SECRETS_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD}@postgres:5432/ground_control_secrets
+      # Map inventory loopback (127.0.0.1 / localhost) to the machine running Docker (see extra_hosts).
+      GROUND_CONTROL_DOCKER_EGRESS_HOST: host.docker.internal
+      GROUND_CONTROL_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control
+      GROUND_CONTROL_MONITOR_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_monitor
+      GROUND_CONTROL_SECRETS_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_secrets
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${GC_PUBLISH_HTTP:-8000}:${GC_CONTAINER_HTTP:-8000}"
       - "${GC_PUBLISH_HTTPS:-8443}:${GC_CONTAINER_HTTPS:-8443}"

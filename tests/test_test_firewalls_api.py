@@ -4,23 +4,33 @@ from __future__ import annotations
 
 import ipaddress
 import json
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import func
 
+from app import data_management
+from app.database import SessionLocal
 from app.ipam import vrf_key
 from app.main import _TEST_FW_POPULATION_TOP10_COUNTRIES
 from app.models import Firewall, FirewallConfigEntry, IpamPrefix, IpamVrf
-from app.test_firewall_interface_seed import SyntheticFwPortLayout
 
 
 @pytest.fixture(autouse=True)
 def _cleanup_synthetic_test_firewalls(authed_client, main_session):
     """Other modules may leave ``is_test`` firewalls; tests here assume a clean slate."""
+    s = SessionLocal()
+    try:
+        data_management.delete_orphaned_firewall_config_entries(s)
+    finally:
+        s.close()
     authed_client.delete("/api/settings/test-firewalls")
     main_session.expire_all()
     yield
+    s2 = SessionLocal()
+    try:
+        data_management.delete_orphaned_firewall_config_entries(s2)
+    finally:
+        s2.close()
     authed_client.delete("/api/settings/test-firewalls")
     main_session.expire_all()
 
@@ -38,11 +48,7 @@ def _expected_lan_from_test_fw_assignment(session, fw_id: int) -> tuple[str, str
     return str(net.network_address + 16), str(net.netmask)
 
 
-@patch(
-    "app.main.random_port_layout",
-    return_value=SyntheticFwPortLayout(copper=8, fiber=2, mgmt=1),
-)
-def test_generate_test_firewalls_copies_cache(_mock_layout, authed_client, main_session):
+def test_generate_test_firewalls_copies_cache(authed_client, main_session):
     src = Firewall(
         name="Source FW",
         host="src.example.local",
@@ -65,7 +71,11 @@ def test_generate_test_firewalls_copies_cache(_mock_layout, authed_client, main_
 
     r = authed_client.post(
         "/api/settings/test-firewalls/generate",
-        json={"count": 2, "source_firewall_id": src.id},
+        json={
+            "count": 2,
+            "source_firewall_id": src.id,
+            "synthetic_layout_token": "copper8_fiber2_mgmt1",
+        },
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -118,11 +128,9 @@ def test_generate_test_firewalls_copies_cache(_mock_layout, authed_client, main_
     authed_client.delete("/api/settings/test-firewalls")
 
 
-@patch(
-    "app.main.random_port_layout",
-    return_value=SyntheticFwPortLayout(copper=8, fiber=2, mgmt=1),
-)
-def test_generate_test_firewalls_skips_interfaces_tab_entities(_mock_layout, authed_client, main_session):
+def test_generate_test_firewalls_skips_interfaces_tab_entities(
+    authed_client, main_session,
+):
     """Cloned cache must not include unified Interfaces tab rows (interface, VLAN, etc.)."""
     src = Firewall(
         name="Src Iface",
@@ -151,7 +159,11 @@ def test_generate_test_firewalls_skips_interfaces_tab_entities(_mock_layout, aut
 
     r = authed_client.post(
         "/api/settings/test-firewalls/generate",
-        json={"count": 1, "source_firewall_id": src.id},
+        json={
+            "count": 1,
+            "source_firewall_id": src.id,
+            "synthetic_layout_token": "copper8_fiber2_mgmt1",
+        },
     )
     assert r.status_code == 200, r.text
     tw = main_session.query(Firewall).filter(Firewall.is_test.is_(True)).one()
@@ -177,9 +189,11 @@ def test_generate_test_firewalls_skips_interfaces_tab_entities(_mock_layout, aut
     authed_client.delete("/api/settings/test-firewalls")
 
 
-@patch("app.main.random_port_layout", return_value=SyntheticFwPortLayout(vm=4))
-def test_generate_test_firewalls_vm_only_ports(_mock_layout, authed_client, main_session):
-    r = authed_client.post("/api/settings/test-firewalls/generate", json={"count": 1})
+def test_generate_test_firewalls_vm_only_ports(authed_client, main_session):
+    r = authed_client.post(
+        "/api/settings/test-firewalls/generate",
+        json={"count": 1, "synthetic_layout_token": "vm4"},
+    )
     assert r.status_code == 200, r.text
     tw = main_session.query(Firewall).filter(Firewall.is_test.is_(True)).one()
     ifaces = (

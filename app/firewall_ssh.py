@@ -21,6 +21,7 @@ from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocketDisconnect
 
 from app import crypto
+from app.docker_firewall_egress import docker_firewall_tcp_host
 from app.access_history import create_access_log, request_actor, request_client_ip
 from app.auth import browser_websocket_origin_error, browser_websocket_session_error
 from app.database import SessionLocal
@@ -106,7 +107,7 @@ async def resolve_host_for_diagnostics(host: str) -> dict[str, Any]:
 
 async def build_firewall_ssh_diagnostics(inventory_host: str) -> dict[str, Any]:
     raw = (inventory_host or "").strip()
-    connect_host = ssh_connect_host(raw)
+    connect_host = docker_firewall_tcp_host(ssh_connect_host(raw))
     dns = await resolve_host_for_diagnostics(connect_host)
     tcp = await probe_tcp_connect(connect_host, SSH_DEFAULT_PORT, 4.0)
     return {
@@ -201,7 +202,7 @@ async def collect_firewall_ssh_device_info(
         return {"ok": False, "error": "host is blank"}
     if not user:
         return {"ok": False, "error": "username is blank"}
-    connect_h = ssh_connect_host(raw_host)
+    connect_h = docker_firewall_tcp_host(ssh_connect_host(raw_host))
     conn: asyncssh.SSHClientConnection | None = None
     try:
         try:
@@ -785,7 +786,7 @@ async def firewall_ssh_terminal_ws(websocket: WebSocket, firewall_id: int) -> No
             return
 
         # Inventory "Host" column is Firewall.host; normalize for AsyncSSH (unwrap [::1] form).
-        host = ssh_connect_host(fw_row.host)
+        host = docker_firewall_tcp_host(ssh_connect_host(fw_row.host))
         # SSH protocol still requires a username; auth itself remains interactive.
         username = (fw_row.username or "").strip()
         if not username:

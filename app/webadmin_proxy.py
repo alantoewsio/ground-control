@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import re
 import time
@@ -17,7 +16,12 @@ from starlette.responses import RedirectResponse, Response, StreamingResponse
 
 from app.firewall_api_client import normalize_firewall_api_timeout_seconds
 from app.models import Firewall
-from app.url_helpers import https_admin_url_for_firewall, webadmin_proxy_root_url
+from app.url_helpers import (
+    firewall_admin_host_header,
+    https_admin_url_for_firewall,
+    https_admin_url_for_upstream_request,
+    webadmin_proxy_root_url,
+)
 from app.webadmin_proxy_log import (
     append_webadmin_proxy_record,
     summarize_outbound_headers,
@@ -71,20 +75,11 @@ def _apply_response_header_list(
 
 def _firewall_upstream_host_header(row: Firewall) -> str:
     """Host header for HTTPS to the appliance (inventory host or device hostname)."""
-    name = (row.device_hostname or row.host or "").strip()
-    if name.startswith("[") and name.endswith("]"):
-        inner = name[1:-1].strip()
-        netloc = f"[{inner}]"
-    else:
-        try:
-            ipaddress.IPv6Address(name)
-            netloc = f"[{name}]"
-        except ValueError:
-            netloc = name
-    p = int(row.port)
-    if p not in (80, 443):
-        return f"{netloc}:{p}"
-    return netloc
+    return firewall_admin_host_header(
+        inventory_host=row.host,
+        port=int(row.port),
+        device_hostname=row.device_hostname,
+    )
 
 
 def _rewrite_forwarded_origin_or_referer(
@@ -313,7 +308,7 @@ async def stream_firewall_webadmin(
     row: Firewall,
     full_path: str,
 ) -> Response:
-    upstream_base = https_admin_url_for_firewall(row.host, row.port).rstrip("/")
+    upstream_base = https_admin_url_for_upstream_request(row.host, row.port).rstrip("/")
     q = request.url.query
     target = _upstream_target_url(upstream_base, full_path, q)
 
@@ -517,7 +512,7 @@ async def try_auto_login_webadmin(
     if request.method.upper() != "GET":
         return None
 
-    upstream_base = https_admin_url_for_firewall(row.host, row.port).rstrip("/")
+    upstream_base = https_admin_url_for_upstream_request(row.host, row.port).rstrip("/")
     proxy_prefix_abs = _proxy_prefix_url(request, row.id)
     timeout = _httpx_timeout(row)
     verify: bool | str = row.verify_ssl

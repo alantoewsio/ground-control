@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 
-def test_health_requires_api_session(authed_client):
-    r = authed_client.get("/api/health")
+def test_health_ok_without_session(client):
+    """Production startup path: ``client`` runs ASGI lifespan (``init_db``); health stays public for Docker HEALTHCHECK and probes."""
+    r = client.get("/api/health")
     assert r.status_code == 200
     assert r.json() == {"ok": True}
 

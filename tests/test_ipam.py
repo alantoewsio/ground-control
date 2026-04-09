@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import random
 import re
+import uuid
 
 from app.models import Firewall, FirewallConfigEntry
 
@@ -1182,9 +1183,9 @@ def test_ipam_accept_discovered_with_existing_pool(authed_client, main_session):
 
 
 def test_ipam_delete_assignment_ok(authed_client):
-    octet = random.randint(100, 120)
-    pool_cidr = f"10.{octet}.0.0/16"
-    cidr = f"10.{octet}.0.0/28"
+    ub = uuid.uuid4().bytes
+    pool_cidr = f"10.{ub[0]}.{ub[1]}.0/16"
+    cidr = f"10.{ub[0]}.{ub[1]}.0/28"
     pool_r = authed_client.post(
         "/api/ipam/prefixes",
         json={
@@ -1226,9 +1227,9 @@ def test_ipam_delete_assignment_blocked_with_managed_firewall(authed_client, mai
     )
     main_session.add(fw)
     main_session.commit()
-    octet = random.randint(121, 140)
-    pool_cidr = f"10.{octet}.0.0/16"
-    cidr = f"10.{octet}.0.0/28"
+    ub = uuid.uuid4().bytes
+    pool_cidr = f"10.{ub[0]}.{ub[1]}.0/16"
+    cidr = f"10.{ub[0]}.{ub[1]}.0/28"
     pool_r = authed_client.post(
         "/api/ipam/prefixes",
         json={
@@ -1259,10 +1260,11 @@ def test_ipam_delete_assignment_blocked_with_managed_firewall(authed_client, mai
 
 
 def test_ipam_delete_pool_cascades(authed_client):
-    b = random.randint(141, 160)
-    pool_cidr = f"10.{b}.0.0/16"
-    child_cidr = f"10.{b}.1.0/24"
-    vrf = f"pytest-cascade-{b}"
+    ub = uuid.uuid4().bytes
+    a = ub[0]
+    pool_cidr = f"10.{a}.0.0/16"
+    child_cidr = f"10.{a}.1.0/24"
+    vrf = f"pytest-cascade-{uuid.uuid4().hex[:16]}"
     p = authed_client.post(
         "/api/ipam/prefixes",
         json={

@@ -18,6 +18,7 @@ from sophosfirewall_python.firewallapi import SophosFirewall
 from sqlalchemy.orm import Session
 
 from app import crypto
+from app.docker_firewall_egress import docker_firewall_tcp_host
 from app.firewall_api_client import (
     normalize_firewall_api_timeout_seconds,
     patch_sophos_firewall_request_timeout,
@@ -571,7 +572,7 @@ def _fetch_remote_payloads(
     fw = SophosFirewall(
         username=username,
         password=password,
-        hostname=host,
+        hostname=docker_firewall_tcp_host(host),
         port=port,
         verify=verify_ssl,
     )
