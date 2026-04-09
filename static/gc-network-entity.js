@@ -195,7 +195,9 @@ function gcBuildRowCombineDiffBodyHtml(row, labelsMap) {
     );
   }
   let labels = labelsMap && typeof labelsMap === "object" ? labelsMap : {};
-  let colKeys = Object.keys(pf).sort();
+  let colKeys = Object.keys(pf).sort(function (a, b) {
+    return a.localeCompare(b);
+  });
   let parts =
     '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
     gcEscapeHtml(hname || "—") +
@@ -210,7 +212,9 @@ function gcBuildRowCombineDiffBodyHtml(row, labelsMap) {
       "</h4>";
     parts += '<ul class="gc-net-zone-modal__fw-list">';
     Object.keys(per)
-      .sort()
+      .sort(function (a, b) {
+        return a.localeCompare(b);
+      })
       .forEach(function (fw) {
         parts +=
           '<li class="gc-net-zone-modal__fw-row">' +
@@ -3197,7 +3201,12 @@ function gcCreateNetworkEntityTable(cfg) {
             if (fb) ents[fb] = true;
           });
         }
-        return { firewallId: fid, entities: Object.keys(ents).sort() };
+        return {
+          firewallId: fid,
+          entities: Object.keys(ents).sort(function (a, b) {
+            return a.localeCompare(b);
+          }),
+        };
       });
       return { error: null, jobs: jobs };
     }
