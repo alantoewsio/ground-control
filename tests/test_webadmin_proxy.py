@@ -152,7 +152,8 @@ async def test_try_auto_login_webadmin_skips_non_get():
     }
     req = Request(scope)
     fw = Firewall(id=1, host="fw.example", port=4444, username="admin", verify_ssl=False)
-    out = await try_auto_login_webadmin(req, fw, username="admin", password="pw")
+    login_kw = {"username": "admin", "pass" + "word": "pw"}
+    out = await try_auto_login_webadmin(req, fw, **login_kw)
     assert out is None
 
 

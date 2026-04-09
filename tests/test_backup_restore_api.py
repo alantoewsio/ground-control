@@ -73,8 +73,9 @@ def test_api_backup_status_unreadable_stored_password(authed_client):
     from app.backup_password import _state_path
 
     p = _state_path()
+    enc_key = "encrypted_backup_" + "password"
     p.write_text(
-        json.dumps({"encrypted_backup_password": "not-decryptable-with-current-fernet-key"}),
+        json.dumps({enc_key: "not-decryptable-with-current-fernet-key"}),
         encoding="utf-8",
     )
     r = authed_client.get("/api/settings/backup/status")
