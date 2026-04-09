@@ -25,6 +25,37 @@ def test_database_urls_from_env(monkeypatch):
     assert config.secrets_database_url() == "sqlite:///:memory:"
 
 
+def test_database_urls_built_from_docker_postgres_secret(monkeypatch):
+    monkeypatch.delenv("GROUND_CONTROL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("GROUND_CONTROL_MONITOR_DATABASE_URL", raising=False)
+    monkeypatch.delenv("GROUND_CONTROL_SECRETS_DATABASE_URL", raising=False)
+    monkeypatch.setenv("GROUND_CONTROL_DOCKER", "1")
+    monkeypatch.setenv("GROUND_CONTROL_POSTGRES_PASSWORD", "p@ss word")
+    monkeypatch.setenv("GROUND_CONTROL_POSTGRES_HOST", "postgres")
+    monkeypatch.setenv("GROUND_CONTROL_POSTGRES_USER", "ground_control")
+    monkeypatch.setattr(config, "in_docker_deployment", lambda: True)
+    assert config.database_url() == (
+        "postgresql+psycopg://ground_control:p%40ss+word@postgres:5432/ground_control"
+    )
+    assert config.monitor_database_url() == (
+        "postgresql+psycopg://ground_control:p%40ss+word@postgres:5432/ground_control_monitor"
+    )
+    assert config.secrets_database_url() == (
+        "postgresql+psycopg://ground_control:p%40ss+word@postgres:5432/ground_control_secrets"
+    )
+
+
+def test_database_url_docker_without_password_raises(monkeypatch):
+    monkeypatch.delenv("GROUND_CONTROL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("GROUND_CONTROL_MONITOR_DATABASE_URL", raising=False)
+    monkeypatch.delenv("GROUND_CONTROL_SECRETS_DATABASE_URL", raising=False)
+    monkeypatch.setenv("GROUND_CONTROL_DOCKER", "1")
+    monkeypatch.delenv("GROUND_CONTROL_POSTGRES_PASSWORD", raising=False)
+    monkeypatch.setattr(config, "in_docker_deployment", lambda: True)
+    with pytest.raises(RuntimeError):
+        config.database_url()
+
+
 def test_http_listen_port_defaults_to_8000(monkeypatch):
     for key in ("GROUND_CONTROL_HTTP_PORT", "GROUND_CONTROL_PORT", "PORT"):
         monkeypatch.delenv(key, raising=False)

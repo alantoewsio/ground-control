@@ -6,10 +6,11 @@
 #
 # Example (matches defaults): docker compose up -d --build
 #
-# PostgreSQL: set GC_POSTGRES_PASSWORD in a project-root `.env` for real deployments (see
-# env.docker.example). If unset, Compose uses the dev default below so `docker compose up` works
-# without a `.env` file. The password is fixed at first volume init; change it later only by
-# resetting the `ground_control_pgdata` volume or updating Postgres credentials to match.
+# PostgreSQL password: Docker secret file `.gc_docker_secrets/ground_control_postgres_password`
+# (create via Launcher → Settings → Docker secrets, or edit the file). Compose mounts it for both
+# the postgres and ground-control services. The password is fixed at first volume init; changing
+# the secret later requires updating the role password inside Postgres to match, or recreating the
+# `ground_control_pgdata` volume.
 #
 # --- Firewall reachability (monitoring, sync, WebAdmin proxy, SSH) ---
 # All of those open TCP connections from *inside* the ground-control container. If the UI works
@@ -35,8 +36,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ground_control
-      POSTGRES_PASSWORD: ${GC_POSTGRES_PASSWORD:-gc_docker_pg}
       POSTGRES_DB: ground_control
+      POSTGRES_PASSWORD_FILE: /run/secrets/ground_control_postgres_password
+    secrets:
+      - ground_control_postgres_password
     volumes:
       - ground_control_pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -59,15 +62,15 @@ services:
       GROUND_CONTROL_BIND_ADDRESS: "0.0.0.0"
       # Map inventory loopback (127.0.0.1 / localhost) to the machine running Docker (see extra_hosts).
       GROUND_CONTROL_DOCKER_EGRESS_HOST: host.docker.internal
-      GROUND_CONTROL_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control
-      GROUND_CONTROL_MONITOR_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_monitor
-      GROUND_CONTROL_SECRETS_DATABASE_URL: postgresql+psycopg://ground_control:${GC_POSTGRES_PASSWORD:-gc_docker_pg}@postgres:5432/ground_control_secrets
+      GROUND_CONTROL_POSTGRES_HOST: postgres
+      GROUND_CONTROL_POSTGRES_USER: ground_control
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${GC_PUBLISH_HTTP:-8000}:${GC_CONTAINER_HTTP:-8000}"
       - "${GC_PUBLISH_HTTPS:-8443}:${GC_CONTAINER_HTTPS:-8443}"
     secrets:
+      - ground_control_postgres_password
       - ground_control_default_admin_password
       - ground_control_http_port
       - ground_control_https_port
@@ -87,6 +90,8 @@ services:
       - ground_control_data:/data
 
 secrets:
+  ground_control_postgres_password:
+    file: .gc_docker_secrets/ground_control_postgres_password
   ground_control_default_admin_password:
     file: .gc_docker_secrets/ground_control_default_admin_password
   ground_control_http_port:

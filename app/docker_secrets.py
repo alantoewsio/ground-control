@@ -51,6 +51,13 @@ DOCKER_SECRET_SPECS: tuple[DockerSecretSpec, ...] = (
         sensitive=True,
     ),
     DockerSecretSpec(
+        "ground_control_postgres_password",
+        "GROUND_CONTROL_POSTGRES_PASSWORD",
+        "PostgreSQL password (compose mounts this for postgres + app; required for Docker Postgres)",
+        field_kind="entry",
+        sensitive=True,
+    ),
+    DockerSecretSpec(
         "ground_control_http_port",
         "PORT",
         "HTTP listen port (container)",

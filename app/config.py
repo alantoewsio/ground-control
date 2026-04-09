@@ -25,30 +25,65 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 
-def database_url() -> str:
+def _docker_postgres_sqlalchemy_url(database_name: str) -> str | None:
+    """Build a Postgres URL from ``GROUND_CONTROL_POSTGRES_*`` when running in Docker (after secret hydration)."""
+    import os
+    from urllib.parse import quote_plus
+
+    if not in_docker_deployment():
+        return None
+    pw = (os.environ.get("GROUND_CONTROL_POSTGRES_PASSWORD") or "").strip()
+    if not pw:
+        return None
+    host = (os.environ.get("GROUND_CONTROL_POSTGRES_HOST") or "postgres").strip() or "postgres"
+    user = (os.environ.get("GROUND_CONTROL_POSTGRES_USER") or "ground_control").strip() or "ground_control"
+    u = quote_plus(user)
+    p = quote_plus(pw)
+    return f"postgresql+psycopg://{u}:{p}@{host}:5432/{database_name}"
+
+
+def _database_url_impl(
+    env_key: str,
+    sqlite_relative_name: str,
+    pg_database_name: str,
+) -> str:
     import os
 
-    return os.environ.get(
+    raw = (os.environ.get(env_key) or "").strip()
+    if raw:
+        return raw
+    built = _docker_postgres_sqlalchemy_url(pg_database_name)
+    if built is not None:
+        return built
+    if in_docker_deployment():
+        raise RuntimeError(
+            f"Docker deployment requires a non-empty Docker secret ground_control_postgres_password "
+            f"(hydrated as GROUND_CONTROL_POSTGRES_PASSWORD) or an explicit {env_key}."
+        )
+    return f"sqlite:///{BASE_DIR / sqlite_relative_name}"
+
+
+def database_url() -> str:
+    return _database_url_impl(
         "GROUND_CONTROL_DATABASE_URL",
-        f"sqlite:///{BASE_DIR / 'ground_control.db'}",
+        "ground_control.db",
+        "ground_control",
     )
 
 
 def monitor_database_url() -> str:
-    import os
-
-    return os.environ.get(
+    return _database_url_impl(
         "GROUND_CONTROL_MONITOR_DATABASE_URL",
-        f"sqlite:///{BASE_DIR / 'ground_control_monitor.db'}",
+        "ground_control_monitor.db",
+        "ground_control_monitor",
     )
 
 
 def secrets_database_url() -> str:
-    import os
-
-    return os.environ.get(
+    return _database_url_impl(
         "GROUND_CONTROL_SECRETS_DATABASE_URL",
-        f"sqlite:///{BASE_DIR / 'ground_control_secrets.db'}",
+        "ground_control_secrets.db",
+        "ground_control_secrets",
     )
 
 

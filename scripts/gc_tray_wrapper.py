@@ -34,6 +34,7 @@ import os
 import webbrowser
 import plistlib
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -230,6 +231,45 @@ def _control_or_command_held_for_window_close() -> bool:
     return _x11_control_modifier_down()
 
 
+def _read_gc_postgres_password_from_dotenv() -> str | None:
+    env_path = _REPO_ROOT / ".env"
+    if not env_path.is_file():
+        return None
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if s.startswith("GC_POSTGRES_PASSWORD="):
+            val = s.split("=", 1)[1].strip().strip('"').strip("'")
+            return val or None
+    return None
+
+
+def _migrate_postgres_password_secret_from_dotenv() -> None:
+    """If the Postgres secret file is empty, copy ``GC_POSTGRES_PASSWORD`` from project ``.env`` once.
+
+    Older setups used ``GC_POSTGRES_PASSWORD`` in ``.env`` with compose interpolation; migrating
+    into ``.gc_docker_secrets/`` keeps existing volumes reachable without embedding passwords in YAML.
+    """
+    secret_path = _DOCKER_SECRETS_DIR / "ground_control_postgres_password"
+    try:
+        if secret_path.read_text(encoding="utf-8").strip():
+            return
+    except OSError:
+        return
+    val = _read_gc_postgres_password_from_dotenv()
+    if not val:
+        return
+    try:
+        secret_path.write_text(val + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _ensure_docker_secrets_stub_files() -> None:
     """Ensure compose secret file paths exist (empty = no override in the container)."""
     _DOCKER_SECRETS_DIR.mkdir(parents=True, exist_ok=True)
@@ -241,6 +281,7 @@ def _ensure_docker_secrets_stub_files() -> None:
         p = _DOCKER_SECRETS_DIR / name
         if not p.exists():
             p.write_bytes(b"")
+    _migrate_postgres_password_secret_from_dotenv()
 
 
 def _docker_compose_publish_env() -> dict[str, str]:
@@ -3097,6 +3138,16 @@ class GcTrayApp:
         except (OSError, ValueError) as e:
             messagebox.showerror("Docker secrets", str(e) or "Could not save secret files.")
 
+    def _on_generate_docker_postgres_password_click(self) -> None:
+        """Fill the Postgres secret field with a new random password (user still saves to disk)."""
+        ent = self._docker_secret_entries.get("ground_control_postgres_password")
+        if ent is None:
+            return
+        raw = secrets.token_urlsafe(24)
+        ent.delete(0, self._tk.END)
+        ent.insert(0, raw)
+        self._docker_secret_plain["ground_control_postgres_password"] = raw
+
     def _queue_settings_scroll_sync(self) -> None:
         if self._settings_scroll_job is not None:
             try:
@@ -3250,6 +3301,12 @@ class GcTrayApp:
                 ent.insert(0, plain)
                 ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
                 self._docker_secret_entries[spec.file_name] = ent
+                if spec.file_name == "ground_control_postgres_password":
+                    ttk.Button(
+                        inner,
+                        text="Generate",
+                        command=self._on_generate_docker_postgres_password_click,
+                    ).pack(side=tk.LEFT, padx=(4, 0))
 
             if spec.sensitive:
                 ttk.Button(
