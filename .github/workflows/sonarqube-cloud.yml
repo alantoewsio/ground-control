@@ -3,6 +3,8 @@
 # - sonar-project.properties: project key + organization must match SonarCloud.
 # - Repository secret SONAR_TOKEN (SonarCloud user token).
 # - SonarCloud: Administration → Analysis Method → disable Automatic Analysis if you use CI.
+# - Quality Gate: sonar.qualitygate.wait=true in sonar-project.properties fails this job if the
+#   project’s gate is red. Configure gates under SonarCloud → Quality Gates; assign one to this project.
 # https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/python-test-coverage
 
 name: SonarQube Cloud
