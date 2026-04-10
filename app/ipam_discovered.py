@@ -9,11 +9,224 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.firewall_config_sync import ENTITY_TYPES_INTERFACES_TAB
+from app.dhcp_server_table import iter_static_lease_dicts
+from app.firewall_config_sync import ENTITY_DHCP_SERVER, ENTITY_TYPES_INTERFACES_TAB
 from app.interface_table import flatten_payload, list_network_cidrs_from_flat
-from app.ipam import _ipam_sort_key, _normalize_name, create_ipam_prefix
+from app.ipam import (
+    _ipam_sort_key,
+    _normalize_name,
+    create_ipam_prefix,
+    find_most_specific_containing_pool,
+    vrf_key,
+)
 from app.ipam_vrf import DEFAULT_IPAM_VRF_NAME
 from app.models import Firewall, FirewallConfigEntry, IpamPrefix
+
+
+def _dhcp_xml_text(node: Any) -> str:
+    if node is None:
+        return ""
+    if isinstance(node, dict) and "#text" in node:
+        return str(node["#text"]).strip()
+    return str(node).strip()
+
+
+def _ptype_cf_row(row: IpamPrefix) -> str:
+    return (row.prefix_type or "").strip().casefold()
+
+
+def _best_assignment_for_host_ip(
+    db: Session, disc_net: ipaddress.IPv4Network | ipaddress.IPv6Network
+) -> IpamPrefix | None:
+    """Most specific saved assignment (any VRF) that strictly contains *disc_net*."""
+    all_rows = db.query(IpamPrefix).all()
+    best: IpamPrefix | None = None
+    best_pl = -1
+    for r in all_rows:
+        if _ptype_cf_row(r) != "assignment":
+            continue
+        try:
+            an = ipaddress.ip_network(r.cidr, strict=False)
+        except ValueError:
+            continue
+        if an.version != disc_net.version:
+            continue
+        if disc_net.subnet_of(an) and disc_net != an:
+            if an.prefixlen > best_pl:
+                best_pl = an.prefixlen
+                best = r
+    return best
+
+
+def _host_ip_already_in_ipam(
+    db: Session, disc_net: ipaddress.IPv4Network | ipaddress.IPv6Network
+) -> bool:
+    for r in db.query(IpamPrefix).all():
+        if _ptype_cf_row(r) not in ("assignment", "host"):
+            continue
+        try:
+            an = ipaddress.ip_network(r.cidr, strict=False)
+        except ValueError:
+            continue
+        if an == disc_net:
+            return True
+    return False
+
+
+def list_discovered_dhcp_host_payloads(
+    db: Session,
+    q: str = "",
+    firewall_ids: list[int] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Discovered /32 host rows from cached IPv4 DHCP ``StaticLease`` entries
+    (see xml-api-docs/Configure/Network/DHCPServer.md). Requires ``dhcp_server`` sync.
+    """
+    needle = (q or "").strip().casefold()
+    fq = (
+        db.query(FirewallConfigEntry, Firewall)
+        .join(Firewall, FirewallConfigEntry.firewall_id == Firewall.id)
+        .filter(FirewallConfigEntry.entity_type == ENTITY_DHCP_SERVER)
+    )
+    if firewall_ids:
+        fq = fq.filter(Firewall.id.in_(firewall_ids))
+    out: list[dict[str, Any]] = []
+    for ent, fw in fq.all():
+        try:
+            data = json.loads(ent.payload_json or "{}")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        srv_name = _dhcp_xml_text(data.get("Name")) or (ent.external_name or "").strip()
+        for lease in iter_static_lease_dicts(data):
+            ip_s = _dhcp_xml_text(lease.get("IPAddress"))
+            if not ip_s:
+                continue
+            try:
+                addr = ipaddress.ip_address(ip_s.strip())
+            except ValueError:
+                continue
+            if addr.version != 4:
+                continue
+            disc_net = ipaddress.ip_network(f"{addr}/32", strict=False)
+            cidr_s = str(disc_net)
+            if discovered_net_in_unmanaged_pool(db, disc_net):
+                continue
+            mac = _dhcp_xml_text(lease.get("MACAddress"))
+            lhn = _dhcp_xml_text(lease.get("HostName"))
+            key = f"dhcp:{int(fw.id)}:{srv_name}:{cidr_s}:{mac}:{lhn}"
+            if _host_ip_already_in_ipam(db, disc_net):
+                continue
+            parent_asg = _best_assignment_for_host_ip(db, disc_net)
+            vrf_k = vrf_key(parent_asg.vrf) if parent_asg is not None else "default"
+            source_summary = f"DHCP server «{srv_name}» (static lease)"
+            display_name = f"Discovered · {_fw_label(fw)} · {lhn or cidr_s}"
+            hay = " ".join(
+                [
+                    display_name,
+                    cidr_s,
+                    srv_name,
+                    lhn,
+                    mac,
+                    source_summary,
+                    _fw_label(fw),
+                ]
+            ).casefold()
+            if needle and needle not in hay:
+                continue
+            accept_allowed = parent_asg is not None
+            out.append(
+                {
+                    "row_kind": "discovered_dhcp_host",
+                    "key": key,
+                    "cidr": cidr_s,
+                    "family": 4,
+                    "firewall_id": int(fw.id),
+                    "firewall_label": _fw_label(fw),
+                    "dhcp_server_name": srv_name,
+                    "lease_hostname": lhn or None,
+                    "mac_address": mac or None,
+                    "suggested_parent_assignment_id": int(parent_asg.id)
+                    if parent_asg is not None
+                    else None,
+                    "vrf_key": vrf_k,
+                    "sources": [
+                        {
+                            "entity_type": ENTITY_DHCP_SERVER,
+                            "external_name": srv_name,
+                            "config_entry_id": ent.id,
+                        }
+                    ],
+                    "source_summary": source_summary,
+                    "display_name": display_name,
+                    "size_label": "1",
+                    "has_encompassing_pool": False,
+                    "encompassing_pool_cidr": None,
+                    "already_in_ipam": False,
+                    "overlap_conflict": False,
+                    "overlap_with_cidr": None,
+                    "accept_allowed": accept_allowed,
+                }
+            )
+    out.sort(key=lambda r: _ipam_sort_key(r["cidr"]))
+    return out
+
+
+def accept_discovered_dhcp_host(
+    db: Session,
+    *,
+    firewall_id: int,
+    cidr: str,
+    name: str,
+    parent_assignment_id: int,
+    lease_hostname: str | None,
+    mac_address: str | None,
+    description: str | None,
+) -> IpamPrefix:
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise ValueError("Firewall not found")
+    disc_net = ipaddress.ip_network(cidr.strip(), strict=False)
+    if disc_net.version != 4 or disc_net.prefixlen != 32:
+        raise ValueError("Only single IPv4 hosts (/32) can be accepted from DHCP static leases.")
+    if discovered_net_in_unmanaged_pool(db, disc_net):
+        raise ValueError(
+            "This address falls inside an unmanaged pool and cannot be accepted into the address plan."
+        )
+    if _host_ip_already_in_ipam(db, disc_net):
+        raise ValueError("This host address is already recorded in the address plan.")
+    asn = db.get(IpamPrefix, int(parent_assignment_id))
+    if asn is None or _ptype_cf_row(asn) != "assignment":
+        raise ValueError("Invalid parent assignment.")
+    try:
+        an = ipaddress.ip_network(asn.cidr, strict=False)
+    except ValueError as exc:
+        raise ValueError("Invalid parent assignment CIDR.") from exc
+    if disc_net.version != an.version or not disc_net.subnet_of(an) or disc_net == an:
+        raise ValueError("Host must be a strict subnet of the parent assignment.")
+    all_rows = db.query(IpamPrefix).all()
+    pp = find_most_specific_containing_pool(
+        an, vrf_key(asn.vrf), all_rows, exclude_prefix_id=int(asn.id)
+    )
+    pool_id = int(pp.id) if pp else None
+    auto_desc = f"Accepted from DHCP static lease on synced firewall {_fw_label(fw)}."
+    desc_final = (description or "").strip() or auto_desc
+    name_final = sanitize_ipam_accept_name(name, cidr=str(disc_net), srcs=None)
+    return create_ipam_prefix(
+        db,
+        name=name_final,
+        cidr=str(disc_net),
+        vrf=asn.vrf,
+        prefix_type="host",
+        assigned_to_firewall_id=None,
+        assigned_to_custom=None,
+        description=desc_final,
+        parent_pool_id=pool_id,
+        parent_assignment_id=int(asn.id),
+        lease_hostname=lease_hostname,
+        mac_address=mac_address,
+    )
 
 
 def _fw_label(fw: Firewall) -> str:

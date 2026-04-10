@@ -73,6 +73,23 @@ def test_merge_netflow_configuration_payload_skips_empty_rows():
     assert merged["@status"] == "200"
 
 
+def test_build_netflow_configuration_table_payload_all_firewalls_without_cache(main_session):
+    """Every selected firewall gets a row even when no netflow cache entry exists yet."""
+    db = main_session
+    fw1 = Firewall(name="East", host="10.0.0.10", port=4444, username="u", verify_ssl=False)
+    fw2 = Firewall(name="West", host="10.0.0.11", port=4444, username="u", verify_ssl=False)
+    db.add(fw1)
+    db.add(fw2)
+    db.commit()
+
+    out = build_netflow_configuration_table_payload(db, [fw1.id, fw2.id])
+    assert len(out["rows"]) == 2
+    for r in out["rows"]:
+        assert r["config_entry_id"] is None
+        assert r["cells"]["netflow_record_count"] == "0"
+        assert r["netflow_servers"] == []
+
+
 def test_build_netflow_configuration_table_payload_includes_firewalls_without_cache(main_session):
     db = main_session
     fw1 = Firewall(name="Alpha", host="10.0.0.1", port=4444, username="u", verify_ssl=False)

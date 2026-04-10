@@ -598,6 +598,41 @@ def _migrate_postgres_ipam_pool_unmanaged() -> None:
         )
 
 
+def _migrate_sqlite_ipam_lease_hostname_mac() -> None:
+    url = config.database_url()
+    if not url.startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("ipam_prefixes"):
+        return
+    cols = {c["name"] for c in insp.get_columns("ipam_prefixes")}
+    with _engine.begin() as conn:
+        if "lease_hostname" not in cols:
+            conn.execute(
+                text("ALTER TABLE ipam_prefixes ADD COLUMN lease_hostname VARCHAR(255)")
+            )
+        if "mac_address" not in cols:
+            conn.execute(
+                text("ALTER TABLE ipam_prefixes ADD COLUMN mac_address VARCHAR(32)")
+            )
+
+
+def _migrate_postgres_ipam_lease_hostname_mac() -> None:
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("ipam_prefixes"):
+        return
+    cols = {c["name"] for c in insp.get_columns("ipam_prefixes")}
+    with _engine.begin() as conn:
+        if "lease_hostname" not in cols:
+            conn.execute(
+                text("ALTER TABLE ipam_prefixes ADD COLUMN lease_hostname VARCHAR(255)")
+            )
+        if "mac_address" not in cols:
+            conn.execute(text("ALTER TABLE ipam_prefixes ADD COLUMN mac_address VARCHAR(32)"))
+
+
 def _migrate_postgres_ref_countries_code_width() -> None:
     """Widen PK: backups from Sophos can contain country identifiers longer than varchar(8)."""
     if config.database_url().startswith("sqlite"):
@@ -659,6 +694,8 @@ def init_db() -> None:
     _migrate_postgres_ipam_cidr_vrf_unique()
     _migrate_sqlite_ipam_pool_unmanaged()
     _migrate_postgres_ipam_pool_unmanaged()
+    _migrate_sqlite_ipam_lease_hostname_mac()
+    _migrate_postgres_ipam_lease_hostname_mac()
     _migrate_postgres_ref_countries_code_width()
     _seed_default_ipam_vrf()
     repair_postgresql_serials_to_max_id(

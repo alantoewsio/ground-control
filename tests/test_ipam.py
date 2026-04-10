@@ -137,6 +137,8 @@ def test_ipam_prefixes_list_shape(authed_client):
     assert isinstance(body["prefixes"], list)
     assert "discovered" in body
     assert isinstance(body["discovered"], list)
+    assert "discovered_hosts" in body
+    assert isinstance(body["discovered_hosts"], list)
     assert "ipam_form_meta" in body
     meta = body["ipam_form_meta"]
     assert "vrf_names" in meta and isinstance(meta["vrf_names"], list)

@@ -1,0 +1,121 @@
+{% extends "designer_base.html" %}
+{% set designer_subnav_active = "controls" %}
+{% block title %}Controls · Designer · Ground Control{% endblock %}
+{% block page_title %}Controls{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/content">Designer</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Controls</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Reference inputs with client-side validation. Empty values are allowed; non-empty values must parse as the stated address family.
+</p>
+{% endblock %}
+{% block content %}
+<main class="layout single gc-designer">
+  <section class="gc-designer__section" aria-labelledby="gc-designer-controls-address-h">
+    <h2 id="gc-designer-controls-address-h" class="gc-designer__h2">IP address fields</h2>
+    <p class="gc-designer__note">
+      Dotted-quad IPv4 (aligned with <code class="mono">interface_table._IPV4_RE</code>). IPv6 uses bracket URL parsing (compressed forms, <code class="mono">::</code>); zone identifiers after <code class="mono">%</code> are stripped before parsing.
+    </p>
+    <div class="gc-designer__sandbox">
+      <form class="settings-form" id="gc-designer-controls-ip-form" autocomplete="off" onsubmit="return false;">
+        <label class="settings-form__field">
+          <span class="settings-form__label" id="gc-designer-ipv4-l">IPv4 address</span>
+          <input
+            type="text"
+            class="settings-form__input mono"
+            id="gc-designer-controls-ipv4"
+            autocomplete="off"
+            inputmode="decimal"
+            placeholder="192.0.2.1"
+            aria-labelledby="gc-designer-ipv4-l"
+            aria-describedby="gc-designer-ipv4-err"
+            aria-invalid="false"
+          />
+          <p class="settings-form__status is-error" id="gc-designer-ipv4-err" role="alert" hidden></p>
+        </label>
+        <label class="settings-form__field">
+          <span class="settings-form__label" id="gc-designer-ipv6-l">IPv6 address</span>
+          <input
+            type="text"
+            class="settings-form__input mono"
+            id="gc-designer-controls-ipv6"
+            autocomplete="off"
+            placeholder="2001:db8::1"
+            aria-labelledby="gc-designer-ipv6-l"
+            aria-describedby="gc-designer-ipv6-err"
+            aria-invalid="false"
+          />
+          <p class="settings-form__status is-error" id="gc-designer-ipv6-err" role="alert" hidden></p>
+        </label>
+      </form>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+
+  var IPV4_RE = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)$/;
+
+  function isValidIpv4(s) {
+    s = String(s || "").trim();
+    if (!s) return true;
+    return IPV4_RE.test(s);
+  }
+
+  function isValidIpv6(s) {
+    s = String(s || "").trim();
+    if (!s) return true;
+    var zone = s.indexOf("%");
+    if (zone !== -1) s = s.slice(0, zone);
+    try {
+      new URL("http://[" + s + "]");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function wire(input, errEl, check, invalidMsg) {
+    if (!input || !errEl) return;
+
+    function apply() {
+      var ok = check(input.value);
+      input.setAttribute("aria-invalid", ok ? "false" : "true");
+      if (ok) {
+        errEl.textContent = "";
+        errEl.hidden = true;
+      } else {
+        errEl.textContent = invalidMsg;
+        errEl.hidden = false;
+      }
+    }
+
+    input.addEventListener("blur", apply);
+    input.addEventListener("input", function () {
+      if (input.getAttribute("aria-invalid") === "true") apply();
+    });
+  }
+
+  wire(
+    document.getElementById("gc-designer-controls-ipv4"),
+    document.getElementById("gc-designer-ipv4-err"),
+    isValidIpv4,
+    "Enter a dotted IPv4 address (four octets 0–255)."
+  );
+  wire(
+    document.getElementById("gc-designer-controls-ipv6"),
+    document.getElementById("gc-designer-ipv6-err"),
+    isValidIpv6,
+    "Enter a valid IPv6 address (e.g. 2001:db8::1 or ::1)."
+  );
+})();
+</script>
+{% endblock %}

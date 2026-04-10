@@ -506,6 +506,8 @@ def ipam_prefix_to_dict(row: IpamPrefix, fw_labels: dict[int, str]) -> dict[str,
         "assigned_to_custom": row.assigned_to_custom,
         "assigned_to_display": disp,
         "description": row.description,
+        "lease_hostname": (row.lease_hostname or "").strip() or None,
+        "mac_address": (row.mac_address or "").strip() or None,
         "size_label": _size_label(row.cidr),
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
@@ -564,6 +566,8 @@ def list_ipam_prefix_payloads(db: Session, q: str = "") -> list[dict[str, Any]]:
                     r.description or "",
                     r.prefix_type or "",
                     disp,
+                    r.lease_hostname or "",
+                    r.mac_address or "",
                 ]
             ).casefold()
             if needle not in hay:
@@ -619,6 +623,18 @@ def _raise_if_cidr_vrf_taken(
     )
 
 
+def _normalize_lease_hostname_mac(
+    lease_hostname: str | None, mac_address: str | None
+) -> tuple[str | None, str | None]:
+    hn = (lease_hostname or "").strip() or None
+    if hn and len(hn) > 255:
+        raise ValueError("Host name must be at most 255 characters.")
+    mac = (mac_address or "").strip() or None
+    if mac and len(mac) > 32:
+        raise ValueError("MAC address must be at most 32 characters.")
+    return hn, mac
+
+
 def create_ipam_prefix(
     db: Session,
     *,
@@ -632,6 +648,8 @@ def create_ipam_prefix(
     parent_pool_id: int | None = None,
     parent_assignment_id: int | None = None,
     pool_unmanaged: bool = False,
+    lease_hostname: str | None = None,
+    mac_address: str | None = None,
 ) -> IpamPrefix:
     nm = _normalize_name(name)
     norm, fam = _normalize_cidr(cidr)
@@ -656,6 +674,7 @@ def create_ipam_prefix(
     )
     vrf_stored = normalize_ipam_prefix_vrf_label(vrf)
     unmanaged_flag = bool(pool_unmanaged) if ptype.casefold() == "pool" else False
+    hn, mac = _normalize_lease_hostname_mac(lease_hostname, mac_address)
     row = IpamPrefix(
         name=nm,
         cidr=norm,
@@ -667,6 +686,8 @@ def create_ipam_prefix(
         assigned_to_custom=acu,
         description=(description.strip() if description else None) or None,
         pool_unmanaged=unmanaged_flag,
+        lease_hostname=hn,
+        mac_address=mac,
     )
     db.add(row)
     try:
@@ -692,6 +713,8 @@ def update_ipam_prefix(
     parent_pool_id: int | None = None,
     parent_assignment_id: int | None = None,
     pool_unmanaged: bool = False,
+    lease_hostname: str | None = None,
+    mac_address: str | None = None,
 ) -> IpamPrefix | None:
     row = db.get(IpamPrefix, prefix_id)
     if row is None:
@@ -728,6 +751,9 @@ def update_ipam_prefix(
     row.assigned_to_custom = acu
     row.description = (description.strip() if description else None) or None
     row.pool_unmanaged = bool(pool_unmanaged) if ptype.casefold() == "pool" else False
+    hn, mac = _normalize_lease_hostname_mac(lease_hostname, mac_address)
+    row.lease_hostname = hn
+    row.mac_address = mac
     try:
         db.commit()
     except IntegrityError:

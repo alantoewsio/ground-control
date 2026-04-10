@@ -13,7 +13,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir uv
 
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY app ./app
 COPY main.py ./
 COPY scripts/docker_healthcheck.py ./scripts/docker_healthcheck.py

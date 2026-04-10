@@ -1,14 +1,24 @@
-{% extends "base.html" %}
-{% set top_nav_active = "designer" %}
-{% block title %}Designer · Ground Control{% endblock %}
-{% block page_title %}Designer{% endblock %}
+{% extends "designer_base.html" %}
+{% set designer_subnav_active = "content" %}
+{% block title %}Content · Designer · Ground Control{% endblock %}
+{% block page_title %}Content{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/content">Designer</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Content</li>
+  </ol>
+</nav>
+{% endblock %}
 {% block page_subtitle %}
 <p class="page-header__subtitle">
   Reference layouts for composite UI controls used across Ground Control. These sandboxes are static; the live top bar, settings modal, and auth overlay remain functional.
 </p>
 {% endblock %}
 {% block content %}
-<main class="layout single gc-designer">
+<!-- Designer Content: list-modal + interface-flyout samples removed; bump data-gc-designer-content when changing. -->
+<main class="layout single gc-designer" data-gc-designer-content="2026-04-10-no-listmodal-no-if-shell">
   <p class="gc-designer__lead muted">
     Use this page to compare styling, spacing, and states while building new screens. Class names match production templates and scripts under
     <code class="mono">templates/</code> and <code class="mono">static/</code>.
@@ -321,7 +331,7 @@
                 <th scope="col" class="gc-th-sortable" aria-sort="ascending">Name</th>
                 <th scope="col" class="gc-th-sortable">Zone</th>
                 <th scope="col">Firewalls</th>
-                <th scope="col">Lists</th>
+                <th scope="col">Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -344,10 +354,7 @@
                     FW-A
                   </span>
                 </td>
-                <td class="gc-table-cell--list">
-                  <span class="gc-table-value-pill">192.168.1.0/24</span>
-                  <span class="gc-table-value-pill gc-table-value-pill--more">+3</span>
-                </td>
+                <td class="muted">—</td>
               </tr>
             </tbody>
           </table>
@@ -446,94 +453,6 @@
     </div>
   </section>
 
-  <section class="gc-designer__section" aria-labelledby="gc-designer-h-listmodal">
-    <h2 id="gc-designer-h-listmodal" class="gc-designer__h2">Cell list popover modal</h2>
-    <p class="gc-designer__note">
-      Multivalue table cells — <code class="mono">fw-cols-modal gc-table-list-modal</code> built in
-      <code class="mono">gc-table-cells.js</code>.
-    </p>
-    <div class="gc-designer__sandbox" style="position: relative; min-height: 240px">
-      <div class="fw-cols-modal gc-table-list-modal" style="position: absolute; left: 12px; top: 12px; pointer-events: none">
-        <div class="fw-cols-modal__panel gc-table-list-modal__panel" role="dialog" aria-modal="true" style="pointer-events: auto; max-width: 340px">
-          <div class="fw-cols-modal__header">
-            <h2 class="fw-cols-modal__title">Addresses</h2>
-            <button type="button" class="fw-cols-modal__close" aria-label="Close">
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-              </svg>
-            </button>
-          </div>
-          <input type="search" class="fw-cols-modal__filter gc-table-list-modal__search" placeholder="Search" aria-label="Search" autocomplete="off" />
-          <ul class="fw-cols-modal__list gc-table-list-modal__list">
-            <li class="gc-table-list-modal__item gc-table-list-modal__item--activate">
-              <span class="gc-table-value-pill mono">10.0.0.1</span>
-            </li>
-            <li class="gc-table-list-modal__item gc-table-list-modal__item--activate">
-              <span class="gc-table-value-pill mono">10.0.0.2</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="gc-designer__section" aria-labelledby="gc-designer-h-flyout">
-    <h2 id="gc-designer-h-flyout" class="gc-designer__h2">Interface flyout shell</h2>
-    <p class="gc-designer__note"><code class="mono">gc-if-flyout</code> — Network · Interfaces, many entity editors.</p>
-    <div class="gc-designer__sandbox">
-      <div class="gc-designer__sample-flyout-host">
-        <div class="gc-if-flyout" aria-hidden="false">
-          <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-designer-if-title" tabindex="-1">
-            <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize"></div>
-            <header class="gc-if-flyout__header">
-              <h2 id="gc-designer-if-title" class="gc-if-flyout__title">Edit interface</h2>
-            </header>
-            <form class="gc-if-flyout__panel-form" novalidate onsubmit="return false;">
-              <div class="gc-if-flyout__scroll">
-                <div class="gc-if-flyout__form-body">
-                  <p class="gc-if-flyout__section-label">General settings</p>
-                  <div class="gc-if-flyout__field">
-                    <label class="gc-if-flyout__label" for="gc-designer-if-name">Name <span class="gc-if-flyout__req" aria-hidden="true">*</span></label>
-                    <input type="text" id="gc-designer-if-name" class="gc-if-flyout__input" value="Port1" autocomplete="off" />
-                  </div>
-                  <div class="gc-if-flyout__field gc-if-flyout__field--readonly">
-                    <span class="gc-if-flyout__label">Hardware</span>
-                    <span class="gc-if-flyout__readonly-val mono">eth0</span>
-                  </div>
-                  <div class="gc-if-flyout__field">
-                    <label class="gc-if-flyout__label" for="gc-designer-if-zone">Network zone</label>
-                    <select id="gc-designer-if-zone" class="gc-if-flyout__input gc-if-flyout__select">
-                      <option>LAN</option>
-                      <option>DMZ</option>
-                    </select>
-                  </div>
-                  <hr class="gc-if-flyout__rule" />
-                  <div class="gc-if-flyout__check-head">
-                    <label class="gc-if-flyout__check-label">
-                      <input type="checkbox" checked />
-                      <span>IPv4 configuration</span>
-                    </label>
-                  </div>
-                  <fieldset class="gc-if-flyout__fieldset">
-                    <legend class="gc-if-flyout__legend">IP assignment</legend>
-                    <div class="gc-if-flyout__radios">
-                      <label><input type="radio" name="gc-designer-ipv4" value="static" /> Static</label>
-                      <label><input type="radio" name="gc-designer-ipv4" value="dhcp" checked /> DHCP</label>
-                    </div>
-                  </fieldset>
-                </div>
-              </div>
-              <footer class="gc-if-flyout__footer">
-                <button type="button" class="btn btn--secondary">Cancel</button>
-                <button type="submit" class="btn primary">Save</button>
-              </footer>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section class="gc-designer__section" aria-labelledby="gc-designer-h-conflict-flyout">
     <h2 id="gc-designer-h-conflict-flyout" class="gc-designer__h2">Combined-view field conflict (flyout)</h2>
     <p class="gc-designer__note">
@@ -553,41 +472,6 @@
             </button>
           </div>
           <p class="muted gc-zone-flyout__layout-conflict-hint">Scopes disagree — pick a value or edit per firewall.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="gc-designer__section" aria-labelledby="gc-designer-h-ips">
-    <h2 id="gc-designer-h-ips" class="gc-designer__h2">IPS policy nested sheet</h2>
-    <p class="gc-designer__note"><code class="mono">gc-ips-pol-subflyout</code> rule editor inside <code class="mono">gc_ips_policy_flyout.html</code>.</p>
-    <div class="gc-designer__sandbox gc-designer__sandbox--clip">
-      <div class="gc-ips-pol-flyout__stack" style="min-height: 220px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden">
-        <div class="gc-ips-pol-flyout--rule-open" style="display: contents">
-          <div class="gc-ips-pol-subflyout gc-ips-pol-subflyout--sheet" aria-hidden="false">
-            <header class="gc-ips-pol-subflyout__head">
-              <h3 class="gc-ips-pol-subflyout__title">Edit rule</h3>
-            </header>
-            <div class="gc-if-flyout__scroll">
-              <div class="gc-if-flyout__form-body">
-                <div class="gc-if-flyout__field">
-                  <label class="gc-if-flyout__label" for="gc-designer-ips-name">Rule name</label>
-                  <input type="text" id="gc-designer-ips-name" class="gc-if-flyout__input" value="Block outbound SMB" autocomplete="off" />
-                </div>
-                <div class="gc-ips-pol-dim-block" data-gc-ips-dim="category">
-                  <p class="gc-if-flyout__section-label">Category</p>
-                  <label class="gc-if-flyout__check-label">
-                    <input type="checkbox" checked />
-                    <span>All</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <footer class="gc-ips-pol-subflyout__footer">
-              <button type="button" class="btn btn--secondary">Cancel</button>
-              <button type="button" class="btn primary">Apply rule</button>
-            </footer>
-          </div>
         </div>
       </div>
     </div>

@@ -10,11 +10,13 @@ from sqlalchemy.orm import Session
 from app.firewall_config_sync import (
     ENTITY_ALIAS,
     ENTITY_BRIDGE_PAIR,
+    ENTITY_DHCP_SERVER,
     ENTITY_INTERFACE,
     ENTITY_LAG,
     ENTITY_VLAN,
     ENTITY_ZONE,
 )
+from app.dhcp_server_table import build_dhcp_server_table_rows
 from app.hosts_services_table import (
     build_hosts_services_table_rows,
     build_hs_table_rows_combined,
@@ -118,6 +120,8 @@ def configuration_network_table_payload(
             if zones_combine
             else build_zone_network_table_rows_flat(parsed)
         )
+    elif entity_type == ENTITY_DHCP_SERVER:
+        payload = build_dhcp_server_table_rows(parsed)
     else:
         payload = build_interface_table_rows(parsed)
 

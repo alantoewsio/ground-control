@@ -57,6 +57,8 @@ from app import (
     config,
     crypto,
     data_management,
+    letsencrypt_queue,
+    letsencrypt_service,
     security_settings,
     users_service,
 )
@@ -144,6 +146,7 @@ from app.configuration_payload import (
     configuration_network_table_payload,
     configuration_unified_interfaces_payload,
 )
+from app.dhcp_server_table import build_dhcp_server_table_rows
 from app.dashboard_metrics import (
     build_dashboard_payload,
     parse_firewall_ids_query,
@@ -154,6 +157,7 @@ from app.firewall_api_client import normalize_firewall_api_timeout_seconds
 from app.firewall_config_sync import (
     ENTITY_ALIAS,
     ENTITY_BRIDGE_PAIR,
+    ENTITY_DHCP_SERVER,
     ENTITY_INTERFACE,
     ENTITY_LAG,
     ENTITY_TYPES_INTERFACES_TAB,
@@ -211,7 +215,9 @@ from app.ipam_conflicts import (
 )
 from app.ipam_discovered import (
     accept_discovered_assignment,
+    accept_discovered_dhcp_host,
     list_discovered_assignment_payloads,
+    list_discovered_dhcp_host_payloads,
 )
 from app.ipam_interface_pool import (
     commit_interface_static_to_ipam_pool,
@@ -702,6 +708,8 @@ class IpamPrefixWriteBody(BaseModel):
     assigned_to_custom: str | None = Field(default=None, max_length=255)
     description: str | None = None
     pool_unmanaged: bool = False
+    lease_hostname: str | None = Field(default=None, max_length=255)
+    mac_address: str | None = Field(default=None, max_length=32)
 
     @field_validator("vrf", mode="before")
     @classmethod
@@ -727,6 +735,16 @@ class IpamAcceptDiscoveredBody(BaseModel):
     assigned_to_custom: str | None = Field(default=None, max_length=255)
     pool_cidr: str | None = Field(default=None, max_length=128)
     pool_name: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class IpamAcceptDiscoveredDhcpHostBody(BaseModel):
+    firewall_id: int = Field(..., gt=0)
+    cidr: str = Field(..., min_length=1, max_length=128)
+    name: str = Field(..., min_length=1, max_length=255)
+    parent_assignment_id: int = Field(..., gt=0)
+    lease_hostname: str | None = Field(default=None, max_length=255)
+    mac_address: str | None = Field(default=None, max_length=32)
     description: str | None = Field(default=None, max_length=500)
 
 
@@ -1441,6 +1459,17 @@ class BackupRestorePasswordBody(BaseModel):
     password: str | None = Field(default=None, max_length=256)
 
 
+class LetsEncryptSaveBody(BaseModel):
+    validation_method: str = Field(pattern="^(http|dns)$")
+    dns_plugin: str = Field(default="cloudflare", max_length=64)
+    email: str = Field(default="", max_length=320)
+    credentials: dict[str, str] = Field(default_factory=dict)
+
+
+class LetsEncryptDryRunBody(BaseModel):
+    domain: str = Field(min_length=1, max_length=253)
+
+
 _MAX_BACKUP_UPLOAD_BYTES = 512 * 1024 * 1024
 
 
@@ -2020,6 +2049,64 @@ async def api_settings_backup_restore(
     return out
 
 
+@app.get("/api/settings/letsencrypt")
+def api_settings_letsencrypt_get(_: Annotated[str, Depends(admin_user_id_dep)]):
+    return letsencrypt_service.letsencrypt_status_payload(include_secret_shapes=True)
+
+
+@app.post("/api/settings/letsencrypt")
+def api_settings_letsencrypt_save(
+    body: LetsEncryptSaveBody,
+    _: Annotated[str, Depends(admin_user_id_dep)],
+):
+    try:
+        letsencrypt_service.save_letsencrypt_from_api(
+            validation_method=body.validation_method,
+            dns_plugin=body.dns_plugin,
+            email=body.email,
+            credentials=dict(body.credentials or {}),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return letsencrypt_service.letsencrypt_status_payload(include_secret_shapes=True)
+
+
+@app.get("/api/settings/letsencrypt/queue")
+def api_settings_letsencrypt_queue(_: Annotated[str, Depends(admin_user_id_dep)]):
+    return letsencrypt_queue.queue_status()
+
+
+@app.post("/api/settings/letsencrypt/test")
+def api_settings_letsencrypt_dry_run(
+    body: LetsEncryptDryRunBody,
+    admin_id: Annotated[str, Depends(admin_user_id_dep)],
+    db: Annotated[Session, Depends(get_secrets_db)],
+):
+    row = db.get(AppUser, admin_id)
+    requested_by = row.username if row else admin_id
+    hostnames = letsencrypt_service.normalize_hostnames([body.domain])
+    errs = letsencrypt_service.validate_hostname_list(hostnames)
+    if errs:
+        raise HTTPException(status_code=400, detail="; ".join(errs))
+    try:
+        code, log = letsencrypt_service.run_certbot_challenge(
+            hostnames,
+            dry_run=True,
+            requested_by=requested_by,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if code != 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Certbot dry run failed.",
+                "log": log,
+            },
+        )
+    return {"log": log}
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -2037,23 +2124,80 @@ def dashboard(
     )
 
 
-@app.get("/designer", response_class=HTMLResponse, name="designer_page")
+def _designer_template_context(
+    request: Request,
+    sdb,
+    db,
+    *,
+    designer_subnav_active: str,
+) -> dict[str, Any]:
+    return {
+        "app_about": APP_ABOUT,
+        "auth_client_state": auth_client_state(request, sdb),
+        **template_nav_firewall_context(request, sdb, db),
+        "top_nav_active": "designer",
+        "designer_subnav_active": designer_subnav_active,
+    }
+
+
+@app.get("/designer", name="designer_page")
 def designer_page(
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Canonical designer entry: send users to Content (reference sandboxes)."""
+    return RedirectResponse(url="/designer/content", status_code=302)
+
+
+@app.get("/designer/navigation", name="designer_navigation_removed")
+def designer_navigation_removed(
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Former Designer · Navigation page; bookmarks redirect to Content."""
+    return RedirectResponse(url="/designer/content", status_code=302)
+
+
+@app.get("/designer/modals", response_class=HTMLResponse, name="designer_modals_page")
+def designer_modals_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
     _: Annotated[None, Depends(require_browser_session)],
 ):
-    """Static UI reference for complex controls (navigation, tables, flyouts, modals)."""
+    """Designer sub-area: modals and overlays."""
     return templates.TemplateResponse(
         request,
-        "designer.html",
-        {
-            "app_about": APP_ABOUT,
-            "auth_client_state": auth_client_state(request, sdb),
-            **template_nav_firewall_context(request, sdb, db),
-            "top_nav_active": "designer",
-        },
+        "designer_modals.html",
+        _designer_template_context(request, sdb, db, designer_subnav_active="modals"),
+    )
+
+
+@app.get("/designer/controls", response_class=HTMLResponse, name="designer_controls_page")
+def designer_controls_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Designer sub-area: reusable input controls and validation patterns."""
+    return templates.TemplateResponse(
+        request,
+        "designer_controls.html",
+        _designer_template_context(request, sdb, db, designer_subnav_active="controls"),
+    )
+
+
+@app.get("/designer/content", response_class=HTMLResponse, name="designer_content_page")
+def designer_content_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Static UI reference for tables, flyouts, modals, and composite controls."""
+    return templates.TemplateResponse(
+        request,
+        "designer_content.html",
+        _designer_template_context(request, sdb, db, designer_subnav_active="content"),
     )
 
 
@@ -2076,6 +2220,9 @@ def _address_management_template_context(
         ),
         "url_api_ipam_accept_discovered_batch": str(
             request.url_for("api_ipam_accept_discovered_batch")
+        ),
+        "url_api_ipam_accept_discovered_dhcp_host": str(
+            request.url_for("api_ipam_accept_discovered_dhcp_host")
         ),
         "url_api_ipam_next_assignment_cidr": str(
             request.url_for("api_ipam_next_assignment_cidr")
@@ -2201,9 +2348,15 @@ def api_ipam_prefixes(
     discovered = list_discovered_assignment_payloads(db, q=q, firewall_ids=fw_filter)
     for d in discovered:
         d["vrf_assignment_conflict"] = d["key"] in disc_conflict_keys
+    discovered_hosts = list_discovered_dhcp_host_payloads(
+        db, q=q, firewall_ids=fw_filter
+    )
+    for h in discovered_hosts:
+        h["vrf_assignment_conflict"] = h["key"] in disc_conflict_keys
     return {
         "prefixes": prefixes,
         "discovered": discovered,
+        "discovered_hosts": discovered_hosts,
         "ipam_form_meta": build_ipam_form_meta(db),
     }
 
@@ -2319,6 +2472,8 @@ def api_ipam_prefixes_create(
             parent_pool_id=body.parent_pool_id,
             parent_assignment_id=body.parent_assignment_id,
             pool_unmanaged=body.pool_unmanaged,
+            lease_hostname=body.lease_hostname,
+            mac_address=body.mac_address,
         )
     except IpamDuplicateCidrError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -2353,6 +2508,8 @@ def api_ipam_prefixes_update(
             parent_pool_id=body.parent_pool_id,
             parent_assignment_id=body.parent_assignment_id,
             pool_unmanaged=body.pool_unmanaged,
+            lease_hostname=body.lease_hostname,
+            mac_address=body.mac_address,
         )
     except IpamDuplicateCidrError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -2417,6 +2574,38 @@ def api_ipam_accept_discovered(
     except IntegrityError as exc:
         raise HTTPException(
             status_code=409, detail="That prefix already exists."
+        ) from exc
+    return ipam_prefix_row_payload(db, row)
+
+
+@app.post(
+    "/api/ipam/accept-discovered-dhcp-host",
+    name="api_ipam_accept_discovered_dhcp_host",
+)
+def api_ipam_accept_discovered_dhcp_host(
+    body: IpamAcceptDiscoveredDhcpHostBody,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[str, Depends(require_browser_json_session)],
+) -> dict[str, Any]:
+    try:
+        row = accept_discovered_dhcp_host(
+            db,
+            firewall_id=body.firewall_id,
+            cidr=body.cidr,
+            name=body.name,
+            parent_assignment_id=body.parent_assignment_id,
+            lease_hostname=body.lease_hostname,
+            mac_address=body.mac_address,
+            description=body.description,
+        )
+    except IpamDuplicateCidrError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="That CIDR already exists in this VRF (address space).",
         ) from exc
     return ipam_prefix_row_payload(db, row)
 
@@ -2969,6 +3158,9 @@ def configurations_network_page(
             "url_api_configuration_network_zones": str(
                 request.url_for("api_configurations_network_zones")
             ),
+            "url_api_configuration_network_dhcp_servers": str(
+                request.url_for("api_configurations_network_dhcp_servers")
+            ),
             "url_api_configurations_apply_interface": str(
                 request.url_for("api_configurations_apply_interface")
             ),
@@ -3159,6 +3351,23 @@ def api_configurations_network_zones(
     ids = _parse_configuration_ids_query(configuration_ids)
     return configuration_network_table_payload(
         db, ids, ENTITY_ZONE, zones_combine=combine
+    )
+
+
+@app.get(
+    "/api/configurations/network/dhcp-servers",
+    name="api_configurations_network_dhcp_servers",
+)
+def api_configurations_network_dhcp_servers(
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs")
+    ] = "",
+):
+    ids = _parse_configuration_ids_query(configuration_ids)
+    return configuration_network_table_payload(
+        db, ids, ENTITY_DHCP_SERVER, zones_combine=True
     )
 
 
@@ -4036,6 +4245,9 @@ def firewalls_network_page(
             ),
             "url_api_network_zones": str(
                 request.url_for("api_firewalls_network_zones")
+            ),
+            "url_api_network_dhcp_servers": str(
+                request.url_for("api_firewalls_network_dhcp_servers")
             ),
             "url_api_task_queue_enqueue_interface": str(
                 request.url_for("api_task_queue_enqueue_interface")
@@ -5708,6 +5920,8 @@ def _firewall_config_table_payload(
         if zones_combine:
             return build_zone_network_table_rows(parsed)
         return build_zone_network_table_rows_flat(parsed)
+    if entity_type == ENTITY_DHCP_SERVER:
+        return build_dhcp_server_table_rows(parsed)
     return build_interface_table_rows(parsed)
 
 
@@ -6222,6 +6436,41 @@ def api_firewalls_network_zones(
         db,
         configuration_ids=configuration_ids,
         zones_combine=combine,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get(
+    "/api/firewalls/network/dhcp-servers",
+    name="api_firewalls_network_dhcp_servers",
+)
+def api_firewalls_network_dhcp_servers(
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated virtual configuration IDs")
+    ] = "",
+    q: Annotated[str, Query(description="Server-side text search filter.")] = "",
+    limit: Annotated[
+        int | None, Query(ge=1, le=5000, description="Max rows to return.")
+    ] = None,
+    offset: Annotated[int, Query(ge=0, description="Row offset for paging.")] = 0,
+):
+    """
+    IPv4 DHCP server rows from cached ``DHCPServer`` objects (see
+    xml-api-docs/Configure/Network/DHCPServer.md). Sync includes ``dhcp_server`` from Inventory.
+    """
+    return _api_firewalls_network_entities(
+        firewall_ids,
+        ENTITY_DHCP_SERVER,
+        db,
+        configuration_ids=configuration_ids,
+        zones_combine=True,
         q=q,
         limit=limit,
         offset=offset,

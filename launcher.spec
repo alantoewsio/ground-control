@@ -23,7 +23,11 @@ script = repo_root / "scripts" / "gc_tray_wrapper.py"
 if not script.is_file():
     raise SystemExit(f"Launcher script not found: {script}")
 
+_brand_ico = repo_root / "assets" / "ground_control_launcher.ico"
+
 datas = collect_data_files("sv_ttk")
+if _brand_ico.is_file():
+    datas.append((str(_brand_ico), "assets"))
 mpl = collect_all("matplotlib")
 datas += mpl[0]
 binaries = list(mpl[1])
@@ -69,6 +73,8 @@ _console = (os.environ.get("GROUND_CONTROL_LAUNCHER_CONSOLE") or "").strip().low
     "yes",
 )
 
+_exe_icon = str(_brand_ico) if _brand_ico.is_file() and sys.platform == "win32" else None
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -89,4 +95,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=_exe_icon,
 )

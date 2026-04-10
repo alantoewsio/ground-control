@@ -392,6 +392,10 @@ class IpamPrefix(Base):
     )
     assigned_to_custom: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Optional DHCP / DNS hostname for ``prefix_type`` host (Sophos static lease HostName).
+    lease_hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    #: Optional MAC for ``prefix_type`` host (Sophos static lease MACAddress).
+    mac_address: Mapped[str | None] = mapped_column(String(32), nullable=True)
     #: When ``prefix_type`` is pool: exclude from assignment/host parent pickers, discovery, and VRF conflicts.
     pool_unmanaged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)

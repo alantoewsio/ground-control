@@ -29,6 +29,11 @@ def test_daily_full_sync_runs_for_each_non_test_firewall(
     mock_workers, mock_pytest, mock_run, main_session
 ) -> None:
     mock_run.return_value = {"ok": True}
+    baseline = (
+        main_session.query(Firewall)
+        .filter(Firewall.is_test.is_(False))
+        .count()
+    )
     for i in range(3):
         main_session.add(
             Firewall(host=f"10.0.1.{i}", port=4444, username="u", is_test=False)
@@ -39,8 +44,8 @@ def test_daily_full_sync_runs_for_each_non_test_firewall(
     main_session.commit()
 
     n = run_daily_full_firewall_config_sync_job()
-    assert n == 3
-    assert mock_run.call_count == 3
+    assert n == baseline + 3
+    assert mock_run.call_count == baseline + 3
     for call in mock_run.call_args_list:
         kwargs = call.kwargs
         assert kwargs.get("entities_explicit") is True

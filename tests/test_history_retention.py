@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import app.config as config
 from app import data_management
+from app.database import SessionLocal
 from app.history_retention import run_history_retention_sweep
 from app.models import (
     Firewall,
@@ -37,22 +38,25 @@ def test_retention_purges_changelog_older_than_max_age(main_session, tmp_path, m
     main_session.commit()
 
     old = (datetime.now(timezone.utc) - timedelta(days=40)).replace(tzinfo=None)
-    main_session.add(
-        FirewallConfigChangelogEntry(
-            sync_run_id=rid,
-            firewall_id=fw.id,
-            entity_type="zone",
-            external_name="z",
-            action="add",
-            new_payload_json="{}",
-            created_at=old,
-        )
+    entry = FirewallConfigChangelogEntry(
+        sync_run_id=rid,
+        firewall_id=fw.id,
+        entity_type="zone",
+        external_name="z",
+        action="add",
+        new_payload_json="{}",
+        created_at=old,
     )
+    main_session.add(entry)
     main_session.commit()
+    main_session.refresh(entry)
+    entry_id = int(entry.id)
 
     counts = run_history_retention_sweep(main_session)
     assert counts["cache_updates"] >= 1
-    assert main_session.query(FirewallConfigChangelogEntry).count() == 0
+
+    with SessionLocal() as verify_db:
+        assert verify_db.get(FirewallConfigChangelogEntry, entry_id) is None
 
 
 def test_retention_purges_changelog_by_max_bytes(main_session, tmp_path, monkeypatch):

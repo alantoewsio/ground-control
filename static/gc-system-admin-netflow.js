@@ -278,6 +278,42 @@
     }
   });
 
+  /**
+   * When every selected firewall has no Netflow collectors in cache, stale toolbar search or facet
+   * filters (from a prior session) can hide all rows. Clear them so firewalls stay visible for Configure.
+   */
+  function clearNetflowFiltersIfAllEmptyCollectorsHidden(data) {
+    var rows = (data && data.rows) || [];
+    if (!rows.length) return;
+    var allNoCollectors = rows.every(function (r) {
+      var c = r.cells || {};
+      return String(c.netflow_record_count != null ? c.netflow_record_count : "0") === "0";
+    });
+    if (!allNoCollectors) return;
+    var tb = mainTbody();
+    if (!tb || !tableNetflow || typeof tableNetflow.applyRowFilter !== "function") return;
+    var total = 0;
+    var vis = 0;
+    tb.querySelectorAll("tr.gc-netflow-data-row").forEach(function (tr) {
+      total++;
+      if (!tr.hidden) vis++;
+    });
+    if (total === 0 || vis > 0) return;
+    var si = document.getElementById("gc-netflow-search");
+    if (si) si.value = "";
+    if (globalThis.gcTableFacets && globalThis.gcTableFacets.clearToolbarSearchStorage) {
+      globalThis.gcTableFacets.clearToolbarSearchStorage("gc-netflow");
+    }
+    var fd = document.getElementById("gc-netflow-filters-drawer");
+    if (fd && globalThis.gcTableFacets) {
+      globalThis.gcTableFacets.reset(fd, "gc-netflow");
+    }
+    tableNetflow.applyRowFilter();
+    if (typeof tableNetflow.updateFacetChrome === "function") {
+      tableNetflow.updateFacetChrome();
+    }
+  }
+
   function init() {
     if (!URL_TABLE || typeof globalThis.gcCreateNetworkEntityTable !== "function") return;
     flyoutRoot = document.getElementById("gc-netflow-flyout");
@@ -297,6 +333,7 @@
       lsKey: "ground-control-netflow-columns-v1",
       dataRowClass: "gc-netflow-data-row",
       colPickerAttr: "data-gc-netflow-col",
+      firewallPillNameColIds: ["__name"],
       pageSyncFallbackEntities: ["netflow_configuration"],
       bulkRowSelect: false,
       rowClickable: true,
@@ -314,7 +351,8 @@
         syncConfigureButton();
         openFlyoutFromRow(row);
       },
-      afterRenderFromApi: function () {
+      afterRenderFromApi: function (data) {
+        clearNetflowFiltersIfAllEmptyCollectorsHidden(data);
         syncConfigureButton();
       },
       labels: {
@@ -346,6 +384,12 @@
         }))
           tableNetflow.refresh();
       });
+    }
+
+    /* Initial load: top bar emits gc-firewall-selection-changed via setTimeout(0) before this script
+       runs; if that fires before we attach the listener, the table never refreshes. Always fetch once. */
+    if (tableNetflow && tableNetflow.refresh) {
+      tableNetflow.refresh();
     }
   }
 

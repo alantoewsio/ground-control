@@ -6,6 +6,11 @@
 #
 # Example (matches defaults): docker compose up -d --build
 #
+# Seeing stale code after “rebuild”? ``compose up --build`` can reuse cached image layers. The
+# Launcher **Start + Build** / **Restart + rebuild** menus run ``build --no-cache ground-control``
+# then ``up -d --force-recreate ground-control``. **Full rebuild** uses the same build step, then
+# ``up`` with ``--no-deps``. Plain **Start** (no dropdown) is ``up -d`` only — no image rebuild.
+#
 # PostgreSQL password: Docker secret file `.gc_docker_secrets/ground_control_postgres_password`
 # (create via Launcher → Settings → Docker secrets, or edit the file). Compose mounts it for both
 # the postgres and ground-control services. The password is fixed at first volume init; changing

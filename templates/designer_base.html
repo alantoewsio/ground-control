@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% set show_designer_sidebar = true %}
+{% set top_nav_active = top_nav_active | default("designer") %}
+{% set _gc_ver = app_about.app_version if app_about is defined else "0.3.3" %}
+{% block app_sidebar %}
+<div class="app-sidebar__inner">
+  <button
+    type="button"
+    class="app-sidebar__toggle"
+    id="app-sidebar-toggle"
+    aria-expanded="true"
+    title="Collapse navigation"
+    aria-label="Collapse navigation"
+  >
+    <span class="app-sidebar__toggle-icon" aria-hidden="true">
+      <svg
+        class="app-sidebar__collapse-svg"
+        viewBox="0 0 28 22"
+        width="25"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          class="app-sidebar__collapse-bars"
+          fill="currentColor"
+          d="M1.25 4.25h14.5v2.35H1.25zm0 5.575h10.25v2.35H1.25zm0 5.575h16.25v2.35H1.25z"
+        />
+        <g class="app-sidebar__collapse-arrow-wrap">
+          <path fill="currentColor" d="M16.35 11L25 3.35v15.3L16.35 11z" />
+        </g>
+      </svg>
+    </span>
+  </button>
+  <p class="app-sidebar__title" id="app-nav-heading">Designer</p>
+  <div class="app-sidebar__nav-scroll">
+    <nav class="app-nav" aria-labelledby="app-nav-heading" aria-orientation="vertical">
+      <a
+        href="/designer/modals"
+        class="app-nav__item{% if designer_subnav_active == 'modals' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7v-7zm4-3h2v10h-2V7zm4 6h2v4h-2v-4z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Modals</span>
+      </a>
+      <a
+        href="/designer/controls"
+        class="app-nav__item{% if designer_subnav_active == 'controls' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2h-6v2h6zm-6-4h2v-2h4V5h-4V3h-2v6z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Controls</span>
+      </a>
+      <a
+        href="/designer/content"
+        class="app-nav__item{% if designer_subnav_active == 'content' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Content</span>
+      </a>
+    </nav>
+  </div>
+  <div class="app-sidebar__footer">
+    <p class="app-sidebar__version" aria-label="Application version">v{{ _gc_ver }}</p>
+  </div>
+</div>
+{% endblock %}

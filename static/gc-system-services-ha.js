@@ -344,6 +344,10 @@
         if (ids.some(function (id) { return set[Number(id)]; })) tableHa.refresh();
       });
     }
+
+    if (tableHa && tableHa.refresh) {
+      tableHa.refresh();
+    }
   }
 
   if (document.readyState === "loading") {

@@ -45,6 +45,7 @@
  * @param {string[]} [cfg.pageSyncFallbackEntities] - When a selected firewall has no visible row-derived entity types, sync these catalog ids (e.g. multi-type Interfaces tab)
  * @param {string[]} [cfg.noBoolToggleColIds] - Column ids where "0"/"1" (and similar) are shown as plain text, not static on/off toggles (e.g. numeric __rules counts)
  * @param {string[]} [cfg.valuePillColIds] - Column ids rendered as a single gc-table-value-pill (e.g. default action labels)
+ * @param {string[]} [cfg.firewallPillNameColIds] - Column ids (e.g. __name) rendered as gc-zone-pill gc-firewall-pill with status via gcFirewallScopePillHtml / gcGetFirewallOnlineByLabel
  */
 
 function gcEscapeHtml(s) {
@@ -452,6 +453,16 @@ function gcCreateNetworkEntityTable(cfg) {
   let valuePillColSet = {};
   valuePillColIds.forEach(function (id) {
     if (id) valuePillColSet[id] = true;
+  });
+  let firewallPillNameColIds =
+    Array.isArray(cfg.firewallPillNameColIds) && cfg.firewallPillNameColIds.length
+      ? cfg.firewallPillNameColIds.map(function (x) {
+        return String(x || "").trim();
+      }).filter(Boolean)
+      : [];
+  let firewallPillNameColSet = {};
+  firewallPillNameColIds.forEach(function (id) {
+    if (id) firewallPillNameColSet[id] = true;
   });
   let afterRenderFromApi = typeof cfg.afterRenderFromApi === "function" ? cfg.afterRenderFromApi : null;
   let combineQuery = cfg.combineQuery || null;
@@ -2510,6 +2521,16 @@ function gcCreateNetworkEntityTable(cfg) {
           html = cfgBtnHtml;
         }
         td.classList.add("gc-table-action-cell");
+      } else if (firewallPillNameColSet[c.id]) {
+        let nm = v != null ? String(v).trim() : "";
+        if (nm && typeof globalThis.gcFirewallScopePillHtml === "function") {
+          html = globalThis.gcFirewallScopePillHtml(nm);
+          td.classList.add("gc-net-firewall-pills");
+        } else if (nm) {
+          html = escapeHtml(nm);
+        } else {
+          html = formatCellHtml(c.id, v);
+        }
       } else {
         let gch =
           row.gc_cell_html && typeof row.gc_cell_html === "object"
@@ -2549,6 +2570,18 @@ function gcCreateNetworkEntityTable(cfg) {
       td.innerHTML = html;
       if (row.gc_cell_sort && row.gc_cell_sort[c.id] != null && String(row.gc_cell_sort[c.id]).trim() !== "") {
         td.setAttribute("data-sort-value", String(row.gc_cell_sort[c.id]).trim().toLowerCase());
+      }
+      if (
+        firewallPillNameColSet[c.id] &&
+        v != null &&
+        String(v).trim() &&
+        !(
+          row.gc_cell_sort &&
+          row.gc_cell_sort[c.id] != null &&
+          String(row.gc_cell_sort[c.id]).trim() !== ""
+        )
+      ) {
+        td.setAttribute("data-sort-value", String(v).trim().toLowerCase());
       }
       if (listExpand) {
         td.setAttribute("data-sort-value", listExpand.items.join(" ").toLowerCase());

@@ -13,7 +13,7 @@
 </nav>
 {% endblock %}
 {% block page_subtitle %}
-<p class="page-header__subtitle">Interfaces and zones across selected firewalls. VLANs appear on the Interfaces tab.</p>
+<p class="page-header__subtitle">Interfaces, zones, and cached IPv4 DHCP servers across selected firewalls. VLANs appear on the Interfaces tab.</p>
 {% endblock %}
 
 {% block content %}
@@ -23,6 +23,7 @@
       <div class="gc-net-filters-column">
         {{ net_filters_aside("gc-net-if", false) }}
         {{ net_filters_aside("gc-net-zone", true) }}
+        {{ net_filters_aside("gc-net-dhcp", true) }}
       </div>
       <div class="content-pane gc-network-panel__content">
         <div class="gc-tabs" role="tablist" aria-label="Network views" id="gc-network-main-tablist">
@@ -31,6 +32,9 @@
           </button>
           <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-zones" data-gc-tab="zones">
             Zones
+          </button>
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-tab-dhcp" data-gc-tab="dhcp">
+            DHCP
           </button>
         </div>
 
@@ -66,6 +70,17 @@
               )
             }}
           </div>
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-tab-dhcp" id="gc-panel-dhcp" hidden>
+            {{
+              net_entity_table_wrap(
+                "gc-net-dhcp",
+                "DHCP servers",
+                "Search DHCP servers",
+                show_combine=false,
+                toolbar_page_sync=true,
+              )
+            }}
+          </div>
         </div>
       </div>
     </div>
@@ -74,6 +89,7 @@
 
 {{ net_cols_modal("gc-net-if") }}
 {{ net_cols_modal("gc-net-zone") }}
+{{ net_cols_modal("gc-net-dhcp") }}
 
 <div id="gc-net-zone-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
   <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
@@ -434,11 +450,13 @@
     var URLS = {
       interfaces: {{ url_api_network_interfaces | tojson }},
       zones: {{ url_api_network_zones | tojson }},
+      dhcp: {{ url_api_network_dhcp_servers | tojson }},
     };
 
     function refreshAllNetworkTables() {
       if (tableIf) tableIf.refresh();
       if (tableZone) tableZone.refresh();
+      if (tableDhcp) tableDhcp.refresh();
     }
 
     document.addEventListener("gc-firewall-selection-changed", function () {
@@ -471,14 +489,14 @@
       });
     }
 
-    var FILTER_IDS = ["gc-net-if-filters-aside", "gc-net-zone-filters-aside"];
+    var FILTER_IDS = ["gc-net-if-filters-aside", "gc-net-zone-filters-aside", "gc-net-dhcp-filters-aside"];
 
     var NETWORK_MAIN_TAB_LS = "ground-control-network-main-tab";
 
     function readSavedNetworkMainTab() {
       try {
         var raw = localStorage.getItem(NETWORK_MAIN_TAB_LS);
-        if (raw === "interfaces" || raw === "zones") return raw;
+        if (raw === "interfaces" || raw === "zones" || raw === "dhcp") return raw;
         if (raw === "vlan") return "interfaces";
       } catch (e) {}
       return "interfaces";
@@ -490,6 +508,7 @@
       var showId;
       if (activeMainTab === "interfaces") showId = "gc-net-if-filters-aside";
       else if (activeMainTab === "zones") showId = "gc-net-zone-filters-aside";
+      else if (activeMainTab === "dhcp") showId = "gc-net-dhcp-filters-aside";
       else showId = "gc-net-if-filters-aside";
       FILTER_IDS.forEach(function (id) {
         var el = document.getElementById(id);
@@ -501,10 +520,11 @@
     var mainTablist = document.getElementById("gc-network-main-tablist");
     var mainTabs = mainTablist
       ? mainTablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-tab]")
-      : document.querySelectorAll("#gc-tab-interfaces, #gc-tab-zones");
+      : document.querySelectorAll("#gc-tab-interfaces, #gc-tab-zones, #gc-tab-dhcp");
     var mainPanels = {
       interfaces: document.getElementById("gc-panel-interfaces"),
       zones: document.getElementById("gc-panel-zones"),
+      dhcp: document.getElementById("gc-panel-dhcp"),
     };
 
     function applyMainTabPanels() {
@@ -1000,6 +1020,27 @@
           "No zones in the cache for the selected firewalls. Run sync from Inventory.",
         emptyFilter: "No zones match the current search or filters.",
         loadError: "Could not load zones.",
+      },
+    });
+
+    var tableDhcp = gcCreateNetworkEntityTable({
+      prefix: "gc-net-dhcp",
+      apiUrl: URLS.dhcp,
+      emptySelectionMessage:
+        "Select one or more firewalls or configurations in the top bar.",
+      lsKey: "ground-control-net-dhcp-columns-v1",
+      dataRowClass: "gc-net-dhcp-data-row",
+      colPickerAttr: "data-gc-net-dhcp-col",
+      pageSyncFallbackEntities: ["dhcp_server"],
+      rowClickable: false,
+      bulkRowSelect: false,
+      labels: {
+        countSingular: "DHCP server",
+        countPlural: "DHCP servers",
+        emptyCache:
+          "No IPv4 DHCP servers in the cache. Run sync from Inventory and include «DHCP servers (IPv4)» (dhcp_server).",
+        emptyFilter: "No rows match the current search or filters.",
+        loadError: "Could not load DHCP servers.",
       },
     });
 

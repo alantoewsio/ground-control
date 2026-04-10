@@ -10,8 +10,8 @@ Console with ANSI-colored output when the child emits escape sequences (``FORCE_
 Runs in the repository root context. **Native** mode stops listeners on the configured
 HTTP/HTTPS ports (matching scripts/restart-dev.ps1), then launches ``uv run python main.py``
 (or ``python main.py`` when ``uv`` is unavailable). **Docker** mode: **Start** runs ``docker compose up -d`` (no image build). **Restart** runs
-``docker compose restart`` on the service. Use **Rebuild** for ``docker compose build`` plus
-``up -d --force-recreate``; the console shows ``docker compose logs -f`` output.
+``docker compose restart`` on the service. Split-button dropdowns offer ``build --no-cache`` then ``up --force-recreate`` (on Windows, native ``tk.Menu`` / ``tk_popup``; elsewhere, the same card panel as the app menu), and
+a full rebuild (``build --no-cache`` then ``up --force-recreate --no-deps``); the console shows ``docker compose logs -f`` output.
 
 Install launcher extras: ``uv sync --group tray``
 Run: ``uv run --group tray python scripts/gc_tray_wrapper.py``
@@ -23,7 +23,7 @@ macOS installs ``~/Library/LaunchAgents/com.groundcontrol.tray.plist`` and runs 
 or **Command** (macOS) while clicking close to **quit the launcher** entirely.
 
 **Update:** when the checkout is a Git repo with an upstream, the dashboard polls ``git fetch`` periodically;
-if the remote branch is ahead of ``HEAD``, an **Update** control (left of the theme toggle) enables and runs
+if the remote branch is ahead of ``HEAD``, **Update** in the app menu (top-left) enables and runs
 ``git pull --ff-only`` then ``scripts/build_launcher.ps1`` (Windows PowerShell, or ``pwsh`` elsewhere).
 """
 
@@ -39,6 +39,7 @@ import webbrowser
 import plistlib
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -46,7 +47,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Sequence
 
 # --- repo on path (for app.config port helpers) ---
 def _resolve_repo_root() -> Path:
@@ -104,19 +105,40 @@ _DOCKER_COMPOSE_SERVICE = "ground-control"
 _DOCKER_LOCAL_IMAGE = "ground-control:local"
 _DOCKER_SECRETS_DIR = _REPO_ROOT / ".gc_docker_secrets"
 
+# Split ▼ panels: same minimum footprint as the hamburger app menu (content can grow wider/taller).
+_SPLIT_DROPDOWN_MIN_WIDTH = 252
+_SPLIT_DROPDOWN_MIN_HEIGHT = 72
+_SPLIT_DROPDOWN_GAP_BELOW_ANCHOR_PX = 4
+
+_BRAND_ICO_NAME = "ground_control_launcher.ico"
+
+
+def _brand_icon_path() -> Path | None:
+    """Login-art launcher icon: ``assets/…`` beside the repo, or bundled under PyInstaller."""
+    rel = Path("assets") / _BRAND_ICO_NAME
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            bundled = Path(meipass) / rel
+            if bundled.is_file():
+                return bundled
+    rooted = _REPO_ROOT / rel
+    if rooted.is_file():
+        return rooted
+    return None
+
+
 # Toolbar run-mode radios show "Native" / "Docker"; tooltips carry the full descriptions.
 _RUN_MODE_TOOLTIP_NATIVE = "Run natively (Python / uv on this machine)"
 _RUN_MODE_TOOLTIP_DOCKER = (
-    "Run in Docker (Start: compose up — no build; Restart: compose restart; Rebuild: build + recreate)"
+    "Run in Docker (Start: compose up — no build; Restart: compose restart; "
+    "dropdowns: build --no-cache then up --force-recreate, or full rebuild: same build then up --no-deps)"
 )
 _TOOLTIP_RESTART = "Restart without rebuilding (Docker: compose restart; native: stop then start)"
-_TOOLTIP_DOCKER_REBUILD = (
-    "Rebuild image and recreate container (compose build + up --force-recreate). "
-    "Only enabled in Docker run mode."
-)
 _TOOLTIP_UPDATE = (
     "Pull the latest changes from GitHub and rebuild the launcher (restarts the tray app when done)"
 )
+_TOOLTIP_APP_MENU = "App menu"
 _GIT_FETCH_TIMEOUT_SEC = 120.0
 _GIT_UPDATE_POLL_INTERVAL_MS = 300_000
 
@@ -368,6 +390,142 @@ def _save_tray_settings(data: dict[str, Any]) -> None:
             json.dump(data, f, indent=2)
     except OSError:
         pass
+
+
+_DASH_DEFAULT_GEOM = "860x720"
+_RE_TK_GEOMETRY = re.compile(r"^(\d+)x(\d+)([+-]\d+)([+-]\d+)$")
+
+
+def _parse_tk_geometry(geom: str) -> tuple[int, int, int, int] | None:
+    m = _RE_TK_GEOMETRY.match((geom or "").strip())
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+
+
+def _format_tk_geometry(w: int, h: int, x: int, y: int) -> str:
+    xs = f"+{x}" if x >= 0 else str(x)
+    ys = f"+{y}" if y >= 0 else str(y)
+    return f"{w}x{h}{xs}{ys}"
+
+
+def _clamp_window_rect_to_bounds(
+    w: int, h: int, x: int, y: int, minx: int, miny: int, maxx: int, maxy: int
+) -> tuple[int, int, int, int]:
+    min_w, min_h = 320, 240
+    w = max(min_w, min(w, max(maxx - minx, min_w)))
+    h = max(min_h, min(h, max(maxy - miny, min_h)))
+    x = max(minx, min(x, maxx - w))
+    y = max(miny, min(y, maxy - h))
+    return w, h, x, y
+
+
+def _dashboard_monitor_key_tk(win: Any) -> str:
+    return "tk:" + json.dumps(
+        [str(win.winfo_screen()), int(win.winfo_screenwidth()), int(win.winfo_screenheight())],
+        separators=(",", ":"),
+    )
+
+
+def _dashboard_parse_tk_monitor_key(key: str) -> tuple[str, int, int] | None:
+    if not key.startswith("tk:"):
+        return None
+    try:
+        raw = json.loads(key[3:])
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(raw, list) or len(raw) != 3:
+        return None
+    try:
+        return str(raw[0]), int(raw[1]), int(raw[2])
+    except (TypeError, ValueError):
+        return None
+
+
+def _dashboard_sig_matches_tk(win: Any, saved_key: str) -> bool:
+    exp = _dashboard_parse_tk_monitor_key(saved_key)
+    if exp is None:
+        return False
+    sc, sw, sh = exp
+    try:
+        return (
+            str(win.winfo_screen()) == sc
+            and int(win.winfo_screenwidth()) == sw
+            and int(win.winfo_screenheight()) == sh
+        )
+    except Exception:
+        return False
+
+
+def _win32_hwnd_from_tk(win: Any) -> int | None:
+    if sys.platform != "win32":
+        return None
+    try:
+        wid = win.winfo_id()
+        return int(str(wid), 0)
+    except Exception:
+        return None
+
+
+def _win32_monitor_device_names() -> frozenset[str]:
+    if sys.platform != "win32":
+        return frozenset()
+    from ctypes import WINFUNCTYPE, POINTER
+    from ctypes.wintypes import BOOL, DWORD, HDC, HMONITOR, LPARAM, RECT
+
+    user32 = ctypes.windll.user32
+
+    class MONITORINFOEX(ctypes.Structure):
+        _fields_ = (
+            ("cbSize", DWORD),
+            ("rcMonitor", RECT),
+            ("rcWork", RECT),
+            ("dwFlags", DWORD),
+            ("szDevice", ctypes.c_wchar * 32),
+        )
+
+    names: list[str] = []
+
+    @WINFUNCTYPE(BOOL, HMONITOR, HDC, POINTER(RECT), LPARAM)
+    def _callback(hmon: int, _hdc: int, _prc: Any, _lp: int) -> bool:
+        mi = MONITORINFOEX()
+        mi.cbSize = ctypes.sizeof(MONITORINFOEX)
+        if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+            names.append(str(mi.szDevice))
+        return True
+
+    user32.EnumDisplayMonitors(None, None, _callback, 0)
+    return frozenset(names)
+
+
+def _win32_monitor_device_for_tk_window(win: Any) -> str | None:
+    if sys.platform != "win32":
+        return None
+    hwnd = _win32_hwnd_from_tk(win)
+    if not hwnd:
+        return None
+    from ctypes.wintypes import DWORD, HMONITOR, RECT
+
+    user32 = ctypes.windll.user32
+    MONITOR_DEFAULTTONEAREST = 2
+
+    class MONITORINFOEX(ctypes.Structure):
+        _fields_ = (
+            ("cbSize", DWORD),
+            ("rcMonitor", RECT),
+            ("rcWork", RECT),
+            ("dwFlags", DWORD),
+            ("szDevice", ctypes.c_wchar * 32),
+        )
+
+    hmon: HMONITOR = user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+    if not hmon:
+        return None
+    mi = MONITORINFOEX()
+    mi.cbSize = ctypes.sizeof(MONITORINFOEX)
+    if not user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+        return None
+    return str(mi.szDevice)
 
 
 def _docker_compose_argv(*args: str) -> list[str] | None:
@@ -628,6 +786,14 @@ def _subprocess_no_window_kw() -> dict[str, int]:
         return {}
     cf = _windows_subprocess_creationflags()
     return {"creationflags": cf} if cf else {}
+
+
+def _format_argv_for_console(argv: Sequence[str]) -> str:
+    """Exact argv as a single line for the launcher console (cmd-style on Windows, POSIX shell elsewhere)."""
+    lst = list(argv)
+    if sys.platform == "win32":
+        return subprocess.list2cmdline(lst)
+    return shlex.join(lst)
 
 
 def _git_remote_has_newer_commits(repo: Path) -> tuple[bool, str]:
@@ -979,17 +1145,23 @@ def _render_status_hourglass_rgba(
     return im.resize((out_w, out_h), _PIL_LANCZOS)
 
 
-def _make_dashboard_toolbar_photos(master: Any) -> tuple[Any, Any, Any, Any]:
+def _make_dashboard_toolbar_photos(master: Any) -> tuple[Any, Any, Any, Any, Any]:
     """Small RGBA icons for ttk toolbar; supersampled in PIL then LANCZOS downscaled for smooth edges."""
     out = 18
     s = 4
     W = out * s
     photos: list[Any] = []
-    for kind in ("start", "stop", "restart", "rebuild"):
+    for kind in ("start", "start_rebuild", "stop", "restart", "rebuild"):
         im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
         d = ImageDraw.Draw(im)
         if kind == "start":
             d.polygon([(3 * s, 2 * s), (3 * s, 16 * s), (15 * s, 9 * s)], fill=(34, 197, 94, 255))
+        elif kind == "start_rebuild":
+            # Green play (narrower) + amber stack lines = build then run when container is down
+            d.polygon([(2 * s, 4 * s), (2 * s, 14 * s), (9 * s, 9 * s)], fill=(34, 197, 94, 255))
+            lw = max(2, int(1.25 * s))
+            d.line([(11 * s, 12 * s), (15 * s, 12 * s)], fill=(245, 158, 11, 255), width=lw)
+            d.line([(11 * s, 9 * s), (15 * s, 9 * s)], fill=(251, 191, 36, 255), width=lw)
         elif kind == "stop":
             d.rounded_rectangle((3 * s, 3 * s, 15 * s, 15 * s), radius=2 * s, fill=(239, 68, 68, 255))
         elif kind == "restart":
@@ -1004,7 +1176,53 @@ def _make_dashboard_toolbar_photos(master: Any) -> tuple[Any, Any, Any, Any]:
             d.line([(5 * s, 11 * s), (10 * s, 11 * s)], fill=(252, 211, 77, 255), width=lw)
         im_small = im.resize((out, out), _PIL_LANCZOS)
         photos.append(ImageTk.PhotoImage(im_small, master=master))
-    return photos[0], photos[1], photos[2], photos[3]
+    return photos[0], photos[1], photos[2], photos[3], photos[4]
+
+
+def _make_hamburger_menu_photo(master: Any, *, dark: bool) -> Any:
+    """Three-bar menu icon for the dashboard app menu (matches light/dark chrome)."""
+    out = 20
+    s = 4
+    W = out * s
+    line = (228, 228, 231, 255) if dark else (39, 39, 42, 255)
+    im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    lw = max(2, int(2 * s))
+    for yi in (6 * s, 10 * s, 14 * s):
+        d.line([(5 * s, yi), (15 * s, yi)], fill=line, width=lw)
+    im_small = im.resize((out, out), _PIL_LANCZOS)
+    return ImageTk.PhotoImage(im_small, master=master)
+
+
+def _make_menu_dark_mode_icon_photo(master: Any, *, dark_ui: bool) -> Any:
+    """Sun (light UI) / moon (dark UI) glyph beside the Dark mode menu checkbutton."""
+    out = 16
+    s = 4
+    W = out * s
+    im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = 8 * s, 8 * s
+    if dark_ui:
+        d.arc(
+            (3 * s, 3 * s, 13 * s, 13 * s),
+            start=40,
+            end=320,
+            fill=(228, 228, 231, 255),
+            width=max(2, int(2 * s)),
+        )
+    else:
+        r = int(3.5 * s)
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(251, 191, 36, 255))
+        ray = max(2, int(1.25 * s))
+        for deg in range(0, 360, 45):
+            rad = math.radians(deg)
+            x0 = cx + (r + s) * math.cos(rad)
+            y0 = cy + (r + s) * math.sin(rad)
+            x1 = cx + (r + 3 * s) * math.cos(rad)
+            y1 = cy + (r + 3 * s) * math.sin(rad)
+            d.line([(x0, y0), (x1, y1)], fill=(245, 158, 11, 255), width=ray)
+    im_small = im.resize((out, out), _PIL_LANCZOS)
+    return ImageTk.PhotoImage(im_small, master=master)
 
 
 def _make_console_chrome_photos(master: Any, *, dark: bool) -> tuple[Any, Any]:
@@ -1065,6 +1283,17 @@ def _make_tray_image(size: int = 64) -> Image.Image:
         font=font,
     )
     return img
+
+
+def _make_brand_tray_image(size: int = 64) -> Image.Image:
+    path = _brand_icon_path()
+    if path is not None:
+        try:
+            im = Image.open(path).convert("RGBA")
+            return im.resize((size, size), _PIL_LANCZOS)
+        except OSError:
+            pass
+    return _make_tray_image(size)
 
 
 def system_prefers_dark_mode() -> bool:
@@ -1357,6 +1586,8 @@ class GcTrayApp:
         self._root = tk.Tk()
         self._root.withdraw()
         self._root.title("Ground Control Launcher")
+        self._wm_icon_photos: list[Any] = []
+        self._apply_brand_window_icon(self._root)
         sv_ttk.set_theme("dark" if self._ui_dark else "light")
 
         self._console_ansi_carry = ""
@@ -1389,14 +1620,18 @@ class GcTrayApp:
         self._log_lines: collections.deque[str] = collections.deque(maxlen=25_000)
         self._log_lines_lock = threading.Lock()
         self._theme_user_pinned: bool = False
-        self._btn_theme: Any = None
-        self._btn_update: Any = None
+        self._btn_top_menu: Any = None
+        self._top_menu_popup: Any = None
+        self._photo_top_menu: Any = None
+        self._photo_menu_dark_icon: Any = None
+        self._menu_dark_mode_var: Any = None
+        self._app_menu_update_row: Any = None
+        self._app_menu_update_lbl: Any = None
         self._git_update_available: bool = False
         self._git_update_apply_in_progress: bool = False
         self._git_fetch_thread_running: bool = False
         self._git_fetch_lock = threading.Lock()
         self._git_update_poll_job: str | None = None
-        self._lnk_web_mgmt: Any = None
         self._status_canvas: Any = None
         self._status_label: Any = None
         self._status_job: str | None = None
@@ -1432,9 +1667,19 @@ class GcTrayApp:
         self._docker_settings_fr: Any = None
         self._btn_delete_docker_image: Any = None
         self._photo_btn_start: Any = None
+        self._photo_btn_start_rebuild: Any = None
         self._photo_btn_stop: Any = None
         self._photo_btn_restart: Any = None
         self._photo_btn_rebuild: Any = None
+        self._frm_start_split: Any = None
+        self._mb_start_split: Any = None
+        self._frm_restart_split: Any = None
+        self._mb_restart_split: Any = None
+        self._split_tools_popup: Any = None
+        self._split_tools_anchor: Any = None
+        # Windows: native ``Menu.tk_popup`` for split carets (borderless ``Toplevel`` is unreliable).
+        self._menu_start_split_win: Any = None
+        self._menu_restart_split_win: Any = None
         self._photo_console_clear: Any = None
         self._photo_console_copy: Any = None
         self._console_copy_tooltip_job: str | None = None
@@ -1450,13 +1695,33 @@ class GcTrayApp:
         self._metrics_thread = threading.Thread(target=self._metrics_loop, name="gc-metrics", daemon=True)
         self._metrics_thread.start()
 
-        image = _make_tray_image()
+        image = _make_brand_tray_image()
         self._icon = pystray.Icon(
             "ground_control_launcher",
             image,
             "Ground Control Launcher",
             menu=self._build_menu(),
         )
+
+    def _apply_brand_window_icon(self, win: Any) -> None:
+        """Taskbar / dock / title bar: .ico on Windows; ``iconphoto`` everywhere for consistency."""
+        path = _brand_icon_path()
+        if path is None:
+            return
+        if sys.platform == "win32":
+            try:
+                win.iconbitmap(default=str(path))
+            except self._tk.TclError:
+                pass
+        try:
+            im = Image.open(path).convert("RGBA")
+            side = 64
+            im = im.resize((side, side), _PIL_LANCZOS)
+            ph = ImageTk.PhotoImage(im, master=win)
+            self._wm_icon_photos.append(ph)
+            win.iconphoto(True, ph)
+        except OSError:
+            pass
 
     # --- state for UI ---
     def _http_https_ports(self) -> tuple[int, int]:
@@ -1542,6 +1807,7 @@ class GcTrayApp:
         if not argv:
             return
         try:
+            self._enqueue_log_command(argv)
             self._docker_logs_proc = subprocess.Popen(
                 argv,
                 cwd=_REPO_ROOT,
@@ -1594,19 +1860,24 @@ class GcTrayApp:
         cpu = _cpu_percent_of_total_capacity(cpu)
         return cpu, ram
 
-    def _docker_up_thread(self, *, rebuild: bool) -> None:
+    def _docker_up_thread(
+        self,
+        *,
+        mode: Literal["plain", "recreate", "full_rebuild"] = "plain",
+    ) -> None:
         try:
             if not _docker_compose_argv():
                 self._schedule(lambda: self._finish_docker_start(False, "docker compose not available (install Docker / add to PATH)."))
                 return
-            build_argv = _docker_compose_argv("build", _DOCKER_COMPOSE_SERVICE)
-            up_recreate_argv = _docker_compose_argv("up", "-d", "--force-recreate", _DOCKER_COMPOSE_SERVICE)
-            up_argv = _docker_compose_argv("up", "-d", _DOCKER_COMPOSE_SERVICE)
-            if rebuild:
-                if not build_argv or not up_recreate_argv:
-                    self._schedule(lambda: self._finish_docker_start(False, "docker compose not available (install Docker / add to PATH)."))
-                    return
-            elif not up_argv:
+            up_plain = _docker_compose_argv("up", "-d", _DOCKER_COMPOSE_SERVICE)
+            up_recreate = _docker_compose_argv("up", "-d", "--force-recreate", _DOCKER_COMPOSE_SERVICE)
+            if mode == "plain":
+                up_use = up_plain
+            elif mode == "recreate":
+                up_use = up_recreate
+            else:
+                up_use = None
+            if mode != "full_rebuild" and not up_use:
                 self._schedule(lambda: self._finish_docker_start(False, "docker compose not available (install Docker / add to PATH)."))
                 return
             _ensure_docker_secrets_stub_files()
@@ -1637,21 +1908,71 @@ class GcTrayApp:
                 "env": env,
                 **_subprocess_no_window_kw(),
             }
-            b_tail = ""
-            if rebuild:
-                r_b = subprocess.run(build_argv, timeout=1200, **run_kw)
+            if mode == "full_rebuild":
+                # ``up --build`` often reuses cached image layers; code edits may not appear. Force a
+                # clean image, then recreate the container (no --build on up).
+                build_nc = _docker_compose_argv("build", "--no-cache", _DOCKER_COMPOSE_SERVICE)
+                up_only = _docker_compose_argv(
+                    "up", "-d", "--force-recreate", "--no-deps", _DOCKER_COMPOSE_SERVICE
+                )
+                if not build_nc or not up_only:
+                    self._schedule(
+                        lambda: self._finish_docker_start(
+                            False,
+                            "docker compose not available (install Docker / add to PATH).",
+                        )
+                    )
+                    return
+                self._enqueue_log_command(build_nc)
+                r_b = subprocess.run(build_nc, timeout=1800, **run_kw)
                 b_tail = "\n".join(x for x in ((r_b.stdout or "").strip(), (r_b.stderr or "").strip()) if x)
                 if r_b.returncode != 0:
                     msg = b_tail or ("docker compose build exited with code %s" % r_b.returncode)
                     self._schedule(lambda m=msg: self._finish_docker_start(False, m))
                     return
-                up_use = up_recreate_argv
-            else:
-                up_use = up_argv
+                self._enqueue_log_command(up_only)
+                r_u = subprocess.run(up_only, timeout=600, **run_kw)
+                u_tail = "\n".join(x for x in ((r_u.stdout or "").strip(), (r_u.stderr or "").strip()) if x)
+                ok = r_u.returncode == 0
+                msg = "\n\n".join(x for x in (b_tail, u_tail) if x) if ok else (
+                    u_tail or b_tail or ("docker compose up exited with code %s" % r_u.returncode)
+                )
+                self._schedule(lambda ok=ok, msg=msg: self._finish_docker_start(ok, msg))
+                return
+
+            if mode == "recreate":
+                # Rebuild (not full rebuild): force a fresh image, then recreate the service container.
+                build_nc = _docker_compose_argv("build", "--no-cache", _DOCKER_COMPOSE_SERVICE)
+                if not build_nc:
+                    self._schedule(
+                        lambda: self._finish_docker_start(
+                            False,
+                            "docker compose not available (install Docker / add to PATH).",
+                        )
+                    )
+                    return
+                self._enqueue_log_command(build_nc)
+                r_b = subprocess.run(build_nc, timeout=1800, **run_kw)
+                b_tail = "\n".join(x for x in ((r_b.stdout or "").strip(), (r_b.stderr or "").strip()) if x)
+                if r_b.returncode != 0:
+                    msg = b_tail or ("docker compose build exited with code %s" % r_b.returncode)
+                    self._schedule(lambda m=msg: self._finish_docker_start(False, m))
+                    return
+                self._enqueue_log_command(up_use)
+                r_u = subprocess.run(up_use, timeout=600, **run_kw)
+                u_tail = "\n".join(x for x in ((r_u.stdout or "").strip(), (r_u.stderr or "").strip()) if x)
+                ok = r_u.returncode == 0
+                msg = "\n\n".join(x for x in (b_tail, u_tail) if x) if ok else (
+                    u_tail or b_tail or ("docker compose up exited with code %s" % r_u.returncode)
+                )
+                self._schedule(lambda ok=ok, msg=msg: self._finish_docker_start(ok, msg))
+                return
+
+            self._enqueue_log_command(up_use)
             r_u = subprocess.run(up_use, timeout=600, **run_kw)
             u_tail = "\n".join(x for x in ((r_u.stdout or "").strip(), (r_u.stderr or "").strip()) if x)
             ok = r_u.returncode == 0
-            msg = "\n\n".join(x for x in (b_tail, u_tail) if x) if ok else (u_tail or b_tail or ("docker compose up exited with code %s" % r_u.returncode))
+            msg = u_tail or ("docker compose up exited with code %s" % r_u.returncode)
             self._schedule(lambda ok=ok, msg=msg: self._finish_docker_start(ok, msg))
         except Exception as e:  # noqa: BLE001
             self._schedule(lambda e=e: self._finish_docker_start(False, str(e)))
@@ -1698,6 +2019,7 @@ class GcTrayApp:
                 return
             env = os.environ.copy()
             env.update(_docker_compose_publish_env())
+            self._enqueue_log_command(argv)
             r = subprocess.run(
                 argv,
                 cwd=_REPO_ROOT,
@@ -1934,6 +2256,300 @@ class GcTrayApp:
             return False
         return bool(_docker_compose_argv())
 
+    def _can_start_rebuild_docker(self) -> bool:
+        """Docker ``up`` options from the Start split when the service container is not running."""
+        if not self._can_rebuild_docker():
+            return False
+        return not self._docker_container_running(force=True)
+
+    def _build_win32_split_menus(self) -> None:
+        """``tk.Menu`` + ``tk_popup`` for Start/Restart carets (Windows only).
+
+        Menus are parented to the withdrawn ``Tk`` root, **not** the dashboard ``Toplevel``.
+        ``Menu`` widgets as direct children of the dashboard can break other ``Toplevel(dw)``
+        popups (e.g. the hamburger app menu) on Windows.
+        """
+        tk = self._tk
+        mroot = self._root
+        self._menu_start_split_win = tk.Menu(mroot, tearoff=0)
+        self._menu_start_split_win.add_command(
+            label="Start + Build",
+            image=self._photo_btn_start_rebuild,
+            compound=tk.LEFT,
+            command=self.docker_start_rebuild_gc,
+        )
+        self._menu_start_split_win.add_command(
+            label="Full rebuild (DESTRUCTIVE)",
+            image=self._photo_btn_rebuild,
+            compound=tk.LEFT,
+            command=lambda: self.docker_full_rebuild_gc(require_container_stopped=True),
+        )
+        self._menu_restart_split_win = tk.Menu(mroot, tearoff=0)
+        self._menu_restart_split_win.add_command(
+            label="Restart + rebuild",
+            image=self._photo_btn_rebuild,
+            compound=tk.LEFT,
+            command=self.docker_rebuild_gc,
+        )
+        self._menu_restart_split_win.add_command(
+            label="Full rebuild (DESTRUCTIVE)",
+            image=self._photo_btn_rebuild,
+            compound=tk.LEFT,
+            command=lambda: self.docker_full_rebuild_gc(require_container_stopped=False),
+        )
+        self._sync_win32_split_menus()
+
+    def _sync_win32_split_menus(self) -> None:
+        """Enable/disable Windows native split menus to match Docker availability."""
+        tk = self._tk
+        m0 = self._menu_start_split_win
+        if m0 is not None:
+            st0 = tk.NORMAL if self._can_start_rebuild_docker() else tk.DISABLED
+            try:
+                m0.entryconfigure(0, state=st0)
+                m0.entryconfigure(1, state=st0)
+            except self._tk.TclError:
+                pass
+        m1 = self._menu_restart_split_win
+        if m1 is not None:
+            st1 = tk.NORMAL if self._can_rebuild_docker() else tk.DISABLED
+            try:
+                m1.entryconfigure(0, state=st1)
+                m1.entryconfigure(1, state=st1)
+            except self._tk.TclError:
+                pass
+
+    def _win32_split_menu_popup_xy(self, split_frm: Any) -> tuple[int, int] | None:
+        """Screen coordinates for ``tk_popup``: just below the full Start/Restart split (main face + ▼)."""
+        if split_frm is None:
+            return None
+        try:
+            if not split_frm.winfo_exists():
+                return None
+        except self._tk.TclError:
+            return None
+        split_frm.update_idletasks()
+        x = int(split_frm.winfo_rootx())
+        y = int(split_frm.winfo_rooty() + split_frm.winfo_height() + _SPLIT_DROPDOWN_GAP_BELOW_ANCHOR_PX)
+        return x, y
+
+    def _win32_post_start_split_menu(self, _event: Any) -> None:
+        # Anchor to split frame (Start + ▼), not pointer — matches card dropdown on other OSes.
+        m = self._menu_start_split_win
+        btn = self._mb_start_split
+        if m is None or btn is None:
+            return
+        if "disabled" in btn.state():
+            return
+        self._close_top_app_menu()
+        self._close_split_tools_popup()
+        self._sync_win32_split_menus()
+        pos = self._win32_split_menu_popup_xy(self._frm_start_split)
+        if pos is None:
+            return
+        px, py = pos
+        try:
+            m.tk_popup(px, py)
+        except self._tk.TclError:
+            pass
+
+    def _win32_post_restart_split_menu(self, _event: Any) -> None:
+        m = self._menu_restart_split_win
+        btn = self._mb_restart_split
+        if m is None or btn is None:
+            return
+        if "disabled" in btn.state():
+            return
+        self._close_top_app_menu()
+        self._close_split_tools_popup()
+        self._sync_win32_split_menus()
+        pos = self._win32_split_menu_popup_xy(self._frm_restart_split)
+        if pos is None:
+            return
+        px, py = pos
+        try:
+            m.tk_popup(px, py)
+        except self._tk.TclError:
+            pass
+
+    def _open_styled_split_tools_dropdown(
+        self,
+        anchor_widget: Any,
+        rows: list[tuple[str, Any, object, bool]],
+    ) -> None:
+        """Card-style panel matching the hamburger app menu (not native ``Menu``).
+
+        *anchor_widget* is the full split frame (Start+▼ or Restart+▼) so the panel sits under it.
+        """
+        dw = self._dash_win
+        if dw is None or anchor_widget is None:
+            return
+        try:
+            if not dw.winfo_exists() or not anchor_widget.winfo_exists():
+                return
+        except self._tk.TclError:
+            return
+
+        self._close_split_tools_popup()
+        self._close_top_app_menu()
+
+        tk = self._tk
+        pal = self._app_menu_palette()
+        ff = self._charts_ui_font()
+
+        # Same pattern as ``_open_top_app_menu``: ``Toplevel(dashboard)``, ``withdraw`` until
+        # content is packed, then ``_finalize_card_dropdown_popup`` synchronously (no ``after_idle``).
+        popup = tk.Toplevel(dw)
+        self._split_tools_popup = popup
+        self._split_tools_anchor = anchor_widget
+        try:
+            popup.withdraw()
+        except tk.TclError:
+            pass
+        popup.bind("<Escape>", lambda _e: self._close_split_tools_popup())
+
+        outer = tk.Frame(popup, bg=pal["border"], padx=1, pady=1)
+        outer.pack(fill=tk.BOTH, expand=True)
+        inner = tk.Frame(outer, bg=pal["card"])
+        inner.pack(fill=tk.BOTH, expand=True, padx=5, pady=7)
+
+        def add_separator() -> None:
+            sep = tk.Frame(inner, bg=pal["sep"], height=1)
+            sep.pack(fill=tk.X, padx=12, pady=4)
+
+        first = True
+        for text, photo, command, enabled in rows:
+            if not first:
+                add_separator()
+            first = False
+
+            row_fr = tk.Frame(inner, bg=pal["card"], cursor=("hand2" if enabled else "arrow"))
+            hover_widgets: list[Any] = []
+            if photo is not None:
+                ic = tk.Label(row_fr, image=photo, bg=pal["card"])
+                ic.pack(side=tk.LEFT, padx=(12, 4), pady=11)
+                hover_widgets.append(ic)
+
+            lb = tk.Label(
+                row_fr,
+                text=text,
+                bg=pal["card"],
+                fg=(pal["fg"] if enabled else pal["fg_muted"]),
+                font=(ff, 11),
+                anchor="w",
+                padx=((0 if photo is not None else 14), 14),
+                pady=11,
+            )
+            lb.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            hover_widgets.append(lb)
+
+            def make_run(cmd: object, ok: bool):
+                def run(_e: Any = None) -> None:
+                    if not ok:
+                        return
+                    self._close_split_tools_popup()
+                    if cmd is not None:
+                        cmd()  # type: ignore[misc]
+
+                return run
+
+            run_fn = make_run(command, enabled)
+            if enabled:
+                row_fr.bind("<Button-1>", run_fn)
+                lb.bind("<Button-1>", run_fn)
+                for w in hover_widgets:
+                    if w is not lb:
+                        w.bind("<Button-1>", run_fn)
+                self._app_menu_attach_row_hover(row_fr, hover_widgets, pal["card"], pal["hover"])
+            row_fr.pack(fill=tk.X)
+
+        popup.update_idletasks()
+        pw = max(int(popup.winfo_reqwidth()), _SPLIT_DROPDOWN_MIN_WIDTH)
+        ph = max(int(popup.winfo_reqheight()), _SPLIT_DROPDOWN_MIN_HEIGHT)
+        anchor_widget.update_idletasks()
+        bx, by = int(anchor_widget.winfo_rootx()), int(anchor_widget.winfo_rooty())
+        bh = int(anchor_widget.winfo_height())
+        try:
+            vy = int(dw.winfo_vrooty())
+            vh = int(dw.winfo_vrootheight())
+        except self._tk.TclError:
+            vy, vh = 0, int(dw.winfo_screenheight())
+        gap = _SPLIT_DROPDOWN_GAP_BELOW_ANCHOR_PX
+        # Match hamburger menu: left-align with anchor; clamp to virtual desktop in finalize.
+        x = bx
+        y = by + bh + gap
+        if y + ph > vy + vh - 12:
+            y = max(vy + 8, by - ph - gap)
+        rel_tm = 220 if sys.platform == "win32" else None
+        self._finalize_card_dropdown_popup(
+            popup, dw, x=x, y=y, pw=pw, ph=ph, release_topmost_ms=rel_tm
+        )
+
+    def _schedule_split_tools_menu(self, *, start: bool) -> None:
+        """Open split menu on the next event-loop turn (after ttk finishes the caret click)."""
+
+        def _go() -> None:
+            if start:
+                self._post_start_split_menu()
+            else:
+                self._post_restart_split_menu()
+
+        try:
+            self._root.after(0, _go)
+        except self._tk.TclError:
+            if start:
+                self._post_start_split_menu()
+            else:
+                self._post_restart_split_menu()
+
+    def _post_start_split_menu(self) -> None:
+        """Open Start extras under the Start split; styled like the app menu."""
+        frm = self._frm_start_split
+        if frm is None:
+            return
+        try:
+            if not frm.winfo_exists():
+                return
+        except self._tk.TclError:
+            return
+        en = self._can_start_rebuild_docker()
+        self._open_styled_split_tools_dropdown(
+            frm,
+            [
+                ("Start + Build", self._photo_btn_start_rebuild, self.docker_start_rebuild_gc, en),
+                (
+                    "Full rebuild (DESTRUCTIVE)",
+                    self._photo_btn_rebuild,
+                    lambda: self.docker_full_rebuild_gc(require_container_stopped=True),
+                    en,
+                ),
+            ],
+        )
+
+    def _post_restart_split_menu(self) -> None:
+        """Open Restart extras under the Restart split; styled like the app menu."""
+        frm = self._frm_restart_split
+        if frm is None:
+            return
+        try:
+            if not frm.winfo_exists():
+                return
+        except self._tk.TclError:
+            return
+        en = self._can_rebuild_docker()
+        self._open_styled_split_tools_dropdown(
+            frm,
+            [
+                ("Restart + rebuild", self._photo_btn_rebuild, self.docker_rebuild_gc, en),
+                (
+                    "Full rebuild (DESTRUCTIVE)",
+                    self._photo_btn_rebuild,
+                    lambda: self.docker_full_rebuild_gc(require_container_stopped=False),
+                    en,
+                ),
+            ],
+        )
+
     def _build_menu(self) -> Menu:
         return Menu(
             MenuItem(_TRAY_MENU_OPEN, self._menu_open_charts, default=True),
@@ -1959,6 +2575,28 @@ class GcTrayApp:
 
     def _schedule(self, fn: object) -> None:
         self._root.after(0, fn)  # type: ignore[arg-type]
+
+    def _app_menu_palette(self) -> dict[str, str]:
+        """Colors for the custom app menu panel (card, not native ``Menu``)."""
+        if self._ui_dark:
+            return {
+                "border": "#3f3f46",
+                "card": "#2c2c30",
+                "fg": "#fafafa",
+                "fg_muted": "#8b8b93",
+                "hover": "#3f3f46",
+                "sep": "#52525c",
+                "select": "#3f3f46",
+            }
+        return {
+            "border": "#d4d4d8",
+            "card": "#ffffff",
+            "fg": "#18181b",
+            "fg_muted": "#a1a1aa",
+            "hover": "#f4f4f5",
+            "sep": "#e4e4e7",
+            "select": "#f4f4f5",
+        }
 
     def _git_update_poll_loop(self) -> None:
         self._start_git_update_check()
@@ -1988,20 +2626,25 @@ class GcTrayApp:
         threading.Thread(target=work, name="gc-git-fetch", daemon=True).start()
 
     def _apply_git_update_button_state(self) -> None:
-        btn = self._btn_update
-        if btn is None:
+        row = self._app_menu_update_row
+        lbl = self._app_menu_update_lbl
+        if row is None or lbl is None:
             return
         try:
-            if not btn.winfo_exists():
+            if not row.winfo_exists() or not lbl.winfo_exists():
                 return
         except self._tk.TclError:
             return
-        if self._git_update_apply_in_progress:
-            btn.configure(state=self._tk.DISABLED)
-            return
-        btn.configure(
-            state=(self._tk.NORMAL if self._git_update_available else self._tk.DISABLED),
-        )
+        pal = self._app_menu_palette()
+        en = bool(not self._git_update_apply_in_progress and self._git_update_available)
+        try:
+            lbl.configure(
+                fg=(pal["fg"] if en else pal["fg_muted"]),
+                cursor=("hand2" if en else "arrow"),
+            )
+            row.configure(cursor=("hand2" if en else "arrow"))
+        except self._tk.TclError:
+            pass
 
     def _launcher_build_argv(self) -> list[str] | None:
         ps1 = _REPO_ROOT / "scripts" / "build_launcher.ps1"
@@ -2045,8 +2688,10 @@ class GcTrayApp:
 
         def work() -> None:
             try:
+                pull_argv = ["git", "-C", str(_REPO_ROOT), "pull", "--ff-only"]
+                self._enqueue_log_command(pull_argv)
                 pull = subprocess.run(
-                    ["git", "-C", str(_REPO_ROOT), "pull", "--ff-only"],
+                    pull_argv,
                     capture_output=True,
                     text=True,
                     timeout=300,
@@ -2087,6 +2732,7 @@ class GcTrayApp:
                     self._apply_git_update_button_state()
                     return
                 try:
+                    self._enqueue_log_command(argv)
                     subprocess.Popen(argv, cwd=str(_REPO_ROOT), **self._launcher_build_popen_kw())
                 except OSError as e:
                     self._git_update_apply_in_progress = False
@@ -2128,6 +2774,12 @@ class GcTrayApp:
 
     def _quit_all(self) -> None:
         """Exit the Ground Control Launcher process (stops Ground Control, removes the launcher icon, ends Tk)."""
+        if self._dash_win is not None:
+            try:
+                if self._dash_win.winfo_exists() and self._dash_win.winfo_viewable():
+                    self._persist_dashboard_window_state()
+            except self._tk.TclError:
+                pass
         if self._git_update_poll_job is not None:
             try:
                 self._root.after_cancel(self._git_update_poll_job)
@@ -2156,6 +2808,7 @@ class GcTrayApp:
         # Help libraries that gate ANSI on TERM (in addition to FORCE_COLOR).
         env.setdefault("TERM", "xterm-256color")
 
+        self._enqueue_log_command(cmd)
         self._child = subprocess.Popen(
             cmd,
             cwd=_REPO_ROOT,
@@ -2198,6 +2851,10 @@ class GcTrayApp:
         with self._log_lines_lock:
             self._log_lines.append(text)
 
+    def _enqueue_log_command(self, argv: Sequence[str]) -> None:
+        """Log a subprocess invocation as ``$ program arg1 …`` on its own line (thread-safe)."""
+        self._enqueue_log_note(f"\n$ {_format_argv_for_console(argv)}\n")
+
     def _drain_log_queue_loop(self) -> None:
         self._root.after(100, self._drain_log_queue_loop)
         self._append_console_from_queue()
@@ -2223,7 +2880,6 @@ class GcTrayApp:
                 return
             take = min(2000, len(self._log_lines))
             chunks = [self._log_lines.popleft() for _ in range(take)]
-        dark_console = self._ui_dark
         for raw in chunks:
             segs, self._console_ansi_carry = ansi_feed(
                 self._console_ansi_carry,
@@ -2231,7 +2887,7 @@ class GcTrayApp:
                 self._ansi_state,
                 tw,
                 self._console_rgb_tags,
-                dark_console=dark_console,
+                dark_console=True,
             )
             for text, tags in segs:
                 if text:
@@ -2253,14 +2909,10 @@ class GcTrayApp:
         self._console_rgb_tags.clear()
 
     def _configure_console_chrome(self, tw: Any) -> None:
-        if self._ui_dark:
-            bg, ins = "#0a0a0a", "#fafafa"
-            base_fg = "#e4e4e7"
-            sel_bg, sel_fg = "#3f3f46", "#fafafa"
-        else:
-            bg, ins = "#ffffff", "#18181b"
-            base_fg = "#27272a"
-            sel_bg, sel_fg = "#e4e4e7", "#18181b"
+        # Console stays terminal-dark even when the rest of the dashboard is in light mode.
+        bg, ins = "#0a0a0a", "#fafafa"
+        base_fg = "#e4e4e7"
+        sel_bg, sel_fg = "#3f3f46", "#fafafa"
         tw.configure(
             bg=bg,
             fg=base_fg,
@@ -2355,8 +3007,18 @@ class GcTrayApp:
         self._console_copy_tooltip_win = tip
         self._console_copy_tooltip_job = self._root.after(2600, self._cancel_console_copy_tooltip)
 
-    def _bind_hover_tooltip(self, widget: Any, text: str) -> None:
-        """Show a short-delay hover tooltip (theme-aware) anchored under ``widget``."""
+    def _bind_hover_tooltip(
+        self,
+        widget: Any,
+        text: str,
+        *,
+        tip_vertical: str = "below",
+    ) -> None:
+        """Show a short-delay hover tooltip (theme-aware).
+
+        ``tip_vertical`` is ``below`` (default) or ``above``. Split ▼ carets use ``above`` so the
+        hint does not sit in the same band as the large dropdown that opens downward.
+        """
         tk = self._tk
         state: dict[str, Any] = {"job": None, "win": None}
 
@@ -2418,11 +3080,21 @@ class GcTrayApp:
             lbl.pack()
             tip.update_idletasks()
             tw_w = tip.winfo_reqwidth()
+            tw_h = tip.winfo_reqheight()
             ax = widget.winfo_rootx()
             ay = widget.winfo_rooty()
+            ah = widget.winfo_height()
             x = ax
-            y = ay + widget.winfo_height() + 4
             sw = dw.winfo_screenwidth()
+            sh = dw.winfo_screenheight()
+            if tip_vertical == "above":
+                y = ay - tw_h - 4
+                if y < 8:
+                    y = ay + ah + 4
+                if y + tw_h > sh - 8:
+                    y = max(8, sh - tw_h - 8)
+            else:
+                y = ay + ah + 4
             if x + tw_w > sw - 8:
                 x = max(0, sw - tw_w - 8)
             tip.geometry(f"+{max(0, int(x))}+{max(0, int(y))}")
@@ -2437,6 +3109,7 @@ class GcTrayApp:
 
         widget.bind("<Enter>", on_enter)
         widget.bind("<Leave>", on_leave)
+        widget.bind("<ButtonPress-1>", cancel, add="+")
 
     def _on_console_clear_click(self) -> None:
         tw = self._console_text
@@ -2488,9 +3161,8 @@ class GcTrayApp:
         self._configure_dashboard_window()
         self._configure_notebook_tabs()
         self._style_charts_stats_footer()
-        self._style_web_management_link()
         self._apply_figure_chrome()
-        self._update_theme_toggle_button()
+        self._sync_top_app_menu_appearance()
         self._redraw_charts_if_visible()
 
     def _dashboard_window_bg(self) -> str:
@@ -2523,7 +3195,6 @@ class GcTrayApp:
                     self._settings_canvas.configure(bg=bg)
             except self._tk.TclError:
                 pass
-        self._style_web_management_link()
 
     def _configure_notebook_tabs(self) -> None:
         from tkinter import ttk
@@ -2555,54 +3226,373 @@ class GcTrayApp:
             except self._tk.TclError:
                 continue
 
-    def _update_theme_toggle_button(self) -> None:
-        btn = self._btn_theme
-        if btn is None:
+    def _close_split_tools_popup(self) -> None:
+        self._split_tools_anchor = None
+        p = self._split_tools_popup
+        self._split_tools_popup = None
+        if p is None:
             return
         try:
-            if not btn.winfo_exists():
-                return
-        except self._tk.TclError:
-            return
-        glyph = "\u2600" if self._ui_dark else "\u263e"
-        btn.configure(text=glyph)
-
-    def _style_web_management_link(self) -> None:
-        from tkinter import font as tkfont
-
-        w = self._lnk_web_mgmt
-        if w is None:
-            return
-        try:
-            if not w.winfo_exists():
-                return
-        except self._tk.TclError:
-            return
-        bg = self._dashboard_window_bg()
-        fg = "#60a5fa" if self._ui_dark else "#2563eb"
-        fn = tkfont.Font(family=self._charts_ui_font(), size=9, underline=True)
-        try:
-            w.configure(bg=bg, fg=fg, font=fn)
+            if p.winfo_exists():
+                p.destroy()
         except self._tk.TclError:
             pass
 
-    def _on_web_management_click(self, _event: Any = None) -> None:
+    def _close_top_app_menu(self) -> None:
+        self._app_menu_update_row = None
+        self._app_menu_update_lbl = None
+        p = self._top_menu_popup
+        self._top_menu_popup = None
+        if p is None:
+            return
+        try:
+            if p.winfo_exists():
+                p.destroy()
+        except self._tk.TclError:
+            pass
+
+    def _toggle_top_app_menu(self) -> None:
+        p = self._top_menu_popup
+        if p is not None:
+            try:
+                if p.winfo_exists():
+                    self._close_top_app_menu()
+                    return
+            except self._tk.TclError:
+                self._top_menu_popup = None
+        self._open_top_app_menu()
+
+    def _on_app_menu_update_row_click(self, _event: Any = None) -> None:
+        if not self._git_update_available or self._git_update_apply_in_progress:
+            return
+        self._close_top_app_menu()
+        self._on_update_click()
+
+    def _app_menu_attach_row_hover(
+        self,
+        row: Any,
+        widgets: list[Any],
+        bg: str,
+        hover: str,
+        *,
+        enabled: bool | None = None,
+    ) -> None:
+        """Highlight row on hover (optional ``enabled`` callable for live gating)."""
+
+        def allow() -> bool:
+            return True if enabled is None else bool(enabled())
+
+        def on_enter(_e: Any = None) -> None:
+            if not allow():
+                return
+            try:
+                row.configure(bg=hover)
+                for w in widgets:
+                    w.configure(bg=hover, activebackground=hover)
+            except self._tk.TclError:
+                pass
+
+        def on_leave(_e: Any = None) -> None:
+            try:
+                row.configure(bg=bg)
+                for w in widgets:
+                    w.configure(bg=bg, activebackground=hover)
+            except self._tk.TclError:
+                pass
+
+        row.bind("<Enter>", on_enter)
+        row.bind("<Leave>", on_leave)
+
+    def _clamp_popup_top_left_to_vroot(
+        self,
+        dw: Any,
+        x: int,
+        y: int,
+        pw: int,
+        ph: int,
+        *,
+        margin: int = 8,
+    ) -> tuple[int, int]:
+        """Clamp popup top-left so a *pw*×*ph* window stays on the virtual desktop (all monitors).
+
+        ``winfo_screenwidth`` / ``height`` on a fresh ``Toplevel`` often match the **primary** monitor
+        only on Windows, which mis-clamps ``winfo_rootx``/``y`` anchors on secondary displays.
+        """
+        tk = self._tk
+        m = margin
+        try:
+            vx = int(dw.winfo_vrootx())
+            vy = int(dw.winfo_vrooty())
+            vw = int(dw.winfo_vrootwidth())
+            vh = int(dw.winfo_vrootheight())
+        except tk.TclError:
+            try:
+                vx = vy = 0
+                vw = int(dw.winfo_screenwidth())
+                vh = int(dw.winfo_screenheight())
+            except tk.TclError:
+                return int(x), int(y)
+        x_min = vx + m
+        y_min = vy + m
+        x_max = vx + vw - pw - m
+        y_max = vy + vh - ph - m
+        if x_max < x_min:
+            x_max = x_min
+        if y_max < y_min:
+            y_max = y_min
+        return int(min(max(x_min, x), x_max)), int(min(max(y_min, y), y_max))
+
+    def _finalize_card_dropdown_popup(
+        self,
+        popup: Any,
+        dw: Any,
+        *,
+        x: int,
+        y: int,
+        pw: int,
+        ph: int,
+        release_topmost_ms: int | None = None,
+    ) -> None:
+        """Borderless chrome, clamp to virtual desktop, map and stack above *dw* (app menu + split menus).
+
+        On Windows, leaving ``-topmost`` on permanently can leave borderless popups in a bad stacking
+        state; *release_topmost_ms* clears it after that many ms and re-``lift``s above *dw*.
+        """
+        tk = self._tk
+        try:
+            popup.overrideredirect(True)
+        except tk.TclError:
+            pass
+        if sys.platform != "win32":
+            try:
+                popup.transient(dw)
+            except tk.TclError:
+                pass
+        try:
+            popup.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        x, y = self._clamp_popup_top_left_to_vroot(dw, x, y, pw, ph, margin=8)
+        popup.geometry(f"{pw}x{ph}+{x}+{y}")
+        try:
+            popup.deiconify()
+        except tk.TclError:
+            pass
+        try:
+            popup.lift(dw)
+        except tk.TclError:
+            try:
+                popup.lift()
+            except tk.TclError:
+                pass
+        try:
+            popup.update_idletasks()
+            popup.update()
+        except tk.TclError:
+            pass
+        try:
+            popup.focus_set()
+        except tk.TclError:
+            pass
+
+        def _raise_again() -> None:
+            try:
+                if popup.winfo_exists() and dw.winfo_exists():
+                    popup.lift(dw)
+            except tk.TclError:
+                pass
+
+        try:
+            self._root.after_idle(_raise_again)
+        except tk.TclError:
+            pass
+
+        if release_topmost_ms is not None and release_topmost_ms > 0:
+
+            def _relax_topmost() -> None:
+                try:
+                    if not popup.winfo_exists():
+                        return
+                    popup.attributes("-topmost", False)
+                    if dw.winfo_exists():
+                        popup.lift(dw)
+                except tk.TclError:
+                    pass
+
+            try:
+                self._root.after(release_topmost_ms, _relax_topmost)
+            except tk.TclError:
+                pass
+
+    def _open_top_app_menu(self) -> None:
+        dw = self._dash_win
+        btn = self._btn_top_menu
+        if dw is None or btn is None:
+            return
+        try:
+            if not dw.winfo_exists() or not btn.winfo_exists():
+                return
+        except self._tk.TclError:
+            return
+
+        self._close_split_tools_popup()
+        self._close_top_app_menu()
+        tk = self._tk
+        pal = self._app_menu_palette()
+        ff = self._charts_ui_font()
+
+        popup = tk.Toplevel(dw)
+        self._top_menu_popup = popup
+        # Windows: overrideredirect before layout can leave the popup never painted; map only when ready.
+        try:
+            popup.withdraw()
+        except tk.TclError:
+            pass
+        popup.bind("<Escape>", lambda _e: self._close_top_app_menu())
+
+        outer = tk.Frame(popup, bg=pal["border"], padx=1, pady=1)
+        outer.pack(fill=tk.BOTH, expand=True)
+        inner = tk.Frame(outer, bg=pal["card"])
+        inner.pack(fill=tk.BOTH, expand=True, padx=5, pady=7)
+
+        def add_separator() -> None:
+            sep = tk.Frame(inner, bg=pal["sep"], height=1)
+            sep.pack(fill=tk.X, padx=12, pady=4)
+
+        def add_action_row(text: str, command: object) -> None:
+            row_fr = tk.Frame(inner, bg=pal["card"], cursor="hand2")
+            lb = tk.Label(
+                row_fr,
+                text=text,
+                bg=pal["card"],
+                fg=pal["fg"],
+                font=(ff, 11),
+                anchor="w",
+                padx=14,
+                pady=11,
+            )
+            lb.pack(fill=tk.X)
+
+            def run(_e: Any = None) -> None:
+                self._close_top_app_menu()
+                command()  # type: ignore[misc]
+
+            row_fr.bind("<Button-1>", run)
+            lb.bind("<Button-1>", run)
+            self._app_menu_attach_row_hover(row_fr, [lb], pal["card"], pal["hover"])
+            row_fr.pack(fill=tk.X)
+
+        add_action_row("Open App", self._on_open_app_click)
+        add_separator()
+
+        row_u = tk.Frame(inner, bg=pal["card"], cursor="hand2")
+        lu = tk.Label(
+            row_u,
+            text="Update",
+            bg=pal["card"],
+            fg=pal["fg"],
+            font=(ff, 11),
+            anchor="w",
+            padx=14,
+            pady=11,
+        )
+        lu.pack(fill=tk.X)
+        self._app_menu_update_row = row_u
+        self._app_menu_update_lbl = lu
+        row_u.bind("<Button-1>", self._on_app_menu_update_row_click)
+        lu.bind("<Button-1>", self._on_app_menu_update_row_click)
+        self._app_menu_attach_row_hover(
+            row_u,
+            [lu],
+            pal["card"],
+            pal["hover"],
+            enabled=lambda: bool(self._git_update_available and not self._git_update_apply_in_progress),
+        )
+        row_u.pack(fill=tk.X)
+        self._apply_git_update_button_state()
+
+        add_separator()
+
+        row_d = tk.Frame(inner, bg=pal["card"])
+        self._photo_menu_dark_icon = _make_menu_dark_mode_icon_photo(row_d, dark_ui=self._ui_dark)
+        ic = tk.Label(row_d, image=self._photo_menu_dark_icon, bg=pal["card"])
+        ic.pack(side=tk.LEFT, padx=(12, 4), pady=6)
+        cb = tk.Checkbutton(
+            row_d,
+            text="Dark mode",
+            variable=self._menu_dark_mode_var,
+            command=self._on_menu_dark_mode_toggle,
+            bg=pal["card"],
+            fg=pal["fg"],
+            activebackground=pal["hover"],
+            activeforeground=pal["fg"],
+            selectcolor=pal["select"],
+            highlightthickness=0,
+            font=(ff, 11),
+            indicatoron=True,
+            anchor="w",
+        )
+        cb.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12), pady=6)
+        self._app_menu_attach_row_hover(row_d, [ic, cb], pal["card"], pal["hover"])
+        row_d.pack(fill=tk.X)
+
+        add_separator()
+        add_action_row("Use system appearance", self._use_system_appearance)
+
+        popup.update_idletasks()
+        pw = max(int(popup.winfo_reqwidth()), 252)
+        ph = max(int(popup.winfo_reqheight()), 72)
+        btn.update_idletasks()
+        bx, by = int(btn.winfo_rootx()), int(btn.winfo_rooty())
+        bh = int(btn.winfo_height())
+        try:
+            vy = int(dw.winfo_vrooty())
+            vh = int(dw.winfo_vrootheight())
+        except self._tk.TclError:
+            vy, vh = 0, int(dw.winfo_screenheight())
+        # Left-align with the menu button; clamp in ``_finalize_card_dropdown_popup`` (virtual desktop).
+        x = bx
+        y = by + bh + 4
+        if y + ph > vy + vh - 12:
+            y = max(vy + 8, by - ph - 4)
+        rel_tm = 220 if sys.platform == "win32" else None
+        self._finalize_card_dropdown_popup(
+            popup, dw, x=x, y=y, pw=pw, ph=ph, release_topmost_ms=rel_tm
+        )
+
+    def _refresh_top_menu_button_icon(self) -> None:
+        mb = self._btn_top_menu
+        if mb is None:
+            return
+        try:
+            if not mb.winfo_exists():
+                return
+        except self._tk.TclError:
+            return
+        self._photo_top_menu = _make_hamburger_menu_photo(mb, dark=self._ui_dark)
+        try:
+            mb.configure(image=self._photo_top_menu)
+        except self._tk.TclError:
+            pass
+
+    def _sync_top_app_menu_appearance(self) -> None:
+        self._close_top_app_menu()
+        self._close_split_tools_popup()
+        v = self._menu_dark_mode_var
+        if v is not None:
+            v.set(self._ui_dark)
+        self._refresh_top_menu_button_icon()
+
+    def _on_menu_dark_mode_toggle(self) -> None:
+        self._theme_user_pinned = True
+        want = bool(self._menu_dark_mode_var.get())
+        self._apply_os_theme(want)
+
+    def _on_open_app_click(self) -> None:
         try:
             webbrowser.open(_web_management_browser_url())
         except OSError:
             pass
-
-    def _on_theme_toggle_click(self) -> None:
-        self._theme_user_pinned = True
-        self._apply_os_theme(not self._ui_dark)
-
-    def _on_theme_context_menu(self, event: Any) -> None:
-        m = self._tk.Menu(self._dash_win, tearoff=0)
-        m.add_command(label="Use system appearance", command=self._use_system_appearance)
-        try:
-            m.tk_popup(event.x_root, event.y_root)
-        finally:
-            m.grab_release()
 
     def _use_system_appearance(self) -> None:
         self._theme_user_pinned = False
@@ -2646,7 +3636,7 @@ class GcTrayApp:
             self._update_status_indicator()
             self._enqueue_log_note("\n=== Starting Ground Control (Docker, compose up — no image build) ===\n")
             threading.Thread(
-                target=lambda: self._docker_up_thread(rebuild=False),
+                target=lambda: self._docker_up_thread(mode="plain"),
                 name="gc-docker-up",
                 daemon=True,
             ).start()
@@ -2692,6 +3682,7 @@ class GcTrayApp:
                 argv = _docker_compose_argv("stop", _DOCKER_COMPOSE_SERVICE)
                 if argv:
                     try:
+                        self._enqueue_log_command(argv)
                         subprocess.run(
                             argv,
                             cwd=_REPO_ROOT,
@@ -2738,7 +3729,7 @@ class GcTrayApp:
         self.start_gc()
 
     def docker_rebuild_gc(self) -> None:
-        """Docker only: ``docker compose build`` then ``up -d --force-recreate``."""
+        """Docker only: ``compose build --no-cache`` then ``up -d --force-recreate <service>``."""
         with self._lock:
             if self._starting or self._stopping:
                 return
@@ -2748,10 +3739,59 @@ class GcTrayApp:
             self._starting = True
         self._refresh_dashboard_buttons()
         self._update_status_indicator()
-        self._enqueue_log_note("\n=== Rebuilding Docker image and recreating container ===\n")
+        self._enqueue_log_note(
+            "\n=== Docker: compose build --no-cache, then up --detach --force-recreate "
+            f"({_DOCKER_COMPOSE_SERVICE}) ===\n"
+        )
         threading.Thread(
-            target=lambda: self._docker_up_thread(rebuild=True),
+            target=lambda: self._docker_up_thread(mode="recreate"),
             name="gc-docker-rebuild",
+            daemon=True,
+        ).start()
+
+    def docker_start_rebuild_gc(self) -> None:
+        """Docker only when the container is stopped: ``build --no-cache`` then ``up -d --force-recreate``."""
+        with self._lock:
+            if self._starting or self._stopping:
+                return
+            if self._run_mode != "docker":
+                return
+        if self._docker_container_running(force=True):
+            return
+        with self._lock:
+            self._starting = True
+        self._refresh_dashboard_buttons()
+        self._update_status_indicator()
+        self._enqueue_log_note(
+            "\n=== Docker: compose build --no-cache, then up --detach --force-recreate "
+            f"({_DOCKER_COMPOSE_SERVICE}, container was stopped) ===\n"
+        )
+        threading.Thread(
+            target=lambda: self._docker_up_thread(mode="recreate"),
+            name="gc-docker-start-rebuild",
+            daemon=True,
+        ).start()
+
+    def docker_full_rebuild_gc(self, *, require_container_stopped: bool) -> None:
+        """``compose build --no-cache`` then ``up -d --force-recreate --no-deps <service>``."""
+        with self._lock:
+            if self._starting or self._stopping:
+                return
+            if self._run_mode != "docker":
+                return
+        if require_container_stopped and self._docker_container_running(force=True):
+            return
+        with self._lock:
+            self._starting = True
+        self._refresh_dashboard_buttons()
+        self._update_status_indicator()
+        self._enqueue_log_note(
+            "\n=== Docker: full rebuild (compose build --no-cache, then up --detach "
+            f"--force-recreate --no-deps {_DOCKER_COMPOSE_SERVICE}) ===\n"
+        )
+        threading.Thread(
+            target=lambda: self._docker_up_thread(mode="full_rebuild"),
+            name="gc-docker-full-rebuild",
             daemon=True,
         ).start()
 
@@ -2818,6 +3858,67 @@ class GcTrayApp:
                 self._samples.append(Sample(_utcnow(), cpu, ram, thr, source="native"))
             self._schedule(self._redraw_charts_if_visible)
 
+    def _persist_dashboard_window_state(self) -> None:
+        win = self._dash_win
+        if win is None:
+            return
+        try:
+            if not win.winfo_exists():
+                return
+            win.update_idletasks()
+            geom = win.geometry()
+            if sys.platform == "win32":
+                mk: str | None = _win32_monitor_device_for_tk_window(win)
+            else:
+                mk = _dashboard_monitor_key_tk(win)
+            merged = _load_tray_settings()
+            merged["dashboard_window"] = {"geometry": geom, "monitor_key": mk}
+            _save_tray_settings(merged)
+        except self._tk.TclError:
+            pass
+
+    def _apply_dashboard_saved_geometry(self, win: Any) -> None:
+        st = _load_tray_settings().get("dashboard_window")
+        if not isinstance(st, dict):
+            win.geometry(_DASH_DEFAULT_GEOM)
+            return
+        geom = st.get("geometry")
+        mk = st.get("monitor_key")
+        if not isinstance(geom, str) or not geom.strip():
+            win.geometry(_DASH_DEFAULT_GEOM)
+            return
+        parsed = _parse_tk_geometry(geom)
+        if parsed is None:
+            win.geometry(_DASH_DEFAULT_GEOM)
+            return
+        w, h, x, y = parsed
+        try:
+            rx = int(self._root.winfo_vrootx())
+            ry = int(self._root.winfo_vrooty())
+            rw = int(self._root.winfo_vrootwidth())
+            rh = int(self._root.winfo_vrootheight())
+        except self._tk.TclError:
+            win.geometry(_DASH_DEFAULT_GEOM)
+            return
+        w, h, x, y = _clamp_window_rect_to_bounds(w, h, x, y, rx, ry, rx + rw, ry + rh)
+        use_geom = _format_tk_geometry(w, h, x, y)
+
+        if sys.platform == "win32":
+            if isinstance(mk, str) and mk and not mk.startswith("tk:"):
+                if mk not in _win32_monitor_device_names():
+                    win.geometry(_DASH_DEFAULT_GEOM)
+                    return
+            win.geometry(use_geom)
+            return
+
+        win.geometry(use_geom)
+        try:
+            win.update_idletasks()
+        except self._tk.TclError:
+            pass
+        if isinstance(mk, str) and mk.startswith("tk:") and not _dashboard_sig_matches_tk(win, mk):
+            win.geometry(_DASH_DEFAULT_GEOM)
+
     def _show_dashboard(self) -> None:
         if self._dash_win is not None and self._dash_win.winfo_exists():
             self._sync_os_theme_on_show()
@@ -2848,11 +3949,32 @@ class GcTrayApp:
         win = self._tk.Toplevel(self._root)
         self._dash_win = win
         win.title("Ground Control Launcher — Dashboard")
-        win.geometry("860x720")
+        self._apply_brand_window_icon(win)
+        self._apply_dashboard_saved_geometry(win)
         win.protocol("WM_DELETE_WINDOW", self._on_dashboard_wm_delete)
 
         top_bar = ttk.Frame(win)
         top_bar.pack(side=self._tk.TOP, fill=self._tk.X, padx=10, pady=(10, 4))
+
+        menu_holder = ttk.Frame(top_bar)
+        menu_holder.pack(side=self._tk.LEFT, padx=(0, 10))
+        self._menu_dark_mode_var = self._tk.BooleanVar(master=win, value=self._ui_dark)
+        self._photo_top_menu = _make_hamburger_menu_photo(win, dark=self._ui_dark)
+        try:
+            sm = ttk.Style()
+            sm.configure("GcLauncherMenu.TButton", padding=(2, 4))
+            _menu_btn_style = "GcLauncherMenu.TButton"
+        except self._tk.TclError:
+            _menu_btn_style = "TButton"
+        self._btn_top_menu = ttk.Button(
+            menu_holder,
+            image=self._photo_top_menu,
+            command=self._toggle_top_app_menu,
+            style=_menu_btn_style,
+        )
+        self._btn_top_menu.pack(side=self._tk.LEFT)
+        self._bind_hover_tooltip(self._btn_top_menu, _TOOLTIP_APP_MENU)
+
         left_top = ttk.Frame(top_bar)
         left_top.pack(side=self._tk.LEFT, fill=self._tk.X, expand=True)
 
@@ -2872,48 +3994,48 @@ class GcTrayApp:
 
         btn_row = ttk.Frame(left_top)
         btn_row.pack(side=self._tk.LEFT, fill=self._tk.X, expand=True)
-        theme_wrap = ttk.Frame(top_bar)
-        theme_wrap.pack(side=self._tk.RIGHT)
-        self._lnk_web_mgmt = self._tk.Label(
-            theme_wrap,
-            text="Web management",
-            cursor="hand2",
-        )
-        self._lnk_web_mgmt.pack(side=self._tk.LEFT, padx=(0, 10))
-        self._lnk_web_mgmt.bind("<Button-1>", self._on_web_management_click)
-        self._style_web_management_link()
-        self._btn_theme = ttk.Button(
-            theme_wrap,
-            text="\u2600",
-            width=3,
-            command=self._on_theme_toggle_click,
-        )
-        self._btn_theme.pack(side=self._tk.RIGHT)
-        self._btn_theme.bind("<Button-3>", self._on_theme_context_menu)
-        self._btn_theme.bind("<Control-Button-1>", self._on_theme_context_menu)
-        self._btn_update = ttk.Button(
-            theme_wrap,
-            text="Update",
-            command=self._on_update_click,
-            state=self._tk.DISABLED,
-        )
-        self._btn_update.pack(side=self._tk.RIGHT, padx=(0, 6))
-        self._bind_hover_tooltip(self._btn_update, _TOOLTIP_UPDATE)
+
+        try:
+            sm_split = ttk.Style()
+            sm_split.configure("GcSplitCaret.TButton", padding=(1, 0), width=2)
+            _caret_style = "GcSplitCaret.TButton"
+        except self._tk.TclError:
+            _caret_style = "TButton"
 
         if self._photo_btn_start is None:
             (
                 self._photo_btn_start,
+                self._photo_btn_start_rebuild,
                 self._photo_btn_stop,
                 self._photo_btn_restart,
                 self._photo_btn_rebuild,
             ) = _make_dashboard_toolbar_photos(self._root)
+        if sys.platform == "win32":
+            self._build_win32_split_menus()
+        self._frm_start_split = ttk.Frame(btn_row)
         self._btn_start = ttk.Button(
-            btn_row,
+            self._frm_start_split,
             text="Start",
             image=self._photo_btn_start,
             compound=self._tk.LEFT,
             command=self.start_gc,
         )
+        self._btn_start.pack(side=self._tk.LEFT, fill=self._tk.Y)
+        self._mb_start_split = ttk.Button(
+            self._frm_start_split,
+            text="\u25bc",
+            style=_caret_style,
+        )
+        self._mb_start_split.pack(side=self._tk.LEFT, fill=self._tk.Y)
+        if sys.platform == "win32":
+            self._mb_start_split.bind("<ButtonRelease-1>", self._win32_post_start_split_menu)
+        else:
+            self._mb_start_split.bind(
+                "<ButtonRelease-1>",
+                lambda _e: self._schedule_split_tools_menu(start=True),
+            )
+        self._frm_start_split.pack(side=self._tk.LEFT, padx=(0, 6))
+
         self._btn_stop = ttk.Button(
             btn_row,
             text="Stop",
@@ -2921,24 +4043,34 @@ class GcTrayApp:
             compound=self._tk.LEFT,
             command=self.stop_gc,
         )
+        self._btn_stop.pack(side=self._tk.LEFT, padx=(0, 6))
+
+        self._frm_restart_split = ttk.Frame(btn_row)
         self._btn_restart = ttk.Button(
-            btn_row,
+            self._frm_restart_split,
             text="Restart",
             image=self._photo_btn_restart,
             compound=self._tk.LEFT,
             command=self.restart_gc,
         )
-        self._btn_rebuild = ttk.Button(
-            btn_row,
-            text="Restart+rebuild",
-            image=self._photo_btn_rebuild,
-            compound=self._tk.LEFT,
-            command=self.docker_rebuild_gc,
+        self._btn_restart.pack(side=self._tk.LEFT, fill=self._tk.Y)
+        self._mb_restart_split = ttk.Button(
+            self._frm_restart_split,
+            text="\u25bc",
+            style=_caret_style,
         )
-        for b in (self._btn_start, self._btn_stop, self._btn_restart, self._btn_rebuild):
-            b.pack(side=self._tk.LEFT, padx=(0, 6))
+        self._mb_restart_split.pack(side=self._tk.LEFT, fill=self._tk.Y)
+        if sys.platform == "win32":
+            self._mb_restart_split.bind("<ButtonRelease-1>", self._win32_post_restart_split_menu)
+        else:
+            self._mb_restart_split.bind(
+                "<ButtonRelease-1>",
+                lambda _e: self._schedule_split_tools_menu(start=False),
+            )
+        self._frm_restart_split.pack(side=self._tk.LEFT, padx=(0, 6))
+
+        self._bind_hover_tooltip(self._btn_start, "Start Ground Control")
         self._bind_hover_tooltip(self._btn_restart, _TOOLTIP_RESTART)
-        self._bind_hover_tooltip(self._btn_rebuild, _TOOLTIP_DOCKER_REBUILD)
 
         if self._run_mode_var is None:
             self._run_mode_var = self._tk.StringVar(value=self._run_mode)
@@ -3153,7 +4285,7 @@ class GcTrayApp:
 
         self._configure_dashboard_window()
         self._configure_notebook_tabs()
-        self._update_theme_toggle_button()
+        self._sync_top_app_menu_appearance()
         self._refresh_dashboard_buttons()
         self._redraw_charts()
         self._schedule_chart_refresh()
@@ -3173,6 +4305,14 @@ class GcTrayApp:
         self._hide_dashboard()
 
     def _hide_dashboard(self) -> None:
+        if self._dash_win is not None:
+            try:
+                if self._dash_win.winfo_exists() and self._dash_win.winfo_viewable():
+                    self._persist_dashboard_window_state()
+            except self._tk.TclError:
+                pass
+        self._close_top_app_menu()
+        self._close_split_tools_popup()
         self._cancel_console_copy_tooltip()
         if self._settings_scroll_job is not None:
             try:
@@ -3871,8 +5011,10 @@ class GcTrayApp:
         log_parts: list[str] = []
         err = False
         try:
+            stop_argv = [*argv, "stop", _DOCKER_COMPOSE_SERVICE]
+            self._enqueue_log_command(stop_argv)
             r_stop = subprocess.run(
-                [*argv, "stop", _DOCKER_COMPOSE_SERVICE],
+                stop_argv,
                 cwd=_REPO_ROOT,
                 capture_output=True,
                 text=True,
@@ -3880,8 +5022,10 @@ class GcTrayApp:
                 **_subprocess_no_window_kw(),
             )
             log_parts.append(f"--- compose stop ---\n{(r_stop.stdout or '').strip()}\n{(r_stop.stderr or '').strip()}")
+            rm_argv = [*argv, "rm", "-f", _DOCKER_COMPOSE_SERVICE]
+            self._enqueue_log_command(rm_argv)
             r_rm = subprocess.run(
-                [*argv, "rm", "-f", _DOCKER_COMPOSE_SERVICE],
+                rm_argv,
                 cwd=_REPO_ROOT,
                 capture_output=True,
                 text=True,
@@ -3889,8 +5033,10 @@ class GcTrayApp:
                 **_subprocess_no_window_kw(),
             )
             log_parts.append(f"--- compose rm ---\n{(r_rm.stdout or '').strip()}\n{(r_rm.stderr or '').strip()}")
+            rmi_argv = ["docker", "rmi", "-f", _DOCKER_LOCAL_IMAGE]
+            self._enqueue_log_command(rmi_argv)
             r_rmi = subprocess.run(
-                ["docker", "rmi", "-f", _DOCKER_LOCAL_IMAGE],
+                rmi_argv,
                 cwd=_REPO_ROOT,
                 capture_output=True,
                 text=True,
@@ -3940,12 +5086,28 @@ class GcTrayApp:
         ):
             try:
                 self._btn_start.config(state=(self._tk.NORMAL if self._can_start() else self._tk.DISABLED))
+                mb0 = getattr(self, "_mb_start_split", None)
+                if mb0 is not None:
+                    mb0.config(
+                        state=(
+                            self._tk.NORMAL
+                            if (self._can_start() or self._can_start_rebuild_docker())
+                            else self._tk.DISABLED
+                        )
+                    )
                 self._btn_stop.config(state=(self._tk.NORMAL if self._can_stop() else self._tk.DISABLED))
                 self._btn_restart.config(state=(self._tk.NORMAL if self._can_restart() else self._tk.DISABLED))
-                if getattr(self, "_btn_rebuild", None) is not None:
-                    self._btn_rebuild.config(
-                        state=(self._tk.NORMAL if self._can_rebuild_docker() else self._tk.DISABLED)
+                mb1 = getattr(self, "_mb_restart_split", None)
+                if mb1 is not None:
+                    mb1.config(
+                        state=(
+                            self._tk.NORMAL
+                            if (self._can_restart() or self._can_rebuild_docker())
+                            else self._tk.DISABLED
+                        )
                     )
+                if sys.platform == "win32":
+                    self._sync_win32_split_menus()
             except self._tk.TclError:
                 pass
         self._apply_git_update_button_state()
@@ -4340,6 +5502,7 @@ class GcTrayApp:
             self._icon.run()
 
         threading.Thread(target=tray_thread, name="pystray", daemon=True).start()
+        self._root.after(0, self._show_dashboard)
         self._root.after(100, self._drain_log_queue_loop)
         self._root.after(600, self._tray_menu_refresh_loop)
         self._root.after(2500, self._git_update_poll_loop)
@@ -4361,6 +5524,7 @@ class GcTrayApp:
                 argv = _docker_compose_argv("stop", _DOCKER_COMPOSE_SERVICE)
                 if argv:
                     try:
+                        self._enqueue_log_command(argv)
                         subprocess.run(
                             argv,
                             cwd=_REPO_ROOT,

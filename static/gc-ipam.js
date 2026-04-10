@@ -4,14 +4,23 @@
   let root = document.getElementById("gc-ipam-root");
   if (!root) return;
 
+  let pageMode = (root.dataset.gcIpamPage || "").trim().toLowerCase();
+  let lockedPrefixType = (root.dataset.gcIpamLockedType || "").trim().toLowerCase();
+
   let PREFIX = "gc-ipam";
   /** Parent pool dropdown: opens nested “new pool” sheet (IPv4 only). */
   let NEW_POOL_VALUE = "__gc_new_pool__";
   let FACET_STORAGE_KEY = "gc-ipam";
-  let LS_COLS = "gc-ipam-cols-v1";
+  let LS_COLS = "gc-ipam-cols-v2";
   let COL_CHECK_ATTR = "data-gc-ipam-col";
-  let COLS = [
-    { id: "name", label: "Name" },
+  let COLS = [{ id: "name", label: "Name" }];
+  if (pageMode === "hosts") {
+    COLS.push(
+      { id: "lease_hostname", label: "Host name" },
+      { id: "mac_address", label: "MAC" },
+    );
+  }
+  COLS = COLS.concat([
     { id: "cidr", label: "Prefix" },
     { id: "family", label: "Family" },
     { id: "type", label: "Type" },
@@ -20,7 +29,7 @@
     { id: "size", label: "Size" },
     { id: "description", label: "Description" },
     { id: "origin", label: "Source" },
-  ];
+  ]);
   let colInputSel = "input[" + COL_CHECK_ATTR + "]";
 
   let facetCols = COLS.filter(function (c) {
@@ -53,12 +62,11 @@
   let apiList = root.dataset.apiPrefixes || "";
   let apiCreate = root.dataset.apiCreate || "";
   let apiAccept = root.dataset.apiAcceptDiscovered || "";
+  let apiAcceptDhcpHost = root.dataset.apiAcceptDiscoveredDhcpHost || "";
   let apiAcceptBatch = root.dataset.apiAcceptDiscoveredBatch || "";
   let apiNextAssignment = root.dataset.apiNextAssignment || "";
   let apiVrfs = root.dataset.apiVrfs || "";
   let apiVrfsCreate = root.dataset.apiVrfsCreate || "";
-  let pageMode = (root.dataset.gcIpamPage || "").trim().toLowerCase();
-  let lockedPrefixType = (root.dataset.gcIpamLockedType || "").trim().toLowerCase();
   let isPrefixPage =
     pageMode === "pools" || pageMode === "assignments" || pageMode === "hosts";
   let isVrfPage = pageMode === "vrfs";
@@ -86,6 +94,10 @@
   let form = document.getElementById("gc-ipam-flyout-form");
   let fieldId = document.getElementById("gc-ipam-flyout-id");
   let fieldName = document.getElementById("gc-ipam-flyout-name");
+  let wrapLeaseHostname = document.getElementById("gc-ipam-flyout-lease-hostname-wrap");
+  let fieldLeaseHostname = document.getElementById("gc-ipam-flyout-lease-hostname");
+  let wrapMac = document.getElementById("gc-ipam-flyout-mac-wrap");
+  let fieldMac = document.getElementById("gc-ipam-flyout-mac");
   let fieldCidr = document.getElementById("gc-ipam-flyout-cidr");
   let wrapAssignmentSize = document.getElementById("gc-ipam-flyout-assignment-size-wrap");
   let fieldAssignmentPl = document.getElementById("gc-ipam-flyout-assignment-pl");
@@ -169,6 +181,7 @@
   let editId = null;
   let cache = [];
   let cacheDiscovered = [];
+  let cacheDiscoveredHosts = [];
   let discCurrent = null;
   /** When set, main add flyout was opened from a discovered row (firewall field locked). */
   let discoveredPrefillSource = null;
@@ -197,6 +210,13 @@
     return "Edit prefix";
   }
 
+  function syncHostOptionalFields() {
+    let ptype = (fieldType && fieldType.value) || "";
+    let show = (ptype || "").trim().toLowerCase() === "host";
+    if (wrapLeaseHostname) wrapLeaseHostname.hidden = !show;
+    if (wrapMac) wrapMac.hidden = !show;
+  }
+
   /** Keep hidden prefix_type, readonly label, and dependent flyout sections in sync. */
   function setFlyoutPrefixType(ptypeRaw) {
     let ptype = (ptypeRaw || "").trim().toLowerCase();
@@ -206,6 +226,7 @@
     syncHierarchyFlyout();
     syncPoolUnmanagedWrap();
     syncAssignedWrap();
+    syncHostOptionalFields();
     syncIpamDeleteButton();
     syncAssignmentCidrUi();
   }
@@ -864,7 +885,7 @@
   }
 
   function manualSearchHaystack(r) {
-    return [
+    let parts = [
       r.name,
       r.cidr,
       String(r.family),
@@ -873,7 +894,11 @@
       r.description || "",
       r.assigned_to_display || "",
       r.assigned_to_custom || "",
-    ]
+    ];
+    if (pageMode === "hosts") {
+      parts.push(r.lease_hostname || "", r.mac_address || "");
+    }
+    return parts
       .join(" ")
       .toLowerCase()
       .replace(/\s+/g, " ")
@@ -886,7 +911,7 @@
       (r.prefix_type || "") === "assignment" && r.assigned_to_display
         ? r.assigned_to_display
         : "—";
-    return {
+    let o = {
       name: (displayName(r) || "").trim(),
       cidr: r.cidr || "",
       family: r.family === 6 ? "IPv6" : "IPv4",
@@ -899,6 +924,11 @@
       discovered: "No",
       conflict: r.vrf_assignment_conflict ? "Yes" : "No",
     };
+    if (pageMode === "hosts") {
+      o.lease_hostname = ((r.lease_hostname || "").trim() || "—").toLowerCase();
+      o.mac_address = ((r.mac_address || "").trim() || "—").toLowerCase();
+    }
+    return o;
   }
 
   function discSearchHaystack(d) {
@@ -995,6 +1025,14 @@
       '<td data-gc-col="name">' +
       esc(displayName(r)) +
       "</td>" +
+      (pageMode === "hosts"
+        ? '<td data-gc-col="lease_hostname">' +
+          esc((r.lease_hostname || "").trim() || "—") +
+          "</td>" +
+          '<td data-gc-col="mac_address" class="mono">' +
+          esc((r.mac_address || "").trim() || "—") +
+          "</td>"
+        : "") +
       '<td data-gc-col="cidr" data-sort-value="' +
       esc(r.cidr) +
       '"><code class="gc-ipam-cidr">' +
@@ -1076,6 +1114,90 @@
     );
   }
 
+  function discHostSearchHaystack(d) {
+    return [
+      d.display_name,
+      d.cidr,
+      d.dhcp_server_name,
+      d.lease_hostname,
+      d.mac_address,
+      d.source_summary,
+      d.firewall_label,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function discFacetMapDhcp(d) {
+    return {
+      name: ((d.display_name || "") + "").trim().toLowerCase(),
+      lease_hostname: ((d.lease_hostname || "").trim() || "—").toLowerCase(),
+      mac_address: ((d.mac_address || "").trim() || "—").toLowerCase(),
+      cidr: d.cidr || "",
+      family: "IPv4",
+      type: "host",
+      assigned: "—",
+      vrf: "—",
+      size: String(d.size_label || "—"),
+      description: ((d.source_summary || "").trim() || "—").toLowerCase(),
+      origin: "Discovered",
+      discovered: "Yes",
+      conflict: d.vrf_assignment_conflict ? "Yes" : "No",
+    };
+  }
+
+  function discRowHtmlDhcpHost(d) {
+    let vrfConflict = !!d.vrf_assignment_conflict;
+    let rowExtra = vrfConflict ? " gc-ipam-row--vrf-conflict" : "";
+    let srcCell =
+      '<span class="gc-ipam-pill gc-ipam-pill--discovered">DHCP</span>' +
+      (vrfConflict ? " " + conflictPill() : "");
+    return (
+      '<tr class="gc-ipam-row gc-ipam-row--discovered gc-ipam-data-row' +
+      rowExtra +
+      '" data-discovered-dhcp-host-key="' +
+      esc(d.key) +
+      '" data-search="' +
+      esc(discHostSearchHaystack(d)) +
+      '" tabindex="0" role="button">' +
+      '<td data-gc-col="name">' +
+      esc(d.display_name || d.cidr) +
+      "</td>" +
+      '<td data-gc-col="lease_hostname">' +
+      esc((d.lease_hostname || "").trim() || "—") +
+      "</td>" +
+      '<td data-gc-col="mac_address" class="mono">' +
+      esc((d.mac_address || "").trim() || "—") +
+      "</td>" +
+      '<td data-gc-col="cidr" data-sort-value="' +
+      esc(d.cidr) +
+      '"><code class="gc-ipam-cidr">' +
+      esc(d.cidr) +
+      "</code></td>" +
+      '<td data-gc-col="family" data-sort-value="4">IPv4</td>' +
+      '<td data-gc-col="type"><span class="gc-ipam-type gc-ipam-type--host">host</span></td>' +
+      '<td data-gc-col="assigned">—</td>' +
+      '<td data-gc-col="vrf">—</td>' +
+      '<td data-gc-col="size">' +
+      esc(d.size_label || "—") +
+      "</td>" +
+      '<td data-gc-col="description">' +
+      esc(d.source_summary || "—") +
+      "</td>" +
+      '<td data-gc-col="origin" class="gc-ipam-discovered-cell gc-ipam-source-cell">' +
+      srcCell +
+      "</td></tr>"
+    );
+  }
+
+  function mergedRowCidr(item) {
+    if (item.kind === "manual") return item.row.cidr;
+    if (item.kind === "disc_host") return item.disc.cidr;
+    return item.disc.cidr;
+  }
+
   function mergedRows() {
     let m = [];
     let i;
@@ -1085,10 +1207,11 @@
     for (i = 0; i < cacheDiscovered.length; i++) {
       m.push({ kind: "discovered", disc: cacheDiscovered[i] });
     }
+    for (i = 0; i < cacheDiscoveredHosts.length; i++) {
+      m.push({ kind: "disc_host", disc: cacheDiscoveredHosts[i] });
+    }
     m.sort(function (a, b) {
-      let ca = a.kind === "manual" ? a.row.cidr : a.disc.cidr;
-      let cb = b.kind === "manual" ? b.row.cidr : b.disc.cidr;
-      return ca.localeCompare(cb, undefined, { numeric: true });
+      return mergedRowCidr(a).localeCompare(mergedRowCidr(b), undefined, { numeric: true });
     });
     return m;
   }
@@ -1101,7 +1224,13 @@
         let pt = (item.row.prefix_type || "").trim();
         return pt === lockedPrefixType;
       }
-      return lockedPrefixType === "assignment";
+      if (item.kind === "discovered") {
+        return lockedPrefixType === "assignment";
+      }
+      if (item.kind === "disc_host") {
+        return lockedPrefixType === "host";
+      }
+      return false;
     });
   }
 
@@ -1113,7 +1242,10 @@
       return "No assignments yet. Add one or sync firewalls to see discovered networks.";
     }
     if (lockedPrefixType === "host") {
-      return "No hosts in the plan yet. Add a host under an assignment.";
+      return (
+        "No hosts in the plan yet. Add a host under an assignment, or sync firewalls with «DHCP servers (IPv4)» " +
+        "to discover static leases."
+      );
     }
     return "No prefixes yet. Add one or sync firewalls to see discovered networks.";
   }
@@ -1211,7 +1343,7 @@
   function renderTable() {
     if (!tbody) return;
     let merged = mergedRowsForView();
-    let totalFromApi = cache.length + cacheDiscovered.length;
+    let totalFromApi = cache.length + cacheDiscovered.length + cacheDiscoveredHosts.length;
     if (totalFromApi === 0) {
       tbody.innerHTML =
         '<tr id="gc-ipam-placeholder" class="gc-ipam-placeholder-row"><td class="muted" colspan="9">No prefixes yet. Add one or sync firewalls to see discovered networks.</td></tr>';
@@ -1244,6 +1376,9 @@
       if (item.kind === "manual") {
         parts.push(manualRowHtml(item.row));
         maps.push(manualFacetMap(item.row));
+      } else if (item.kind === "disc_host") {
+        parts.push(discRowHtmlDhcpHost(item.disc));
+        maps.push(discFacetMapDhcp(item.disc));
       } else {
         parts.push(discRowHtml(item.disc));
         maps.push(discFacetMap(item.disc));
@@ -1266,7 +1401,7 @@
     });
   }
 
-  function renderStats(prefixes, discovered) {
+  function renderStats(prefixes, discovered, discoveredHosts) {
     // Summary cards count saved plan rows only; discovered has its own stat.
     let total = prefixes.length;
     let v4 = 0;
@@ -1274,6 +1409,7 @@
     let pools = 0;
     let i;
     let p;
+    let dhosts = discoveredHosts || [];
     for (i = 0; i < prefixes.length; i++) {
       p = prefixes[i];
       if (p.family === 6) v6++;
@@ -1287,6 +1423,9 @@
     for (i = 0; i < discovered.length; i++) {
       if (discovered[i].vrf_assignment_conflict) conflictN++;
     }
+    for (i = 0; i < dhosts.length; i++) {
+      if (dhosts[i].vrf_assignment_conflict) conflictN++;
+    }
     function set(id, v) {
       let el = document.getElementById(id);
       if (el) el.textContent = String(v);
@@ -1295,7 +1434,7 @@
     set("gc-ipam-stat-v4", v4);
     set("gc-ipam-stat-v6", v6);
     set("gc-ipam-stat-pools", pools);
-    set("gc-ipam-stat-discovered", discovered.length);
+    set("gc-ipam-stat-discovered", discovered.length + dhosts.length);
     set("gc-ipam-stat-conflicts", conflictN);
   }
 
@@ -1313,8 +1452,9 @@
       .then(function (data) {
         cache = data.prefixes || [];
         cacheDiscovered = data.discovered || [];
+        cacheDiscoveredHosts = data.discovered_hosts || [];
         ipamFormMeta = data.ipam_form_meta || { vrf_names: [], pools: [], assignments: [] };
-        renderStats(cache, cacheDiscovered);
+        renderStats(cache, cacheDiscovered, cacheDiscoveredHosts);
         renderTable();
         setStatus("", false);
         if (flyout && !flyout.hidden) {
@@ -1346,6 +1486,13 @@
   function findDiscovered(key) {
     for (let i = 0; i < cacheDiscovered.length; i++) {
       if (cacheDiscovered[i].key === key) return cacheDiscovered[i];
+    }
+    return null;
+  }
+
+  function findDiscoveredDhcpHost(key) {
+    for (let i = 0; i < cacheDiscoveredHosts.length; i++) {
+      if (cacheDiscoveredHosts[i].key === key) return cacheDiscoveredHosts[i];
     }
     return null;
   }
@@ -1420,6 +1567,8 @@
       fieldAssignedCustom.value = row.assigned_to_custom || "";
     }
     if (fieldDesc) fieldDesc.value = row.description || "";
+    if (fieldLeaseHostname) fieldLeaseHostname.value = (row.lease_hostname || "").trim();
+    if (fieldMac) fieldMac.value = (row.mac_address || "").trim();
     setPoolUnmanagedSwitch(!!row.pool_unmanaged);
     setFormStatus("", false);
     hydrateIpamFlyoutHierarchyFromRow(row);
@@ -1745,6 +1894,68 @@
       if (ns0.length === 1 && fieldVrf) fieldVrf.value = String(ns0[0]);
     }
     setFlyoutPrefixType("assignment");
+    showFlyout();
+    if (fieldName) fieldName.focus();
+  }
+
+  function openFlyoutFromDiscoveredDhcpHost(d) {
+    discoveredPrefillSource = d;
+    discCurrent = d;
+    editId = null;
+    if (flyoutTitle) flyoutTitle.textContent = "Add host from DHCP";
+    if (fieldId) fieldId.value = "";
+    if (form) form.reset();
+    unlockAssignedFirewallFields();
+    if (fieldName) {
+      fieldName.value =
+        (d.lease_hostname || "").trim() ||
+        String(d.cidr || "")
+          .replace(/\/32$/i, "")
+          .trim() ||
+        "";
+    }
+    if (fieldCidr) fieldCidr.value = d.cidr || "";
+    if (fieldLeaseHostname) fieldLeaseHostname.value = (d.lease_hostname || "").trim();
+    if (fieldMac) fieldMac.value = (d.mac_address || "").trim();
+    if (fieldDesc) fieldDesc.value = (d.source_summary || "").trim() || "";
+    setFormStatus("", false);
+    if (d.vrf_assignment_conflict) {
+      setFormStatus(
+        "Overlaps another prefix in the same VRF (resolve the conflict before saving).",
+        true,
+      );
+    }
+    if (!d.accept_allowed) {
+      setFormStatus(
+        "No saved assignment fully contains this /32. Create or accept an assignment that covers this address first.",
+        true,
+      );
+    }
+    rebuildVrfSelect("");
+    rebuildParentPoolSelect(false);
+    rebuildParentAssignmentSelect(false);
+    let asgs = (ipamFormMeta && ipamFormMeta.assignments) || [];
+    let sug = d.suggested_parent_assignment_id;
+    let pickVrf = "";
+    if (sug != null && fieldParentAssignment && optionValueExists(fieldParentAssignment, String(sug))) {
+      fieldParentAssignment.value = String(sug);
+      let hit = asgs.filter(function (a) {
+        return String(a.id) === String(sug);
+      })[0];
+      if (hit) pickVrf = hit.vrf_key || "";
+      if (hit && hit.parent_pool_id != null && fieldParentPool) {
+        if (optionValueExists(fieldParentPool, String(hit.parent_pool_id))) {
+          fieldParentPool.value = String(hit.parent_pool_id);
+        }
+      }
+    }
+    if (pickVrf && fieldVrf && optionValueExists(fieldVrf, pickVrf)) {
+      fieldVrf.value = pickVrf;
+    } else {
+      let ns0 = (ipamFormMeta && ipamFormMeta.vrf_names) || [];
+      if (ns0.length === 1 && fieldVrf) fieldVrf.value = String(ns0[0]);
+    }
+    setFlyoutPrefixType("host");
     showFlyout();
     if (fieldName) fieldName.focus();
   }
@@ -2564,6 +2775,13 @@
 
   if (tbody) {
     tbody.addEventListener("click", function (ev) {
+      let trH = ev.target.closest("tr[data-discovered-dhcp-host-key]");
+      if (trH && tbody.contains(trH) && trH.classList.contains("gc-ipam-data-row")) {
+        let hk = trH.dataset.discoveredDhcpHostKey;
+        let hr = findDiscoveredDhcpHost(hk);
+        if (hr) openFlyoutFromDiscoveredDhcpHost(hr);
+        return;
+      }
       let trD = ev.target.closest("tr[data-discovered-key]");
       if (trD && tbody.contains(trD) && trD.classList.contains("gc-ipam-data-row")) {
         let dk = trD.dataset.discoveredKey;
@@ -2579,6 +2797,14 @@
     });
     tbody.addEventListener("keydown", function (ev) {
       if (ev.key !== "Enter" && ev.key !== " ") return;
+      let trH = ev.target.closest("tr[data-discovered-dhcp-host-key]");
+      if (trH && tbody.contains(trH) && trH.classList.contains("gc-ipam-data-row")) {
+        ev.preventDefault();
+        let hk = trH.dataset.discoveredDhcpHostKey;
+        let hr = findDiscoveredDhcpHost(hk);
+        if (hr) openFlyoutFromDiscoveredDhcpHost(hr);
+        return;
+      }
       let trD = ev.target.closest("tr[data-discovered-key]");
       if (trD && tbody.contains(trD) && trD.classList.contains("gc-ipam-data-row")) {
         ev.preventDefault();
@@ -2612,6 +2838,58 @@
       let hierErr = validateHierarchyBeforeSubmit(ptype, cidrTrim);
       if (hierErr) {
         setFormStatus(hierErr, true);
+        return;
+      }
+      if (
+        discoveredPrefillSource &&
+        discoveredPrefillSource.row_kind === "discovered_dhcp_host"
+      ) {
+        if (!apiAcceptDhcpHost) {
+          setFormStatus("DHCP accept API URL is not configured.", true);
+          return;
+        }
+        let pa =
+          fieldParentAssignment && fieldParentAssignment.value
+            ? parseInt(fieldParentAssignment.value, 10)
+            : NaN;
+        if (isNaN(pa) || pa < 1) {
+          setFormStatus("Select a parent assignment.", true);
+          return;
+        }
+        let nm = name.trim();
+        if (!nm) {
+          setFormStatus("Name is required.", true);
+          return;
+        }
+        let bodyDhcp = {
+          firewall_id: discoveredPrefillSource.firewall_id,
+          cidr: cidrTrim || discoveredPrefillSource.cidr,
+          name: nm,
+          parent_assignment_id: pa,
+          lease_hostname:
+            ((fieldLeaseHostname && fieldLeaseHostname.value) || "").trim() || null,
+          mac_address: ((fieldMac && fieldMac.value) || "").trim() || null,
+          description: ((fieldDesc && fieldDesc.value) || "").trim() || null,
+        };
+        fetch(apiAcceptDhcpHost, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyDhcp),
+        })
+          .then(function (r) {
+            return parseJsonSafe(r).then(function (j) {
+              return { ok: r.ok, status: r.status, body: j };
+            });
+          })
+          .then(function (res) {
+            if (!res.ok) handleSaveError(res, res.body);
+            closeFlyout();
+            applyFilters();
+          })
+          .catch(function (e) {
+            setFormStatus(e.message || String(e), true);
+          });
         return;
       }
       let parentPoolId = null;
@@ -2651,6 +2929,9 @@
         assigned_to_custom: null,
         description: ((fieldDesc && fieldDesc.value) || "").trim() || null,
         pool_unmanaged: ptype === "pool" ? poolUnmanagedSwitchIsOn() : false,
+        lease_hostname:
+          ((fieldLeaseHostname && fieldLeaseHostname.value) || "").trim() || null,
+        mac_address: ((fieldMac && fieldMac.value) || "").trim() || null,
       };
       if (ptype === "assignment") {
         if (fwVal != null) {

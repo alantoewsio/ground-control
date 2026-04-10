@@ -24,6 +24,7 @@
   data-api-prefixes="{{ url_api_ipam_prefixes }}"
   data-api-create="{{ url_api_ipam_prefixes_create }}"
   data-api-accept-discovered="{{ url_api_ipam_accept_discovered }}"
+  data-api-accept-discovered-dhcp-host="{{ url_api_ipam_accept_discovered_dhcp_host }}"
   data-api-accept-discovered-batch="{{ url_api_ipam_accept_discovered_batch }}"
   data-api-next-assignment="{{ url_api_ipam_next_assignment_cidr }}"
   data-api-vrfs="{{ url_api_ipam_vrfs }}"
@@ -194,6 +195,10 @@
                 <thead>
                   <tr>
                     <th scope="col" data-gc-col="name">Name</th>
+                    {% if ipam_page == "hosts" %}
+                    <th scope="col" data-gc-col="lease_hostname">Host name</th>
+                    <th scope="col" data-gc-col="mac_address">MAC</th>
+                    {% endif %}
                     <th scope="col" data-gc-col="cidr">Prefix</th>
                     <th scope="col" data-gc-col="family" data-gc-sort="number">Family</th>
                     <th scope="col" data-gc-col="type">Type</th>
@@ -292,6 +297,30 @@
               required
               autocomplete="off"
               placeholder="e.g. User VLAN west"
+            />
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-lease-hostname-wrap" hidden>
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-lease-hostname">Host name (optional)</label>
+            <input
+              type="text"
+              id="gc-ipam-flyout-lease-hostname"
+              name="lease_hostname"
+              class="gc-if-flyout__input"
+              maxlength="255"
+              autocomplete="off"
+              placeholder="DHCP / DNS hostname"
+            />
+          </div>
+          <div class="gc-if-flyout__field" id="gc-ipam-flyout-mac-wrap" hidden>
+            <label class="gc-if-flyout__label" for="gc-ipam-flyout-mac">MAC address (optional)</label>
+            <input
+              type="text"
+              id="gc-ipam-flyout-mac"
+              name="mac_address"
+              class="gc-if-flyout__input mono"
+              maxlength="32"
+              autocomplete="off"
+              placeholder="aa:bb:cc:dd:ee:ff"
             />
           </div>
           <div class="gc-if-flyout__field">

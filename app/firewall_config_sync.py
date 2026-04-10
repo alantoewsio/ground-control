@@ -40,6 +40,7 @@ ENTITY_BRIDGE_PAIR = "bridge_pair"
 ENTITY_LAG = "lag"
 ENTITY_ALIAS = "alias"
 ENTITY_ZONE = "zone"
+ENTITY_DHCP_SERVER = "dhcp_server"
 
 # Unified Network · Interfaces tab (interface, VLAN, bridge pair, LAG, alias).
 ENTITY_TYPES_INTERFACES_TAB: frozenset[str] = frozenset(
@@ -250,6 +251,13 @@ _SYNC_ENTITY_SPECS: tuple[SyncEntitySpec, ...] = (
     ),
     SyncEntitySpec(ENTITY_ALIAS, "Aliases", "Alias", _spec_tag("Alias")),
     SyncEntitySpec(ENTITY_ZONE, "Zones", "Zone", _spec_get("get_zone")),
+    # ``Response/DHCPServer`` per xml-api-docs/Configure/Network/DHCPServer.md
+    SyncEntitySpec(
+        ENTITY_DHCP_SERVER,
+        "DHCP servers (IPv4)",
+        "DHCPServer",
+        _spec_tag("DHCPServer"),
+    ),
     SyncEntitySpec("acl_rule", "ACL rules", "LocalServiceACL", _spec_get("get_acl_rule"), ("RuleName",)),
     SyncEntitySpec(
         "admin_authen",
@@ -513,6 +521,7 @@ _SOFT_FAIL_SYNC_IDS: frozenset[str] = frozenset(
         ENTITY_VPN_PROFILE,
         ENTITY_HA_CONFIGURE,
         ENTITY_NETFLOW_CONFIGURATION,
+        ENTITY_DHCP_SERVER,
     }
 )
 

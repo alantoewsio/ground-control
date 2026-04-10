@@ -89,6 +89,18 @@ def vrf_assignment_conflict_maps(db: Session) -> tuple[set[int], set[str]]:
         key = f"{int(fw_id)}:{cidr_s}"
         disc_entries.append((key, disc_net, vrf_key))
 
+    from app.ipam_discovered import list_discovered_dhcp_host_payloads
+
+    for dh in list_discovered_dhcp_host_payloads(db, q="", firewall_ids=None):
+        if dh.get("already_in_ipam"):
+            continue
+        try:
+            dnet = ipaddress.ip_network(dh["cidr"], strict=False)
+        except ValueError:
+            continue
+        vk = str(dh.get("vrf_key") or "default").strip() or "default"
+        disc_entries.append((str(dh.get("key") or ""), dnet, vk))
+
     buckets: dict[
         str, list[tuple[str, int | str, ipaddress.IPv4Network | ipaddress.IPv6Network]]
     ] = defaultdict(list)
