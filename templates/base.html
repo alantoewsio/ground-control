@@ -39,8 +39,12 @@
       aria-hidden="{{ 'true' if ac.authenticated else 'false' }}"
     >
       <div class="auth-overlay__stage">
+        <h2 class="auth-overlay__wordmark auth-overlay__wordmark--hero" id="auth-brand-wordmark">
+          GROUND CONTROL
+        </h2>
         <div class="auth-overlay__split">
           <div class="auth-overlay__left">
+            <div class="auth-overlay__intro-stack">
             <div class="auth-overlay__card" role="dialog" aria-modal="true" aria-label="Authentication">
             <h1 id="auth-overlay-title" class="auth-overlay__card-title" hidden></h1>
             <p id="auth-overlay-subtitle" class="auth-overlay__card-sub muted" hidden></p>
@@ -135,6 +139,7 @@
               </form>
             </div>
             </div>
+            </div>
           </div>
           <div class="auth-overlay__visual" aria-hidden="true">
             <img src="/static/Design.png" alt="" class="auth-overlay__visual-image" />
@@ -171,6 +176,15 @@
                 href="/"
                 class="top-bar__nav-link{% if top_nav_active == 'dashboard' %} is-active{% endif %}"
               >Dashboard</a>
+              {% set gc_role_key = ((gc_u.role if gc_u else '') | trim | lower) %}
+              {% set gc_designer_like_nav = gc_role_key in ['designer', 'superadmin', 'super admin'] %}
+              {% if gc_designer_like_nav %}
+              <a
+                href="/firewalls-v2"
+                data-top-nav="firewalls-v2"
+                class="top-bar__nav-link{% if top_nav_active == 'firewalls_v2' %} is-active{% endif %}"
+              >Firewalls v2</a>
+              {% endif %}
               <a
                 href="/firewalls"
                 class="top-bar__nav-link{% if top_nav_active == 'firewalls' %} is-active{% endif %}"
@@ -179,10 +193,13 @@
                 href="/address-management"
                 class="top-bar__nav-link{% if top_nav_active == 'address_management' %} is-active{% endif %}"
               >Address Management</a>
+              {% if gc_designer_like_nav %}
               <a
                 href="/designer"
+                data-top-nav="designer"
                 class="top-bar__nav-link{% if top_nav_active == 'designer' %} is-active{% endif %}"
               >Designer</a>
+              {% endif %}
             </nav>
           </div>
           <div class="top-bar__tools">
@@ -232,7 +249,18 @@
                       aria-expanded="false"
                       aria-labelledby="gc-net-fw-multiselect-label gc-net-fw-trigger"
                     >
-                      <span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text" id="gc-net-fw-trigger-text">Loading…</span>
+                      <span class="gc-multiselect__trigger-value">
+                        <span
+                          class="gc-ms-trigger-chips gc-hs-ip-host-flyout__fw-trigger-chips"
+                          id="gc-net-fw-trigger-chips"
+                          aria-hidden="true"
+                        ></span>
+                        <span
+                          class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text"
+                          id="gc-net-fw-trigger-text"
+                          >Loading…</span
+                        >
+                      </span>
                       <span class="gc-multiselect__chev" aria-hidden="true">▾</span>
                     </button>
                     <div
@@ -306,6 +334,12 @@
                     d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
                   />
                 </svg>
+                <span class="user-menu__chat-alert-bubble" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="13" height="13">
+                    <path fill="currentColor" d="M4 4h16v11H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z" />
+                  </svg>
+                </span>
+                <span class="user-menu__idle-countdown" id="user-menu-idle-countdown" aria-hidden="true" hidden></span>
               </button>
               <div
                 id="user-menu-dropdown"
@@ -331,7 +365,8 @@
                     </div>
                     <div class="user-menu__role" id="user-menu-role-line">
                       {% if gc_u -%}
-                        {%- if gc_u.role == 'admin' -%}Administrator{%- elif gc_u.role == 'user' -%}User{%- else -%}{{ gc_u.role | e }}{%- endif -%}
+                        {%- set menu_role_key = (gc_u.role | trim | lower) -%}
+                        {%- if menu_role_key == 'admin' -%}Admin{%- elif menu_role_key == 'superadmin' or menu_role_key == 'super admin' -%}SuperAdmin{%- elif menu_role_key == 'readonly' or menu_role_key == 'user' -%}ReadOnly{%- elif menu_role_key == 'designer' -%}Designer{%- else -%}{{ gc_u.role | e }}{%- endif -%}
                       {%- endif %}
                     </div>
                   </div>
@@ -344,9 +379,15 @@
                     role="menuitem"
                     id="user-menu-active-admins"
                   >
-                    <span class="user-menu__session-label">Admins logged in</span>
+                    <span class="user-menu__session-label">Users logged in</span>
                     <span class="user-menu__session-count" id="user-menu-active-admin-count">—</span>
                   </button>
+                  <div
+                    id="user-menu-admin-chats"
+                    class="user-menu__chat-list"
+                    aria-label="Admin chats"
+                    hidden
+                  ></div>
                 </div>
                 <div class="user-menu__footer">
                   <button type="button" class="user-menu__signout" role="menuitem" id="user-menu-logout">
@@ -368,13 +409,14 @@
 
       <div class="app-body">
         {% set show_firewalls_sidebar = show_firewalls_sidebar if show_firewalls_sidebar is defined else false %}
+        {% set show_firewalls_v2_sidebar = show_firewalls_v2_sidebar if show_firewalls_v2_sidebar is defined else false %}
         {% set show_configurations_sidebar = show_configurations_sidebar if show_configurations_sidebar is defined else false %}
         {% set show_address_management_sidebar = show_address_management_sidebar if show_address_management_sidebar is defined else false %}
         {% set show_designer_sidebar = show_designer_sidebar if show_designer_sidebar is defined else false %}
-        {% set show_app_sidebar = show_firewalls_sidebar or show_configurations_sidebar or show_address_management_sidebar or show_designer_sidebar %}
+        {% set show_app_sidebar = show_firewalls_sidebar or show_firewalls_v2_sidebar or show_configurations_sidebar or show_address_management_sidebar or show_designer_sidebar %}
         <aside
           class="app-sidebar{% if not show_app_sidebar %} app-sidebar--hidden{% endif %}"
-          aria-label="{% if show_firewalls_sidebar %}Firewalls navigation{% elif show_configurations_sidebar %}Configuration navigation{% elif show_address_management_sidebar %}Address Management navigation{% elif show_designer_sidebar %}Designer navigation{% else %}Main navigation{% endif %}"
+          aria-label="{% if show_firewalls_sidebar %}Firewalls navigation{% elif show_firewalls_v2_sidebar %}Firewalls v2 navigation{% elif show_configurations_sidebar %}Configuration navigation{% elif show_address_management_sidebar %}Address Management navigation{% elif show_designer_sidebar %}Designer navigation{% else %}Main navigation{% endif %}"
         >
           {% block app_sidebar %}{% endblock %}
         </aside>
@@ -409,6 +451,11 @@
             </div>
           </div>
           <script src="/static/gc-global-banner.js"></script>
+          {% if gc_error_banner %}
+          <script>
+            window.gcGlobalBannerShowResult?.(false, {{ gc_error_banner | tojson }}, { holdMs: 15000 });
+          </script>
+          {% endif %}
           {% block app_content_pre_main %}{% endblock %}
           <div class="app-main">
             {% if not hide_app_chrome %}
@@ -424,7 +471,6 @@
             {% endif %}
             {% block content %}{% endblock %}
           </div>
-          {% block app_content_overlays %}{% endblock %}
           {% block app_content_dock %}
           {% if ac.authenticated %}
           <div
@@ -604,6 +650,12 @@
       </div>
     </div>
 
+    {# Designer / FW v2 flyouts: outside .app-content so body.gc-designer-modal-open overflow rules and
+       .app-shell overflow cannot clip fixed-position sheets (same idea as #settings-modal below). #}
+    <div class="gc-app-shell-modals">
+      {% block app_content_overlays %}{% endblock %}
+    </div>
+
     <div id="settings-modal" class="settings-modal" hidden aria-hidden="true">
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -659,6 +711,15 @@
                     />
                   </svg>
                   <span>Users</span>
+                </button>
+                <button type="button" class="settings-nav__item" id="settings-nav-roles" data-settings-section="roles">
+                  <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 2 4 5.6v5.8c0 5.1 3.4 9.8 8 10.6 4.6-.8 8-5.5 8-10.6V5.6L12 2zm0 2.2 6 2.7v4.5c0 3.9-2.5 7.5-6 8.5-3.5-1-6-4.6-6-8.5V6.9l6-2.7zm-1 4.3h2V11h2.5v2H13v2.5h-2V13H8.5v-2H11V8.5z"
+                    />
+                  </svg>
+                  <span>Roles</span>
                 </button>
                 <button type="button" class="settings-nav__item" id="settings-nav-security" data-settings-section="security">
                   <svg class="settings-nav__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -814,24 +875,54 @@
                       <colgroup>
                         <col class="settings-user-col-name" />
                         <col class="settings-user-col-fullname" />
-                        <col class="settings-user-col-email" />
-                        <col class="settings-user-col-mobile" />
                         <col class="settings-user-col-role" />
                         <col class="settings-user-col-updated" />
-                        <col class="settings-cred-col-actions" />
                       </colgroup>
                       <thead>
                         <tr>
                           <th scope="col" data-gc-col="username">Username</th>
                           <th scope="col" data-gc-col="full_name">Full name</th>
-                          <th scope="col" data-gc-col="email">Email</th>
-                          <th scope="col" data-gc-col="mobile">Mobile</th>
                           <th scope="col" data-gc-col="role">Role</th>
                           <th scope="col" data-gc-col="updated_at" data-gc-sort="date">Updated</th>
-                          <th scope="col" class="settings-cred-actions-col">Actions</th>
                         </tr>
                       </thead>
                       <tbody id="settings-users-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+              <section id="settings-panel-roles" class="settings-panel" data-settings-panel="roles" hidden>
+                <h3 class="settings-panel__heading">Roles</h3>
+                <p class="settings-panel__lead muted">
+                  Application roles available for local users.
+                </p>
+                <div class="settings-cred-table-wrap table-wrap">
+                  <div class="table-scroll">
+                    <table class="data-table data-table--dense settings-cred-table settings-roles-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Role</th>
+                          <th scope="col">Access</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td><strong>Admin</strong></td>
+                          <td>Manages users, settings, active admin sessions, and system configuration.</td>
+                        </tr>
+                        <tr>
+                          <td><strong>SuperAdmin</strong></td>
+                          <td>Full administrative access, plus access to the Designer navigation.</td>
+                        </tr>
+                        <tr>
+                          <td><strong>ReadOnly</strong></td>
+                          <td>Can sign in and view application data without administrative settings access.</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Designer</strong></td>
+                          <td>Can sign in and use the Designer navigation.</td>
+                        </tr>
+                      </tbody>
                     </table>
                   </div>
                 </div>
@@ -943,6 +1034,40 @@
                         spellcheck="false"
                       ></textarea>
                       <span class="settings-security__hint muted">IPv4 or IPv6 CIDR notation. Empty means no extra restriction beyond the interface.</span>
+                    </label>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label settings-form__label--with-warn">
+                        <span class="settings-form__label-text">Administrator session idle timeout (minutes)</span>
+                        <span
+                          class="settings-field-external-src"
+                          hidden
+                          data-security-field-source="session_idle_timeout_minutes"
+                          role="img"
+                          tabindex="0"
+                          aria-label=""
+                        >
+                          <svg class="settings-field-external-src__icon" width="16" height="16" aria-hidden="true" focusable="false">
+                            <use href="#icon-settings-external-warning" />
+                          </svg>
+                        </span>
+                      </span>
+                      <input
+                        type="number"
+                        name="session_idle_timeout_minutes"
+                        id="settings-security-session-idle"
+                        class="settings-form__input"
+                        min="0"
+                        max="525600"
+                        step="1"
+                        value="60"
+                      />
+                      <p class="settings-security__hint muted" id="settings-security-session-idle-hint" hidden></p>
+                      <span class="settings-security__hint muted">
+                        Sign out the web UI after this many minutes without activity. Use 0 to disable idle sign-out.
+                        Optional env override:
+                        <code class="settings-about__code">GROUND_CONTROL_SESSION_IDLE_MINUTES</code>
+                        (applies immediately; when set, this field is ignored).
+                      </span>
                     </label>
                   </div>
                   <div class="settings-security__section">
@@ -1712,8 +1837,10 @@
           <label class="settings-form__field">
             <span class="settings-form__label">Role</span>
             <select id="user-form-role" class="settings-form__input" name="role" required>
-              <option value="user">User</option>
               <option value="admin">Admin</option>
+              <option value="SuperAdmin">SuperAdmin</option>
+              <option value="ReadOnly" selected>ReadOnly</option>
+              <option value="Designer">Designer</option>
             </select>
           </label>
           <label class="settings-form__field">
@@ -1739,9 +1866,9 @@
 
     <div id="user-edit-profile-dialog" class="settings-subdialog" hidden aria-hidden="true">
       <div class="settings-subdialog__backdrop" aria-hidden="true"></div>
-      <div class="settings-subdialog__panel" role="dialog" aria-modal="true" aria-labelledby="user-edit-profile-title">
+      <div class="settings-subdialog__panel settings-user-edit-panel" role="dialog" aria-modal="true" aria-labelledby="user-edit-profile-title">
         <div class="settings-subdialog__header">
-          <h3 id="user-edit-profile-title" class="settings-subdialog__title">Edit user profile</h3>
+          <h3 id="user-edit-profile-title" class="settings-subdialog__title">Edit user</h3>
           <button
             type="button"
             class="settings-subdialog__close icon-btn"
@@ -1760,20 +1887,30 @@
         <form id="user-edit-profile-form" class="settings-form">
           <input type="hidden" id="user-edit-profile-id" name="user_id" value="" />
           <label class="settings-form__field">
+            <span class="settings-form__label">Username</span>
+            <input type="text" id="user-edit-profile-username" class="settings-form__input" maxlength="200" required autocomplete="username" />
+          </label>
+          <label class="settings-form__field">
             <span class="settings-form__label">Full name <span class="muted">(optional)</span></span>
-            <input type="text" id="user-edit-profile-full-name" class="settings-form__input" maxlength="200" autocomplete="off" />
+            <input type="text" id="user-edit-profile-full-name" class="settings-form__input" maxlength="200" autocomplete="name" />
           </label>
           <label class="settings-form__field">
             <span class="settings-form__label">Email <span class="muted">(optional)</span></span>
-            <input type="text" id="user-edit-profile-email" class="settings-form__input" maxlength="320" autocomplete="off" />
+            <input type="email" id="user-edit-profile-email" class="settings-form__input" maxlength="320" autocomplete="email" />
           </label>
           <label class="settings-form__field">
-            <span class="settings-form__label">Mobile number <span class="muted">(optional)</span></span>
-            <input type="text" id="user-edit-profile-mobile" class="settings-form__input" maxlength="80" autocomplete="off" />
+            <span class="settings-form__label">Phone number <span class="muted">(optional)</span></span>
+            <input type="text" id="user-edit-profile-mobile" class="settings-form__input" maxlength="80" autocomplete="tel" />
+          </label>
+          <label class="settings-form__field">
+            <span class="settings-form__label">Role</span>
+            <select id="user-edit-profile-role" class="settings-form__input" aria-label="User role"></select>
           </label>
           <p id="user-edit-profile-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
-          <div class="settings-form__actions">
-            <button type="submit" class="btn btn--primary" id="user-edit-profile-submit">Save</button>
+          <div class="settings-form__actions settings-user-edit-panel__actions">
+            <button type="submit" class="btn btn--primary" id="user-edit-profile-submit">Save changes</button>
+            <button type="button" class="btn btn--secondary" id="user-edit-profile-set-password">Set password…</button>
+            <button type="button" class="btn btn--secondary settings-user-edit-panel__delete" id="user-edit-profile-delete">Delete user…</button>
           </div>
         </form>
       </div>
@@ -1783,7 +1920,7 @@
       <div class="settings-subdialog__backdrop" aria-hidden="true"></div>
       <div class="settings-subdialog__panel active-admins-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="active-admins-title">
         <div class="settings-subdialog__header">
-          <h3 id="active-admins-title" class="settings-subdialog__title">Logged-in administrators</h3>
+          <h3 id="active-admins-title" class="settings-subdialog__title">Logged-in users</h3>
           <button type="button" class="settings-subdialog__close icon-btn" id="active-admins-close" aria-label="Close" title="Close">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
               <path
@@ -1799,7 +1936,8 @@
             <table class="data-table data-table--dense active-admins-dialog__table">
               <thead>
                 <tr>
-                  <th scope="col">Admin</th>
+                  <th scope="col">User</th>
+                  <th scope="col">Role</th>
                   <th scope="col">IP</th>
                   <th scope="col">Logged in</th>
                   <th scope="col">Last activity</th>
@@ -1810,6 +1948,77 @@
             </table>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="admin-logout-warning-dialog" class="settings-subdialog admin-logout-warning" hidden aria-hidden="true">
+      <div class="settings-subdialog__backdrop" aria-hidden="true"></div>
+      <div class="settings-subdialog__panel admin-logout-warning__panel" role="dialog" aria-modal="true" aria-labelledby="admin-logout-warning-title">
+        <div class="settings-subdialog__header">
+          <h3 id="admin-logout-warning-title" class="settings-subdialog__title">Still here?</h3>
+        </div>
+        <div class="admin-logout-warning__body">
+          <p class="admin-logout-warning__message">
+            Another administrator requested that you sign out. You will be logged out in
+            <strong id="admin-logout-warning-seconds">30</strong>
+            seconds unless you respond.
+          </p>
+          <p id="admin-logout-warning-requester" class="admin-logout-warning__requester muted"></p>
+          <p id="admin-logout-warning-status" class="settings-form__status muted" role="status"></p>
+          <div class="settings-form__actions">
+            <button type="button" class="btn btn--primary" id="admin-logout-warning-still-here">I'm still here</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="admin-chat-flyout"
+      class="gc-designer-modal gc-designer-modal--flyout-right admin-chat-flyout"
+      hidden
+      aria-hidden="true"
+    >
+      <button type="button" class="gc-designer-modal__backdrop admin-chat-flyout__backdrop" tabindex="-1" aria-label="Close chat"></button>
+      <div
+        class="gc-designer-view-flyout__stack admin-chat-flyout__stack"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-chat-title"
+      >
+        <aside class="gc-designer-modal__panel gc-designer-view-flyout__panel gc-designer-view-flyout__panel--primary admin-chat-flyout__panel">
+          <div class="gc-designer-view-flyout__resize gc-designer-view-flyout__resize--primary admin-chat-flyout__resize" aria-hidden="true"></div>
+          <header class="gc-designer-modal__header admin-chat-flyout__header">
+            <div>
+              <p class="admin-chat-flyout__eyebrow">Admin chat</p>
+              <h3 id="admin-chat-title" class="gc-designer-modal__title admin-chat-flyout__title">Message admin</h3>
+            </div>
+            <button type="button" class="gc-designer-modal__close admin-chat-flyout__close" id="admin-chat-close" aria-label="Close" title="Close">
+              ×
+            </button>
+          </header>
+          <div class="gc-designer-modal__divider" aria-hidden="true"></div>
+          <div class="gc-designer-modal__body admin-chat-flyout__body">
+            <div class="admin-chat-flyout__phone">
+              <div id="admin-chat-messages" class="admin-chat-flyout__messages" aria-live="polite"></div>
+              <form id="admin-chat-form" class="admin-chat-flyout__composer" autocomplete="off">
+                <label class="sr-only" for="admin-chat-input">Message</label>
+                <textarea
+                  id="admin-chat-input"
+                  class="admin-chat-flyout__input"
+                  rows="1"
+                  maxlength="2000"
+                  placeholder="Message"
+                ></textarea>
+                <button type="submit" class="admin-chat-flyout__send" aria-label="Send message" title="Send">
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+            <p id="admin-chat-status" class="admin-chat-flyout__status muted" role="status"></p>
+          </div>
+        </aside>
       </div>
     </div>
 
@@ -1886,6 +2095,7 @@
     <script src="/static/gc-table-lazy.js"></script>
     <script src="/static/gc-table-virtual.js"></script>
     <script src="/static/gc-table-cells.js"></script>
+    <script src="/static/gc-multiselect-trigger-chips.js"></script>
     {% if ac.authenticated %}
     <script>
       window.gcNavFirewallsJson = {{ nav_firewalls_add_json | default([]) | tojson }};

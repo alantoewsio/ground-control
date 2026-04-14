@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% set show_firewalls_v2_sidebar = true %}
+{% set top_nav_active = top_nav_active | default("firewalls_v2") %}
+{% set _gc_ver = app_about.app_version if app_about is defined else "0.3.3" %}
+{% block app_sidebar %}
+<div class="app-sidebar__inner">
+  <button
+    type="button"
+    class="app-sidebar__toggle"
+    id="app-sidebar-toggle"
+    aria-expanded="true"
+    title="Collapse navigation"
+    aria-label="Collapse navigation"
+  >
+    <span class="app-sidebar__toggle-icon" aria-hidden="true">
+      <svg
+        class="app-sidebar__collapse-svg"
+        viewBox="0 0 28 22"
+        width="25"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          class="app-sidebar__collapse-bars"
+          fill="currentColor"
+          d="M1.25 4.25h14.5v2.35H1.25zm0 5.575h10.25v2.35H1.25zm0 5.575h16.25v2.35H1.25z"
+        />
+        <g class="app-sidebar__collapse-arrow-wrap">
+          <path fill="currentColor" d="M16.35 11L25 3.35v15.3L16.35 11z" />
+        </g>
+      </svg>
+    </span>
+  </button>
+  <p class="app-sidebar__title" id="app-nav-heading">Firewalls v2</p>
+  <div class="app-sidebar__nav-scroll">
+    <nav class="app-nav" aria-labelledby="app-nav-heading" aria-orientation="vertical">
+      <p class="app-nav__section">Monitor</p>
+      <a
+        href="/firewalls-v2"
+        class="app-nav__item{% if fw_v2_route == 'inventory' and fw_subnav_active == 'inventory' %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">Inventory</span>
+      </a>
+      <span class="app-nav__item app-nav__item--placeholder" aria-disabled="true">
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M6 11h12v2H6z" />
+          </svg>
+        </span>
+        <span class="app-nav__label">Diagnostics</span>
+      </span>
+      <span class="app-nav__item app-nav__item--placeholder" aria-disabled="true">
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M6 11h12v2H6z" />
+          </svg>
+        </span>
+        <span class="app-nav__label">Zero-Day protection</span>
+      </span>
+      {% for sec in fw_v2_nav_tree %}
+      <p class="app-nav__section">{{ sec.label }}</p>
+      {% for page in sec.pages %}
+      <a
+        href="/firewalls-v2/o/{{ sec.slug }}/{{ page.slug }}"
+        class="app-nav__item{% if fw_v2_route == 'object' and fw_v2_active_section_slug == sec.slug and fw_v2_active_page_slug == page.slug %} is-active{% endif %}"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">{{ page.label }}</span>
+      </a>
+      {% endfor %}
+      {% endfor %}
+    </nav>
+  </div>
+  <div class="app-sidebar__footer">
+    <p class="app-sidebar__version" aria-label="Application version">v{{ _gc_ver }}</p>
+    <hr class="app-sidebar__divider" aria-hidden="true" />
+    <nav class="app-nav app-nav--footer" aria-label="Utility">
+      <a
+        href="/firewalls/history"
+        class="app-nav__item"
+      >
+        <span class="app-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path
+              fill="currentColor"
+              d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 0 1 11.07-5.61l1.42-1.42A8.96 8.96 0 0 0 13 3zm7.07 6.11-1.42 1.42A7 7 0 0 1 15 19h-3l4.89 4.89.07.14L23 20h-2.93a9 9 0 0 0-8.14-10.89z"
+            />
+          </svg>
+        </span>
+        <span class="app-nav__label">History</span>
+      </a>
+    </nav>
+  </div>
+</div>
+{% endblock %}

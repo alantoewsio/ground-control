@@ -119,6 +119,46 @@ class FirewallConfigEntry(Base):
     )
 
 
+class FirewallConfigEntityPayloadField(Base):
+    """
+    One row per (entity_type, top-level payload_json key) discovered during firewall cache sync.
+
+    ``json_value_kind`` is inferred from JSON values (``mixed`` when the same key appears with
+    different kinds across appliances). ``dependent_on``, ``data_entry_type``,
+    ``data_entry_properties``, ``show_as``, ``display_order``, and ``help_text`` are manual / UI
+    metadata and stay unset by sync (except ``display_order`` on generated cache rows, which may be
+    set to append).
+    """
+
+    __tablename__ = "firewall_config_entity_payload_fields"
+    __table_args__ = (
+        UniqueConstraint(
+            "entity_type",
+            "property_name",
+            name="uq_fw_cfg_entity_payload_prop",
+        ),
+        Index("idx_fwcepf_entity_type", "entity_type"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    property_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    json_value_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    dependent_on: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_entry_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_entry_properties: Mapped[str | None] = mapped_column(Text, nullable=True)
+    show_as: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    display_order: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    help_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    allowed_options: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: JSON array of cached ``entity_type`` strings (object-selector data sources for the field).
+    data_source_entity_types: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utc_now, onupdate=_utc_now
+    )
+
+
 class FirewallConfigSyncRun(Base):
     """One row per sync attempt (success or failure)."""
 

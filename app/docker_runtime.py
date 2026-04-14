@@ -132,6 +132,15 @@ def _merge_security_from_env(base: SecurityUiState) -> SecurityUiState:
     ar = (os.environ.get("GROUND_CONTROL_ALLOWED_RANGES") or "").strip()
     if ar:
         d["allowed_ranges"] = ar
+    sidle = (os.environ.get("GROUND_CONTROL_SESSION_IDLE_MINUTES") or "").strip()
+    if sidle:
+        try:
+            v = int(sidle)
+        except ValueError:
+            pass
+        else:
+            if v >= 0:
+                d["session_idle_timeout_minutes"] = min(v, 525600)
     return SecurityUiState.from_json_dict(d)
 
 

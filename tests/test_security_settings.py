@@ -37,6 +37,7 @@ def test_default_security_ui_state_loopback_https_redirect():
     assert st.http_enabled and st.https_enabled and st.redirect_http_to_https
     assert st.http_port == config.http_listen_port()
     assert st.https_port == config.https_listen_port()
+    assert st.session_idle_timeout_minutes == config.DEFAULT_SESSION_IDLE_MINUTES
 
 
 def test_build_http_to_https_redirect_url():
@@ -53,10 +54,19 @@ def test_build_http_to_https_redirect_url():
     )
     u = security_settings.build_http_to_https_redirect_url(st, path="/foo", query="a=1")
     assert u == "https://localhost:8443/foo?a=1"
-    u2 = security_settings.build_http_to_https_redirect_url(
-        st, path="/foo", query="", host_hint="203.0.113.7"
+    st_alias = security_settings.SecurityUiState(
+        http_enabled=True,
+        https_enabled=True,
+        redirect_http_to_https=True,
+        http_port=8000,
+        https_port=8443,
+        listen_interface="127.0.0.1",
+        allowed_ranges="",
+        tls_hostnames="primary.example\nalt.example",
+        cert_source="self_signed",
     )
-    assert u2 == "https://203.0.113.7:8443/foo"
+    u2 = security_settings.build_http_to_https_redirect_url(st_alias, path="/foo", query="")
+    assert u2 == "https://primary.example:8443/foo"
     assert (
         security_settings.build_http_to_https_redirect_url(
             st, path="/.well-known/acme-challenge/x", query=""
@@ -140,21 +150,32 @@ def test_https_redirect_url_skips_when_browser_already_https(monkeypatch):
     assert security_settings.https_redirect_url_if_applicable(r) is None
 
 
-def test_https_redirect_url_targets_request_host_not_tls_hostname(monkeypatch, tmp_path):
+def test_https_redirect_url_uses_first_tls_hostname_not_request_host(monkeypatch, tmp_path):
     monkeypatch.setenv("GROUND_CONTROL_UNDER_PYTEST", "0")
     monkeypatch.setattr(config, "BASE_DIR", tmp_path)
     from starlette.requests import Request
 
-    hp = config.https_listen_port()
+    st = security_settings.SecurityUiState(
+        http_enabled=True,
+        https_enabled=True,
+        redirect_http_to_https=True,
+        http_port=8000,
+        https_port=8443,
+        listen_interface="127.0.0.1",
+        allowed_ranges="",
+        tls_hostnames="gc.example\nlegacy-alias.example",
+        cert_source="self_signed",
+    )
+    security_settings.save_security_ui_state(st)
     r = Request(
         _request_scope(
             path="/x",
             scheme="http",
-            headers=[(b"host", b"10.0.0.5:8000")],
+            headers=[(b"host", b"legacy-alias.example:8000")],
         )
     )
     u = security_settings.https_redirect_url_if_applicable(r)
-    assert u == f"https://10.0.0.5:{hp}/x"
+    assert u == "https://gc.example:8443/x"
 
 
 def test_validate_requires_cert_for_https(monkeypatch, tmp_path):
@@ -303,6 +324,35 @@ def test_api_security_validate_and_apply(authed_client, tmp_path, monkeypatch):
     assert ra.status_code == 200
     assert ra.json()["ok"] is True
     assert ra.json()["restart_required"] is True
+
+
+def test_api_security_apply_session_idle_no_restart(authed_client, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
+    b = authed_client.get("/api/settings/security").json()
+    base_payload = {
+        "http_enabled": True,
+        "https_enabled": False,
+        "redirect_http_to_https": False,
+        "http_port": b["http_port"],
+        "https_port": None,
+        "listen_interface": b["listen_interface"],
+        "allowed_ranges": "",
+        "tls_hostnames": "localhost",
+        "cert_source": "self_signed",
+        "session_idle_timeout_minutes": config.DEFAULT_SESSION_IDLE_MINUTES,
+    }
+    r1 = authed_client.post("/api/settings/security", json=base_payload)
+    assert r1.status_code == 200
+    r2 = authed_client.post(
+        "/api/settings/security",
+        json={**base_payload, "session_idle_timeout_minutes": 33},
+    )
+    assert r2.status_code == 200
+    out = r2.json()
+    assert out["restart_required"] is False
+    assert out["session_idle_effective_minutes"] == 33
+    assert "security_field_sources" in out
+    assert security_settings.load_security_ui_state().session_idle_timeout_minutes == 33
 
 
 def test_api_generate_self_signed(authed_client, tmp_path, monkeypatch):

@@ -9,8 +9,27 @@
   let lastUserActivityAt = 0;
   let lastKeepaliveSentAt = 0;
   let sessionIdleWatchdogTimer = null;
+  let sessionIdleCountdownTimer = null;
   let sessionIdleListenersBound = false;
   const SESSION_IDLE_ACTIVITY_EVENTS = ["pointerdown", "keydown", "scroll", "touchstart", "wheel"];
+  /** Abort in-flight ``/api/auth/activity`` so it cannot race logout and revive the session cookie. */
+  let sessionActivityAbort = null;
+
+  function getSessionActivitySignal() {
+    if (!sessionActivityAbort || sessionActivityAbort.signal.aborted) {
+      sessionActivityAbort = new AbortController();
+    }
+    return sessionActivityAbort.signal;
+  }
+
+  function abortSessionActivityKeepalives() {
+    try {
+      sessionActivityAbort?.abort();
+    } catch {
+      /* ignore */
+    }
+    sessionActivityAbort = null;
+  }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => {
@@ -24,6 +43,33 @@
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return escapeHtml(String(iso));
     return escapeHtml(d.toLocaleString());
+  }
+
+  /** Elapsed time since ISO timestamp, e.g. "5 mins ago", "3 weeks ago". */
+  function formatUserRelativeTime(iso) {
+    if (!iso) return "—";
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return "—";
+    const diffSec = Math.floor((Date.now() - then) / 1000);
+    if (diffSec < 45) return "just now";
+    const mins = Math.floor(diffSec / 60);
+    if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+    if (days < 30) {
+      const weeks = Math.floor(days / 7);
+      return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+    }
+    if (days < 365) {
+      const months = Math.floor(days / 30);
+      const m = Math.max(1, months);
+      return `${m} month${m === 1 ? "" : "s"} ago`;
+    }
+    const years = Math.floor(days / 365);
+    const y = Math.max(1, years);
+    return `${y} year${y === 1 ? "" : "s"} ago`;
   }
 
   function formatDuration(seconds) {
@@ -45,12 +91,42 @@
       clearInterval(sessionIdleWatchdogTimer);
       sessionIdleWatchdogTimer = null;
     }
+    if (sessionIdleCountdownTimer != null) {
+      clearInterval(sessionIdleCountdownTimer);
+      sessionIdleCountdownTimer = null;
+    }
     sessionIdleMs = 0;
+    updateSessionIdleCountdownTab();
   }
 
   function onSessionUserActivity() {
     lastUserActivityAt = Date.now();
+    updateSessionIdleCountdownTab();
     maybeSendSessionKeepalive();
+  }
+
+  function updateSessionIdleCountdownTab() {
+    const tab = document.getElementById("user-menu-idle-countdown");
+    if (!tab) return;
+    if (!currentSessionUser || sessionIdleMs <= 0 || lastUserActivityAt <= 0) {
+      tab.hidden = true;
+      tab.textContent = "";
+      tab.removeAttribute("title");
+      tab.classList.remove("user-menu__idle-countdown--urgent");
+      return;
+    }
+    const remainingMs = Math.max(0, sessionIdleMs - (Date.now() - lastUserActivityAt));
+    const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+    const label = remainingSeconds > 60 ? `${Math.ceil(remainingSeconds / 60)}m` : `${remainingSeconds}s`;
+    const name =
+      String(currentSessionUser.full_name || "").trim() ||
+      String(currentSessionUser.username || "").trim() ||
+      "User";
+    const role = appRoleDisplay(currentSessionUser.role);
+    tab.textContent = `${name} | ${role} | ${label}`;
+    tab.title = `${name} | ${role} | Automatic logout in ${remainingSeconds > 60 ? `${Math.ceil(remainingSeconds / 60)} minutes` : `${remainingSeconds} seconds`}`;
+    tab.classList.toggle("user-menu__idle-countdown--urgent", remainingSeconds < 60);
+    tab.hidden = false;
   }
 
   function maybeSendSessionKeepalive() {
@@ -58,8 +134,13 @@
     const now = Date.now();
     if (now - lastKeepaliveSentAt < 45000) return;
     lastKeepaliveSentAt = now;
-    fetch("/api/auth/activity", { method: "POST", credentials: "same-origin", cache: "no-store" }).then((r) => {
-      if (r.status === 401) handleSessionExpired("Signed out due to inactivity.");
+    fetch("/api/auth/activity", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: getSessionActivitySignal(),
+    }).then((r) => {
+      if (r.status === 401) handleSessionExpired("Signed out due to inactivity.").catch(() => {});
     });
   }
 
@@ -80,9 +161,11 @@
     sessionIdleWatchdogTimer = globalThis.setInterval(() => {
       if (!currentSessionUser || sessionIdleMs <= 0) return;
       if (Date.now() - lastUserActivityAt >= sessionIdleMs) {
-        handleSessionExpired("Signed out due to inactivity.");
+        handleSessionExpired("Signed out due to inactivity.").catch(() => {});
       }
-    }, 10000);
+    }, 1000);
+    updateSessionIdleCountdownTab();
+    sessionIdleCountdownTimer = globalThis.setInterval(updateSessionIdleCountdownTab, 1000);
   }
 
   function restartSessionIdleWatchIfAuthenticated() {
@@ -90,17 +173,48 @@
     startSessionIdleWatch();
   }
 
-  function isAdmin() {
-    return currentSessionUser?.role === "admin";
+  const APP_ROLES = [
+    { value: "admin", label: "Admin" },
+    { value: "SuperAdmin", label: "SuperAdmin" },
+    { value: "ReadOnly", label: "ReadOnly" },
+    { value: "Designer", label: "Designer" },
+  ];
+
+  function normalizeAppRole(role) {
+    const key = String(role || "").trim().toLowerCase();
+    if (key === "admin" || key === "administrator") return "admin";
+    if (key === "superadmin" || key === "super admin") return "SuperAdmin";
+    if (key === "readonly" || key === "read only" || key === "user") return "ReadOnly";
+    if (key === "designer") return "Designer";
+    return String(role || "").trim();
   }
 
-  function handleSessionExpired(message) {
+  function isAdminRole(role) {
+    const r = normalizeAppRole(role);
+    return r === "admin" || r === "SuperAdmin";
+  }
+
+  function isDesignerRole(role) {
+    const r = normalizeAppRole(role);
+    return r === "Designer" || r === "SuperAdmin";
+  }
+
+  function isAdmin() {
+    return isAdminRole(currentSessionUser?.role);
+  }
+
+  async function handleSessionExpired(message) {
+    abortSessionActivityKeepalives();
     stopSessionIdleWatch();
     currentSessionUser = null;
     const btnUser = document.getElementById("btn-user-menu");
     if (btnUser) btnUser.hidden = true;
+    stopActiveAdminsPoller();
+    stopAdminChatsPoller();
     closeUserDropdown();
     closeActiveAdminsDialog();
+    closeAdminChatFlyout();
+    closeAdminLogoutWarning();
     closeSettingsModal();
     const uf = document.getElementById("user-form-dialog");
     if (uf && !uf.hidden) {
@@ -112,13 +226,24 @@
       uep.hidden = true;
       uep.setAttribute("aria-hidden", "true");
     }
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+    } catch {
+      /* still show login gate; session may already be invalid */
+    }
     showLoginGate(message || "Session expired. Sign in again.");
   }
 
   async function loadJson(url) {
     const r = await fetch(url, { credentials: "same-origin" });
     if (r.status === 401) {
-      handleSessionExpired();
+      await handleSessionExpired();
       throw new Error("Unauthorized");
     }
     if (!r.ok) throw new Error(r.statusText);
@@ -131,7 +256,7 @@
     const headers = { "Content-Type": "application/json", ...(fetchOptions.headers || {}) };
     const r = await fetch(url, { ...fetchOptions, headers, credentials: "same-origin" });
     if (r.status === 401 && !skipAuthRedirectOn401) {
-      handleSessionExpired();
+      await handleSessionExpired();
       throw new Error("Unauthorized");
     }
     if (!r.ok) {
@@ -160,9 +285,26 @@
   }
 
   function appRoleDisplay(role) {
-    if (role === "admin") return "Administrator";
-    if (role === "user") return "User";
-    return role ? String(role) : "—";
+    const r = normalizeAppRole(role);
+    const found = APP_ROLES.find((item) => item.value === r);
+    return found ? found.label : role ? String(role) : "—";
+  }
+
+  function appRoleOptionsHtml(selectedRole) {
+    const selected = normalizeAppRole(selectedRole);
+    return APP_ROLES.map((role) => {
+      const sel = role.value === selected ? " selected" : "";
+      return `<option value="${escapeHtml(role.value)}"${sel}>${escapeHtml(role.label)}</option>`;
+    }).join("");
+  }
+
+  function applyDesignerNavForRole() {
+    const show = isDesignerRole(currentSessionUser?.role);
+    document
+      .querySelectorAll('[data-top-nav="designer"], [data-top-nav="firewalls-v2"]')
+      .forEach((el) => {
+        el.hidden = !show;
+      });
   }
 
   function applySessionUserToChrome() {
@@ -176,6 +318,7 @@
     if (roleEl) {
       roleEl.textContent = u ? appRoleDisplay(u.role) : "";
     }
+    applyDesignerNavForRole();
   }
 
   function hideAuthBootstrapLoading() {
@@ -196,6 +339,8 @@
     const btnUser = document.getElementById("btn-user-menu");
     if (btnUser) btnUser.hidden = false;
     applySessionUserToChrome();
+    startActiveAdminsPoller();
+    startAdminChatsPoller();
     if (typeof globalThis.gcRefreshTaskQueueBadge === "function") {
       globalThis.gcRefreshTaskQueueBadge();
     }
@@ -215,7 +360,8 @@
   function scheduleAuthGateFocus() {
     const reduce =
       typeof globalThis.matchMedia === "function" && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const delay = reduce ? 0 : 560;
+    /* After whole split fade (delay ~0.92s + duration ~0.52s) */
+    const delay = reduce ? 0 : 1500;
     globalThis.setTimeout(() => {
       const o = document.getElementById("auth-overlay");
       if (!o || o.hidden) return;
@@ -232,6 +378,8 @@
   function showSetupGate(defaultAdminUsername) {
     const btnUserEarly = document.getElementById("btn-user-menu");
     if (btnUserEarly) btnUserEarly.hidden = true;
+    stopActiveAdminsPoller();
+    stopAdminChatsPoller();
     const overlay = document.getElementById("auth-overlay");
     const title = document.getElementById("auth-overlay-title");
     const sub = document.getElementById("auth-overlay-subtitle");
@@ -239,7 +387,6 @@
     const login = document.getElementById("auth-login-block");
     const lead = document.getElementById("auth-setup-lead");
     if (!overlay || !setup || !login) return;
-    hideAuthBootstrapLoading();
     const u = (defaultAdminUsername != null && String(defaultAdminUsername).trim()
       ? String(defaultAdminUsername).trim()
       : "admin");
@@ -262,19 +409,21 @@
     }
     document.getElementById("auth-setup-form")?.reset();
     triggerAuthIntro();
+    hideAuthBootstrapLoading();
     scheduleAuthGateFocus();
   }
 
   function showLoginGate(prefillMessage) {
     const btnUserEarly = document.getElementById("btn-user-menu");
     if (btnUserEarly) btnUserEarly.hidden = true;
+    stopActiveAdminsPoller();
+    stopAdminChatsPoller();
     const overlay = document.getElementById("auth-overlay");
     const title = document.getElementById("auth-overlay-title");
     const sub = document.getElementById("auth-overlay-subtitle");
     const setup = document.getElementById("auth-setup-block");
     const login = document.getElementById("auth-login-block");
     if (!overlay || !setup || !login) return;
-    hideAuthBootstrapLoading();
     if (title) title.textContent = "Sign in to Ground Control";
     if (sub) {
       sub.textContent = "Use your local account credentials.";
@@ -292,6 +441,7 @@
     }
     document.getElementById("auth-login-form")?.reset();
     triggerAuthIntro();
+    hideAuthBootstrapLoading();
     scheduleAuthGateFocus();
   }
 
@@ -436,7 +586,20 @@
   let activeAdminsDialogOpen = false;
   let activeAdminsRows = [];
   let activeAdminsTickTimer = null;
+  let activeAdminsPollTimer = null;
+  let activeAdminsKnownKeys = null;
+  let activeAdminsPulseTimer = null;
+  let adminChatsRows = [];
+  let adminChatsPollTimer = null;
+  let adminChatToast = null;
+  const adminChatToastDismissedIds = new Set();
+  let activeAdminChatId = "";
+  let adminChatFlyoutOpen = false;
+  let activeAdminLogoutChallenge = null;
+  let adminLogoutCountdownTimer = null;
   let lastActiveAdminsFetchAt = 0;
+  const ACTIVE_ADMINS_POLL_MS = 10000;
+  const ADMIN_CHATS_POLL_MS = 4000;
 
   function setUserMenuOpen(open) {
     const menu = document.getElementById("user-menu-dropdown");
@@ -470,8 +633,63 @@
       e.preventDefault();
       openActiveAdminsDialog();
     });
+    document.getElementById("user-menu-admin-chats")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-admin-chat-id]");
+      if (!btn) return;
+      e.preventDefault();
+      const chatId = btn.dataset.adminChatId || "";
+      const chat = adminChatsRows.find((c) => c.chat_id === chatId);
+      if (chat) {
+        closeUserDropdown();
+        openAdminChatFlyout(chat);
+      }
+    });
     document.getElementById("active-admins-close")?.addEventListener("click", closeActiveAdminsDialog);
     document.querySelector("#active-admins-dialog .settings-subdialog__backdrop")?.addEventListener("click", closeActiveAdminsDialog);
+    document.getElementById("active-admins-body")?.addEventListener("click", (e) => {
+      const logoutBtn = e.target.closest("button[data-admin-logout-peer]");
+      if (logoutBtn) {
+        e.preventDefault();
+        requestAdminLogout(logoutBtn.dataset.adminLogoutPeer || "").catch((err) => {
+          setActiveAdminsStatus(err?.message || "Could not request logout.", true);
+        });
+        return;
+      }
+      const btn = e.target.closest("button[data-admin-chat-peer]");
+      if (!btn) return;
+      e.preventDefault();
+      startAdminChat(btn.dataset.adminChatPeer || "").catch((err) => {
+        setActiveAdminsStatus(err?.message || "Could not start chat.", true);
+      });
+    });
+    document.getElementById("admin-chat-close")?.addEventListener("click", closeAdminChatFlyout);
+    document.querySelector("#admin-chat-flyout .admin-chat-flyout__backdrop")?.addEventListener("click", closeAdminChatFlyout);
+    document.getElementById("admin-chat-form")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      sendActiveAdminChatMessage().catch((err) => {
+        setAdminChatStatus(err?.message || "Could not send message.", true);
+      });
+    });
+    document.getElementById("admin-chat-input")?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      if (e.shiftKey) {
+        globalThis.setTimeout(resizeAdminChatInput, 0);
+        return;
+      }
+      e.preventDefault();
+      document.getElementById("admin-chat-form")?.requestSubmit();
+    });
+    document.getElementById("admin-chat-input")?.addEventListener("input", resizeAdminChatInput);
+    bindAdminChatFlyoutResize();
+    document.getElementById("admin-logout-warning-still-here")?.addEventListener("click", () => {
+      respondStillHereToAdminLogout().catch((err) => {
+        const st = document.getElementById("admin-logout-warning-status");
+        if (st) {
+          st.textContent = err?.message || "Could not respond.";
+          st.classList.add("is-error");
+        }
+      });
+    });
     document.getElementById("user-menu-logout")?.addEventListener("click", async () => {
       try {
         await apiRequestJson("/api/auth/logout", { method: "POST" });
@@ -480,8 +698,12 @@
       }
       currentSessionUser = null;
       trigger.hidden = true;
+      stopActiveAdminsPoller();
+      stopAdminChatsPoller();
       closeUserDropdown();
       closeActiveAdminsDialog();
+      closeAdminChatFlyout();
+      closeAdminLogoutWarning();
       globalThis.location.href = "/";
     });
   }
@@ -494,6 +716,8 @@
     if (wrap) wrap.classList.toggle("settings-user-readonly", !admin);
     const secNav = document.getElementById("settings-nav-security");
     if (secNav) secNav.hidden = !admin;
+    const rolesNav = document.getElementById("settings-nav-roles");
+    if (rolesNav) rolesNav.hidden = !admin;
     const leNav = document.getElementById("settings-nav-letsencrypt");
     if (leNav) leNav.hidden = !admin;
     const testNav = document.getElementById("settings-nav-test");
@@ -505,6 +729,7 @@
     const activePanel = document.querySelector("#settings-modal .settings-panel.is-active");
     const adminOnlyPanel =
       activePanel?.dataset?.settingsPanel === "security" ||
+      activePanel?.dataset?.settingsPanel === "roles" ||
       activePanel?.dataset?.settingsPanel === "letsencrypt" ||
       activePanel?.dataset?.settingsPanel === "test" ||
       activePanel?.dataset?.settingsPanel === "data-management" ||
@@ -554,13 +779,14 @@
     const tbody = document.getElementById("active-admins-body");
     if (!tbody) return;
     if (!Array.isArray(activeAdminsRows) || activeAdminsRows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="muted active-admins-dialog__empty">No admins are currently active.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="muted active-admins-dialog__empty">No users are currently active.</td></tr>';
       return;
     }
     const now = Date.now();
     tbody.innerHTML = activeAdminsRows
       .map((row) => {
         const displayName = escapeHtml(row.display_name || row.username || row.user_id || "—");
+        const role = escapeHtml(appRoleDisplay(row.role));
         const ipAddr = escapeHtml(row.client_ip || "—");
         const loggedIn = fmtDate(row.logged_in_at);
         const lastActivity = fmtDate(row.last_activity_at);
@@ -568,12 +794,30 @@
           row.last_activity_at && !Number.isNaN(new Date(row.last_activity_at).getTime())
             ? Math.max(0, Math.floor((now - new Date(row.last_activity_at).getTime()) / 1000))
             : Number(row.last_activity_seconds_ago || 0);
+        const currentTag = row.is_current
+          ? '<span class="active-admins-dialog__me-pill" aria-label="This is your session">ME</span>'
+          : "";
+        const chatButton = row.is_current
+          ? ""
+          : `<button type="button" class="active-admins-dialog__chat-btn" data-admin-chat-peer="${escapeHtml(row.session_id || "")}" aria-label="Message ${displayName}" title="Message ${displayName}">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M4 4h16v11H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z" />
+              </svg>
+            </button>`;
+        const logoutButton = row.is_current
+          ? ""
+          : `<button type="button" class="active-admins-dialog__logout-btn" data-admin-logout-peer="${escapeHtml(row.session_id || "")}" aria-label="Request logout for ${displayName}" title="Request logout">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M10.09 15.59 11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H7c-1.11 0-2 .9-2 2v4h2V5h12v14H7v-4H5v4c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
+              </svg>
+            </button>`;
         return `<tr>
-          <td>${displayName}</td>
+          <td><span class="active-admins-dialog__admin-name">${displayName}</span>${chatButton}${logoutButton}</td>
+          <td>${role}</td>
           <td>${ipAddr}</td>
           <td>${loggedIn}</td>
           <td>${lastActivity}</td>
-          <td>${escapeHtml(formatDuration(idleSecs))} ago</td>
+          <td>${escapeHtml(formatDuration(idleSecs))} ago${currentTag}</td>
         </tr>`;
       })
       .join("");
@@ -584,6 +828,475 @@
     if (!countEl) return;
     const n = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
     countEl.textContent = String(n);
+    countEl.classList.toggle("user-menu__session-count--active-admins", n >= 2);
+  }
+
+  function activeAdminSessionKey(row) {
+    return [
+      row?.user_id,
+      row?.username,
+      row?.client_ip,
+      row?.logged_in_at,
+    ]
+      .map((v) => String(v || "").trim())
+      .join("|");
+  }
+
+  function setActiveAdminsIndicator(count) {
+    const trigger = document.getElementById("btn-user-menu");
+    if (!trigger) return;
+    const n = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+    trigger.classList.toggle("user-menu__trigger--active-admins", n >= 2);
+  }
+
+  function pulseActiveAdminsIndicator() {
+    const trigger = document.getElementById("btn-user-menu");
+    if (!trigger) return;
+    if (activeAdminsPulseTimer != null) {
+      clearTimeout(activeAdminsPulseTimer);
+      activeAdminsPulseTimer = null;
+    }
+    trigger.classList.remove("user-menu__trigger--admin-login-pulse");
+    void trigger.offsetWidth;
+    trigger.classList.add("user-menu__trigger--admin-login-pulse");
+    activeAdminsPulseTimer = globalThis.setTimeout(() => {
+      trigger.classList.remove("user-menu__trigger--admin-login-pulse");
+      activeAdminsPulseTimer = null;
+    }, 10000);
+  }
+
+  function applyActiveAdminsPayload(payload, { notifyNew = false } = {}) {
+    const rows = Array.isArray(payload?.admins) ? payload.admins : [];
+    const count = Number.isFinite(Number(payload?.count)) ? Number(payload.count) : rows.length;
+    const nextKeys = new Set(rows.map(activeAdminSessionKey).filter(Boolean));
+    if (notifyNew && activeAdminsKnownKeys && count >= 2) {
+      const hasNewSession = [...nextKeys].some((key) => !activeAdminsKnownKeys.has(key));
+      if (hasNewSession) pulseActiveAdminsIndicator();
+    }
+    activeAdminsKnownKeys = nextKeys;
+    activeAdminsRows = rows;
+    updateActiveAdminCountBadge(count);
+    setActiveAdminsIndicator(count);
+    if (activeAdminsDialogOpen) renderActiveAdminsTable();
+  }
+
+  function speechBubbleSvg(size = 16) {
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">
+      <path fill="currentColor" d="M4 4h16v11H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z" />
+    </svg>`;
+  }
+
+  function setAdminChatStatus(message, isError) {
+    const st = document.getElementById("admin-chat-status");
+    if (!st) return;
+    st.textContent = message || "";
+    st.classList.toggle("is-error", !!isError);
+  }
+
+  function renderAdminChatMenu() {
+    const list = document.getElementById("user-menu-admin-chats");
+    if (!list) return;
+    if (!Array.isArray(adminChatsRows) || adminChatsRows.length === 0) {
+      list.hidden = true;
+      list.innerHTML = "";
+      return;
+    }
+    list.hidden = false;
+    list.innerHTML = adminChatsRows
+      .map((chat) => {
+        const unread = Number(chat.unread_count || 0);
+        const peer = escapeHtml(chat.peer_display_name || "Admin");
+        const unreadBadge = unread > 0 ? `<span class="user-menu__chat-unread">${unread}</span>` : "";
+        return `<button type="button" class="user-menu__chat-link${unread > 0 ? " user-menu__chat-link--unread" : ""}" data-admin-chat-id="${escapeHtml(chat.chat_id || "")}">
+          <span class="user-menu__chat-icon">${speechBubbleSvg(15)}</span>
+          <span class="user-menu__chat-name">${peer}</span>
+          ${unreadBadge}
+        </button>`;
+      })
+      .join("");
+  }
+
+  function renderAdminChatMessages(chat) {
+    const wrap = document.getElementById("admin-chat-messages");
+    const title = document.getElementById("admin-chat-title");
+    if (title) title.textContent = chat?.peer_display_name ? `Message ${chat.peer_display_name}` : "Message admin";
+    if (!wrap) return;
+    const messages = Array.isArray(chat?.messages) ? chat.messages : [];
+    if (messages.length === 0) {
+      wrap.innerHTML = '<p class="admin-chat-flyout__empty muted">No messages yet.</p>';
+      return;
+    }
+    wrap.replaceChildren(
+      ...messages.map((msg) => {
+        const bubble = document.createElement("div");
+        bubble.className = `admin-chat-flyout__bubble ${
+          msg.is_mine ? "admin-chat-flyout__bubble--mine" : "admin-chat-flyout__bubble--theirs"
+        }`;
+        const body = document.createElement("div");
+        body.className = "admin-chat-flyout__bubble-text";
+        body.textContent = msg.body || "";
+        const sent = document.createElement("div");
+        sent.className = "admin-chat-flyout__bubble-time";
+        sent.textContent = fmtDate(msg.sent_at);
+        bubble.append(body, sent);
+        return bubble;
+      })
+    );
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function resizeAdminChatInput() {
+    const input = document.getElementById("admin-chat-input");
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 104)}px`;
+  }
+
+  function bindAdminChatFlyoutResize() {
+    const root = document.getElementById("admin-chat-flyout");
+    const panel = root?.querySelector(".admin-chat-flyout__panel");
+    const handle = root?.querySelector(".admin-chat-flyout__resize");
+    if (!root || !panel || !handle || handle.dataset.adminChatResizeBound === "1") return;
+    handle.dataset.adminChatResizeBound = "1";
+    handle.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = panel.getBoundingClientRect().width;
+      const maxW = Math.max(320, globalThis.innerWidth - 24);
+      const minW = Math.min(320, maxW);
+      function onMove(e2) {
+        const w = Math.max(minW, Math.min(maxW, startW + (startX - e2.clientX)));
+        panel.style.width = `${w}px`;
+      }
+      function onUp() {
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      }
+      document.body.style.cursor = "ew-resize";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+  }
+
+  function setAdminChatAlert(unreadCount) {
+    const n = Number.isFinite(Number(unreadCount)) ? Math.max(0, Math.floor(Number(unreadCount))) : 0;
+    const activeUnread = n > 0 && !adminChatFlyoutOpen;
+    const trigger = document.getElementById("btn-user-menu");
+    trigger?.classList.toggle("user-menu__trigger--chat-alert", activeUnread);
+    document.getElementById("user-menu-admin-chats")?.classList.toggle("user-menu__chat-list--alert", activeUnread);
+  }
+
+  function ensureAdminChatToast() {
+    let toast = document.getElementById("admin-chat-toast");
+    if (toast) return toast;
+    toast = document.createElement("div");
+    toast.id = "admin-chat-toast";
+    toast.className = "admin-chat-toast";
+    toast.hidden = true;
+    toast.innerHTML = `<button type="button" class="admin-chat-toast__body">
+      <span class="admin-chat-toast__icon">${speechBubbleSvg(15)}</span>
+      <span class="admin-chat-toast__text"></span>
+    </button>
+    <button type="button" class="admin-chat-toast__close" aria-label="Dismiss message" title="Dismiss">×</button>`;
+    toast.querySelector(".admin-chat-toast__body")?.addEventListener("click", () => {
+      const chat = adminChatsRows.find((row) => row.chat_id === adminChatToast?.chatId);
+      hideAdminChatToast();
+      if (chat) {
+        closeUserDropdown();
+        openAdminChatFlyout(chat);
+      }
+    });
+    toast.querySelector(".admin-chat-toast__close")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (adminChatToast?.messageId) adminChatToastDismissedIds.add(adminChatToast.messageId);
+      hideAdminChatToast();
+    });
+    document.body.appendChild(toast);
+    return toast;
+  }
+
+  function positionAdminChatToast(toast) {
+    const trigger = document.getElementById("btn-user-menu");
+    if (!trigger || !toast) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.min(320, Math.max(240, globalThis.innerWidth - 24));
+    toast.style.width = `${width}px`;
+    toast.style.top = `${Math.max(0, rect.bottom + 8)}px`;
+    toast.style.left = `${Math.min(Math.max(12, rect.right - width), globalThis.innerWidth - width - 12)}px`;
+  }
+
+  function showAdminChatToast(chat, msg) {
+    if (adminChatFlyoutOpen || !chat || !msg?.id) return;
+    const toast = ensureAdminChatToast();
+    const sender = chat.peer_display_name || msg.sender_display_name || "Admin";
+    const text = String(msg.body || "").trim();
+    const textWrap = toast.querySelector(".admin-chat-toast__text");
+    if (textWrap) {
+      const senderEl = document.createElement("strong");
+      senderEl.textContent = sender;
+      const messageEl = document.createElement("span");
+      messageEl.textContent = text;
+      textWrap.replaceChildren(senderEl, messageEl);
+    }
+    adminChatToast = { chatId: chat.chat_id, messageId: msg.id };
+    positionAdminChatToast(toast);
+    toast.hidden = false;
+  }
+
+  function hideAdminChatToast() {
+    const toast = document.getElementById("admin-chat-toast");
+    if (toast) toast.hidden = true;
+    adminChatToast = null;
+  }
+
+  function newestUnreadIncomingMessage(chat) {
+    if (!chat || Number(chat.unread_count || 0) <= 0) return null;
+    const messages = Array.isArray(chat.messages) ? chat.messages : [];
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const msg = messages[i];
+      if (!msg?.is_mine && msg.id) return msg;
+    }
+    return null;
+  }
+
+  function updateAdminChatToast() {
+    if (adminChatFlyoutOpen) {
+      hideAdminChatToast();
+      return;
+    }
+    const chat = adminChatsRows.find((row) => Number(row.unread_count || 0) > 0);
+    const msg = newestUnreadIncomingMessage(chat);
+    if (!chat || !msg || adminChatToastDismissedIds.has(msg.id)) {
+      if (adminChatToast && (!msg || adminChatToast.messageId !== msg.id)) hideAdminChatToast();
+      return;
+    }
+    if (adminChatToast?.messageId !== msg.id) showAdminChatToast(chat, msg);
+    else positionAdminChatToast(document.getElementById("admin-chat-toast"));
+  }
+
+  function applyAdminChatsPayload(payload) {
+    adminChatsRows = Array.isArray(payload?.chats) ? payload.chats : [];
+    renderAdminChatMenu();
+    const active = adminChatsRows.find((chat) => chat.chat_id === activeAdminChatId);
+    if (adminChatFlyoutOpen) {
+      if (active) {
+        renderAdminChatMessages(active);
+        markActiveAdminChatRead().catch(() => {});
+      } else {
+        closeAdminChatFlyout();
+      }
+    }
+    setAdminChatAlert(payload?.unread_count || 0);
+    updateAdminChatToast();
+    applyAdminLogoutChallenges(payload?.logout_challenges || []);
+  }
+
+  function applyAdminLogoutChallenges(challenges) {
+    const rows = Array.isArray(challenges) ? challenges : [];
+    if (!rows.length) {
+      if (activeAdminLogoutChallenge) closeAdminLogoutWarning();
+      return;
+    }
+    const next = rows[0];
+    if (!activeAdminLogoutChallenge || activeAdminLogoutChallenge.id !== next.id) {
+      openAdminLogoutWarning(next);
+      return;
+    }
+    activeAdminLogoutChallenge = next;
+    updateAdminLogoutCountdown();
+  }
+
+  function openAdminLogoutWarning(challenge) {
+    const d = document.getElementById("admin-logout-warning-dialog");
+    if (!d) return;
+    activeAdminLogoutChallenge = challenge;
+    d.hidden = false;
+    d.setAttribute("aria-hidden", "false");
+    const req = document.getElementById("admin-logout-warning-requester");
+    if (req) req.textContent = challenge.requester_display_name ? `Requested by ${challenge.requester_display_name}.` : "";
+    const st = document.getElementById("admin-logout-warning-status");
+    if (st) {
+      st.textContent = "";
+      st.classList.remove("is-error", "is-ok");
+    }
+    updateAdminLogoutCountdown();
+    if (adminLogoutCountdownTimer != null) clearInterval(adminLogoutCountdownTimer);
+    adminLogoutCountdownTimer = globalThis.setInterval(updateAdminLogoutCountdown, 500);
+    document.getElementById("admin-logout-warning-still-here")?.focus();
+  }
+
+  function closeAdminLogoutWarning() {
+    const d = document.getElementById("admin-logout-warning-dialog");
+    activeAdminLogoutChallenge = null;
+    if (adminLogoutCountdownTimer != null) {
+      clearInterval(adminLogoutCountdownTimer);
+      adminLogoutCountdownTimer = null;
+    }
+    if (d) {
+      d.hidden = true;
+      d.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function adminLogoutSecondsRemaining() {
+    if (!activeAdminLogoutChallenge?.deadline_at) return 0;
+    const deadline = new Date(activeAdminLogoutChallenge.deadline_at).getTime();
+    if (Number.isNaN(deadline)) return 0;
+    return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  }
+
+  function updateAdminLogoutCountdown() {
+    const n = adminLogoutSecondsRemaining();
+    const el = document.getElementById("admin-logout-warning-seconds");
+    if (el) el.textContent = String(n);
+    if (n <= 0 && activeAdminLogoutChallenge?.id) {
+      completeAdminLogoutChallenge(activeAdminLogoutChallenge.id).catch(() => {
+        handleSessionExpired("Signed out by administrator request.");
+      });
+    }
+  }
+
+  async function requestAdminLogout(peerSessionId) {
+    const peer = String(peerSessionId || "").trim();
+    if (!peer) return;
+    await apiRequestJson("/api/auth/admin-logout-requests", {
+      method: "POST",
+      body: JSON.stringify({ target_session_id: peer }),
+    });
+    setActiveAdminsStatus("Logout warning sent.", false);
+  }
+
+  async function respondStillHereToAdminLogout() {
+    const id = activeAdminLogoutChallenge?.id;
+    if (!id) return;
+    await apiRequestJson(`/api/auth/admin-logout-requests/${encodeURIComponent(id)}/still-here`, {
+      method: "POST",
+    });
+    closeAdminLogoutWarning();
+    await fetchAdminChats().catch(() => {});
+  }
+
+  async function completeAdminLogoutChallenge(id) {
+    await apiRequestJson(`/api/auth/admin-logout-requests/${encodeURIComponent(id)}/logout`, {
+      method: "POST",
+    });
+    closeAdminLogoutWarning();
+    currentSessionUser = null;
+    handleSessionExpired("Signed out by administrator request.");
+  }
+
+  async function fetchAdminChats() {
+    const payload = await apiRequestJson("/api/auth/admin-chats", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    applyAdminChatsPayload(payload || {});
+  }
+
+  function startAdminChatsPoller() {
+    stopAdminChatsPoller();
+    if (!currentSessionUser) return;
+    fetchAdminChats().catch(() => {});
+    adminChatsPollTimer = globalThis.setInterval(() => {
+      if (!currentSessionUser) return;
+      fetchAdminChats().catch(() => {});
+    }, ADMIN_CHATS_POLL_MS);
+  }
+
+  function stopAdminChatsPoller() {
+    if (adminChatsPollTimer != null) {
+      clearInterval(adminChatsPollTimer);
+      adminChatsPollTimer = null;
+    }
+    adminChatsRows = [];
+    activeAdminChatId = "";
+    adminChatFlyoutOpen = false;
+    renderAdminChatMenu();
+    setAdminChatAlert(0);
+    hideAdminChatToast();
+  }
+
+  async function startAdminChat(peerSessionId) {
+    const peer = String(peerSessionId || "").trim();
+    if (!peer) return;
+    const payload = await apiRequestJson("/api/auth/admin-chats", {
+      method: "POST",
+      body: JSON.stringify({ peer_session_id: peer }),
+    });
+    const chat = payload?.chat;
+    if (chat) {
+      await fetchAdminChats().catch(() => {});
+      closeActiveAdminsDialog();
+      openAdminChatFlyout(chat);
+    }
+  }
+
+  function openAdminChatFlyout(chat) {
+    if (!chat?.chat_id) return;
+    const flyout = document.getElementById("admin-chat-flyout");
+    if (!flyout) return;
+    activeAdminChatId = chat.chat_id;
+    adminChatFlyoutOpen = true;
+    flyout.hidden = false;
+    flyout.setAttribute("aria-hidden", "false");
+    setAdminChatStatus("", false);
+    renderAdminChatMessages(chat);
+    setAdminChatAlert(0);
+    hideAdminChatToast();
+    markActiveAdminChatRead().catch(() => {});
+    resizeAdminChatInput();
+    document.getElementById("admin-chat-input")?.focus();
+  }
+
+  function closeAdminChatFlyout() {
+    const flyout = document.getElementById("admin-chat-flyout");
+    adminChatFlyoutOpen = false;
+    activeAdminChatId = "";
+    if (flyout) {
+      flyout.hidden = true;
+      flyout.setAttribute("aria-hidden", "true");
+    }
+    const unread = adminChatsRows.reduce((acc, chat) => acc + Number(chat.unread_count || 0), 0);
+    setAdminChatAlert(unread);
+    updateAdminChatToast();
+  }
+
+  async function markActiveAdminChatRead() {
+    if (!activeAdminChatId) return;
+    const payload = await apiRequestJson(`/api/auth/admin-chats/${encodeURIComponent(activeAdminChatId)}/read`, {
+      method: "POST",
+    });
+    const chat = payload?.chat;
+    if (!chat) return;
+    adminChatsRows = adminChatsRows.map((row) => (row.chat_id === chat.chat_id ? chat : row));
+    renderAdminChatMenu();
+    renderAdminChatMessages(chat);
+    setAdminChatAlert(0);
+    hideAdminChatToast();
+  }
+
+  async function sendActiveAdminChatMessage() {
+    const input = document.getElementById("admin-chat-input");
+    const msg = String(input?.value || "").trim();
+    if (!activeAdminChatId || !msg) return;
+    const payload = await apiRequestJson(`/api/auth/admin-chats/${encodeURIComponent(activeAdminChatId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ message: msg }),
+    });
+    if (input) input.value = "";
+    resizeAdminChatInput();
+    const chat = payload?.chat;
+    if (chat) {
+      adminChatsRows = adminChatsRows.some((row) => row.chat_id === chat.chat_id)
+        ? adminChatsRows.map((row) => (row.chat_id === chat.chat_id ? chat : row))
+        : [chat, ...adminChatsRows];
+      renderAdminChatMenu();
+      renderAdminChatMessages(chat);
+      setAdminChatStatus("", false);
+    }
   }
 
   async function fetchActiveAdmins({ force = false } = {}) {
@@ -594,10 +1307,36 @@
       method: "GET",
       headers: { Accept: "application/json" },
     });
-    const rows = Array.isArray(payload?.admins) ? payload.admins : [];
-    activeAdminsRows = rows;
-    updateActiveAdminCountBadge(payload?.count ?? rows.length);
-    if (activeAdminsDialogOpen) renderActiveAdminsTable();
+    applyActiveAdminsPayload(payload, { notifyNew: force });
+  }
+
+  function stopActiveAdminsPoller() {
+    if (activeAdminsPollTimer != null) {
+      clearInterval(activeAdminsPollTimer);
+      activeAdminsPollTimer = null;
+    }
+    if (activeAdminsPulseTimer != null) {
+      clearTimeout(activeAdminsPulseTimer);
+      activeAdminsPulseTimer = null;
+    }
+    activeAdminsKnownKeys = null;
+    setActiveAdminsIndicator(0);
+    updateActiveAdminCountBadge(0);
+    document.getElementById("btn-user-menu")?.classList.remove("user-menu__trigger--admin-login-pulse");
+  }
+
+  function startActiveAdminsPoller() {
+    stopActiveAdminsPoller();
+    if (!currentSessionUser) return;
+    fetchActiveAdmins({ force: true }).catch(() => {
+      setActiveAdminsIndicator(0);
+    });
+    activeAdminsPollTimer = globalThis.setInterval(() => {
+      if (!currentSessionUser) return;
+      fetchActiveAdmins({ force: true }).catch(() => {
+        /* Keep the last known dot state on transient failures. */
+      });
+    }, ACTIVE_ADMINS_POLL_MS);
   }
 
   function stopActiveAdminsTicker() {
@@ -838,7 +1577,7 @@
         cache: "no-store",
       });
       if (r.status === 401) {
-        handleSessionExpired();
+        await handleSessionExpired();
         return;
       }
       if (!r.ok) {
@@ -899,6 +1638,12 @@
       allowed_ranges: document.getElementById("settings-security-allowed-ranges")?.value || "",
       tls_hostnames: readSecurityTlsHostnamesText(),
       cert_source: certMethod === "letsencrypt" ? "letsencrypt" : "self_signed",
+      session_idle_timeout_minutes: (() => {
+        const raw = (document.getElementById("settings-security-session-idle")?.value || "").trim();
+        const n = Number.parseInt(raw, 10);
+        if (!Number.isFinite(n)) return 60;
+        return Math.min(525600, Math.max(0, n));
+      })(),
     };
   }
 
@@ -1266,6 +2011,32 @@
         const th = data.tls_hostnames != null ? String(data.tls_hostnames).trim() : "";
         tlsTa.value = th || "localhost";
       }
+      const idleInp = document.getElementById("settings-security-session-idle");
+      if (idleInp) {
+        const iv =
+          data.session_idle_timeout_minutes != null ? Number(data.session_idle_timeout_minutes) : 60;
+        idleInp.value = String(Number.isFinite(iv) ? iv : 60);
+        const idleSrc = data.security_field_sources?.session_idle_timeout_minutes;
+        idleInp.disabled = !!(idleSrc && (idleSrc.from_environment || idleSrc.from_docker_secret));
+      }
+      const idleHint = document.getElementById("settings-security-session-idle-hint");
+      if (idleHint) {
+        const src = data.security_field_sources?.session_idle_timeout_minutes;
+        const envOverride = !!(src && (src.from_environment || src.from_docker_secret));
+        const saved =
+          data.session_idle_timeout_minutes != null ? Number(data.session_idle_timeout_minutes) : 60;
+        const eff =
+          data.session_idle_effective_minutes != null
+            ? Number(data.session_idle_effective_minutes)
+            : saved;
+        if (envOverride) {
+          idleHint.textContent = `Effective timeout is ${Number.isFinite(eff) ? eff : "—"} minute(s); GROUND_CONTROL_SESSION_IDLE_MINUTES overrides the value in this form.`;
+          idleHint.hidden = false;
+        } else {
+          idleHint.textContent = "";
+          idleHint.hidden = true;
+        }
+      }
       securityLetsencryptReady = !!data.letsencrypt_ready;
       const cs = data.cert_source === "letsencrypt" ? "letsencrypt" : "self_signed";
       const cr = document.querySelector(`#settings-security-form input[name="cert_method"][value="${cs}"]`);
@@ -1306,6 +2077,10 @@
       renderSecurityTlsCertificatePanels(result);
       applySecurityFieldSourceWarnings(result.security_field_sources);
       syncSecurityFormControls();
+      if (typeof result.session_idle_effective_minutes === "number") {
+        sessionIdleMinutes = result.session_idle_effective_minutes;
+        restartSessionIdleWatchIfAuthenticated();
+      }
       setSecurityStatus(result.message || "Applied.", "ok");
     } catch (err) {
       setSecurityStatus(err.message || "Apply failed.", "error");
@@ -1846,7 +2621,7 @@
     try {
       const r = await fetch("/api/settings/backup/download", { credentials: "same-origin" });
       if (r.status === 401) {
-        handleSessionExpired();
+        await handleSessionExpired();
         return;
       }
       if (!r.ok) {
@@ -1900,7 +2675,7 @@
         body: JSON.stringify(payload),
       });
       if (r.status === 401) {
-        handleSessionExpired();
+        await handleSessionExpired();
         return;
       }
       const data = await r.json().catch(() => null);
@@ -1944,7 +2719,7 @@
         credentials: "same-origin",
       });
       if (r.status === 401) {
-        handleSessionExpired();
+        await handleSessionExpired();
         return;
       }
       const data = await r.json().catch(() => null);
@@ -2235,10 +3010,18 @@
 
   function filterSettingsNav() {
     const q = (document.getElementById("settings-nav-filter")?.value || "").trim().toLowerCase();
+    const adminOnly = new Set([
+      "settings-nav-roles",
+      "settings-nav-security",
+      "settings-nav-letsencrypt",
+      "settings-nav-data-management",
+      "settings-nav-backup",
+      "settings-nav-test",
+    ]);
     document.querySelectorAll("#settings-nav .settings-nav__item").forEach((btn) => {
       const navText = (btn.querySelector("span")?.textContent || "").toLowerCase();
       const match = q === "" || navText.includes(q);
-      btn.hidden = !match;
+      btn.hidden = !match || (adminOnly.has(btn.id) && !isAdmin());
     });
     const aboutBtn = document.getElementById("settings-nav-about");
     if (aboutBtn) {
@@ -2248,19 +3031,6 @@
     }
   }
 
-  const CRED_ROW_ICONS = {
-    edit:
-      '<svg class="settings-cred-icon-btn__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>',
-    del: '<svg class="settings-cred-icon-btn__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
-  };
-
-  const USER_ROW_ICONS = {
-    role: '<svg class="settings-cred-icon-btn__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
-    edit: CRED_ROW_ICONS.edit,
-    key: '<svg class="settings-cred-icon-btn__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6 0 1.66.68 3.15 1.76 4.24l1.42-1.42A3.96 3.96 0 0 1 3 12c0-2.21 1.79-4 4-4 1.38 0 2.6.7 3.31 1.76L12 11h5V6l-1.79 1.79C14.55 6.67 12.83 6 11 6a7 7 0 0 0 0 14c3.87 0 7-3.13 7-7h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5c1.13 0 2.17.39 3.02 1.02L12.65 10z"/></svg>',
-    del: CRED_ROW_ICONS.del,
-  };
-
   function cellTextOrDash(val) {
     const t = val != null ? String(val).trim() : "";
     return t ? escapeHtml(t) : "—";
@@ -2269,14 +3039,14 @@
   const SETTINGS_USER_FACET_COLS = [
     { id: "username", label: "Username" },
     { id: "full_name", label: "Full name" },
-    { id: "email", label: "Email" },
-    { id: "mobile", label: "Mobile" },
     { id: "role", label: "Role" },
     { id: "updated_at", label: "Updated" },
   ];
 
   let settingsUsersFacetAsideBound = false;
   let settingsUsersLoadGen = 0;
+  /** @type {Map<string, Record<string, unknown>>} */
+  let settingsUsersRowCache = new Map();
 
   function normUserFacetCell(val) {
     const t = val != null ? String(val).trim() : "";
@@ -2294,11 +3064,7 @@
         .trim()
         .replace(/\s+/g, " "),
       full_name: normUserFacetCell(row.full_name),
-      email: normUserFacetCell(row.email),
-      mobile: normUserFacetCell(row.mobile),
-      role: String(row.role || "")
-        .trim()
-        .replace(/\s+/g, " "),
+      role: appRoleDisplay(row.role),
       updated_at: updatedDisplay.trim().replace(/\s+/g, " "),
     };
   }
@@ -2388,8 +3154,9 @@
     if (!tbody) return;
     bindSettingsUsersFacetAsideOnce();
     const drawer = document.getElementById("settings-users-filters-drawer");
+    settingsUsersRowCache = new Map();
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="muted">No users.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="muted">No users.</td></tr>';
       if (drawer && globalThis.gcTableFacets) {
         globalThis.gcTableFacets.reset(drawer, "settings-users");
         drawer.innerHTML = "";
@@ -2399,6 +3166,9 @@
       return;
     }
     const adminUi = isAdmin();
+    rows.forEach((r) => {
+      if (r && r.id != null) settingsUsersRowCache.set(String(r.id), r);
+    });
     const facetMaps = rows.map(settingsUserFacetMapFromApiRow);
     if (drawer && globalThis.gcTableFacets) {
       rebuildSettingsUsersFacets(facetMaps);
@@ -2406,24 +3176,17 @@
     const rowHtmlJoined = rows
       .map((row) => {
         const id = escapeHtml(row.id);
-        const actions = adminUi
-          ? `<td class="settings-cred-actions settings-user-actions-cell">
-          <div class="settings-cred-actions">
-            <button type="button" class="settings-cred-icon-btn user-role-btn" data-id="${id}" title="Change role" aria-label="Change role">${USER_ROW_ICONS.role}</button>
-            <button type="button" class="settings-cred-icon-btn user-profile-btn" data-id="${id}" title="Edit name and contact" aria-label="Edit name and contact">${USER_ROW_ICONS.edit}</button>
-            <button type="button" class="settings-cred-icon-btn user-password-btn" data-id="${id}" title="Set password" aria-label="Set password">${USER_ROW_ICONS.key}</button>
-            <button type="button" class="settings-cred-icon-btn settings-cred-icon-btn--danger user-delete-btn" data-id="${id}" title="Delete user" aria-label="Delete user">${USER_ROW_ICONS.del}</button>
-          </div>
-        </td>`
-          : `<td class="settings-user-actions-cell"></td>`;
+        const usernameCell = adminUi
+          ? `<button type="button" class="settings-user-username-btn" data-user-open="${id}" title="Edit user">${escapeHtml(row.username)}</button>`
+          : `<strong>${escapeHtml(row.username)}</strong>`;
+        const roleCell = escapeHtml(appRoleDisplay(row.role));
+        const updatedTitle = row.updated_at ? escapeHtml(String(row.updated_at)) : "";
+        const updatedDisplay = formatUserRelativeTime(row.updated_at);
         return `<tr data-user-id="${id}">
-          <td data-gc-col="username"><strong>${escapeHtml(row.username)}</strong></td>
+          <td data-gc-col="username">${usernameCell}</td>
           <td data-gc-col="full_name">${cellTextOrDash(row.full_name)}</td>
-          <td data-gc-col="email">${cellTextOrDash(row.email)}</td>
-          <td data-gc-col="mobile">${cellTextOrDash(row.mobile)}</td>
-          <td data-gc-col="role" class="settings-user-cell--role">${escapeHtml(row.role)}</td>
-          <td data-gc-col="updated_at" data-sort-value="${escapeHtml(row.updated_at || "")}" class="muted">${fmtDate(row.updated_at)}</td>
-          ${actions}
+          <td data-gc-col="role" data-sort-value="${escapeHtml(appRoleDisplay(row.role))}" class="settings-user-cell--role">${roleCell}</td>
+          <td data-gc-col="updated_at" data-sort-value="${escapeHtml(row.updated_at || "")}" class="muted" ${updatedTitle ? `title="${updatedTitle}"` : ""}>${updatedDisplay}</td>
         </tr>`;
       })
       .join("");
@@ -2454,15 +3217,22 @@
     });
   }
 
-  function openUserEditProfileDialogFromRow(row, userId) {
+  function openUserEditUserDialog(userId) {
     const d = document.getElementById("user-edit-profile-dialog");
+    const row = settingsUsersRowCache.get(String(userId));
     if (!d || !row) return;
-    const cells = row.querySelectorAll("td");
-    const readCell = (i) => (cells[i]?.textContent || "").replace("—", "").trim();
-    document.getElementById("user-edit-profile-id").value = userId;
-    document.getElementById("user-edit-profile-full-name").value = readCell(1);
-    document.getElementById("user-edit-profile-email").value = readCell(2);
-    document.getElementById("user-edit-profile-mobile").value = readCell(3);
+    document.getElementById("user-edit-profile-id").value = String(row.id || "");
+    const un = document.getElementById("user-edit-profile-username");
+    if (un) un.value = row.username != null ? String(row.username) : "";
+    document.getElementById("user-edit-profile-full-name").value =
+      row.full_name != null ? String(row.full_name) : "";
+    document.getElementById("user-edit-profile-email").value = row.email != null ? String(row.email) : "";
+    document.getElementById("user-edit-profile-mobile").value = row.mobile != null ? String(row.mobile) : "";
+    const roleSel = document.getElementById("user-edit-profile-role");
+    if (roleSel) {
+      roleSel.innerHTML = appRoleOptionsHtml(row.role);
+      roleSel.dataset.previousRole = normalizeAppRole(row.role);
+    }
     const st = document.getElementById("user-edit-profile-status");
     if (st) {
       st.textContent = "";
@@ -2470,7 +3240,7 @@
     }
     d.hidden = false;
     d.setAttribute("aria-hidden", "false");
-    document.getElementById("user-edit-profile-full-name")?.focus();
+    un?.focus();
   }
 
   function initSettingsModal() {
@@ -2649,7 +3419,7 @@
       e.preventDefault();
       const username = document.getElementById("user-form-username")?.value?.trim() || "";
       const password = document.getElementById("user-form-password")?.value || "";
-      const role = document.getElementById("user-form-role")?.value || "user";
+      const role = document.getElementById("user-form-role")?.value || "ReadOnly";
       const full_name = document.getElementById("user-form-full-name")?.value?.trim() || "";
       const email = document.getElementById("user-form-email")?.value?.trim() || "";
       const mobile = document.getElementById("user-form-mobile")?.value?.trim() || "";
@@ -2677,20 +3447,30 @@
     document.getElementById("user-edit-profile-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const id = document.getElementById("user-edit-profile-id")?.value?.trim() || "";
+      const username = document.getElementById("user-edit-profile-username")?.value?.trim() || "";
       const full_name = document.getElementById("user-edit-profile-full-name")?.value?.trim() ?? "";
       const email = document.getElementById("user-edit-profile-email")?.value?.trim() ?? "";
       const mobile = document.getElementById("user-edit-profile-mobile")?.value?.trim() ?? "";
+      const role = document.getElementById("user-edit-profile-role")?.value ?? "";
       const st = document.getElementById("user-edit-profile-status");
       const sub = document.getElementById("user-edit-profile-submit");
       if (!id) return;
+      if (!username) {
+        if (st) {
+          st.textContent = "Username is required.";
+          st.classList.add("is-error");
+        }
+        return;
+      }
       if (sub) sub.disabled = true;
       try {
         const updated = await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
           method: "PATCH",
-          body: JSON.stringify({ full_name, email, mobile }),
+          body: JSON.stringify({ username, full_name, email, mobile, role }),
         });
         if (updated && updated.id === currentSessionUser?.id) {
           currentSessionUser = { ...currentSessionUser, ...updated };
+          applySettingsNavForRole();
           applySessionUserToChrome();
         }
         closeUserEditProfileDialog();
@@ -2704,83 +3484,49 @@
         if (sub) sub.disabled = false;
       }
     });
-    document.getElementById("settings-users-body")?.addEventListener("click", async (e) => {
-      const profileBtn = e.target.closest("button.user-profile-btn");
-      if (profileBtn) {
-        const id = profileBtn.dataset.id;
-        if (!id) return;
-        const row = profileBtn.closest("tr");
-        openUserEditProfileDialogFromRow(row, id);
+    document.getElementById("user-edit-profile-set-password")?.addEventListener("click", async () => {
+      const id = document.getElementById("user-edit-profile-id")?.value?.trim() || "";
+      if (!id) return;
+      const pw = globalThis.prompt("New password (min. 10 characters)");
+      if (pw == null) return;
+      if (pw.length < 10) {
+        notify("Password too short", "Password must be at least 10 characters.");
         return;
       }
-      const roleBtn = e.target.closest("button.user-role-btn");
-      if (roleBtn) {
-        const id = roleBtn.dataset.id;
-        if (!id) return;
-        const row = roleBtn.closest("tr");
-        const current = row?.querySelector(".settings-user-cell--role")?.textContent?.trim() || "user";
-        const choice = globalThis.prompt(`Role for this user: type "admin" or "user"`, current);
-        if (choice == null) return;
-        const r = choice.trim().toLowerCase();
-        if (r !== "admin" && r !== "user") {
-          notify("Invalid role", 'Role must be "admin" or "user".');
+      try {
+        await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ password: pw }),
+        });
+        await loadSettingsUsers();
+      } catch (err) {
+        notify("Could not set password", err.message || "");
+      }
+    });
+    document.getElementById("user-edit-profile-delete")?.addEventListener("click", async () => {
+      const id = document.getElementById("user-edit-profile-id")?.value?.trim() || "";
+      if (!id) return;
+      if (!globalThis.confirm("Remove this user? They will no longer be able to sign in.")) return;
+      try {
+        await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+        closeUserEditProfileDialog();
+        if (id === currentSessionUser?.id) {
+          globalThis.location.href = "/";
           return;
         }
-        try {
-          await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
-            method: "PATCH",
-            body: JSON.stringify({ role: r }),
-          });
-          await loadSettingsUsers();
-          if (id === currentSessionUser?.id) {
-            currentSessionUser = { ...currentSessionUser, role: r };
-            applySettingsNavForRole();
-            applySessionUserToChrome();
-          }
-        } catch (err) {
-          notify("Could not update role", err.message || "");
-        }
-        return;
+        await loadSettingsUsers();
+      } catch (err) {
+        notify("Delete failed", err.message || "");
       }
-      const pwBtn = e.target.closest("button.user-password-btn");
-      if (pwBtn) {
-        const id = pwBtn.dataset.id;
-        if (!id) return;
-        const pw = globalThis.prompt("New password (min. 10 characters)");
-        if (pw == null) return;
-        if (pw.length < 10) {
-          notify("Password too short", "Password must be at least 10 characters.");
-          return;
-        }
-        try {
-          await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
-            method: "PATCH",
-            body: JSON.stringify({ password: pw }),
-          });
-          await loadSettingsUsers();
-        } catch (err) {
-          notify("Could not set password", err.message || "");
-        }
-        return;
-      }
-      const delBtn = e.target.closest("button.user-delete-btn");
-      if (delBtn) {
-        const id = delBtn.dataset.id;
-        if (!id) return;
-        if (!globalThis.confirm("Remove this user? They will no longer be able to sign in.")) return;
-        try {
-          await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
-            method: "DELETE",
-          });
-          if (id === currentSessionUser?.id) {
-            globalThis.location.href = "/";
-            return;
-          }
-          await loadSettingsUsers();
-        } catch (err) {
-          notify("Delete failed", err.message || "");
-        }
-      }
+    });
+    document.getElementById("settings-users-body")?.addEventListener("click", (e) => {
+      const opener = e.target.closest("button[data-user-open]");
+      if (!opener) return;
+      const id = opener.getAttribute("data-user-open");
+      if (!id) return;
+      openUserEditUserDialog(id);
     });
   }
 

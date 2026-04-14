@@ -760,41 +760,76 @@
       flyoutBackdrop.addEventListener("click", closeEditFlyout);
     }
 
-    function buildSyncToggleRows() {
-      var root = document.getElementById("gc-fw-sync-toggles");
-      if (!root || !SYNC_CATALOG || !SYNC_CATALOG.length) return;
-      var prefs = loadSyncEntityPrefs();
-      root.innerHTML = (SYNC_CATALOG || [])
-        .map(function (x) {
-          var on = !!prefs[x.id];
-          return (
-            '<div class="gc-if-flyout__field gc-if-flyout__field--toggle gc-fw-sync-toggles__row">' +
-            '<label class="gc-if-flyout__toggle-label">' +
-            '<input type="checkbox" class="gc-fw-sync-entity-cb" data-sync-entity-id="' +
-            escapeHtml(x.id) +
-            '" ' +
-            (on ? "checked" : "") +
-            " />" +
-            "<span>" +
-            escapeHtml(x.label) +
-            "</span>" +
-            "</label>" +
-            "</div>"
-          );
-        })
-        .join("");
-      root.querySelectorAll(".gc-fw-sync-entity-cb").forEach(function (cb) {
-        cb.addEventListener("change", function () {
-          var pr = loadSyncEntityPrefs();
-          var eid = cb.getAttribute("data-sync-entity-id");
-          if (eid) pr[eid] = cb.checked;
-          persistSyncEntityPrefs(pr);
-          refreshInventorySyncColumn();
-          applyRowFilter();
-        });
+    function applySyncPrefsToObjectSelectorList(root) {
+      if (!root) return;
+      var pr = loadSyncEntityPrefs();
+      root.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+        var id = cb.value;
+        if (!id) return;
+        if (Object.prototype.hasOwnProperty.call(pr, id)) cb.checked = !!pr[id];
+        else cb.checked = true;
       });
     }
-    buildSyncToggleRows();
+
+    function persistObjectSelectorListStateToPrefs(root) {
+      if (!root) return;
+      var pr = loadSyncEntityPrefs();
+      root.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+        var eid = cb.value;
+        if (eid) pr[eid] = cb.checked;
+      });
+      persistSyncEntityPrefs(pr);
+      refreshInventorySyncColumn();
+      applyRowFilter();
+    }
+
+    function refreshFwEditSyncObjectSelectorList() {
+      var root = document.getElementById("gc-fw-edit-sync-object-selector-list");
+      if (!root || typeof window.gcDesignerHydrateObjectSelectorList !== "function") return;
+      window.gcDesignerHydrateObjectSelectorList(root, function () {
+        applySyncPrefsToObjectSelectorList(root);
+      });
+    }
+
+    function mountFwEditSyncObjectSelectorList() {
+      var root = document.getElementById("gc-fw-edit-sync-object-selector-list");
+      if (!root || root.dataset.gcFwSyncObjectListBound === "1") return;
+      root.dataset.gcFwSyncObjectListBound = "1";
+      root.addEventListener("change", function (e) {
+        var t = e.target;
+        if (!t.matches || !t.matches("input.gc-designer-object-selector-list__cb")) return;
+        persistObjectSelectorListStateToPrefs(root);
+      });
+      var selAll = document.getElementById("gc-fw-edit-sync-select-all");
+      var clrSel = document.getElementById("gc-fw-edit-sync-clear-selection");
+      if (selAll && selAll.dataset.gcFwSyncBulkBound !== "1") {
+        selAll.dataset.gcFwSyncBulkBound = "1";
+        selAll.addEventListener("click", function () {
+          var r = document.getElementById("gc-fw-edit-sync-object-selector-list");
+          if (!r) return;
+          r.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+            cb.checked = true;
+          });
+          persistObjectSelectorListStateToPrefs(r);
+        });
+      }
+      if (clrSel && clrSel.dataset.gcFwSyncBulkBound !== "1") {
+        clrSel.dataset.gcFwSyncBulkBound = "1";
+        clrSel.addEventListener("click", function () {
+          var r = document.getElementById("gc-fw-edit-sync-object-selector-list");
+          if (!r) return;
+          r.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+            cb.checked = false;
+          });
+          persistObjectSelectorListStateToPrefs(r);
+        });
+      }
+      refreshFwEditSyncObjectSelectorList();
+    }
+    mountFwEditSyncObjectSelectorList();
+    document.addEventListener("gc-config-cache-synced", function () {
+      refreshFwEditSyncObjectSelectorList();
+    });
 
     function configSyncBannerMessage(res) {
       var body = res.body || {};

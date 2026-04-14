@@ -24,6 +24,7 @@ from app.firewall_api_client import (
     patch_sophos_firewall_request_timeout,
 )
 from app.firewall_connectivity import firewall_is_online
+from app.firewall_config_entity_payload_catalog import record_entity_payload_field_rows
 from app.models import (
     Firewall,
     FirewallConfigChangelogEntry,
@@ -703,6 +704,8 @@ def _sync_entity_type(
 ) -> None:
     seen: set[str] = set()
     for item in items:
+        if isinstance(item, dict):
+            record_entity_payload_field_rows(db, entity_type, item)
         name = name_fn(item) if name_fn else _extract_item_name(item, name_keys)
         if not name:
             if singleton and len(items) == 1:

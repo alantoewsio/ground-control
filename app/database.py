@@ -677,6 +677,197 @@ def _migrate_sqlite_ipam_prefix_name() -> None:
         )
 
 
+def _migrate_sqlite_entity_payload_field_editor_columns() -> None:
+    url = config.database_url()
+    if not url.startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    added_display_order = "display_order" not in cols
+    with _engine.begin() as conn:
+        if "show_as" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE firewall_config_entity_payload_fields "
+                    "ADD COLUMN show_as VARCHAR(512)"
+                )
+            )
+        if added_display_order:
+            conn.execute(
+                text(
+                    "ALTER TABLE firewall_config_entity_payload_fields "
+                    "ADD COLUMN display_order INTEGER"
+                )
+            )
+    if not added_display_order:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE firewall_config_entity_payload_fields "
+                "SET display_order = ("
+                "SELECT rn FROM ("
+                "SELECT id AS iid, ROW_NUMBER() OVER ("
+                "PARTITION BY entity_type ORDER BY property_name) AS rn "
+                "FROM firewall_config_entity_payload_fields"
+                ") x WHERE x.iid = firewall_config_entity_payload_fields.id"
+                ") WHERE display_order IS NULL"
+            )
+        )
+
+
+def _migrate_postgres_entity_payload_field_editor_columns() -> None:
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    added_display_order = "display_order" not in cols
+    with _engine.begin() as conn:
+        if "show_as" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE firewall_config_entity_payload_fields "
+                    "ADD COLUMN show_as VARCHAR(512)"
+                )
+            )
+        if added_display_order:
+            conn.execute(
+                text(
+                    "ALTER TABLE firewall_config_entity_payload_fields "
+                    "ADD COLUMN display_order INTEGER"
+                )
+            )
+    if not added_display_order:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE firewall_config_entity_payload_fields AS t "
+                "SET display_order = s.rn FROM ("
+                "SELECT id, ROW_NUMBER() OVER ("
+                "PARTITION BY entity_type ORDER BY property_name) AS rn "
+                "FROM firewall_config_entity_payload_fields"
+                ") AS s "
+                "WHERE t.id = s.id AND t.display_order IS NULL"
+            )
+        )
+
+
+def _migrate_sqlite_entity_payload_field_help_text() -> None:
+    url = config.database_url()
+    if not url.startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "help_text" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN help_text TEXT"
+            )
+        )
+
+
+def _migrate_postgres_entity_payload_field_help_text() -> None:
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "help_text" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN help_text TEXT"
+            )
+        )
+
+
+def _migrate_sqlite_entity_payload_field_allowed_options() -> None:
+    url = config.database_url()
+    if not url.startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "allowed_options" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN allowed_options TEXT"
+            )
+        )
+
+
+def _migrate_postgres_entity_payload_field_allowed_options() -> None:
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "allowed_options" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN allowed_options TEXT"
+            )
+        )
+
+
+def _migrate_sqlite_entity_payload_field_data_source_entity_types() -> None:
+    url = config.database_url()
+    if not url.startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "data_source_entity_types" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN data_source_entity_types TEXT"
+            )
+        )
+
+
+def _migrate_postgres_entity_payload_field_data_source_entity_types() -> None:
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "data_source_entity_types" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN data_source_entity_types TEXT"
+            )
+        )
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=_engine)
     _migrate_sqlite_firewall_columns()
@@ -697,12 +888,21 @@ def init_db() -> None:
     _migrate_sqlite_ipam_lease_hostname_mac()
     _migrate_postgres_ipam_lease_hostname_mac()
     _migrate_postgres_ref_countries_code_width()
+    _migrate_sqlite_entity_payload_field_editor_columns()
+    _migrate_postgres_entity_payload_field_editor_columns()
+    _migrate_sqlite_entity_payload_field_help_text()
+    _migrate_postgres_entity_payload_field_help_text()
+    _migrate_sqlite_entity_payload_field_allowed_options()
+    _migrate_postgres_entity_payload_field_allowed_options()
+    _migrate_sqlite_entity_payload_field_data_source_entity_types()
+    _migrate_postgres_entity_payload_field_data_source_entity_types()
     _seed_default_ipam_vrf()
     repair_postgresql_serials_to_max_id(
         _engine,
         tables=(
             "firewalls",
             "firewall_config_entries",
+            "firewall_config_entity_payload_fields",
             "task_queue",
             "task_queue_completed",
             "configurations",
@@ -713,6 +913,11 @@ def init_db() -> None:
             "access_session_logs",
         ),
     )
+    from app.firewall_config_entity_payload_io import (
+        maybe_import_firewall_config_entity_payload_fields_seed,
+    )
+
+    maybe_import_firewall_config_entity_payload_fields_seed()
 
 
 def _seed_default_ipam_vrf() -> None:

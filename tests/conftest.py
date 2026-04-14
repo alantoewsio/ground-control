@@ -28,6 +28,9 @@ _monitor_scheduler.stop_monitor_scheduler = _noop_scheduler  # type: ignore[meth
 
 import pytest
 
+# Shared with role-switching fixtures (must match validate_new_password minimum length).
+AUTHED_CLIENT_TEST_PASSWORD = "x" * 12
+
 
 @pytest.fixture
 def client():
@@ -71,11 +74,13 @@ def authed_client(client, secrets_session):
     """Browser session + API auth: set known admin password in DB and log in."""
     from app import users_service
     from app.auth import hash_password
-    from app.secrets_models import DEFAULT_ADMIN_USERNAME, AppUser
+    from app.secrets_models import DEFAULT_ADMIN_USERNAME
 
-    pw = "x" * 12  # meets validate_new_password
+    pw = AUTHED_CLIENT_TEST_PASSWORD
     users_service.ensure_default_admin_user(secrets_session)
-    row = secrets_session.query(AppUser).filter_by(username=DEFAULT_ADMIN_USERNAME).one()
+    row = users_service.get_app_user_by_username_db(secrets_session, DEFAULT_ADMIN_USERNAME)
+    assert row is not None
+    row.role = "admin"
     row.password_hash = hash_password(pw)
     secrets_session.commit()
     r = client.post(
@@ -84,3 +89,40 @@ def authed_client(client, secrets_session):
     )
     assert r.status_code == 200, r.text
     return client
+
+
+@pytest.fixture
+def designer_client(authed_client, secrets_session):
+    """Browser client with Designer role; re-login refreshes session-backed ``auth_client_state``."""
+    from app.secrets_models import DEFAULT_ADMIN_USERNAME, AppUser
+
+    row = secrets_session.query(AppUser).filter_by(username=DEFAULT_ADMIN_USERNAME).one()
+    row.role = "Designer"
+    secrets_session.commit()
+    lr = authed_client.post(
+        "/api/auth/login",
+        json={
+            "username": DEFAULT_ADMIN_USERNAME,
+            "password": AUTHED_CLIENT_TEST_PASSWORD,
+        },
+    )
+    assert lr.status_code == 200, lr.text
+    return authed_client
+
+
+@pytest.fixture
+def superadmin_client(authed_client, secrets_session):
+    from app.secrets_models import DEFAULT_ADMIN_USERNAME, AppUser
+
+    row = secrets_session.query(AppUser).filter_by(username=DEFAULT_ADMIN_USERNAME).one()
+    row.role = "SuperAdmin"
+    secrets_session.commit()
+    lr = authed_client.post(
+        "/api/auth/login",
+        json={
+            "username": DEFAULT_ADMIN_USERNAME,
+            "password": AUTHED_CLIENT_TEST_PASSWORD,
+        },
+    )
+    assert lr.status_code == 200, lr.text
+    return authed_client

@@ -116,6 +116,37 @@ def active_listen_ports_for_process() -> set[int]:
     return ports
 
 
+def normalize_session_idle_timeout_minutes(
+    value: object, *, fallback: int | None = None
+) -> int:
+    """Persisted / UI value: 0 disables idle timeout; max one year in minutes."""
+    fb = fallback if fallback is not None else config.DEFAULT_SESSION_IDLE_MINUTES
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return fb
+    if n < 0:
+        return fb
+    return min(n, 525600)
+
+
+def effective_session_idle_timeout_minutes() -> int:
+    """Env ``GROUND_CONTROL_SESSION_IDLE_MINUTES`` overrides saved security settings when set."""
+    import os
+
+    raw = (os.environ.get("GROUND_CONTROL_SESSION_IDLE_MINUTES") or "").strip()
+    if raw:
+        try:
+            v = int(raw)
+        except ValueError:
+            return config.DEFAULT_SESSION_IDLE_MINUTES
+        if v < 0:
+            return config.DEFAULT_SESSION_IDLE_MINUTES
+        return min(v, 525600)
+    st = load_security_ui_state()
+    return normalize_session_idle_timeout_minutes(st.session_idle_timeout_minutes)
+
+
 @dataclass
 class SecurityUiState:
     http_enabled: bool
@@ -127,6 +158,7 @@ class SecurityUiState:
     allowed_ranges: str
     tls_hostnames: str
     cert_source: str  # self_signed | letsencrypt
+    session_idle_timeout_minutes: int = config.DEFAULT_SESSION_IDLE_MINUTES
 
     def to_json_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -139,6 +171,7 @@ class SecurityUiState:
         th = str(raw.get("tls_hostnames") or "").strip()
         if not th and raw.get("tls_hostname"):
             th = str(raw.get("tls_hostname") or "").strip()
+        idle = normalize_session_idle_timeout_minutes(raw.get("session_idle_timeout_minutes"))
         return cls(
             http_enabled=bool(raw.get("http_enabled", True)),
             https_enabled=bool(raw.get("https_enabled", True)),
@@ -149,6 +182,7 @@ class SecurityUiState:
             allowed_ranges=str(raw.get("allowed_ranges") or ""),
             tls_hostnames=th,
             cert_source=cs,
+            session_idle_timeout_minutes=idle,
         )
 
 
@@ -163,7 +197,24 @@ def default_security_ui_state() -> SecurityUiState:
         allowed_ranges="",
         tls_hostnames="localhost",
         cert_source="self_signed",
+        session_idle_timeout_minutes=config.DEFAULT_SESSION_IDLE_MINUTES,
     )
+
+
+def security_listen_settings_changed(before: SecurityUiState, after: SecurityUiState) -> bool:
+    """Whether HTTP/HTTPS bind options changed (typically needs process restart)."""
+    if (
+        before.http_enabled != after.http_enabled
+        or before.https_enabled != after.https_enabled
+        or before.redirect_http_to_https != after.redirect_http_to_https
+        or before.http_port != after.http_port
+        or before.listen_interface != after.listen_interface
+    ):
+        return True
+    # When HTTPS is off, persisted state may still carry a placeholder https_port; ignore it.
+    if before.https_enabled and after.https_enabled:
+        return before.https_port != after.https_port
+    return False
 
 
 _sec_state_cache: SecurityUiState | None = None
@@ -444,6 +495,10 @@ def security_field_external_sources() -> dict[str, dict[str, bool]]:
             "from_environment": env_on("GROUND_CONTROL_CERT_SOURCE"),
             "from_docker_secret": docker_secret_value_present("ground_control_cert_source"),
         },
+        "session_idle_timeout_minutes": {
+            "from_environment": env_on("GROUND_CONTROL_SESSION_IDLE_MINUTES"),
+            "from_docker_secret": False,
+        },
     }
 
 
@@ -503,14 +558,16 @@ def build_http_to_https_redirect_url(
     *,
     path: str,
     query: str,
-    host_hint: str | None = None,
 ) -> str | None:
-    """Return absolute https URL to redirect to, or None if redirect should not apply."""
+    """Return absolute https URL to redirect to, or None if redirect should not apply.
+
+    Uses the first TLS hostname from security settings as the redirect host.
+    """
     if not (st.redirect_http_to_https and st.https_enabled and st.http_enabled):
         return None
     if path.startswith("/.well-known/acme-challenge/"):
         return None
-    hn = (host_hint or primary_tls_hostname(st)).strip() or "localhost"
+    hn = primary_tls_hostname(st).strip() or "localhost"
     hp = st.https_port if st.https_port is not None else config.https_listen_port()
     base = https_admin_url_for_firewall(hn, hp)
     netloc = urlparse(base).netloc
@@ -534,10 +591,7 @@ def https_redirect_url_if_applicable(request: Request) -> str | None:
     if request.headers.get("upgrade", "").lower() == "websocket":
         return None
     st = load_security_ui_state()
-    host_hint = client_visible_hostname_for_redirect(request)
-    return build_http_to_https_redirect_url(
-        st, path=request.url.path, query=request.url.query, host_hint=host_hint
-    )
+    return build_http_to_https_redirect_url(st, path=request.url.path, query=request.url.query)
 
 
 def generate_self_signed_certificate(hostnames: list[str]) -> None:
@@ -665,6 +719,8 @@ def security_settings_payload() -> dict[str, Any]:
         "allowed_ranges": st.allowed_ranges,
         "tls_hostnames": st.tls_hostnames,
         "cert_source": st.cert_source,
+        "session_idle_timeout_minutes": st.session_idle_timeout_minutes,
+        "session_idle_effective_minutes": effective_session_idle_timeout_minutes(),
         "letsencrypt_ready": le_ready,
         "runtime_http_port": runtime_http,
         "runtime_https_port": runtime_https,

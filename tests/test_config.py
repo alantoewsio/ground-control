@@ -8,6 +8,7 @@ import pytest
 from cryptography.fernet import Fernet
 
 import app.config as config
+from app import security_settings
 
 
 def test_database_urls_default_sqlite_paths():
@@ -143,7 +144,7 @@ def test_monitor_tcp_timeout_seconds(monkeypatch, raw, expected):
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("", 60),
+        ("", 99),
         ("abc", 60),
         ("-1", 60),
         ("0", 0),
@@ -151,9 +152,36 @@ def test_monitor_tcp_timeout_seconds(monkeypatch, raw, expected):
         ("999999", 525600),
     ],
 )
-def test_session_idle_timeout_minutes(monkeypatch, raw, expected):
+def test_session_idle_timeout_minutes_env_overrides_saved(
+    monkeypatch, tmp_path, raw, expected
+):
+    from dataclasses import replace
+
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
+    security_settings.save_security_ui_state(
+        replace(
+            security_settings.default_security_ui_state(),
+            https_enabled=False,
+            session_idle_timeout_minutes=99,
+        )
+    )
     monkeypatch.setenv("GROUND_CONTROL_SESSION_IDLE_MINUTES", raw)
     assert config.session_idle_timeout_minutes() == expected
+
+
+def test_session_idle_timeout_minutes_from_saved_when_env_unset(monkeypatch, tmp_path):
+    from dataclasses import replace
+
+    monkeypatch.setattr(config, "BASE_DIR", tmp_path)
+    monkeypatch.delenv("GROUND_CONTROL_SESSION_IDLE_MINUTES", raising=False)
+    security_settings.save_security_ui_state(
+        replace(
+            security_settings.default_security_ui_state(),
+            https_enabled=False,
+            session_idle_timeout_minutes=42,
+        )
+    )
+    assert config.session_idle_timeout_minutes() == 42
 
 
 def test_fernet_key_from_env(monkeypatch):

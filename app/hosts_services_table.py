@@ -26,6 +26,44 @@ COL_ID_LOCK = "__lock"
 # Multivalue cells for indexed JSON paths (joined in API; split in UI as pills). Must match gc-network-entity.js.
 _HS_MULTIVALUE_SEP = "\x1e"
 
+# Combined-view merge key from a single flattened column id (query / designer property).
+_COMBINE_BY_COL_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,512}$")
+
+
+def sanitize_hs_combine_by_column(raw: str | None) -> str:
+    """Return a safe column id for combine-by, or '' for default (Sophos name / type rules)."""
+    if raw is None or not isinstance(raw, str):
+        return ""
+    s = raw.strip()
+    if not s or s == COL_ID_NAME:
+        return ""
+    if not _COMBINE_BY_COL_RE.fullmatch(s):
+        return ""
+    return s
+
+
+def _hs_disp_flat_for_combine(flat: dict[str, str], entity_type: str) -> dict[str, str]:
+    if _hs_use_indexed_path_consolidation(entity_type):
+        return _consolidate_hs_indexed_flat(flat)
+    return flat
+
+
+def _hs_combine_bucket_key(
+    entity_type: str,
+    flat: dict[str, str],
+    external_name: str,
+    combine_by: str | None,
+) -> tuple[Any, ...]:
+    """Bucket key for combined rows: default Sophos identity, or one cell value when combine_by is set."""
+    eff = sanitize_hs_combine_by_column(combine_by)
+    if not eff:
+        return _hs_combine_group_key(entity_type, flat, external_name)
+    disp = _hs_disp_flat_for_combine(flat, entity_type)
+    v = (disp.get(eff) or "").strip()
+    if not v:
+        v = "—"
+    return (v,)
+
 
 def _hs_logical_flat_key(key: str) -> str:
     """Strip numeric path segments so e.g. ServiceDetails.ServiceDetail.0.Protocol merges with .1.Protocol."""
@@ -494,8 +532,24 @@ def build_hosts_services_table_rows(
     return meta
 
 
+def _ip_host_combine_bucket_key(
+    flat: dict[str, str],
+    external_name: str,
+    combine_by: str | None,
+) -> tuple[Any, ...]:
+    eff = sanitize_hs_combine_by_column(combine_by)
+    if not eff:
+        return _ip_host_combine_group_key(flat, external_name)
+    v = (flat.get(eff) or "").strip()
+    if not v:
+        v = "—"
+    return (v,)
+
+
 def build_ip_host_table_rows_combined(
     parsed: list[tuple[Any, Any, dict[str, Any]]],
+    *,
+    combine_by: str | None = None,
 ) -> dict[str, Any]:
     """
     IP hosts: one row per unique (name, HostType) across firewalls (Name + Firewalls + extras).
@@ -509,8 +563,9 @@ def build_ip_host_table_rows_combined(
     groups: dict[tuple[str, str], dict[str, Any]] = {}
     order_keys: list[tuple[str, str]] = []
 
+    use_custom_combine = bool(sanitize_hs_combine_by_column(combine_by))
     for (ent, fw, _data), flat in zip(parsed, flat_per_row, strict=True):
-        gkey = _ip_host_combine_group_key(flat, ent.external_name)
+        gkey = _ip_host_combine_bucket_key(flat, ent.external_name, combine_by)
         fw_label = fw.name or fw.host or str(fw.id)
         is_system = (flat.get("HostType") or "").strip() == "System Host"
         if gkey not in groups:
@@ -559,12 +614,16 @@ def build_ip_host_table_rows_combined(
     out_rows: list[dict[str, Any]] = []
     for gkey in order_keys:
         g = groups[gkey]
-        hname = gkey[0]
         rep_flat = g["rep_flat"]
         ent = g["rep_ent"]
         fw = g["rep_fw"]
         fws = g["fws_ordered"]
         sources = g["sources"]
+        if use_custom_combine:
+            nv, _ = _name_value(rep_flat, ent.external_name)
+            hname = (nv or ent.external_name or "").strip() or "—"
+        else:
+            hname = gkey[0]
 
         cells: dict[str, str] = {
             COL_ID_NAME: hname,
@@ -637,6 +696,7 @@ def build_hs_table_rows_combined(
     parsed: list[tuple[Any, Any, dict[str, Any]]],
     *,
     entity_type: str,
+    combine_by: str | None = None,
 ) -> dict[str, Any]:
     """
     Combined view for non-IP-host entities: one row per merge key across firewalls.
@@ -648,9 +708,10 @@ def build_hs_table_rows_combined(
 
     groups: dict[tuple[Any, ...], dict[str, Any]] = {}
     order_keys: list[tuple[Any, ...]] = []
+    use_custom_combine = bool(sanitize_hs_combine_by_column(combine_by))
 
     for (ent, fw, _data), flat in zip(parsed, flat_per_row, strict=True):
-        gkey = _hs_combine_group_key(entity_type, flat, ent.external_name)
+        gkey = _hs_combine_bucket_key(entity_type, flat, ent.external_name, combine_by)
         fw_label = fw.name or fw.host or str(fw.id)
         if gkey not in groups:
             groups[gkey] = {
@@ -707,12 +768,16 @@ def build_hs_table_rows_combined(
     out_rows: list[dict[str, Any]] = []
     for gkey in order_keys:
         g = groups[gkey]
-        hname = gkey[0]
         rep_flat = g["rep_flat"]
         ent = g["rep_ent"]
         fw = g["rep_fw"]
         fws = g["fws_ordered"]
         sources = g["sources"]
+        if use_custom_combine:
+            nv, _ = _name_value(rep_flat, ent.external_name)
+            hname = (nv or ent.external_name or "").strip() or "—"
+        else:
+            hname = gkey[0]
 
         cells: dict[str, str] = {
             COL_ID_NAME: hname,

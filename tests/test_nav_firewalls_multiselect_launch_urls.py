@@ -15,6 +15,8 @@ def test_nav_multiselect_webadmin_and_ssh_use_launch_routes(authed_client, main_
     assert r.status_code == 200
     data = r.json()
     entry = next(x for x in data if x["id"] == fw.id)
+    assert entry.get("host") == "10.0.0.99"
+    assert entry.get("serial_number") in (None, "")
     urls = entry["urls"]
     assert urls["webadmin"].rstrip("/").endswith(f"/firewalls/{fw.id}/webadmin/launch")
     assert urls["ssh"].rstrip("/").endswith(f"/firewalls/{fw.id}/ssh/launch")

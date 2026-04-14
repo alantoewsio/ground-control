@@ -1,0 +1,105 @@
+{% extends "firewalls_v2_base.html" %}
+{% set _gc_ver = app_about.app_version if app_about is defined else "0.3.3" %}
+{% block title %}{{ fw_v2_page.label }}{% if fw_v2_active_tab %} · {{ fw_v2_active_tab.label }}{% endif %} · {{
+fw_v2_section.label }} · Firewalls v2 · Ground Control{% endblock %}
+{% block page_title %}{{ fw_v2_page.label }}{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls-v2">Firewalls v2</a></li>
+    <li class="breadcrumbs__item"><span class="breadcrumbs__link">{{ fw_v2_section.label }}</span></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">{{ fw_v2_page.label }}</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  {% if fw_v2_nav_tabbed %}
+  Object types and settings follow the <strong>tab</strong> labels from
+  <span class="mono">designer_entity_type_navigation.json</span> for this page. Table layout can be saved per tab when
+  design mode is on.
+  {% else %}
+  Unified data table for every <strong>Objects</strong> entity type mapped to this page in
+  <span class="mono">designer_entity_type_navigation.json</span>. Table layout and column settings can be saved per path
+  when design mode is on.
+  {% endif %}
+</p>
+{% endblock %}
+{% block content %}
+<main class="layout single gc-fw-v2-object-layout">
+  <section class="firewalls-page">
+    <div class="gc-fw-v2-object-page-body">
+      {% if fw_v2_nav_tabbed and fw_v2_page.tabs %}
+      <div class="gc-tabs gc-fw-v2-object-page-tabs" role="tablist" aria-label="{{ fw_v2_page.label }} views"
+        id="gc-fw-v2-object-page-tablist">
+        {% for t in fw_v2_page.tabs %}
+        {% if t is mapping and t.slug is defined and t.label is defined %}
+        <a class="gc-tabs__tab{% if fw_v2_active_tab and t.slug == fw_v2_active_tab.slug %} is-active{% endif %}"
+          role="tab"
+          aria-selected="{% if fw_v2_active_tab and t.slug == fw_v2_active_tab.slug %}true{% else %}false{% endif %}"
+          id="gc-fw-v2-obj-tab-{{ t.slug }}" href="{{ request.url.path }}?tab={{ t.slug | urlencode }}">{{ t.label
+          }}</a>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if fw_v2_show_object_table %}
+      {% include "partials/fw_v2_object_data_table.html" %}
+      {% endif %}
+
+      {% if fw_v2_settings_entities %}
+      <section class="gc-fw-v2-object-settings" aria-labelledby="gc-fw-v2-obj-settings-h">
+        <h2 id="gc-fw-v2-obj-settings-h" class="gc-fw-v2-object-settings__title">Settings</h2>
+        <p class="gc-fw-v2-object-settings__lead muted">
+          Config-backed settings mapped to this tab (from the Object navigation table). Use the production pages for
+          full editing when available.
+        </p>
+        <ul class="gc-fw-v2-object-settings__list">
+          {% for row in fw_v2_settings_entities %}
+          <li class="gc-fw-v2-object-settings__item">
+            <span class="mono gc-fw-v2-object-settings__etype">{{ row.entity_type }}</span>
+            <span class="gc-fw-v2-object-settings__name">{{ row.display_name }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if fw_v2_nav_tabbed and not fw_v2_show_object_table and not fw_v2_settings_entities %}
+      <p class="gc-fw-v2-object-empty-tab muted" role="status">Nothing is mapped to this tab in the Object navigation
+        table.</p>
+      {% endif %}
+    </div>
+  </section>
+</main>
+{% endblock %}
+{% block app_content_overlays %}
+{% if fw_v2_show_object_table %}
+{% include "partials/gc_designer_object_edit_flyout_modal.html" %}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+  window.GC_HOSTS_SERVICES_TABLE_ENTITY_TYPES = {};
+  {% for et in hosts_services_entity_types %}
+  window.GC_HOSTS_SERVICES_TABLE_ENTITY_TYPES[{{ et | tojson }}] = true;
+  {% endfor %}
+</script>
+{% if fw_v2_show_object_table %}
+<script>
+  window.GC_FW_V2_TABLE_INSTANCE_ID = {{ fw_v2_table_instance_id | tojson }};
+  window.GC_FW_V2_LOCK_ENTITY_TYPES = {{ fw_v2_locked_entity_types | tojson }};
+  window.GC_FW_V2_NAV_TABBED = {{ fw_v2_nav_tabbed | tojson }};
+</script>
+<script src="/static/gc-network-entity.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-hosts-services-flyout.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-option-selector.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-designer-object-edit-dd-runtime.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-data-controls-object-edit-layout.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-designer-object-edit-catalog.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-designer-stack-flyout-runtime.js?v={{ _gc_ver }}"></script>
+<script src="/static/gc-fw-v2-object-data-table.js?v={{ _gc_ver }}"></script>
+{% endif %}
+{% endblock %}

@@ -14,7 +14,8 @@
 {% endblock %}
 {% block page_subtitle %}
 <p class="page-header__subtitle">
-  Host and service objects from the config cache. Select firewalls in the top bar and enable the matching sync types under
+  Host and service objects from the config cache. Select firewalls in the top bar and enable the matching sync types
+  under
   <strong>Inventory</strong> to populate data. UI patterns follow the
   <code class="mono">mocks/</code> reference screens (IP host, FQDN, MAC, services, etc.).
 </p>
@@ -36,56 +37,95 @@
       </div>
       <div class="content-pane gc-network-panel__content">
         <div class="gc-tabs" role="tablist" aria-label="Hosts and services views" id="gc-hs-main-tablist">
-          <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true" id="gc-hs-tab-ip-host" data-gc-hs-tab="ip_host">
+          <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true" id="gc-hs-tab-ip-host"
+            data-gc-hs-tab="ip_host">
             IP host
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-ip-hostgroup" data-gc-hs-tab="ip_hostgroup">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-ip-hostgroup"
+            data-gc-hs-tab="ip_hostgroup">
             IP host group
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-mac-host" data-gc-hs-tab="mac_host">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-mac-host"
+            data-gc-hs-tab="mac_host">
             MAC host
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-fqdn-host" data-gc-hs-tab="fqdn_host">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-fqdn-host"
+            data-gc-hs-tab="fqdn_host">
             FQDN host
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-fqdn-hostgroup" data-gc-hs-tab="fqdn_hostgroup">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-fqdn-hostgroup"
+            data-gc-hs-tab="fqdn_hostgroup">
             FQDN host group
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-country-group" data-gc-hs-tab="country_group">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-country-group"
+            data-gc-hs-tab="country_group">
             Country group
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-service" data-gc-hs-tab="service">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-service"
+            data-gc-hs-tab="service">
             Services
           </button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-service-group" data-gc-hs-tab="service_group">
+          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-hs-tab-service-group"
+            data-gc-hs-tab="service_group">
             Service group
           </button>
         </div>
 
         <div class="gc-tab-panels">
-          <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-hs-tab-ip-host" id="gc-hs-panel-ip-host">
-            {{ net_entity_table_wrap("gc-hs-ip-host", "IP hosts", "Search IP hosts", true, "gc-hs-ip-host-add", "Add IP host", "Combined view merges rows that share the same host name and host type. When other details differ across firewalls, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.", "gc-hs-ip-host-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-hs-tab-ip-host"
+            id="gc-hs-panel-ip-host">
+            {{ net_entity_table_wrap("gc-hs-ip-host", "IP hosts", "Search IP hosts", true, "gc-hs-ip-host-add", "Add IP
+            host", "Combined view merges rows that share the same host name and host type. When other details differ
+            across firewalls, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.",
+            "gc-hs-ip-host-delete-selected", "Delete selected") }}
           </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-ip-hostgroup" id="gc-hs-panel-ip-hostgroup" hidden>
-            {{ net_entity_table_wrap("gc-hs-ip-hostgroup", "IP host groups", "Search IP host groups", true, "gc-hs-ip-hostgroup-add", "Add IP host group", "Combined view merges rows that share the same group name. When members differ across firewalls, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-ip-hostgroup-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-ip-hostgroup"
+            id="gc-hs-panel-ip-hostgroup" hidden>
+            {{ net_entity_table_wrap("gc-hs-ip-hostgroup", "IP host groups", "Search IP host groups", true,
+            "gc-hs-ip-hostgroup-add", "Add IP host group", "Combined view merges rows that share the same group name.
+            When members differ across firewalls, the switch turns yellow — click to compare, or Shift+click for one row
+            per firewall.", "gc-hs-ip-hostgroup-delete-selected", "Delete selected") }}
           </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-mac-host" id="gc-hs-panel-mac-host" hidden>
-            {{ net_entity_table_wrap("gc-hs-mac-host", "MAC hosts", "Search MAC hosts", true, "gc-hs-mac-host-add", "Add MAC host", "Combined view merges rows that share the same name and MAC host type. When details differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-mac-host-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-mac-host" id="gc-hs-panel-mac-host"
+            hidden>
+            {{ net_entity_table_wrap("gc-hs-mac-host", "MAC hosts", "Search MAC hosts", true, "gc-hs-mac-host-add", "Add
+            MAC host", "Combined view merges rows that share the same name and MAC host type. When details differ, the
+            switch turns yellow — click to compare, or Shift+click for one row per firewall.",
+            "gc-hs-mac-host-delete-selected", "Delete selected") }}
           </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-fqdn-host" id="gc-hs-panel-fqdn-host" hidden>
-            {{ net_entity_table_wrap("gc-hs-fqdn-host", "FQDN hosts", "Search FQDN hosts", true, "gc-hs-fqdn-host-add", "Add FQDN host", "Combined view merges rows that share the same name and FQDN. When details differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-fqdn-host-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-fqdn-host" id="gc-hs-panel-fqdn-host"
+            hidden>
+            {{ net_entity_table_wrap("gc-hs-fqdn-host", "FQDN hosts", "Search FQDN hosts", true, "gc-hs-fqdn-host-add",
+            "Add FQDN host", "Combined view merges rows that share the same name and FQDN. When details differ, the
+            switch turns yellow — click to compare, or Shift+click for one row per firewall.",
+            "gc-hs-fqdn-host-delete-selected", "Delete selected") }}
           </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-fqdn-hostgroup" id="gc-hs-panel-fqdn-hostgroup" hidden>
-            {{ net_entity_table_wrap("gc-hs-fqdn-hostgroup", "FQDN host groups", "Search FQDN host groups", true, "gc-hs-fqdn-hostgroup-add", "Add FQDN host group", "Combined view merges rows that share the same group name. When members differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-fqdn-hostgroup-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-fqdn-hostgroup"
+            id="gc-hs-panel-fqdn-hostgroup" hidden>
+            {{ net_entity_table_wrap("gc-hs-fqdn-hostgroup", "FQDN host groups", "Search FQDN host groups", true,
+            "gc-hs-fqdn-hostgroup-add", "Add FQDN host group", "Combined view merges rows that share the same group
+            name. When members differ, the switch turns yellow — click to compare, or Shift+click for one row per
+            firewall.", "gc-hs-fqdn-hostgroup-delete-selected", "Delete selected") }}
           </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-country-group" id="gc-hs-panel-country-group" hidden>
-            {{ net_entity_table_wrap("gc-hs-country-group", "Country groups", "Search country groups", true, "gc-hs-country-group-add", "Add country group", "Combined view merges rows that share the same group name. When country lists differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-country-group-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-country-group"
+            id="gc-hs-panel-country-group" hidden>
+            {{ net_entity_table_wrap("gc-hs-country-group", "Country groups", "Search country groups", true,
+            "gc-hs-country-group-add", "Add country group", "Combined view merges rows that share the same group name.
+            When country lists differ, the switch turns yellow — click to compare, or Shift+click for one row per
+            firewall.", "gc-hs-country-group-delete-selected", "Delete selected") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-service" id="gc-hs-panel-service" hidden>
-            {{ net_entity_table_wrap("gc-hs-service", "Services", "Search services", true, "gc-hs-service-add", "Add service", "Combined view merges rows that share the same service name and type (TCP/UDP, IP, ICMP, …). When details differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-service-delete-selected", "Delete selected") }}
+            {{ net_entity_table_wrap("gc-hs-service", "Services", "Search services", true, "gc-hs-service-add", "Add
+            service", "Combined view merges rows that share the same service name and type (TCP/UDP, IP, ICMP, …). When
+            details differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.",
+            "gc-hs-service-delete-selected", "Delete selected") }}
           </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-service-group" id="gc-hs-panel-service-group" hidden>
-            {{ net_entity_table_wrap("gc-hs-service-group", "Service groups", "Search service groups", true, "gc-hs-service-group-add", "Add service group", "Combined view merges rows that share the same group name. When members differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.", "gc-hs-service-group-delete-selected", "Delete selected") }}
+          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-service-group"
+            id="gc-hs-panel-service-group" hidden>
+            {{ net_entity_table_wrap("gc-hs-service-group", "Service groups", "Search service groups", true,
+            "gc-hs-service-group-add", "Add service group", "Combined view merges rows that share the same group name.
+            When members differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.",
+            "gc-hs-service-group-delete-selected", "Delete selected") }}
           </div>
         </div>
       </div>
@@ -104,19 +144,8 @@
 
 <div id="gc-hs-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
   <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
-  <div
-    class="gc-if-flyout__panel"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="gc-hs-flyout-title"
-    tabindex="-1"
-  >
-    <div
-      class="gc-if-flyout__resize"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize panel"
-    ></div>
+  <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-hs-flyout-title" tabindex="-1">
+    <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
     <header class="gc-if-flyout__header">
       <h2 id="gc-hs-flyout-title" class="gc-if-flyout__title">Host / service</h2>
       <button type="button" class="gc-fw-inv-flyout__close" id="gc-hs-flyout-close" aria-label="Close" title="Close">
@@ -145,15 +174,12 @@
 
 <div id="gc-hs-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
   <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
-  <div
-    class="gc-net-zone-combine-modal__panel"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="gc-hs-combine-modal-title"
-  >
+  <div class="gc-net-zone-combine-modal__panel" role="dialog" aria-modal="true"
+    aria-labelledby="gc-hs-combine-modal-title">
     <header class="gc-net-zone-combine-modal__header">
       <h2 id="gc-hs-combine-modal-title" class="gc-net-zone-combine-modal__title">Fields by firewall</h2>
-      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-hs-combine-modal-close" aria-label="Close" title="Close">
+      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-hs-combine-modal-close" aria-label="Close"
+        title="Close">
         ×
       </button>
     </header>
@@ -187,529 +213,530 @@
 </script>
 <script>
   (function () {
-    var API_BASE = {{ url_api_hosts_services_table | tojson }};
+    var API_BASE = {{ url_api_hosts_services_table | tojson
+  }};
 
-    var TAB_DEFS = [
-      { key: "ip_host", prefix: "gc-hs-ip-host", aria: "IP host", countS: "IP host", countP: "IP hosts" },
-      { key: "ip_hostgroup", prefix: "gc-hs-ip-hostgroup", aria: "IP host group", countS: "IP host group", countP: "IP host groups" },
-      { key: "mac_host", prefix: "gc-hs-mac-host", aria: "MAC host", countS: "MAC host", countP: "MAC hosts" },
-      { key: "fqdn_host", prefix: "gc-hs-fqdn-host", aria: "FQDN host", countS: "FQDN host", countP: "FQDN hosts" },
-      { key: "fqdn_hostgroup", prefix: "gc-hs-fqdn-hostgroup", aria: "FQDN host group", countS: "FQDN host group", countP: "FQDN host groups" },
-      { key: "country_group", prefix: "gc-hs-country-group", aria: "Country group", countS: "country group", countP: "country groups" },
-      { key: "service", prefix: "gc-hs-service", aria: "service", countS: "service", countP: "services" },
-      { key: "service_group", prefix: "gc-hs-service-group", aria: "service group", countS: "service group", countP: "service groups" },
-    ];
+  var TAB_DEFS = [
+    { key: "ip_host", prefix: "gc-hs-ip-host", aria: "IP host", countS: "IP host", countP: "IP hosts" },
+    { key: "ip_hostgroup", prefix: "gc-hs-ip-hostgroup", aria: "IP host group", countS: "IP host group", countP: "IP host groups" },
+    { key: "mac_host", prefix: "gc-hs-mac-host", aria: "MAC host", countS: "MAC host", countP: "MAC hosts" },
+    { key: "fqdn_host", prefix: "gc-hs-fqdn-host", aria: "FQDN host", countS: "FQDN host", countP: "FQDN hosts" },
+    { key: "fqdn_hostgroup", prefix: "gc-hs-fqdn-hostgroup", aria: "FQDN host group", countS: "FQDN host group", countP: "FQDN host groups" },
+    { key: "country_group", prefix: "gc-hs-country-group", aria: "Country group", countS: "country group", countP: "country groups" },
+    { key: "service", prefix: "gc-hs-service", aria: "service", countS: "service", countP: "services" },
+    { key: "service_group", prefix: "gc-hs-service-group", aria: "service group", countS: "service group", countP: "service groups" },
+  ];
 
-    var FILTER_IDS = TAB_DEFS.map(function (t) {
-      return t.prefix + "-filters-aside";
-    });
+  var FILTER_IDS = TAB_DEFS.map(function (t) {
+    return t.prefix + "-filters-aside";
+  });
 
-    var HS_TAB_LS = "ground-control-hosts-services-main-tab";
+  var HS_TAB_LS = "ground-control-hosts-services-main-tab";
 
-    function readSavedTab() {
-      try {
-        var raw = localStorage.getItem(HS_TAB_LS);
-        if (raw && TAB_DEFS.some(function (t) { return t.key === raw; })) return raw;
-      } catch (e) {}
-      return "ip_host";
-    }
+  function readSavedTab() {
+    try {
+      var raw = localStorage.getItem(HS_TAB_LS);
+      if (raw && TAB_DEFS.some(function (t) { return t.key === raw; })) return raw;
+    } catch (e) { }
+    return "ip_host";
+  }
 
-    var activeKey = readSavedTab();
+  var activeKey = readSavedTab();
 
-    var mainTablist = document.getElementById("gc-hs-main-tablist");
-    var mainTabs = mainTablist
-      ? mainTablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-hs-tab]")
-      : [];
+  var mainTablist = document.getElementById("gc-hs-main-tablist");
+  var mainTabs = mainTablist
+    ? mainTablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-hs-tab]")
+    : [];
 
-    var mainPanels = {};
+  var mainPanels = {};
+  TAB_DEFS.forEach(function (t) {
+    var slug = t.key.replace(/_/g, "-");
+    mainPanels[t.key] = document.getElementById("gc-hs-panel-" + slug);
+  });
+
+  function syncFilterAsidesVisibility() {
     TAB_DEFS.forEach(function (t) {
-      var slug = t.key.replace(/_/g, "-");
-      mainPanels[t.key] = document.getElementById("gc-hs-panel-" + slug);
+      var id = t.prefix + "-filters-aside";
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.hidden = t.key !== activeKey;
     });
+  }
 
-    function syncFilterAsidesVisibility() {
-      TAB_DEFS.forEach(function (t) {
-        var id = t.prefix + "-filters-aside";
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.hidden = t.key !== activeKey;
-      });
+  function applyMainTabPanels() {
+    TAB_DEFS.forEach(function (t) {
+      var p = mainPanels[t.key];
+      if (!p) return;
+      var show = t.key === activeKey;
+      p.classList.toggle("is-active", show);
+      p.hidden = !show;
+    });
+  }
+
+  function syncMainTabButtons() {
+    mainTabs.forEach(function (btn) {
+      var tid = btn.getAttribute("data-gc-hs-tab");
+      var on = tid === activeKey;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  var tables = {};
+  var lastHsPayloadByKey = {};
+
+  var hsCombineModal = document.getElementById("gc-hs-combine-modal");
+  var hsCombineModalBody = document.getElementById("gc-hs-combine-modal-body");
+  var hsCombineModalClose = document.getElementById("gc-hs-combine-modal-close");
+  var hsCombineModalDone = document.getElementById("gc-hs-combine-modal-done");
+  var hsCombineModalBackdrop = hsCombineModal
+    ? hsCombineModal.querySelector(".gc-net-zone-combine-modal__backdrop")
+    : null;
+
+  function hsCombineStorageKey(entityKey) {
+    return "ground-control-hs-combine-v1:" + entityKey;
+  }
+
+  function updateHsCombineChrome(entityKey, prefix, data) {
+    var wrap = document.getElementById(prefix + "-combine-wrap");
+    var inp = document.getElementById(prefix + "-combine");
+    if (!wrap || !inp) return;
+    var conflicts = !!(data && (data.hs_combine_conflicts || data.ip_hosts_combine_conflicts));
+    var flat = !!(data && (data.hs_combined === false || data.ip_hosts_combined === false));
+    wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
+  }
+
+  function escModalHs(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function boolTriModalHs(raw) {
+    var t = String(raw == null ? "" : raw)
+      .trim()
+      .toLowerCase();
+    if (t === "") return null;
+    if (
+      t === "1" ||
+      t === "true" ||
+      t === "yes" ||
+      t === "on" ||
+      t === "enabled" ||
+      t === "enable"
+    ) {
+      return true;
     }
-
-    function applyMainTabPanels() {
-      TAB_DEFS.forEach(function (t) {
-        var p = mainPanels[t.key];
-        if (!p) return;
-        var show = t.key === activeKey;
-        p.classList.toggle("is-active", show);
-        p.hidden = !show;
-      });
+    if (
+      t === "0" ||
+      t === "false" ||
+      t === "no" ||
+      t === "off" ||
+      t === "disabled" ||
+      t === "disable"
+    ) {
+      return false;
     }
+    return null;
+  }
 
-    function syncMainTabButtons() {
-      mainTabs.forEach(function (btn) {
-        var tid = btn.getAttribute("data-gc-hs-tab");
-        var on = tid === activeKey;
-        btn.classList.toggle("is-active", on);
-        btn.setAttribute("aria-selected", on ? "true" : "false");
-      });
-    }
+  function modalToggleHtmlHs(on) {
+    var state = on ? "on" : "off";
+    var lab = on ? "On" : "Off";
+    return (
+      '<span class="gc-table-toggle gc-table-toggle--static gc-table-toggle--' +
+      state +
+      '" role="img" aria-label="' +
+      lab +
+      '"><span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span></span>'
+    );
+  }
 
-    var tables = {};
-    var lastHsPayloadByKey = {};
-
-    var hsCombineModal = document.getElementById("gc-hs-combine-modal");
-    var hsCombineModalBody = document.getElementById("gc-hs-combine-modal-body");
-    var hsCombineModalClose = document.getElementById("gc-hs-combine-modal-close");
-    var hsCombineModalDone = document.getElementById("gc-hs-combine-modal-done");
-    var hsCombineModalBackdrop = hsCombineModal
-      ? hsCombineModal.querySelector(".gc-net-zone-combine-modal__backdrop")
-      : null;
-
-    function hsCombineStorageKey(entityKey) {
-      return "ground-control-hs-combine-v1:" + entityKey;
-    }
-
-    function updateHsCombineChrome(entityKey, prefix, data) {
-      var wrap = document.getElementById(prefix + "-combine-wrap");
-      var inp = document.getElementById(prefix + "-combine");
-      if (!wrap || !inp) return;
-      var conflicts = !!(data && (data.hs_combine_conflicts || data.ip_hosts_combine_conflicts));
-      var flat = !!(data && (data.hs_combined === false || data.ip_hosts_combined === false));
-      wrap.classList.toggle("gc-toolbar-combine--warning", conflicts && !flat && inp.checked);
-    }
-
-    function escModalHs(s) {
-      return String(s == null ? "" : s)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
-
-    function boolTriModalHs(raw) {
-      var t = String(raw == null ? "" : raw)
-        .trim()
-        .toLowerCase();
-      if (t === "") return null;
-      if (
-        t === "1" ||
-        t === "true" ||
-        t === "yes" ||
-        t === "on" ||
-        t === "enabled" ||
-        t === "enable"
-      ) {
-        return true;
-      }
-      if (
-        t === "0" ||
-        t === "false" ||
-        t === "no" ||
-        t === "off" ||
-        t === "disabled" ||
-        t === "disable"
-      ) {
-        return false;
-      }
-      return null;
-    }
-
-    function modalToggleHtmlHs(on) {
-      var state = on ? "on" : "off";
-      var lab = on ? "On" : "Off";
-      return (
-        '<span class="gc-table-toggle gc-table-toggle--static gc-table-toggle--' +
-        state +
-        '" role="img" aria-label="' +
-        lab +
-        '"><span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span></span>'
-      );
-    }
-
-    function modalValueCellHs(val) {
-      var tri = boolTriModalHs(val);
-      if (tri !== null) return modalToggleHtmlHs(tri);
-      var s0 = String(val == null ? "" : val);
-      if (s0.indexOf("\x1E") !== -1) {
-        var parts = s0
-          .split("\x1E")
-          .map(function (x) {
-            return String(x || "").trim();
-          })
-          .filter(function (x) {
-            return x.length > 0;
-          });
-        if (!parts.length) return modalToggleHtmlHs(false);
-        return (
-          '<span class="gc-net-zone-modal__pills">' +
-          parts
-            .map(function (p) {
-              var hue = zoneHueModalHs(p);
-              return (
-                '<span class="gc-zone-pill" style="--gc-zone-h:' +
-                hue +
-                '">' +
-                escModalHs(p) +
-                "</span>"
-              );
-            })
-            .join("") +
-          "</span>"
-        );
-      }
-      var s = s0.trim();
-      if (s === "") return modalToggleHtmlHs(false);
-      return '<span class="gc-net-zone-modal__scalar">' + escModalHs(s) + "</span>";
-    }
-
-    function zoneHueModalHs(name) {
-      var h = 0;
-      var s = String(name || "");
-      for (var i = 0; i < s.length; i++) {
-        h = (h * 31 + s.charCodeAt(i)) >>> 0;
-      }
-      return h % 360;
-    }
-
-    function fwPillModalHs(name) {
-      var hue = zoneHueModalHs(name);
-      return (
-        '<span class="gc-zone-pill" style="--gc-zone-h:' + hue + '">' + escModalHs(name) + "</span>"
-      );
-    }
-
-    function buildHsCombineModalHtml(data) {
-      var labels = (data && data.column_labels) || {};
-      var rows = (data && data.rows) || [];
-      var conflictRows = rows.filter(function (r) {
-        if (!r) return false;
-        var pf = r.hs_combine_per_field || r.ip_host_combine_per_field;
-        var c = r.hs_combine_conflict || r.ip_host_combine_conflict;
-        return c && pf;
-      });
-      if (!conflictRows.length) {
-        return '<p class="muted">No differing field values for this selection.</p>';
-      }
-      return conflictRows
-        .map(function (row) {
-          var hname = (row.cells && row.cells["__name"]) || "";
-          var pf = row.hs_combine_per_field || row.ip_host_combine_per_field || {};
-          var colKeys = Object.keys(pf).sort();
-          var parts =
-            '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
-            escModalHs(hname) +
-            "</h3>";
-          colKeys.forEach(function (colKey) {
-            var lbl = labels[colKey] || colKey;
-            parts +=
-              '<h4 class="gc-net-zone-modal__col">' + escModalHs(lbl).replace(/\n/g, "<br />") + "</h4>";
-            parts += '<ul class="gc-net-zone-modal__fw-list">';
-            var per = pf[colKey];
-            Object.keys(per)
-              .sort()
-              .forEach(function (fw) {
-                parts +=
-                  '<li class="gc-net-zone-modal__fw-row">' +
-                  fwPillModalHs(fw) +
-                  '<span class="gc-net-zone-modal__fw-val">' +
-                  modalValueCellHs(per[fw]) +
-                  "</span></li>";
-              });
-            parts += "</ul>";
-          });
-          parts += "</section>";
-          return parts;
+  function modalValueCellHs(val) {
+    var tri = boolTriModalHs(val);
+    if (tri !== null) return modalToggleHtmlHs(tri);
+    var s0 = String(val == null ? "" : val);
+    if (s0.indexOf("\x1E") !== -1) {
+      var parts = s0
+        .split("\x1E")
+        .map(function (x) {
+          return String(x || "").trim();
         })
-        .join("");
+        .filter(function (x) {
+          return x.length > 0;
+        });
+      if (!parts.length) return modalToggleHtmlHs(false);
+      return (
+        '<span class="gc-net-zone-modal__pills">' +
+        parts
+          .map(function (p) {
+            var hue = zoneHueModalHs(p);
+            return (
+              '<span class="gc-zone-pill" style="--gc-zone-h:' +
+              hue +
+              '">' +
+              escModalHs(p) +
+              "</span>"
+            );
+          })
+          .join("") +
+        "</span>"
+      );
     }
+    var s = s0.trim();
+    if (s === "") return modalToggleHtmlHs(false);
+    return '<span class="gc-net-zone-modal__scalar">' + escModalHs(s) + "</span>";
+  }
 
-    function closeHsCombineModal() {
-      if (!hsCombineModal) return;
-      hsCombineModal.hidden = true;
-      hsCombineModal.setAttribute("aria-hidden", "true");
-      document.body.style.overflow = "";
+  function zoneHueModalHs(name) {
+    var h = 0;
+    var s = String(name || "");
+    for (var i = 0; i < s.length; i++) {
+      h = (h * 31 + s.charCodeAt(i)) >>> 0;
     }
+    return h % 360;
+  }
 
-    function openHsCombineModalForKey(entityKey) {
-      var data = lastHsPayloadByKey[entityKey];
-      if (!data || !hsCombineModalBody || !hsCombineModal) return;
-      hsCombineModalBody.innerHTML = buildHsCombineModalHtml(data);
-      hsCombineModal.hidden = false;
-      hsCombineModal.setAttribute("aria-hidden", "false");
-      document.body.style.overflow = "hidden";
-      if (hsCombineModalClose) hsCombineModalClose.focus();
-    }
+  function fwPillModalHs(name) {
+    var hue = zoneHueModalHs(name);
+    return (
+      '<span class="gc-zone-pill" style="--gc-zone-h:' + hue + '">' + escModalHs(name) + "</span>"
+    );
+  }
 
-    function onHsCombineModalKeydown(e) {
-      if (!hsCombineModal || hsCombineModal.hidden) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        closeHsCombineModal();
-      }
-    }
-
-    function initCombineToggleFromStorage(entityKey, prefix) {
-      var inp = document.getElementById(prefix + "-combine");
-      if (!inp) return;
-      try {
-        var v = localStorage.getItem(hsCombineStorageKey(entityKey));
-        if (v === "0") inp.checked = false;
-        else if (v === "1") inp.checked = true;
-      } catch (e) {}
-    }
-
-    TAB_DEFS.forEach(function (t) {
-      initCombineToggleFromStorage(t.key, t.prefix);
+  function buildHsCombineModalHtml(data) {
+    var labels = (data && data.column_labels) || {};
+    var rows = (data && data.rows) || [];
+    var conflictRows = rows.filter(function (r) {
+      if (!r) return false;
+      var pf = r.hs_combine_per_field || r.ip_host_combine_per_field;
+      var c = r.hs_combine_conflict || r.ip_host_combine_conflict;
+      return c && pf;
     });
-
-    document.addEventListener("keydown", onHsCombineModalKeydown);
-
-    function refreshAllHsTables() {
-      TAB_DEFS.forEach(function (t) {
-        if (tables[t.key]) tables[t.key].refresh();
-      });
+    if (!conflictRows.length) {
+      return '<p class="muted">No differing field values for this selection.</p>';
     }
-
-    document.addEventListener("gc-firewall-selection-changed", function () {
-      refreshAllHsTables();
-    });
-    document.addEventListener("gc-configuration-exclusive-view-changed", function () {
-      refreshAllHsTables();
-    });
-
-    function hostsServicesCacheSyncSelectionHits(ids) {
-      if (!ids || !ids.length) return false;
-      var sel =
-        typeof window.gcGetSelectedFirewallIds === "function"
-          ? window.gcGetSelectedFirewallIds()
-          : [];
-      if (!sel || !sel.length) return false;
-      var set = {};
-      sel.forEach(function (id) {
-        set[Number(id)] = true;
-      });
-      return ids.some(function (id) {
-        return set[id];
-      });
-    }
-
-    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
-      window.gcRegisterConfigCacheTableRefresher(function (ids) {
-        if (!hostsServicesCacheSyncSelectionHits(ids)) return;
-        refreshAllHsTables();
-      });
-    }
-
-    TAB_DEFS.forEach(function (t) {
-      var tcfg = {
-        prefix: t.prefix,
-        apiUrl: API_BASE,
-        emptySelectionMessage:
-          "Select one or more firewalls or configurations in the top bar.",
-        apiEntityType: t.key,
-        lsKey: "ground-control-hs-cols-" + t.key + "-v1",
-        dataRowClass: t.prefix + "-data-row",
-        colPickerAttr: "data-gc-hs-col-" + t.key.replace(/_/g, "-"),
-        rowClickable: true,
-        rowAriaEntitySingular: t.aria,
-        bulkRowSelect: true,
-        combineQuery: { param: "combine" },
-        combineSyncSelected: {
-          strategy: "auto_hs",
-          hsCreatesBatchUrl: window.gcHsEnqueueCreatesBatchUrl,
-          ipHostCreateBatchUrl: window.gcHsIpHostEnqueueCreateBatchUrl,
-        },
-        onRowClick: function (tr) {
-          if (window.gcHsFlyoutOpenFromTr) window.gcHsFlyoutOpenFromTr(tr);
-        },
-        labels: {
-          countSingular: t.countS,
-          countPlural: t.countP,
-          emptyCache:
-            "No " +
-            t.countP +
-            " in the cache for the selected firewalls. Enable the matching type under Inventory → Edit firewall → Sync from firewall, then run sync.",
-          emptyFilter: "No " + t.countP + " match the current search or filters.",
-          loadError: "Could not load " + t.countP + ".",
-        },
-        afterRenderFromApi: function (data) {
-          lastHsPayloadByKey[t.key] = data;
-          updateHsCombineChrome(t.key, t.prefix, data);
-        },
-      };
-      if (t.key === "ip_host") {
-        tcfg.ipHostTable = {
-          excludeSystemStorageKey: "ground-control-hs-ip-host-exclude-system-v1",
-          excludeSystemDefault: true,
-          bulkRowSelect: true,
-        };
-      }
-      tables[t.key] = gcCreateNetworkEntityTable(tcfg);
-    });
-
-    TAB_DEFS.forEach(function (t) {
-      var inp = document.getElementById(t.prefix + "-combine");
-      if (!inp) return;
-      inp.addEventListener("change", function () {
-        try {
-          localStorage.setItem(hsCombineStorageKey(t.key), inp.checked ? "1" : "0");
-        } catch (e) {}
-        if (tables[t.key]) tables[t.key].refresh();
-      });
-      inp.addEventListener("pointerdown", function (e) {
-        var d = lastHsPayloadByKey[t.key];
-        var conflicts = !!(d && (d.hs_combine_conflicts || d.ip_hosts_combine_conflicts));
-        if (!d || !conflicts || !inp.checked) return;
-        if (e.shiftKey) return;
-        var pt = e.pointerType;
-        if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
-        if (pt === "mouse" && e.button !== 0) return;
-        e.preventDefault();
-        openHsCombineModalForKey(t.key);
-      });
-    });
-
-    if (hsCombineModalClose) hsCombineModalClose.addEventListener("click", closeHsCombineModal);
-    if (hsCombineModalDone) hsCombineModalDone.addEventListener("click", closeHsCombineModal);
-    if (hsCombineModalBackdrop) hsCombineModalBackdrop.addEventListener("click", closeHsCombineModal);
-
-    mainTabs.forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        var id = tab.getAttribute("data-gc-hs-tab");
-        activeKey = id;
-        syncMainTabButtons();
-        applyMainTabPanels();
-        syncFilterAsidesVisibility();
-        try {
-          localStorage.setItem(HS_TAB_LS, id);
-        } catch (e) {}
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () {
-            TAB_DEFS.forEach(function (t) {
-              var tbl = tables[t.key];
-              if (tbl && tbl.compactZoneFirewallCells) tbl.compactZoneFirewallCells();
+    return conflictRows
+      .map(function (row) {
+        var hname = (row.cells && row.cells["__name"]) || "";
+        var pf = row.hs_combine_per_field || row.ip_host_combine_per_field || {};
+        var colKeys = Object.keys(pf).sort();
+        var parts =
+          '<section class="gc-net-zone-modal__zone"><h3 class="gc-net-zone-modal__zn">' +
+          escModalHs(hname) +
+          "</h3>";
+        colKeys.forEach(function (colKey) {
+          var lbl = labels[colKey] || colKey;
+          parts +=
+            '<h4 class="gc-net-zone-modal__col">' + escModalHs(lbl).replace(/\n/g, "<br />") + "</h4>";
+          parts += '<ul class="gc-net-zone-modal__fw-list">';
+          var per = pf[colKey];
+          Object.keys(per)
+            .sort()
+            .forEach(function (fw) {
+              parts +=
+                '<li class="gc-net-zone-modal__fw-row">' +
+                fwPillModalHs(fw) +
+                '<span class="gc-net-zone-modal__fw-val">' +
+                modalValueCellHs(per[fw]) +
+                "</span></li>";
             });
+          parts += "</ul>";
+        });
+        parts += "</section>";
+        return parts;
+      })
+      .join("");
+  }
+
+  function closeHsCombineModal() {
+    if (!hsCombineModal) return;
+    hsCombineModal.hidden = true;
+    hsCombineModal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  function openHsCombineModalForKey(entityKey) {
+    var data = lastHsPayloadByKey[entityKey];
+    if (!data || !hsCombineModalBody || !hsCombineModal) return;
+    hsCombineModalBody.innerHTML = buildHsCombineModalHtml(data);
+    hsCombineModal.hidden = false;
+    hsCombineModal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    if (hsCombineModalClose) hsCombineModalClose.focus();
+  }
+
+  function onHsCombineModalKeydown(e) {
+    if (!hsCombineModal || hsCombineModal.hidden) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeHsCombineModal();
+    }
+  }
+
+  function initCombineToggleFromStorage(entityKey, prefix) {
+    var inp = document.getElementById(prefix + "-combine");
+    if (!inp) return;
+    try {
+      var v = localStorage.getItem(hsCombineStorageKey(entityKey));
+      if (v === "0") inp.checked = false;
+      else if (v === "1") inp.checked = true;
+    } catch (e) { }
+  }
+
+  TAB_DEFS.forEach(function (t) {
+    initCombineToggleFromStorage(t.key, t.prefix);
+  });
+
+  document.addEventListener("keydown", onHsCombineModalKeydown);
+
+  function refreshAllHsTables() {
+    TAB_DEFS.forEach(function (t) {
+      if (tables[t.key]) tables[t.key].refresh();
+    });
+  }
+
+  document.addEventListener("gc-firewall-selection-changed", function () {
+    refreshAllHsTables();
+  });
+  document.addEventListener("gc-configuration-exclusive-view-changed", function () {
+    refreshAllHsTables();
+  });
+
+  function hostsServicesCacheSyncSelectionHits(ids) {
+    if (!ids || !ids.length) return false;
+    var sel =
+      typeof window.gcGetSelectedFirewallIds === "function"
+        ? window.gcGetSelectedFirewallIds()
+        : [];
+    if (!sel || !sel.length) return false;
+    var set = {};
+    sel.forEach(function (id) {
+      set[Number(id)] = true;
+    });
+    return ids.some(function (id) {
+      return set[id];
+    });
+  }
+
+  if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
+    window.gcRegisterConfigCacheTableRefresher(function (ids) {
+      if (!hostsServicesCacheSyncSelectionHits(ids)) return;
+      refreshAllHsTables();
+    });
+  }
+
+  TAB_DEFS.forEach(function (t) {
+    var tcfg = {
+      prefix: t.prefix,
+      apiUrl: API_BASE,
+      emptySelectionMessage:
+        "Select one or more firewalls or configurations in the top bar.",
+      apiEntityType: t.key,
+      lsKey: "ground-control-hs-cols-" + t.key + "-v1",
+      dataRowClass: t.prefix + "-data-row",
+      colPickerAttr: "data-gc-hs-col-" + t.key.replace(/_/g, "-"),
+      rowClickable: true,
+      rowAriaEntitySingular: t.aria,
+      bulkRowSelect: true,
+      combineQuery: { param: "combine" },
+      combineSyncSelected: {
+        strategy: "auto_hs",
+        hsCreatesBatchUrl: window.gcHsEnqueueCreatesBatchUrl,
+        ipHostCreateBatchUrl: window.gcHsIpHostEnqueueCreateBatchUrl,
+      },
+      onRowClick: function (tr) {
+        if (window.gcHsFlyoutOpenFromTr) window.gcHsFlyoutOpenFromTr(tr);
+      },
+      labels: {
+        countSingular: t.countS,
+        countPlural: t.countP,
+        emptyCache:
+          "No " +
+          t.countP +
+          " in the cache for the selected firewalls. Enable the matching type under Inventory → Edit firewall → Sync from firewall, then run sync.",
+        emptyFilter: "No " + t.countP + " match the current search or filters.",
+        loadError: "Could not load " + t.countP + ".",
+      },
+      afterRenderFromApi: function (data) {
+        lastHsPayloadByKey[t.key] = data;
+        updateHsCombineChrome(t.key, t.prefix, data);
+      },
+    };
+    if (t.key === "ip_host") {
+      tcfg.ipHostTable = {
+        excludeSystemStorageKey: "ground-control-hs-ip-host-exclude-system-v1",
+        excludeSystemDefault: true,
+        bulkRowSelect: true,
+      };
+    }
+    tables[t.key] = gcCreateNetworkEntityTable(tcfg);
+  });
+
+  TAB_DEFS.forEach(function (t) {
+    var inp = document.getElementById(t.prefix + "-combine");
+    if (!inp) return;
+    inp.addEventListener("change", function () {
+      try {
+        localStorage.setItem(hsCombineStorageKey(t.key), inp.checked ? "1" : "0");
+      } catch (e) { }
+      if (tables[t.key]) tables[t.key].refresh();
+    });
+    inp.addEventListener("pointerdown", function (e) {
+      var d = lastHsPayloadByKey[t.key];
+      var conflicts = !!(d && (d.hs_combine_conflicts || d.ip_hosts_combine_conflicts));
+      if (!d || !conflicts || !inp.checked) return;
+      if (e.shiftKey) return;
+      var pt = e.pointerType;
+      if (pt !== "mouse" && pt !== "pen" && pt !== "touch") return;
+      if (pt === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+      openHsCombineModalForKey(t.key);
+    });
+  });
+
+  if (hsCombineModalClose) hsCombineModalClose.addEventListener("click", closeHsCombineModal);
+  if (hsCombineModalDone) hsCombineModalDone.addEventListener("click", closeHsCombineModal);
+  if (hsCombineModalBackdrop) hsCombineModalBackdrop.addEventListener("click", closeHsCombineModal);
+
+  mainTabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      var id = tab.getAttribute("data-gc-hs-tab");
+      activeKey = id;
+      syncMainTabButtons();
+      applyMainTabPanels();
+      syncFilterAsidesVisibility();
+      try {
+        localStorage.setItem(HS_TAB_LS, id);
+      } catch (e) { }
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          TAB_DEFS.forEach(function (t) {
+            var tbl = tables[t.key];
+            if (tbl && tbl.compactZoneFirewallCells) tbl.compactZoneFirewallCells();
           });
         });
       });
     });
+  });
 
-    if (window.gcHsFlyoutInit) window.gcHsFlyoutInit();
+  if (window.gcHsFlyoutInit) window.gcHsFlyoutInit();
 
-    function gcHsSelectedFirewallIdsFromCheckboxes() {
-      var ids = [];
-      document.querySelectorAll(".gc-net-fw-cb--fw:checked").forEach(function (cb) {
-        var raw = String(cb.value || "");
-        var v =
-          raw.indexOf("f:") === 0 ? parseInt(raw.slice(2), 10) : parseInt(raw, 10);
-        if (!isNaN(v) && v > 0) ids.push(v);
-      });
-      return ids;
-    }
+  function gcHsSelectedFirewallIdsFromCheckboxes() {
+    var ids = [];
+    document.querySelectorAll(".gc-net-fw-cb--fw:checked").forEach(function (cb) {
+      var raw = String(cb.value || "");
+      var v =
+        raw.indexOf("f:") === 0 ? parseInt(raw.slice(2), 10) : parseInt(raw, 10);
+      if (!isNaN(v) && v > 0) ids.push(v);
+    });
+    return ids;
+  }
 
-    function gcHsTopBarFirewallIds() {
-      return window.gcGetSelectedFirewallIds && typeof window.gcGetSelectedFirewallIds === "function"
-        ? window.gcGetSelectedFirewallIds()
-        : gcHsSelectedFirewallIdsFromCheckboxes();
-    }
-    window.gcHsTopBarFirewallIds = gcHsTopBarFirewallIds;
+  function gcHsTopBarFirewallIds() {
+    return window.gcGetSelectedFirewallIds && typeof window.gcGetSelectedFirewallIds === "function"
+      ? window.gcGetSelectedFirewallIds()
+      : gcHsSelectedFirewallIdsFromCheckboxes();
+  }
+  window.gcHsTopBarFirewallIds = gcHsTopBarFirewallIds;
 
-    function syncAllHsAddButtons() {
-      var ids = gcHsTopBarFirewallIds();
-      var ok = ids.length >= 1;
-      TAB_DEFS.forEach(function (t) {
-        var btn = document.getElementById(t.prefix + "-add");
-        if (!btn) return;
-        btn.disabled = !ok;
-        btn.title = ok ? "Add (configure in flyout)" : "Select one or more firewalls in the top bar";
-      });
-    }
-
+  function syncAllHsAddButtons() {
+    var ids = gcHsTopBarFirewallIds();
+    var ok = ids.length >= 1;
     TAB_DEFS.forEach(function (t) {
       var btn = document.getElementById(t.prefix + "-add");
       if (!btn) return;
-      btn.addEventListener("click", function () {
-        if (gcHsTopBarFirewallIds().length < 1) return;
-        if (window.gcHsFlyoutInit) window.gcHsFlyoutInit();
-        if (window.gcHsFlyoutOpenAddForEntity) window.gcHsFlyoutOpenAddForEntity(t.key);
-        else if (t.key === "ip_host" && window.gcHsFlyoutOpenAddIpHost) window.gcHsFlyoutOpenAddIpHost();
-      });
+      btn.disabled = !ok;
+      btn.title = ok ? "Add (configure in flyout)" : "Select one or more firewalls in the top bar";
     });
-    document.addEventListener("gc-firewall-selection-changed", syncAllHsAddButtons);
-    syncAllHsAddButtons();
+  }
 
-    function bindHsDeleteSelected(btnId, tableKey, labelPlural) {
-      var btn = document.getElementById(btnId);
-      if (!btn) return;
-      btn.addEventListener("click", function () {
-        var tbl = tables[tableKey];
-        if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
-        var ids = tbl.getDeleteConfigEntryIdsFromSelection();
-        if (!ids.length) {
-          alert("Select one or more rows to delete.");
-          return;
-        }
-        var n = ids.length;
-        var msg =
-          "Queue " +
-          n +
-          " delete task" +
-          (n === 1 ? "" : "s") +
-          " for the selected " +
-          labelPlural +
-          "? This uses the task queue.";
-        if (!window.confirm(msg)) return;
-        var url =
-          typeof window.gcHsEnqueueDeletesBatchUrl === "string"
-            ? window.gcHsEnqueueDeletesBatchUrl
-            : "";
-        if (!url) {
-          alert("Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(url, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
-            });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em =
-                (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
-              alert(typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            if (typeof window.gcHsDispatchAfterDeleteBatch === "function") {
-              window.gcHsDispatchAfterDeleteBatch();
-            } else {
-              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-            }
-            if (tbl.refresh) tbl.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            alert("Network error.");
+  TAB_DEFS.forEach(function (t) {
+    var btn = document.getElementById(t.prefix + "-add");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      if (gcHsTopBarFirewallIds().length < 1) return;
+      if (window.gcHsFlyoutInit) window.gcHsFlyoutInit();
+      if (window.gcHsFlyoutOpenAddForEntity) window.gcHsFlyoutOpenAddForEntity(t.key);
+      else if (t.key === "ip_host" && window.gcHsFlyoutOpenAddIpHost) window.gcHsFlyoutOpenAddIpHost();
+    });
+  });
+  document.addEventListener("gc-firewall-selection-changed", syncAllHsAddButtons);
+  syncAllHsAddButtons();
+
+  function bindHsDeleteSelected(btnId, tableKey, labelPlural) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var tbl = tables[tableKey];
+      if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
+      var ids = tbl.getDeleteConfigEntryIdsFromSelection();
+      if (!ids.length) {
+        alert("Select one or more rows to delete.");
+        return;
+      }
+      var n = ids.length;
+      var msg =
+        "Queue " +
+        n +
+        " delete task" +
+        (n === 1 ? "" : "s") +
+        " for the selected " +
+        labelPlural +
+        "? This uses the task queue.";
+      if (!window.confirm(msg)) return;
+      var url =
+        typeof window.gcHsEnqueueDeletesBatchUrl === "string"
+          ? window.gcHsEnqueueDeletesBatchUrl
+          : "";
+      if (!url) {
+        alert("Delete batch URL is not configured.");
+        return;
+      }
+      btn.disabled = true;
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config_entry_ids: ids }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, j: j };
           });
-      });
-    }
-
-    TAB_DEFS.forEach(function (t) {
-      bindHsDeleteSelected(t.prefix + "-delete-selected", t.key, t.countP);
+        })
+        .then(function (x) {
+          btn.disabled = false;
+          if (!x.ok) {
+            var em =
+              (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
+            alert(typeof em === "string" ? em : JSON.stringify(em));
+            return;
+          }
+          if (typeof window.gcHsDispatchAfterDeleteBatch === "function") {
+            window.gcHsDispatchAfterDeleteBatch();
+          } else {
+            document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+          }
+          if (tbl.refresh) tbl.refresh();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          alert("Network error.");
+        });
     });
+  }
 
-    syncMainTabButtons();
-    applyMainTabPanels();
-    syncFilterAsidesVisibility();
-    refreshAllHsTables();
-  })();
+  TAB_DEFS.forEach(function (t) {
+    bindHsDeleteSelected(t.prefix + "-delete-selected", t.key, t.countP);
+  });
+
+  syncMainTabButtons();
+  applyMainTabPanels();
+  syncFilterAsidesVisibility();
+  refreshAllHsTables();
+  }) ();
 </script>
 {% endblock %}

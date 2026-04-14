@@ -23,10 +23,14 @@ script = repo_root / "scripts" / "gc_tray_wrapper.py"
 if not script.is_file():
     raise SystemExit(f"Launcher script not found: {script}")
 
+# Tray / window icon at runtime: prefer web favicon (same pixels as browser tab).
+_favicon_ico = repo_root / "static" / "favicon.ico"
 _brand_ico = repo_root / "assets" / "ground_control_launcher.ico"
 
 datas = collect_data_files("sv_ttk")
-if _brand_ico.is_file():
+if _favicon_ico.is_file():
+    datas.append((str(_favicon_ico), "static"))
+elif _brand_ico.is_file():
     datas.append((str(_brand_ico), "assets"))
 mpl = collect_all("matplotlib")
 datas += mpl[0]
@@ -73,7 +77,12 @@ _console = (os.environ.get("GROUND_CONTROL_LAUNCHER_CONSOLE") or "").strip().low
     "yes",
 )
 
-_exe_icon = str(_brand_ico) if _brand_ico.is_file() and sys.platform == "win32" else None
+_exe_icon = None
+if sys.platform == "win32":
+    if _favicon_ico.is_file():
+        _exe_icon = str(_favicon_ico)
+    elif _brand_ico.is_file():
+        _exe_icon = str(_brand_ico)
 
 exe = EXE(
     pyz,

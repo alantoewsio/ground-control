@@ -1,0 +1,274 @@
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{# Firewalls v2 object nav data table (generated from designer_tables fragment) #}
+<div class="gc-fw-v2-object-table-shell gc-designer" data-gc-fw-v2-object-table="1">
+  <section class="gc-network-panel gc-designer__section" aria-labelledby="gc-fw-v2-obj-preview-h">
+    <h2 id="gc-fw-v2-obj-preview-h" class="gc-designer__h2 gc-sr-only">Preview</h2>
+    {# Design mode + data-table pencil: Designer and SuperAdmin (incl. legacy "Super Admin"). #}
+    {% set _r = (auth_client_state.user.role | default("") | trim | lower) %}
+    {% if _r in ["designer", "superadmin", "super admin"] %}
+    <span id="gc-fw-v2-obj-design-mode-marker" hidden data-gc-designer-design-mode-eligible="1"></span>
+    {% endif %}
+    <div class="gc-designer-data-table" data-gc-designer-control-id="data-table">
+      <div class="split gc-network-split">
+        <div class="gc-net-filters-column">{{ net_filters_aside("gc-fw-v2-obj", false) }}</div>
+        <div class="content-pane gc-network-panel__content">
+          {{
+          net_entity_table_wrap(
+          "gc-fw-v2-obj",
+          "Preview table",
+          "Search rows",
+          show_combine=true,
+          show_combine_sync_selected=false,
+          combine_title="Merge rows that share the same identity across selected firewalls or configurations (Hosts &
+          Services object types). When field values differ, the switch turns yellow — click to compare scopes, or
+          Shift+click to show one row per scope without opening the dialog.",
+          primary_btn_id="gc-fw-v2-obj-add",
+          primary_btn_label="Add",
+          secondary_btn_id="gc-fw-v2-obj-delete-selected",
+          secondary_btn_label="Delete",
+          primary_btn_hidden=false,
+          secondary_btn_hidden=false,
+          toolbar_page_sync=false,
+          head_end_slot_id="gc-fw-v2-obj-head-end",
+          table_title_element_id="gc-fw-v2-obj-table-title",
+          )
+          }}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="gc-fw-v2-obj-props-flyout"
+  class="gc-designer-modal gc-designer-modal--flyout-right gc-designer-tables-props-flyout gc-fw-v2-obj-props-flyout"
+  hidden aria-hidden="true">
+  <button type="button"
+    class="gc-designer-modal__backdrop gc-designer-tables-props-flyout__backdrop gc-fw-v2-obj-props-flyout__backdrop"
+    tabindex="-1" aria-label="Close panel"></button>
+  <div class="gc-designer-view-flyout__stack" role="dialog" aria-modal="true"
+    aria-labelledby="gc-fw-v2-obj-props-flyout-title">
+    <div class="gc-designer-modal__panel gc-designer-view-flyout__panel gc-designer-view-flyout__panel--primary"
+      id="gc-fw-v2-obj-props-flyout-primary">
+      <div class="gc-designer-view-flyout__resize gc-designer-view-flyout__resize--primary" aria-hidden="true"></div>
+      <header class="gc-designer-modal__header">
+        <h2 class="gc-designer-modal__title" id="gc-fw-v2-obj-props-flyout-title">
+          Data source &amp; table properties
+        </h2>
+        <button type="button" class="gc-designer-modal__close" id="gc-fw-v2-obj-props-flyout-close" aria-label="Close"
+          title="Close">
+          ×
+        </button>
+      </header>
+      <div class="gc-designer-modal__divider" aria-hidden="true"></div>
+      <div class="gc-designer-modal__body gc-designer-tables-props-flyout__body gc-fw-v2-obj-props-flyout__body">
+        <div class="settings-form gc-designer-table-props" id="gc-fw-v2-obj-props" role="group"
+          aria-labelledby="gc-fw-v2-obj-props-legend">
+          <h3 id="gc-fw-v2-obj-props-legend" class="gc-designer-ip-fieldset__legend">
+            Data source &amp; columns
+          </h3>
+          <label class="settings-form__field gc-fw-v2-obj-prop-title-field">
+            <span class="settings-form__label">Table title</span>
+            <input type="text" class="settings-form__input" id="gc-fw-v2-obj-prop-title" maxlength="500"
+              autocomplete="off" aria-label="Table title" placeholder="Shown above the preview grid" />
+          </label>
+          <div class="settings-form__field" style="min-width: 14rem; max-width: 40rem">
+            <div class="gc-designer-dd gc-designer-dd--multi gc-designer-table-dd" id="gc-fw-v2-obj-entity-dd"
+              data-gc-dd-empty-label="None selected">
+              <label class="settings-form__label" id="gc-fw-v2-obj-entity-dd-l" for="gc-fw-v2-obj-entity-trigger">Cached
+                object types</label>
+              <div class="gc-designer-dd__shell">
+                <button type="button" class="settings-form__input gc-designer-dd__trigger"
+                  id="gc-fw-v2-obj-entity-trigger" aria-haspopup="listbox" aria-expanded="false"
+                  aria-labelledby="gc-fw-v2-obj-entity-dd-l gc-fw-v2-obj-entity-trigger">
+                  None selected
+                </button>
+                <div class="gc-designer-dd__panel" id="gc-fw-v2-obj-entity-panel" hidden>
+                  <div class="gc-designer-dd__search-wrap">
+                    <input type="search" class="settings-form__input mono gc-designer-dd__search"
+                      id="gc-fw-v2-obj-entity-search" placeholder="Filter types…" autocomplete="off"
+                      aria-label="Filter object types" />
+                  </div>
+                  <ul class="gc-designer-dd__list gc-designer-dd__list--multi" id="gc-fw-v2-obj-entity-list"
+                    role="listbox" aria-multiselectable="true" aria-label="Cached object types">
+                    <li class="gc-designer-dd__row muted" role="status" id="gc-fw-v2-obj-entity-loading">
+                      Loading types from cache…
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="gc-fw-v2-obj-behavior">
+            <h4 class="gc-fw-v2-obj-secondary-filters__h">Preview table options</h4>
+            <p class="gc-designer__note gc-fw-v2-obj-secondary-filters__hint muted">
+              Sandbox-only: row checkboxes, toolbar Add/Delete, and read-only cell rendering for the preview grid.
+              Delete stays disabled until at least one row is selected.
+            </p>
+            <div class="gc-fw-v2-obj-behavior__toggles" role="group" aria-label="Preview table options">
+              <label class="gc-toolbar-combine gc-fw-v2-obj-behavior__toggle"
+                title="Per-row checkboxes and select-all in the header">
+                <span class="gc-toolbar-combine__text">Row selectors</span>
+                <input type="checkbox" id="gc-fw-v2-obj-opt-row-selectors" class="gc-toolbar-combine__input" checked
+                  autocomplete="off" />
+                <span class="gc-toolbar-combine__track" aria-hidden="true"><span
+                    class="gc-toolbar-combine__thumb"></span></span>
+              </label>
+              <label class="gc-toolbar-combine gc-fw-v2-obj-behavior__toggle"
+                title="Matches the toolbar Combined View switch — merge rows across selected scopes for Hosts & Services types">
+                <span class="gc-toolbar-combine__text">Combined view</span>
+                <input type="checkbox" id="gc-fw-v2-obj-opt-combine-view" class="gc-toolbar-combine__input" checked
+                  autocomplete="off" />
+                <span class="gc-toolbar-combine__track" aria-hidden="true"><span
+                    class="gc-toolbar-combine__thumb"></span></span>
+              </label>
+              <label class="gc-toolbar-combine gc-fw-v2-obj-behavior__toggle"
+                title="Show the Add button in the preview toolbar">
+                <span class="gc-toolbar-combine__text">Add button</span>
+                <input type="checkbox" id="gc-fw-v2-obj-opt-add-btn" class="gc-toolbar-combine__input" checked
+                  autocomplete="off" />
+                <span class="gc-toolbar-combine__track" aria-hidden="true"><span
+                    class="gc-toolbar-combine__thumb"></span></span>
+              </label>
+              <label class="gc-toolbar-combine gc-fw-v2-obj-behavior__toggle"
+                title="Show the Delete button (enabled when rows are selected)">
+                <span class="gc-toolbar-combine__text">Delete button</span>
+                <input type="checkbox" id="gc-fw-v2-obj-opt-delete-btn" class="gc-toolbar-combine__input" checked
+                  autocomplete="off" />
+                <span class="gc-toolbar-combine__track" aria-hidden="true"><span
+                    class="gc-toolbar-combine__thumb"></span></span>
+              </label>
+              <label class="gc-toolbar-combine gc-fw-v2-obj-behavior__toggle"
+                title="Booleans and actions as static text; selection checkboxes disabled">
+                <span class="gc-toolbar-combine__text">Read-only mode</span>
+                <input type="checkbox" id="gc-fw-v2-obj-opt-read-only" class="gc-toolbar-combine__input"
+                  autocomplete="off" />
+                <span class="gc-toolbar-combine__track" aria-hidden="true"><span
+                    class="gc-toolbar-combine__thumb"></span></span>
+              </label>
+            </div>
+            <div class="settings-form__field gc-fw-v2-obj-combine-by-field" style="margin-top: 14px; max-width: 40rem">
+              <label class="settings-form__label" for="gc-fw-v2-obj-combine-by-column">Combine rows by</label>
+              <select id="gc-fw-v2-obj-combine-by-column" class="settings-form__input"
+                aria-label="Merge combined view rows using this column value"></select>
+              <p class="gc-designer__note muted" style="margin: 6px 0 0; font-size: 0.88rem">
+                When Combined view is on, rows with the same value in this column merge across selected scopes.
+                Choices are built from the current table column set (after each load). Default uses Sophos name rules
+                (and type where required).
+              </p>
+            </div>
+          </div>
+          <div class="gc-fw-v2-obj-secondary-filters-wrap">
+            <h4 class="gc-fw-v2-obj-secondary-filters__h">Secondary filters</h4>
+            <p class="gc-designer__note gc-fw-v2-obj-secondary-filters__hint muted">
+              Each row is required (AND). Leave a row empty or clear the property to ignore it. Operators <span
+                class="mono">~</span> uses <span class="mono">*</span> and <span class="mono">?</span> wildcards
+              (full-cell match).
+            </p>
+            <div class="gc-fw-v2-obj-secondary-filters__scroll">
+              <table class="gc-fw-v2-obj-secondary-filters" aria-label="Secondary filters">
+                <thead>
+                  <tr>
+                    <th scope="col">Property</th>
+                    <th scope="col">Operator</th>
+                    <th scope="col">Value</th>
+                    <th scope="col"><span class="gc-sr-only">Remove</span></th>
+                  </tr>
+                </thead>
+                <tbody id="gc-fw-v2-obj-secondary-filters-tbody"></tbody>
+              </table>
+            </div>
+            <div class="gc-fw-v2-obj-secondary-filters__actions">
+              <button type="button" class="btn btn--secondary" id="gc-fw-v2-obj-secondary-add">Add filter row</button>
+            </div>
+          </div>
+          <div class="gc-designer__row"
+            style="flex-wrap: wrap; align-items: flex-start; gap: 16px 20px; margin-top: 12px">
+            <div class="settings-form__field" style="min-width: 14rem; flex: 1">
+              <div class="gc-designer-dd gc-designer-dd--multi gc-designer-table-dd" id="gc-fw-v2-obj-hide-dd"
+                data-gc-dd-empty-label="None hidden">
+                <label class="settings-form__label" id="gc-fw-v2-obj-hide-dd-l" for="gc-fw-v2-obj-hide-trigger">Hide
+                  columns</label>
+                <div class="gc-designer-dd__shell">
+                  <button type="button" class="settings-form__input gc-designer-dd__trigger"
+                    id="gc-fw-v2-obj-hide-trigger" aria-haspopup="listbox" aria-expanded="false"
+                    aria-labelledby="gc-fw-v2-obj-hide-dd-l gc-fw-v2-obj-hide-trigger">
+                    None hidden
+                  </button>
+                  <div class="gc-designer-dd__panel" id="gc-fw-v2-obj-hide-panel" hidden>
+                    <div class="gc-designer-dd__search-wrap">
+                      <input type="search" class="settings-form__input mono gc-designer-dd__search"
+                        id="gc-fw-v2-obj-hide-search" placeholder="Filter properties…" autocomplete="off"
+                        aria-label="Filter column list" />
+                    </div>
+                    <ul class="gc-designer-dd__list gc-designer-dd__list--multi" id="gc-fw-v2-obj-hide-list"
+                      role="listbox" aria-multiselectable="true" aria-label="Columns to hide"></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <label class="settings-form__field" style="min-width: 12rem; flex: 1">
+              <span class="settings-form__label">Column order</span>
+              <textarea class="settings-form__input mono" id="gc-fw-v2-obj-col-order" rows="3"
+                placeholder="Comma or line-separated column ids — listed first, then remaining columns"
+                aria-label="Column order"></textarea>
+            </label>
+            <label class="settings-form__field" style="min-width: 12rem; flex: 1">
+              <span class="settings-form__label">Column name overrides</span>
+              <textarea class="settings-form__input mono" id="gc-fw-v2-obj-col-overrides" rows="3"
+                placeholder="One per line: __name: Display name" aria-label="Column label overrides"></textarea>
+            </label>
+          </div>
+        </div>
+      </div>
+      <footer
+        class="gc-designer-modal__footer gc-designer-tables-props-flyout__footer gc-fw-v2-obj-props-flyout__footer">
+        <span class="gc-designer-tables-props-save-status gc-fw-v2-obj-props-save-status muted"
+          id="gc-fw-v2-obj-props-save-status" aria-live="polite"></span>
+        <div class="gc-designer-tables-props-flyout__footer-btns gc-fw-v2-obj-props-flyout__footer-btns">
+          <button type="button" class="btn btn--secondary" id="gc-fw-v2-obj-props-flyout-cancel">Cancel</button>
+          <button type="button" class="btn primary" id="gc-fw-v2-obj-props-flyout-save">Save</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+</div>
+<div class="gc-designer-modal gc-designer-modal--dialog-center" id="gc-fw-v2-obj-leave-guard"
+  data-gc-fw-v2-leave-guard="1" hidden aria-hidden="true">
+  <button type="button" class="gc-designer-modal__backdrop" tabindex="-1" aria-label="Stay on this page"
+    id="gc-fw-v2-obj-leave-guard-backdrop"></button>
+  <div class="gc-designer-modal__panel" role="dialog" aria-modal="true"
+    aria-labelledby="gc-fw-v2-obj-leave-guard-title">
+    <header class="gc-designer-modal__header">
+      <h2 id="gc-fw-v2-obj-leave-guard-title" class="gc-designer-modal__title">Unsaved table design</h2>
+    </header>
+    <div class="gc-designer-modal__divider" aria-hidden="true"></div>
+    <div class="gc-designer-modal__body">
+      <p class="gc-designer__note" id="gc-fw-v2-obj-leave-guard-msg">
+        You have unsaved changes to the table design on this page (for example column order or display names). Do you
+        want to save before leaving?
+      </p>
+    </div>
+    <footer class="gc-designer-modal__footer gc-designer-tables-leave-guard__footer gc-fw-v2-obj-leave-guard__footer">
+      <button type="button" class="btn btn--secondary" id="gc-fw-v2-obj-leave-stay">Cancel</button>
+      <button type="button" class="btn btn--secondary" id="gc-fw-v2-obj-leave-discard">Don't save</button>
+      <button type="button" class="btn primary" id="gc-fw-v2-obj-leave-save">Save</button>
+    </footer>
+  </div>
+</div>
+<div id="gc-fw-v2-obj-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
+  <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="gc-net-zone-combine-modal__panel" role="dialog" aria-modal="true"
+    aria-labelledby="gc-fw-v2-obj-combine-modal-title">
+    <header class="gc-net-zone-combine-modal__header">
+      <h2 id="gc-fw-v2-obj-combine-modal-title" class="gc-net-zone-combine-modal__title">Fields by scope</h2>
+      <button type="button" class="gc-net-zone-combine-modal__close" id="gc-fw-v2-obj-combine-modal-close"
+        aria-label="Close" title="Close">
+        <span aria-hidden="true">×</span>
+      </button>
+    </header>
+    <div id="gc-fw-v2-obj-combine-modal-body" class="gc-net-zone-combine-modal__body"></div>
+    <footer class="gc-net-zone-combine-modal__footer">
+      <button type="button" class="btn btn--secondary" id="gc-fw-v2-obj-combine-modal-done">Close</button>
+    </footer>
+  </div>
+</div>
+{{ net_cols_modal("gc-fw-v2-obj") }}

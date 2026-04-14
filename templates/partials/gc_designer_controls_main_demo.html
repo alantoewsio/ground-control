@@ -1,0 +1,520 @@
+<main class="layout single gc-designer">
+  <section class="gc-designer__section" aria-labelledby="gc-designer-controls-address-h">
+    <h2 id="gc-designer-controls-address-h" class="gc-designer__h2">IP address fields</h2>
+    <p class="gc-designer__note">
+      Dotted-quad IPv4 (aligned with <code class="mono">interface_table._IPV4_RE</code>). IPv6 uses bracket URL parsing (compressed forms, <code class="mono">::</code>); zone identifiers after <code class="mono">%</code> are stripped before parsing.
+      Use <strong>Configure IP field properties</strong> (same sheet pattern as <span class="mono">edit-flyout</span> on Modals) to set validation options on both fields. Until you <strong>Save</strong> in that sheet, the demo inputs follow the in-sheet settings; Save writes <code class="mono">data-gc-ip-*</code> on the inputs. The <code class="mono">ip-address</code> control uses <code class="mono">IPFamily</code> (<code class="mono">IPv4</code> or <code class="mono">IPv6</code>) in catalog JSON; the demo toggles family with the select below. The label exposes <code class="mono">gcOpenIpFieldPropertiesFlyout()</code> to open the sheet from script.
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+        <button type="button" class="btn primary" id="gc-designer-ip-props-open">Configure IP field properties</button>
+        <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
+          >edit-flyout</span
+        >
+      </div>
+      <p class="settings-form__status" id="gc-designer-ip-opts-status" role="status" aria-live="polite" style="margin-top: 10px"></p>
+      <span
+        class="gc-designer__control-id gc-designer__control-id--block"
+        title="Reference id for this control"
+        data-gc-designer-control-id="ip-constraint"
+        >ip-constraint</span
+      >
+
+      <form class="settings-form" id="gc-designer-controls-ip-form" autocomplete="off" onsubmit="return false;" style="margin-top: 1rem">
+        <label class="settings-form__field">
+          <span class="settings-form__label" for="gc-designer-ip-family">IP family</span>
+          <select class="settings-form__input" id="gc-designer-ip-family" aria-label="IP family for demo and catalog snapshot">
+            <option value="IPv4">IPv4</option>
+            <option value="IPv6">IPv6</option>
+          </select>
+        </label>
+        <div id="gc-designer-ip-fields-v4">
+          <label class="settings-form__field">
+            <span class="settings-form__label" id="gc-designer-ipv4-l" title="">IPv4 address</span>
+            <span id="gc-designer-ipv4-constraints" class="gc-sr-only"></span>
+            <div class="gc-ip-field" id="gc-designer-ipv4-field-wrap">
+              <input
+                type="text"
+                class="settings-form__input mono gc-ip-field__input"
+                id="gc-designer-controls-ipv4"
+                autocomplete="off"
+                inputmode="decimal"
+                placeholder="192.0.2.1"
+                aria-labelledby="gc-designer-ipv4-l"
+                aria-describedby="gc-designer-ipv4-constraints gc-designer-ipv4-correct-preview gc-designer-ipv4-err"
+                aria-invalid="false"
+              />
+              <span class="gc-ip-field__mask-pill" id="gc-designer-ipv4-mask-pill" hidden aria-hidden="true"></span>
+              <span class="gc-ip-field__ok" id="gc-designer-ipv4-ok" hidden aria-hidden="true" title="Valid">&#10003;</span>
+            </div>
+            <p class="settings-form__status gc-ip-correct-preview" id="gc-designer-ipv4-correct-preview" role="status" aria-live="polite" hidden></p>
+            <p class="settings-form__status is-error" id="gc-designer-ipv4-err" role="alert" hidden></p>
+          </label>
+        </div>
+        <div id="gc-designer-ip-fields-v6" hidden>
+          <label class="settings-form__field">
+            <span class="settings-form__label" id="gc-designer-ipv6-l" title="">IPv6 address</span>
+            <span id="gc-designer-ipv6-constraints" class="gc-sr-only"></span>
+            <div class="gc-ip-field" id="gc-designer-ipv6-field-wrap">
+              <input
+                type="text"
+                class="settings-form__input mono gc-ip-field__input"
+                id="gc-designer-controls-ipv6"
+                autocomplete="off"
+                placeholder="2001:db8::1"
+                aria-labelledby="gc-designer-ipv6-l"
+                aria-describedby="gc-designer-ipv6-constraints gc-designer-ipv6-correct-preview gc-designer-ipv6-err"
+                aria-invalid="false"
+              />
+              <span class="gc-ip-field__mask-pill" id="gc-designer-ipv6-mask-pill" hidden aria-hidden="true"></span>
+              <span class="gc-ip-field__ok" id="gc-designer-ipv6-ok" hidden aria-hidden="true" title="Valid">&#10003;</span>
+            </div>
+            <p class="settings-form__status gc-ip-correct-preview" id="gc-designer-ipv6-correct-preview" role="status" aria-live="polite" hidden></p>
+            <p class="settings-form__status is-error" id="gc-designer-ipv6-err" role="alert" hidden></p>
+          </label>
+        </div>
+        <span
+          class="gc-designer__control-id gc-designer__control-id--block"
+          title="Reference id for this control"
+          data-gc-designer-control-id="ip-address"
+          >ip-address</span
+        >
+        <span
+          class="gc-designer__control-id gc-designer__control-id--block"
+          title="Reference id for this control"
+          data-gc-designer-control-id="ip-list"
+          >ip-list</span
+        >
+      </form>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-text-h">
+    <h2 id="gc-designer-text-h" class="gc-designer__h2">Text fields</h2>
+    <p class="gc-designer__note">
+      Single-line and multi-line inputs with <code class="mono">minlength</code> / <code class="mono">maxlength</code>. Charset presets are the
+      distinct <code class="mono">xml-api-docs</code> STRING constraint sets (duplicates such as FQDNHost vs MACHost Name are merged).
+      Use <strong>Configure text field properties</strong> for the sheet; <code class="mono">text-single</code> and <code class="mono">text-multiline</code> expose <code class="mono">gcOpenTextFieldPropertiesFlyout()</code>.
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+        <button type="button" class="btn primary" id="gc-designer-text-props-open">Configure text field properties</button>
+        <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
+          >edit-flyout</span
+        >
+      </div>
+      <span
+        class="gc-designer__control-id gc-designer__control-id--block"
+        title="Reference id for this control"
+        data-gc-designer-control-id="text-config"
+        >text-config</span
+      >
+      <form class="settings-form" id="gc-designer-text-form" autocomplete="off" onsubmit="return false;" style="margin-top: 1rem">
+        <label class="settings-form__field">
+          <span class="settings-form__label">Single-line text</span>
+          <input
+            type="text"
+            class="settings-form__input mono"
+            id="gc-designer-text-single"
+            autocomplete="off"
+            minlength="0"
+            maxlength="60"
+            data-gc-text-charset=""
+            aria-describedby="gc-designer-text-single-err"
+          />
+          <p class="settings-form__status is-error" id="gc-designer-text-single-err" role="alert" hidden></p>
+          <span
+            class="gc-designer__control-id gc-designer__control-id--block"
+            title="Reference id for this control"
+            data-gc-designer-control-id="text-single"
+            >text-single</span
+          >
+        </label>
+        <label class="settings-form__field">
+          <span class="settings-form__label">Multi-line text</span>
+          <textarea
+            class="settings-form__input mono"
+            id="gc-designer-text-multi"
+            rows="4"
+            maxlength="500"
+            aria-describedby="gc-designer-text-multi-err"
+          ></textarea>
+          <p class="settings-form__status is-error" id="gc-designer-text-multi-err" role="alert" hidden></p>
+          <span
+            class="gc-designer__control-id gc-designer__control-id--block"
+            title="Reference id for this control"
+            data-gc-designer-control-id="text-multiline"
+            >text-multiline</span
+          >
+        </label>
+      </form>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-option-selectors-h">
+    <h2 id="gc-designer-option-selectors-h" class="gc-designer__h2">Option selectors</h2>
+    <p class="gc-designer__note">
+      One continuous control: a single outer border and pill-shaped ends (end radius is half the bar height). Segments are flush with no gap; vertical dividers separate options. The active segment uses the <strong>primary</strong> style; inactive segments use the neutral <strong>secondary</strong> look.
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row" style="flex-direction: column; align-items: flex-start; gap: 1.25rem">
+        <button type="button" class="btn primary" id="gc-designer-selector-props-open">Configure selector options</button>
+        <div class="gc-designer__sample gc-designer__sample--controls">
+          <span class="settings-form__label">Segments</span>
+          <div
+            id="gc-designer-option-selector"
+            class="gc-option-selector"
+            role="group"
+            aria-label="Designer demo: option selector"
+            data-gc-option-selector
+            data-gc-designer-selector-items='["On","Off"]'
+          ></div>
+          <span
+            id="gc-designer-selector-control-label"
+            class="gc-designer__control-id"
+            title="Reference id for this control"
+            data-gc-designer-control-id="selector"
+            >selector</span
+          >
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-toggles-h">
+    <h2 id="gc-designer-toggles-h" class="gc-designer__h2">Toggles</h2>
+    <p class="gc-designer__note">
+      <strong>On/off switch</strong> is a <code class="mono">button</code> with <code class="mono">role="switch"</code>, <code class="mono">aria-checked</code>, and the same track/thumb classes as boolean columns in data tables (this demo uses <strong>accent blue</strong> when on; default table toggles use success green). <strong>Toggle checkbox</strong> is a real <code class="mono">checkbox</code> with the toolbar combine pattern: label text, visually hidden input, and sliding thumb (accent when checked) — use it when the value must post with a form or participate in native checkbox semantics.
+    </p>
+    <div class="gc-designer__sandbox">
+      <form class="settings-form" id="gc-designer-toggles-form" autocomplete="off" onsubmit="return false;" style="margin-top: 0">
+        <div class="settings-form__field">
+          <span class="settings-form__label" id="gc-designer-toggle-onoff-heading">On/off switch</span>
+          <div
+            class="gc-designer__row"
+            style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0"
+          >
+            <button
+              type="button"
+              class="gc-table-toggle"
+              id="gc-designer-toggle-onoff"
+              role="switch"
+              aria-checked="false"
+              aria-labelledby="gc-designer-toggle-onoff-heading"
+            >
+              <span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span>
+            </button>
+            <span class="muted" id="gc-designer-toggle-onoff-state" aria-live="polite">Off</span>
+          </div>
+          <span
+            class="gc-designer__control-id gc-designer__control-id--block"
+            title="Reference id for this control"
+            data-gc-designer-control-id="toggle-onoff"
+            >toggle-onoff</span
+          >
+        </div>
+        <div class="settings-form__field" style="margin-top: 1rem">
+          <label class="gc-toolbar-combine" id="gc-designer-toggle-checkbox-wrap">
+            <span class="gc-toolbar-combine__text" id="gc-designer-toggle-checkbox-text">Toggle checkbox</span>
+            <input
+              type="checkbox"
+              class="gc-toolbar-combine__input"
+              id="gc-designer-toggle-checkbox"
+              autocomplete="off"
+              aria-labelledby="gc-designer-toggle-checkbox-text"
+            />
+            <span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>
+          </label>
+          <span
+            class="gc-designer__control-id gc-designer__control-id--block"
+            title="Reference id for this control"
+            data-gc-designer-control-id="toggle-checkbox"
+            >toggle-checkbox</span
+          >
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-tags-h">
+    <h2 id="gc-designer-tags-h" class="gc-designer__h2">Tags</h2>
+    <p class="gc-designer__note">
+      Type to filter tag suggestions. The first match previews inline after the caret; more matches appear in a list (arrow keys, Enter to add). Tags appear as pills with remove on hover. When focus leaves, the control collapses to one line with a <code class="mono">+N</code> overflow pill if needed.
+      <strong>Unsaved</strong> tags (not yet committed with <strong>Save</strong>) use black pills with white text. After save, each tag name gets a <strong>stable color</strong> (same name → same color in both editors).
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row" style="align-items: flex-end; flex-wrap: wrap; gap: 16px 24px">
+        <div class="gc-designer__sample gc-designer__sample--controls" style="flex: 1; min-width: 16rem">
+          <div class="settings-form__field" style="width: 100%">
+            <label class="settings-form__label" for="gc-designer-tags-input-a">Tag editor A</label>
+            <div class="gc-designer-tags" id="gc-designer-tag-editor" data-gc-designer-tag-editor>
+              <input type="hidden" class="gc-designer-tags__hidden" id="gc-designer-tags-hidden" value="[]" />
+              <div class="gc-designer-tags__combo">
+                <div class="gc-designer-tags__field" role="group" aria-label="Tags A">
+                  <div class="gc-designer-tags__chips" aria-live="polite"></div>
+                  <div class="gc-designer-tags__input-shell">
+                    <div class="gc-designer-tags__mirror" aria-hidden="true">
+                      <span class="gc-designer-tags__typed-mirror"></span><span class="gc-designer-tags__ghost"></span>
+                    </div>
+                    <input
+                      type="text"
+                      class="gc-designer-tags__input mono"
+                      id="gc-designer-tags-input-a"
+                      autocomplete="off"
+                      spellcheck="false"
+                      aria-autocomplete="list"
+                      aria-expanded="false"
+                      placeholder="Add tag…"
+                    />
+                  </div>
+                </div>
+                <ul class="gc-designer-tags__suggest" role="listbox" hidden aria-label="Tag suggestions A"></ul>
+              </div>
+            </div>
+          </div>
+          <span
+            class="gc-designer__control-id"
+            title="Reference id for this control"
+            data-gc-designer-control-id="tag-editor"
+            >tag-editor</span
+          >
+        </div>
+        <div class="gc-designer__sample gc-designer__sample--controls" style="flex: 1; min-width: 16rem">
+          <div class="settings-form__field" style="width: 100%">
+            <label class="settings-form__label" for="gc-designer-tags-input-b">Tag editor B</label>
+            <div class="gc-designer-tags" id="gc-designer-tag-editor-b" data-gc-designer-tag-editor>
+              <input type="hidden" class="gc-designer-tags__hidden" id="gc-designer-tags-hidden-b" value="[]" />
+              <div class="gc-designer-tags__combo">
+                <div class="gc-designer-tags__field" role="group" aria-label="Tags B">
+                  <div class="gc-designer-tags__chips" aria-live="polite"></div>
+                  <div class="gc-designer-tags__input-shell">
+                    <div class="gc-designer-tags__mirror" aria-hidden="true">
+                      <span class="gc-designer-tags__typed-mirror"></span><span class="gc-designer-tags__ghost"></span>
+                    </div>
+                    <input
+                      type="text"
+                      class="gc-designer-tags__input mono"
+                      id="gc-designer-tags-input-b"
+                      autocomplete="off"
+                      spellcheck="false"
+                      aria-autocomplete="list"
+                      aria-expanded="false"
+                      placeholder="Add tag…"
+                    />
+                  </div>
+                </div>
+                <ul class="gc-designer-tags__suggest" role="listbox" hidden aria-label="Tag suggestions B"></ul>
+              </div>
+            </div>
+          </div>
+          <span
+            class="gc-designer__control-id"
+            title="Reference id for this control"
+            data-gc-designer-control-id="tag-editor"
+            >tag-editor</span
+          >
+        </div>
+        <div class="gc-designer__sample gc-designer__sample--controls" style="margin-bottom: 2px">
+          <div class="settings-form__field" style="margin-bottom: 0">
+            <span class="settings-form__label">&nbsp;</span>
+            <button type="button" class="btn primary" id="gc-designer-tags-save">Save tags</button>
+          </div>
+          <span
+            class="gc-designer__control-id"
+            title="Reference id for this control"
+            data-gc-designer-control-id="tag-save"
+            >tag-save</span
+          >
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-dd-h">
+    <h2 id="gc-designer-dd-h" class="gc-designer__h2">Dropdowns</h2>
+    <p class="gc-designer__note">
+      Searchable single- and multi-select lists backed by cached Hosts &amp; Services objects. Each control has its own scope (top-bar selection vs custom firewall/configuration IDs), entity-type filters, optional list columns, and per-type icons. The filter box sits inside the open panel. Lists reload automatically when scope, custom IDs, entity types, or the top-bar firewall/configuration selection change. <strong>Load from cache</strong> repeats the fetch with current settings. Use the property buttons for shared UI, single-select source, and multi-select source; <code class="mono">dropdown-single</code> / <code class="mono">dropdown-multi</code> / <code class="mono">dropdown-shared</code> expose <code class="mono">gcOpenDropdownPropertiesFlyout()</code> (pass <code class="mono">"shared"</code>, <code class="mono">"single"</code>, or <code class="mono">"multi"</code>).
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+        <button type="button" class="btn primary" id="gc-designer-dd-shared-props-open">Configure shared dropdown UI</button>
+        <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
+          >edit-flyout</span
+        >
+      </div>
+      <span
+        class="gc-designer__control-id gc-designer__control-id--block"
+        title="Reference id for this control"
+        data-gc-designer-control-id="dropdown-shared"
+        >dropdown-shared</span
+      >
+      <div class="gc-designer__row" style="margin-top: 1rem; align-items: flex-start; gap: 24px; flex-wrap: wrap">
+        <div class="gc-designer-dd" id="gc-designer-dd-single" data-gc-designer-dd>
+          <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0 0 8px">
+            <button type="button" class="btn primary" id="gc-designer-dd-single-props-open">Configure single-select properties</button>
+            <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
+              >edit-flyout</span
+            >
+          </div>
+          <span class="settings-form__label" id="gc-designer-dd-single-l">Single select (cached objects)</span>
+          <div class="gc-designer-dd__shell">
+            <button
+              type="button"
+              class="settings-form__input gc-designer-dd__trigger"
+              id="gc-designer-dd-single-trigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-labelledby="gc-designer-dd-single-l"
+            >
+              Choose…
+            </button>
+            <div class="gc-designer-dd__panel" id="gc-designer-dd-single-panel" hidden>
+              <div class="gc-designer-dd__search-wrap">
+                <input
+                  type="search"
+                  class="settings-form__input mono gc-designer-dd__search"
+                  id="gc-designer-dd-single-search"
+                  placeholder="Filter…"
+                  autocomplete="off"
+                  aria-label="Filter single-select options"
+                />
+              </div>
+              <ul class="gc-designer-dd__list" id="gc-designer-dd-single-list" role="listbox" aria-label="Cached objects"></ul>
+            </div>
+          </div>
+          <span
+            class="gc-designer__control-id gc-designer__control-id--block"
+            title="Reference id for this control"
+            data-gc-designer-control-id="dropdown-single"
+            >dropdown-single</span
+          >
+        </div>
+        <div class="gc-designer-dd gc-designer-dd--multi" id="gc-designer-dd-multi" data-gc-designer-dd>
+          <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0 0 8px">
+            <button type="button" class="btn primary" id="gc-designer-dd-multi-props-open">Configure multi-select properties</button>
+            <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
+              >edit-flyout</span
+            >
+          </div>
+          <span class="settings-form__label" id="gc-designer-dd-multi-l">Multi select (cached objects)</span>
+          <div class="gc-designer-dd__shell">
+            <button
+              type="button"
+              class="settings-form__input gc-designer-dd__trigger"
+              id="gc-designer-dd-multi-trigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-labelledby="gc-designer-dd-multi-l"
+            >
+              None selected
+            </button>
+            <div class="gc-designer-dd__panel" id="gc-designer-dd-multi-panel" hidden>
+              <div class="gc-designer-dd__search-wrap">
+                <input
+                  type="search"
+                  class="settings-form__input mono gc-designer-dd__search"
+                  id="gc-designer-dd-multi-search"
+                  placeholder="Filter…"
+                  autocomplete="off"
+                  aria-label="Filter multi-select options"
+                />
+              </div>
+              <ul
+                class="gc-designer-dd__list gc-designer-dd__list--multi"
+                id="gc-designer-dd-multi-list"
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label="Cached objects"
+              ></ul>
+            </div>
+          </div>
+          <span
+            class="gc-designer__control-id gc-designer__control-id--block"
+            title="Reference id for this control"
+            data-gc-designer-control-id="dropdown-multi"
+            >dropdown-multi</span
+          >
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-ml-h">
+    <h2 id="gc-designer-ml-h" class="gc-designer__h2">Member lookup</h2>
+    <p class="gc-designer__note">
+      Searchable single- or multi-select of cached object names (same table API as Dropdowns). Scope resolves from the
+      <strong>Object edit</strong> flyout firewall or configuration multiselect when this control is inside
+      <code class="mono">#gc-designer-flyout-object-edit-modal</code> (checked rows); if none are checked there, it falls
+      back to the <strong>top-bar</strong> firewall/configuration selection. Use <strong>Configure member lookup</strong>
+      to choose object types and single vs multi. The open panel always includes a filter field; multi-select adds
+      <strong>Select all shown</strong> for the rows visible after filtering.
+      <code class="mono">member-lookup</code> exposes <code class="mono">gcOpenMemberLookupPropertiesFlyout()</code>.
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+        <button type="button" class="btn primary" id="gc-designer-ml-props-open">Configure member lookup</button>
+        <span
+          class="gc-designer__control-id"
+          title="Reference id for this pattern"
+          data-gc-designer-control-id="edit-flyout"
+          >edit-flyout</span
+        >
+      </div>
+      <span
+        class="gc-designer__control-id gc-designer__control-id--block"
+        title="Reference id for this control"
+        data-gc-designer-control-id="member-lookup"
+        >member-lookup</span
+      >
+      <div
+        class="gc-designer-dd gc-designer-member-lookup gc-designer-dd--multi"
+        id="gc-designer-member-lookup"
+        data-gc-designer-dd
+        data-gc-designer-member-lookup="1"
+        style="margin-top: 1rem; max-width: 28rem"
+      >
+        <span class="settings-form__label" id="gc-designer-member-lookup-l">Member lookup (cached names)</span>
+        <div class="gc-designer-dd__shell">
+          <button
+            type="button"
+            class="settings-form__input gc-designer-dd__trigger"
+            id="gc-designer-member-lookup-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-labelledby="gc-designer-member-lookup-l"
+          >
+            None selected
+          </button>
+          <div class="gc-designer-dd__panel" id="gc-designer-member-lookup-panel" hidden>
+            <div class="gc-designer-dd__search-wrap">
+              <input
+                type="search"
+                class="settings-form__input mono gc-designer-dd__search"
+                id="gc-designer-member-lookup-search"
+                placeholder="Filter…"
+                autocomplete="off"
+                aria-label="Filter member lookup options"
+              />
+            </div>
+            <div class="gc-designer-member-lookup__toolbar">
+              <button
+                type="button"
+                class="btn btn--text gc-designer-member-lookup__select-all"
+                id="gc-designer-member-lookup-select-all"
+              >
+                Select all shown
+              </button>
+            </div>
+            <ul
+              class="gc-designer-dd__list gc-designer-dd__list--multi"
+              id="gc-designer-member-lookup-list"
+              role="listbox"
+              aria-multiselectable="true"
+              aria-label="Cached object names"
+            ></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>

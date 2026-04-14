@@ -22,6 +22,30 @@
     return "";
   }
 
+  function getEntitySchema(entityType) {
+    if (typeof globalThis.gcHsGetEntitySchema !== "function") return null;
+    try {
+      return globalThis.gcHsGetEntitySchema(entityType);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function htmlAttrs(attrs) {
+    if (!attrs || typeof attrs !== "object") return "";
+    let out = "";
+    Object.keys(attrs).forEach(function (k) {
+      let v = attrs[k];
+      if (v == null || v === false) return;
+      if (v === true) {
+        out += " " + escapeHtml(k);
+        return;
+      }
+      out += ' ' + escapeHtml(k) + '="' + escapeHtml(String(v)) + '"';
+    });
+    return out;
+  }
+
   function collectFwIdsFromFlyoutDom(root) {
     let out = [];
     if (!root) return out;
@@ -107,7 +131,10 @@
       '">' +
       '<div class="gc-multiselect__control gc-hs-ip-host-flyout__fw-ms-control">' +
       '<button type="button" class="gc-multiselect__trigger gc-hs-ip-host-flyout__fw-trigger" aria-haspopup="listbox" aria-expanded="false">' +
+      '<span class="gc-multiselect__trigger-value">' +
+      '<span class="gc-ms-trigger-chips gc-hs-ip-host-flyout__fw-trigger-chips" aria-hidden="true"></span>' +
       '<span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__fw-trigger-text">Loading…</span>' +
+      "</span>" +
       '<span class="gc-multiselect__chev" aria-hidden="true">▾</span>' +
       "</button>" +
       '<div class="gc-multiselect__dropdown gc-hs-ip-host-flyout__fw-dropdown" hidden>' +
@@ -147,7 +174,10 @@
       ">" +
       '<div class="gc-multiselect__control gc-hs-ip-host-flyout__hg-ms-control">' +
       '<button type="button" class="gc-multiselect__trigger gc-hs-ip-host-flyout__hg-trigger" aria-haspopup="listbox" aria-expanded="false">' +
+      '<span class="gc-multiselect__trigger-value">' +
+      '<span class="gc-ms-trigger-chips gc-hs-ip-host-flyout__hg-trigger-chips" aria-hidden="true"></span>' +
       '<span class="gc-multiselect__trigger-text gc-hs-ip-host-flyout__hg-trigger-text">Loading…</span>' +
+      "</span>" +
       '<span class="gc-multiselect__chev" aria-hidden="true">▾</span>' +
       "</button>" +
       '<div class="gc-multiselect__dropdown gc-hs-ip-host-flyout__hg-dropdown" hidden>' +
@@ -687,6 +717,11 @@
 
   function buildGroupHtml(entityType, row, mode, opts) {
     opts = opts || {};
+    let schema = getEntitySchema(entityType) || {};
+    let fields = schema.fields || {};
+    let nameCfg = fields.name || {};
+    let descCfg = fields.description || {};
+    let membersCfg = fields.members || {};
     let met = GROUP_MEMBER_ET[entityType] || "ip_host";
     let flat = (row && row.flat) || {};
     let nm = pick(flat, ["Name"]);
@@ -703,6 +738,8 @@
         : entityType === "service_group"
           ? "Service"
           : "Host";
+    if (membersCfg.listKey) listKey = String(membersCfg.listKey);
+    if (membersCfg.itemKey) itemKey = String(membersCfg.itemKey);
     let members = memberNamesFromFlat(flat, listKey, itemKey);
     let memberColKey = listKey + "." + itemKey;
     let fwHtml =
@@ -715,21 +752,29 @@
           );
     return (
       fwHtml +
-      '<div class="gc-if-flyout__field"><label class="gc-if-flyout__label" for="gc-hs-grp-name">Name <span class="gc-if-flyout__req">*</span></label>' +
+      '<div class="gc-if-flyout__field"><label class="gc-if-flyout__label" for="gc-hs-grp-name">' +
+      escapeHtml(String(nameCfg.label || "Name")) +
+      ' <span class="gc-if-flyout__req">*</span></label>' +
       '<input id="gc-hs-grp-name" type="text" class="gc-if-flyout__input mono" value="' +
       escapeHtml(nm) +
-      '" /></div>' +
-      '<div class="gc-if-flyout__field" data-gc-combine-field-keys="Description"><label class="gc-if-flyout__label" for="gc-hs-grp-desc">Description</label>' +
+      '"' +
+      htmlAttrs({ maxlength: nameCfg.maxLength || null }) +
+      " /></div>" +
+      '<div class="gc-if-flyout__field" data-gc-combine-field-keys="Description"><label class="gc-if-flyout__label" for="gc-hs-grp-desc">' +
+      escapeHtml(String(descCfg.label || "Description")) +
+      "</label>" +
       '<input id="gc-hs-grp-desc" type="text" class="gc-if-flyout__input" value="' +
       escapeHtml(desc) +
-      '" /></div>' +
+      '"' +
+      htmlAttrs({ maxlength: descCfg.maxLength || null }) +
+      " /></div>" +
       '<textarea hidden id="gc-hs-grp-mem-initial" class="gc-hs-json-init" aria-hidden="true">' +
       escapeHtml(JSON.stringify(members)) +
       "</textarea>" +
       buildNamesMultiselectSection(
-        GROUP_MEMBER_LABEL[entityType] || "Members",
-        "No members synced on selected firewalls.",
-        met,
+        String(membersCfg.label || GROUP_MEMBER_LABEL[entityType] || "Members"),
+        String(membersCfg.emptyText || "No members synced on selected firewalls."),
+        String(membersCfg.sourceEntity || met),
         false,
         "#gc-hs-grp-mem-initial",
         'data-gc-combine-field-keys="' + escapeHtml(memberColKey) + '"',
@@ -829,7 +874,6 @@
     let search = ms.querySelector(".gc-hs-ip-host-flyout__hg-search");
     let optsRoot = ms.querySelector(".gc-hs-ip-host-flyout__hg-ms-options");
     let emptyEl = ms.querySelector(".gc-hs-entity-ms-empty");
-    let pillsEl = ms.querySelector(".gc-hs-ip-host-flyout__hg-pills");
     let selected = selectedNamesFromMs(ms);
     if (!selected.length && !ms.dataset.gcHsSeedApplied) {
       let srcSel = ms.dataset.initSource;
@@ -852,23 +896,52 @@
     }
 
     function syncTrigger() {
-      if (triggerText) triggerText.textContent = hgSummary(selected.length);
-    }
-
-    function syncPills() {
-      if (!pillsEl) return;
-      pillsEl.innerHTML = "";
+      let chipsFn =
+        typeof globalThis.gcRenderMultiselectTriggerChips === "function"
+          ? globalThis.gcRenderMultiselectTriggerChips
+          : null;
+      let chipsEl = ms.querySelector(".gc-hs-ip-host-flyout__hg-trigger-chips");
+      let n = selected.length;
+      if (n === 0) {
+        if (triggerText) {
+          triggerText.textContent = hgSummary(0);
+          triggerText.classList.remove("gc-ms-trigger-sr");
+        }
+        if (chipsEl) chipsEl.innerHTML = "";
+        return;
+      }
+      if (triggerText) {
+        triggerText.textContent = hgSummary(n);
+        triggerText.classList.add("gc-ms-trigger-sr");
+      }
+      if (!chipsEl || !chipsFn) {
+        if (triggerText) triggerText.classList.remove("gc-ms-trigger-sr");
+        return;
+      }
+      let items = [];
       selected
         .slice()
         .sort(function (a, b) {
           return a.toLowerCase().localeCompare(b.toLowerCase());
         })
         .forEach(function (nm) {
-          let li = document.createElement("li");
-          li.className = "gc-hs-ip-host-flyout__hg-pill mono";
-          li.textContent = nm;
-          pillsEl.appendChild(li);
+          items.push({
+            label: nm,
+            title: nm,
+            removeLabel: "Remove " + nm,
+            onRemove: function () {
+              ms.querySelectorAll('input[type="checkbox"][data-gc-hs-mem-name]').forEach(
+                function (hit) {
+                  if (hit.dataset.gcHsMemName === nm) {
+                    hit.checked = false;
+                    hit.dispatchEvent(new Event("change", { bubbles: true }));
+                  }
+                },
+              );
+            },
+          });
         });
+      chipsFn(chipsEl, items);
     }
 
     function renderGroups(groups) {
@@ -892,7 +965,6 @@
         cb.addEventListener("change", function () {
           selected = selectedNamesFromMs(ms);
           syncTrigger();
-          syncPills();
         });
         let textWrap = document.createElement("span");
         textWrap.className = "gc-hs-ip-host-flyout__hg-opt-text";
@@ -921,7 +993,6 @@
         emptyEl.hidden = !show;
       }
       syncTrigger();
-      syncPills();
     }
 
     if (ms.dataset.gcHsNmUiBound !== "1") {

@@ -7,6 +7,7 @@ import logging
 import os
 import zipfile
 import random
+import re
 import secrets
 import signal
 import sys
@@ -43,7 +44,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import and_, func, select, tuple_
+from sqlalchemy import and_, case, func, select, tuple_
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -62,6 +63,7 @@ from app import (
     security_settings,
     users_service,
 )
+from app.firmware_inventory_display import firmware_inventory_cell
 from app.history_retention import run_history_retention_sweep
 from app.backup_crypto import encrypt_backup_archive
 from app.backup_password import (
@@ -94,17 +96,31 @@ from app.access_launch_tokens import (
     validate_and_consume_launch_token,
 )
 from app.auth import (
+    SESSION_TRACKING_ID_KEY,
     SESSION_USER_ID_KEY,
+    add_admin_chat_message,
+    apply_expired_admin_logout_challenge,
+    cancel_admin_logout_challenge,
+    complete_admin_logout_challenge,
     evaluate_session_idle,
     get_session_secret,
     hash_password,
+    list_admin_logout_challenges,
+    list_admin_chats,
     list_active_admin_sessions,
+    mark_admin_chat_read,
+    purge_invalidated_browser_session,
     register_authenticated_session,
+    remember_invalidated_session_tracking_id,
+    request_admin_logout_challenge,
     require_admin_user_id,
     require_authenticated_user_id,
     require_browser_json_session,
+    user_role_can_use_designer,
+    user_role_is_admin,
     session_idle_timeout_seconds,
     session_user_id,
+    start_admin_chat,
     touch_session_activity,
     unregister_authenticated_session,
     validate_new_password,
@@ -152,6 +168,34 @@ from app.dashboard_metrics import (
     parse_firewall_ids_query,
 )
 from app.database import SessionLocal, get_db, init_db
+from app.designer_entity_type_navigation import (
+    build_firewalls_v2_object_nav_tree,
+    get_navigation_entries,
+    list_object_entity_types_for_nav_page,
+    list_object_entity_types_for_nav_tab,
+    list_settings_entities_for_nav_tab,
+    resolve_firewalls_v2_active_tab,
+    resolve_firewalls_v2_object_page,
+    save_navigation_entries,
+)
+from app.designer_modal_properties import get_modal_props, save_modal_props
+from app.designer_named_controls import (
+    CATALOG_DATA_ENTRY_TYPE_ALLOWLIST,
+    catalog_data_entry_type_dropdown_values,
+    designer_named_control_ids_sorted,
+)
+from app.designer_data_controls_layout import (
+    get_layout_for_entity_type,
+    save_layout_for_entity_type,
+)
+from app.designer_table_properties import (
+    INSTANCE_ID_RE,
+    get_instance_props,
+    save_instance_props,
+)
+from app.firewall_config_entity_payload_backfill import (
+    backfill_missing_entity_payload_fields_from_cache,
+)
 from app.db_utils import chunked_in_query
 from app.firewall_api_client import normalize_firewall_api_timeout_seconds
 from app.firewall_config_sync import (
@@ -186,6 +230,7 @@ from app.hosts_services_table import (
     list_fqdn_hostgroups_for_firewall,
     list_ip_hostgroups_for_configuration,
     list_ip_hostgroups_for_firewall,
+    sanitize_hs_combine_by_column,
 )
 from app.interface_combine_ipam import enrich_interface_payload_combine_sources_ipam
 from app.interface_ipam_hints import attach_ipam_hints_to_interface_rows
@@ -250,6 +295,7 @@ from app.models import (
     ConfigurationConfigEntry,
     Firewall,
     FirewallConfigChangelogEntry,
+    FirewallConfigEntityPayloadField,
     FirewallConfigEntry,
     FirewallConfigSyncRun,
     RefCountry,
@@ -501,6 +547,7 @@ def _bg_task_queue_send_batch(task_ids: list[int], user_id: str, username: str) 
 
 def auth_client_state(request: Request, db: Session) -> dict[str, Any]:
     """Browser/client auth snapshot (same shape as GET /api/auth/status). Used for first paint and API."""
+    purge_invalidated_browser_session(request)
     users_service.ensure_default_admin_user(db)
     need_setup = users_service.needs_initial_admin_password(db)
     uid = session_user_id(request)
@@ -519,6 +566,7 @@ def auth_client_state(request: Request, db: Session) -> dict[str, Any]:
                     "user": users_service.user_row_public(row),
                     "session_idle_timeout_minutes": config.session_idle_timeout_minutes(),
                 }
+        remember_invalidated_session_tracking_id(request)
         unregister_authenticated_session(request)
         request.session.pop(SESSION_USER_ID_KEY, None)
     return {
@@ -543,12 +591,20 @@ def nav_firewalls_multiselect_json(
     for f in rows:
         online = firewall_is_online(f)
         desc = (f.description or "").strip()
+        name_s = (f.name or "").strip()
+        host_s = (f.host or "").strip()
+        dev_host_s = (f.device_hostname or "").strip()
+        serial_s = (f.serial_number or "").strip()
         entry: dict[str, Any] = {
             "id": f.id,
             "label": (f.name or f.host or str(f.id)).strip(),
             "tags": f.tags_list(),
             "description": desc if desc else None,
             "online": online,
+            "name": name_s or None,
+            "host": host_s or None,
+            "device_hostname": dev_host_s or None,
+            "serial_number": serial_s or None,
         }
         if request is not None:
             # Always use /webadmin/launch and /ssh/launch so clicks get a fresh
@@ -647,6 +703,75 @@ def _firewall_cached_sync_entity_map(
     return {fid: sorted(types) for fid, types in buckets.items()}
 
 
+def _entity_type_scalar_from_distinct_row(row: Any) -> str | None:
+    """Normalize a distinct entity_type query row to a stripped string."""
+    if row is None:
+        return None
+    if isinstance(row, str):
+        s = row.strip()
+        return s or None
+    if isinstance(row, (list, tuple)):
+        if not row:
+            return None
+        v = row[0]
+    else:
+        try:
+            v = row[0]
+        except (TypeError, IndexError, KeyError):
+            return None
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s or None
+
+
+def _distinct_config_cache_entity_types_union(
+    db: Session,
+    firewall_ids: list[int],
+    configuration_ids: list[int],
+) -> list[str]:
+    """Sorted unique ``entity_type`` values from firewall and configuration config caches."""
+    types: set[str] = set()
+    if firewall_ids:
+        rows = chunked_in_query(
+            lambda chunk: (
+                db.query(FirewallConfigEntry.entity_type)
+                .filter(FirewallConfigEntry.firewall_id.in_(chunk))
+                .distinct()
+                .all()
+            ),
+            firewall_ids,
+        )
+        for row in rows:
+            et = _entity_type_scalar_from_distinct_row(row)
+            if et:
+                types.add(et)
+    if configuration_ids:
+        rows_c = chunked_in_query(
+            lambda chunk: (
+                db.query(ConfigurationConfigEntry.entity_type)
+                .filter(ConfigurationConfigEntry.configuration_id.in_(chunk))
+                .distinct()
+                .all()
+            ),
+            configuration_ids,
+        )
+        for row in rows_c:
+            et = _entity_type_scalar_from_distinct_row(row)
+            if et:
+                types.add(et)
+    if not firewall_ids and not configuration_ids:
+        for row in db.query(FirewallConfigEntry.entity_type).distinct().all():
+            et = _entity_type_scalar_from_distinct_row(row)
+            if et:
+                types.add(et)
+        for row in db.query(ConfigurationConfigEntry.entity_type).distinct().all():
+            et = _entity_type_scalar_from_distinct_row(row)
+            if et:
+                types.add(et)
+    return sorted(types, key=str.casefold)
+
+
 def _firewall_last_sync_error_by_id(
     db: Session, firewall_ids: list[int]
 ) -> dict[int, str]:
@@ -664,15 +789,19 @@ def _firewall_last_sync_error_by_id(
         )
         .group_by(FirewallConfigSyncRun.firewall_id)
     ).subquery()
-    rows = db.execute(
-        select(FirewallConfigSyncRun).join(
-            sub,
-            and_(
-                FirewallConfigSyncRun.firewall_id == sub.c.fid,
-                FirewallConfigSyncRun.finished_at == sub.c.mx,
-            ),
+    rows = (
+        db.execute(
+            select(FirewallConfigSyncRun).join(
+                sub,
+                and_(
+                    FirewallConfigSyncRun.firewall_id == sub.c.fid,
+                    FirewallConfigSyncRun.finished_at == sub.c.mx,
+                ),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     out: dict[int, str] = {}
     for r in rows:
         if r.status != "error":
@@ -1143,6 +1272,7 @@ BASE_DIR = config.BASE_DIR
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["https_admin_url_for_firewall"] = https_admin_url_for_firewall
 templates.env.globals["request_is_https_session"] = request_is_https_session
+templates.env.globals["firmware_inventory_cell"] = firmware_inventory_cell
 
 
 def _template_webadmin_browser_url(request: Request, fw: Firewall) -> str:
@@ -1251,6 +1381,7 @@ async def _gc_hsts_header(request: Request, call_next):
 
 
 _GC_NAV_PREFLIGHT_HEADER = "x-gc-navigation-preflight"
+_GC_ERROR_BANNER_SESSION_KEY = "gc_error_banner"
 
 
 def _json_detail_payload(detail: Any) -> dict[str, Any]:
@@ -1259,6 +1390,37 @@ def _json_detail_payload(detail: Any) -> dict[str, Any]:
     if isinstance(detail, (list, dict)):
         return {"detail": detail}
     return {"detail": str(detail)}
+
+
+def _http_exception_detail_message(exc: StarletteHTTPException) -> str:
+    detail = exc.detail
+    if isinstance(detail, str) and detail.strip():
+        return detail.strip()
+    if detail is None:
+        return "Access denied."
+    try:
+        return json.dumps(detail)
+    except TypeError:
+        return str(detail)
+
+
+def _is_browser_page_navigation(request: Request) -> bool:
+    if request.method.upper() != "GET":
+        return False
+    path = request.url.path
+    if path.startswith(("/api/", "/internal/", "/static/")):
+        return False
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept or "*/*" in accept
+
+
+def _pop_error_banner_flash(request: Request) -> str | None:
+    try:
+        raw = request.session.pop(_GC_ERROR_BANNER_SESSION_KEY, None)
+    except AssertionError:
+        return None
+    msg = str(raw or "").strip()
+    return msg or None
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -1277,6 +1439,18 @@ async def _gc_starlette_http_exception_handler(
             _json_detail_payload(exc.detail),
             status_code=exc.status_code,
         )
+    if (
+        exc.status_code == 403
+        and request.url.path != "/"
+        and _is_browser_page_navigation(request)
+    ):
+        try:
+            request.session[_GC_ERROR_BANNER_SESSION_KEY] = (
+                _http_exception_detail_message(exc)
+            )
+        except AssertionError:
+            pass
+        return RedirectResponse(url="/", status_code=303)
     return await http_exception_handler(request, exc)
 
 
@@ -1313,6 +1487,7 @@ class ProtectApiMiddleware(BaseHTTPMiddleware):
         method = request.method.upper()
         if not path.startswith("/api/"):
             return await call_next(request)
+        purge_invalidated_browser_session(request)
         public = (
             (method, path) == ("GET", "/api/health")
             or (method, path) == ("GET", "/api/auth/status")
@@ -1327,6 +1502,7 @@ class ProtectApiMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
         row = users_service.get_app_user_by_id(uid)
         if not row or not users_service.app_user_has_password(row):
+            remember_invalidated_session_tracking_id(request)
             unregister_authenticated_session(request)
             request.session.clear()
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
@@ -1337,7 +1513,16 @@ class ProtectApiMiddleware(BaseHTTPMiddleware):
                 {"detail": "Session expired due to inactivity."},
                 status_code=401,
             )
-        touch_session_activity(request)
+        if apply_expired_admin_logout_challenge(request):
+            return JSONResponse(
+                {"detail": "Signed out by administrator request."},
+                status_code=401,
+            )
+        if (method, path) not in {
+            ("GET", "/api/auth/active-admin-sessions"),
+            ("GET", "/api/auth/admin-chats"),
+        }:
+            touch_session_activity(request)
         return await call_next(request)
 
 
@@ -1353,11 +1538,13 @@ app.add_middleware(
 
 
 def require_browser_session(request: Request) -> None:
+    purge_invalidated_browser_session(request)
     uid = session_user_id(request)
     if not uid:
         raise HTTPException(status_code=307, headers={"Location": "/"})
     row = users_service.get_app_user_by_id(uid)
     if not row or not users_service.app_user_has_password(row):
+        remember_invalidated_session_tracking_id(request)
         unregister_authenticated_session(request)
         request.session.clear()
         raise HTTPException(status_code=307, headers={"Location": "/"})
@@ -1376,9 +1563,39 @@ def admin_user_id_dep(request: Request) -> str:
     return require_admin_user_id(request)
 
 
+def designer_user_id_dep(request: Request) -> str:
+    require_browser_session(request)
+    uid = require_authenticated_user_id(request)
+    row = users_service.get_app_user_by_id(uid)
+    if not row or not user_role_can_use_designer(row.role):
+        raise HTTPException(status_code=403, detail="Designer access required")
+    return uid
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
+
+
+APP_USER_ROLES = frozenset({"admin", "SuperAdmin", "ReadOnly", "Designer", "user"})
+
+
+def normalize_app_user_role(role: str) -> str:
+    raw = str(role or "").strip()
+    by_key = {
+        "admin": "admin",
+        "administrator": "admin",
+        "superadmin": "SuperAdmin",
+        "super admin": "SuperAdmin",
+        "readonly": "ReadOnly",
+        "read only": "ReadOnly",
+        "designer": "Designer",
+        "user": "user",
+    }
+    normalized = by_key.get(raw.casefold())
+    if not normalized or normalized not in APP_USER_ROLES:
+        raise ValueError("Invalid role.")
+    return normalized
 
 
 class LoginBody(BaseModel):
@@ -1394,18 +1611,43 @@ class SetupAdminPasswordBody(BaseModel):
 class CreateAppUserBody(BaseModel):
     username: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=10, max_length=256)
-    role: str = Field(pattern="^(admin|user)$")
+    role: str = Field(min_length=1, max_length=32)
     full_name: str | None = Field(default=None, max_length=200)
     email: str | None = Field(default=None, max_length=320)
     mobile: str | None = Field(default=None, max_length=80)
 
+    @field_validator("role")
+    @classmethod
+    def normalize_role(cls, v: str) -> str:
+        return normalize_app_user_role(v)
+
 
 class PatchAppUserBody(BaseModel):
-    role: str | None = Field(None, pattern="^(admin|user)$")
+    username: str | None = Field(default=None, min_length=1, max_length=200)
+    role: str | None = Field(None, min_length=1, max_length=32)
     password: str | None = Field(None, min_length=10, max_length=256)
     full_name: str | None = Field(default=None, max_length=200)
     email: str | None = Field(default=None, max_length=320)
     mobile: str | None = Field(default=None, max_length=80)
+
+    @field_validator("role")
+    @classmethod
+    def normalize_role(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return normalize_app_user_role(v)
+
+
+class StartAdminChatBody(BaseModel):
+    peer_session_id: str = Field(min_length=1, max_length=256)
+
+
+class AdminChatMessageBody(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class AdminLogoutRequestBody(BaseModel):
+    target_session_id: str = Field(min_length=1, max_length=256)
 
 
 class SecuritySettingsBody(BaseModel):
@@ -1417,7 +1659,12 @@ class SecuritySettingsBody(BaseModel):
     listen_interface: str = Field(default="0.0.0.0", max_length=64)
     allowed_ranges: str = Field(default="", max_length=32000)
     tls_hostnames: str = Field(default="", max_length=32000)
-    cert_source: str = Field(default="self_signed", pattern="^(self_signed|letsencrypt)$")
+    cert_source: str = Field(
+        default="self_signed", pattern="^(self_signed|letsencrypt)$"
+    )
+    session_idle_timeout_minutes: int = Field(
+        default=config.DEFAULT_SESSION_IDLE_MINUTES, ge=0, le=525600
+    )
 
 
 class GenerateSelfSignedTlsBody(BaseModel):
@@ -1577,15 +1824,113 @@ def api_auth_activity():
 
 @app.post("/api/auth/logout")
 def api_auth_logout(request: Request):
+    remember_invalidated_session_tracking_id(request)
     unregister_authenticated_session(request)
     request.session.clear()
     return {"ok": True}
 
 
 @app.get("/api/auth/active-admin-sessions")
-def api_auth_active_admin_sessions(_: Annotated[str, Depends(current_user_id_dep)]):
-    admins = list_active_admin_sessions()
+def api_auth_active_admin_sessions(
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    admins = list_active_admin_sessions(
+        current_tracking_id=request.session.get(SESSION_TRACKING_ID_KEY)
+    )
     return {"count": len(admins), "admins": admins}
+
+
+def _current_session_tracking_id_or_401(request: Request) -> str:
+    tok = str(request.session.get(SESSION_TRACKING_ID_KEY) or "").strip()
+    if not tok:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return tok
+
+
+@app.get("/api/auth/admin-chats")
+def api_auth_admin_chats(
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    tok = _current_session_tracking_id_or_401(request)
+    chats = list_admin_chats(tok)
+    unread = sum(int(c.get("unread_count") or 0) for c in chats)
+    return {
+        "count": len(chats),
+        "unread_count": unread,
+        "chats": chats,
+        "logout_challenges": list_admin_logout_challenges(tok),
+    }
+
+
+@app.post("/api/auth/admin-chats")
+def api_auth_admin_chats_start(
+    body: StartAdminChatBody,
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    chat = start_admin_chat(
+        _current_session_tracking_id_or_401(request), body.peer_session_id
+    )
+    return {"ok": True, "chat": chat}
+
+
+@app.post("/api/auth/admin-chats/{chat_id}/messages")
+def api_auth_admin_chats_send(
+    chat_id: str,
+    body: AdminChatMessageBody,
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    chat = add_admin_chat_message(
+        _current_session_tracking_id_or_401(request), chat_id, body.message
+    )
+    return {"ok": True, "chat": chat}
+
+
+@app.post("/api/auth/admin-chats/{chat_id}/read")
+def api_auth_admin_chats_read(
+    chat_id: str,
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    chat = mark_admin_chat_read(_current_session_tracking_id_or_401(request), chat_id)
+    return {"ok": True, "chat": chat}
+
+
+@app.post("/api/auth/admin-logout-requests")
+def api_auth_admin_logout_request(
+    body: AdminLogoutRequestBody,
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    challenge = request_admin_logout_challenge(
+        _current_session_tracking_id_or_401(request), body.target_session_id
+    )
+    return {"ok": True, "challenge": challenge}
+
+
+@app.post("/api/auth/admin-logout-requests/{challenge_id}/still-here")
+def api_auth_admin_logout_still_here(
+    challenge_id: str,
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    chat = cancel_admin_logout_challenge(
+        _current_session_tracking_id_or_401(request), challenge_id
+    )
+    return {"ok": True, "chat": chat}
+
+
+@app.post("/api/auth/admin-logout-requests/{challenge_id}/logout")
+def api_auth_admin_logout_complete(
+    challenge_id: str,
+    request: Request,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    complete_admin_logout_challenge(request, challenge_id)
+    return {"ok": True}
 
 
 @app.get("/api/settings/users")
@@ -1626,15 +1971,28 @@ def api_settings_users_patch(
     db: Annotated[Session, Depends(get_secrets_db)],
 ):
     profile_updates = _app_user_profile_updates_from_body(body)
-    if body.role is None and body.password is None and not profile_updates:
+    if (
+        body.username is None
+        and body.role is None
+        and body.password is None
+        and not profile_updates
+    ):
         raise HTTPException(status_code=400, detail="Nothing to update.")
     row = db.get(AppUser, user_id)
     if not row:
         raise HTTPException(status_code=404, detail="User not found.")
+    if body.username is not None:
+        try:
+            users_service.update_app_user_username(db, user_id, body.username)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        row = db.get(AppUser, user_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
     if body.role is not None and body.role != row.role:
         if (
-            row.role == "admin"
-            and body.role == "user"
+            user_role_is_admin(row.role)
+            and not user_role_is_admin(body.role)
             and users_service.count_admins(db) <= 1
         ):
             raise HTTPException(
@@ -1675,7 +2033,7 @@ def api_settings_users_delete(
     row = db.get(AppUser, user_id)
     if not row:
         raise HTTPException(status_code=404, detail="User not found.")
-    if row.role == "admin" and users_service.count_admins(db) <= 1:
+    if user_role_is_admin(row.role) and users_service.count_admins(db) <= 1:
         raise HTTPException(
             status_code=400,
             detail="Cannot delete the last administrator.",
@@ -1698,6 +2056,9 @@ def _security_state_from_body(
         allowed_ranges=body.allowed_ranges,
         tls_hostnames=body.tls_hostnames.strip(),
         cert_source=body.cert_source,
+        session_idle_timeout_minutes=security_settings.normalize_session_idle_timeout_minutes(
+            body.session_idle_timeout_minutes
+        ),
     )
 
 
@@ -1721,22 +2082,29 @@ def api_settings_security_validate(
 def api_settings_security_apply(
     body: SecuritySettingsBody, _: Annotated[str, Depends(admin_user_id_dep)]
 ):
+    before = security_settings.load_security_ui_state()
     state = _security_state_from_body(body)
     errs = security_settings.validate_security_apply(
         state, ports_held_by_this_process=_security_ports_held_by_this_process()
     )
     if errs:
         raise HTTPException(status_code=400, detail={"errors": errs})
+    restart = security_settings.security_listen_settings_changed(before, state)
     security_settings.save_security_ui_state(state)
+    msg = (
+        "Settings saved. Restart the application for new listen ports and environment "
+        "variables to take effect."
+        if restart
+        else "Settings saved."
+    )
     return {
         "ok": True,
         "errors": [],
-        "restart_required": True,
-        "message": (
-            "Settings saved. Restart the application for new listen ports and environment "
-            "variables to take effect."
-        ),
+        "restart_required": restart,
+        "message": msg,
         "certificate": security_settings.load_https_certificate_summary(),
+        "security_field_sources": security_settings.security_field_external_sources(),
+        "session_idle_effective_minutes": security_settings.effective_session_idle_timeout_minutes(),
     }
 
 
@@ -1865,7 +2233,11 @@ def api_settings_test_firewalls_generate(
     if src_id is not None and db.get(Firewall, int(src_id)) is None:
         raise HTTPException(status_code=404, detail="Source firewall not found")
     tok = body.synthetic_layout_token
-    if tok and str(tok).strip() and os.environ.get("GROUND_CONTROL_UNDER_PYTEST") != "1":
+    if (
+        tok
+        and str(tok).strip()
+        and os.environ.get("GROUND_CONTROL_UNDER_PYTEST") != "1"
+    ):
         raise HTTPException(status_code=400, detail="Invalid request.")
     try:
         created = _create_test_firewalls(
@@ -2001,7 +2373,9 @@ def api_settings_backup_restore_last(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except DataError as exc:
-        raise HTTPException(status_code=400, detail=_GC_BACKUP_RESTORE_DATA_TOO_LONG) from exc
+        raise HTTPException(
+            status_code=400, detail=_GC_BACKUP_RESTORE_DATA_TOO_LONG
+        ) from exc
     except IntegrityError as exc:
         raise HTTPException(
             status_code=400,
@@ -2009,7 +2383,8 @@ def api_settings_backup_restore_last(
         ) from exc
     except zipfile.BadZipFile as exc:
         raise HTTPException(
-            status_code=400, detail="Backup payload is not a valid zip after decrypt.",
+            status_code=400,
+            detail="Backup payload is not a valid zip after decrypt.",
         ) from exc
 
 
@@ -2036,7 +2411,9 @@ async def api_settings_backup_restore(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except DataError as exc:
-        raise HTTPException(status_code=400, detail=_GC_BACKUP_RESTORE_DATA_TOO_LONG) from exc
+        raise HTTPException(
+            status_code=400, detail=_GC_BACKUP_RESTORE_DATA_TOO_LONG
+        ) from exc
     except IntegrityError as exc:
         raise HTTPException(
             status_code=400,
@@ -2044,7 +2421,8 @@ async def api_settings_backup_restore(
         ) from exc
     except zipfile.BadZipFile as exc:
         raise HTTPException(
-            status_code=400, detail="Backup payload is not a valid zip after decrypt.",
+            status_code=400,
+            detail="Backup payload is not a valid zip after decrypt.",
         ) from exc
     return out
 
@@ -2119,6 +2497,7 @@ def dashboard(
         {
             "app_about": APP_ABOUT,
             "auth_client_state": auth_client_state(request, sdb),
+            "gc_error_banner": _pop_error_banner_flash(request),
             **template_nav_firewall_context(request, sdb, db),
         },
     )
@@ -2142,18 +2521,29 @@ def _designer_template_context(
 
 @app.get("/designer", name="designer_page")
 def designer_page(
-    _: Annotated[None, Depends(require_browser_session)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
 ):
-    """Canonical designer entry: send users to Content (reference sandboxes)."""
-    return RedirectResponse(url="/designer/content", status_code=302)
+    """Canonical designer entry: Navigation (entity types & nav metadata)."""
+    return RedirectResponse(url="/designer/navigation", status_code=302)
 
 
-@app.get("/designer/navigation", name="designer_navigation_removed")
-def designer_navigation_removed(
-    _: Annotated[None, Depends(require_browser_session)],
+@app.get(
+    "/designer/navigation", response_class=HTMLResponse, name="designer_navigation_page"
+)
+def designer_navigation_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
 ):
-    """Former Designer · Navigation page; bookmarks redirect to Content."""
-    return RedirectResponse(url="/designer/content", status_code=302)
+    """Designer: cached entity types and navigation metadata (JSON in /data)."""
+    return templates.TemplateResponse(
+        request,
+        "designer_navigation.html",
+        _designer_template_context(
+            request, sdb, db, designer_subnav_active="navigation"
+        ),
+    )
 
 
 @app.get("/designer/modals", response_class=HTMLResponse, name="designer_modals_page")
@@ -2161,7 +2551,7 @@ def designer_modals_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
-    _: Annotated[None, Depends(require_browser_session)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
 ):
     """Designer sub-area: modals and overlays."""
     return templates.TemplateResponse(
@@ -2171,12 +2561,14 @@ def designer_modals_page(
     )
 
 
-@app.get("/designer/controls", response_class=HTMLResponse, name="designer_controls_page")
+@app.get(
+    "/designer/controls", response_class=HTMLResponse, name="designer_controls_page"
+)
 def designer_controls_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
-    _: Annotated[None, Depends(require_browser_session)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
 ):
     """Designer sub-area: reusable input controls and validation patterns."""
     return templates.TemplateResponse(
@@ -2186,19 +2578,628 @@ def designer_controls_page(
     )
 
 
-@app.get("/designer/content", response_class=HTMLResponse, name="designer_content_page")
-def designer_content_page(
+@app.get("/designer/tables", response_class=HTMLResponse, name="designer_tables_page")
+def designer_tables_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
-    _: Annotated[None, Depends(require_browser_session)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
 ):
-    """Static UI reference for tables, flyouts, modals, and composite controls."""
-    return templates.TemplateResponse(
-        request,
-        "designer_content.html",
-        _designer_template_context(request, sdb, db, designer_subnav_active="content"),
+    """Designer sandbox: configurable faceted cache-backed tables."""
+    ctx = _designer_template_context(request, sdb, db, designer_subnav_active="tables")
+    ctx["hosts_services_entity_types"] = sorted(HOSTS_SERVICES_ENTITY_TYPES)
+    ctx["designer_table_instance_id"] = "gc-designer-tables"
+    return templates.TemplateResponse(request, "designer_tables.html", ctx)
+
+
+_DESIGNER_ENTITY_TYPE_PARAM_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,31}$")
+
+
+_MAX_ALLOWED_OPTION_LEN = 512
+_MAX_ALLOWED_OPTIONS_COUNT = 256
+
+
+def _decode_allowed_options_from_db(raw: str | None) -> list[str] | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        j = json.loads(s)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(j, list):
+        return None
+    out: list[str] = []
+    for x in j:
+        if isinstance(x, str):
+            t = x.strip()
+        else:
+            t = str(x).strip() if x is not None else ""
+        if not t:
+            continue
+        if len(t) > _MAX_ALLOWED_OPTION_LEN:
+            t = t[:_MAX_ALLOWED_OPTION_LEN]
+        out.append(t)
+        if len(out) >= _MAX_ALLOWED_OPTIONS_COUNT:
+            break
+    return out if out else None
+
+
+def _encode_allowed_options_for_db(value: list[str] | None) -> str | None:
+    if value is None:
+        return None
+    norm: list[str] = []
+    for x in value:
+        t = str(x).strip() if x is not None else ""
+        if not t:
+            continue
+        if len(t) > _MAX_ALLOWED_OPTION_LEN:
+            t = t[:_MAX_ALLOWED_OPTION_LEN]
+        norm.append(t)
+        if len(norm) >= _MAX_ALLOWED_OPTIONS_COUNT:
+            break
+    if not norm:
+        return None
+    return json.dumps(norm)
+
+
+_MAX_DATA_SOURCE_ENTITY_TYPES_COUNT = 64
+
+
+def _decode_data_source_entity_types_from_db(raw: str | None) -> list[str] | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        j = json.loads(s)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(j, list):
+        return None
+    out: list[str] = []
+    for x in j:
+        if isinstance(x, str):
+            t = x.strip()
+        else:
+            t = str(x).strip() if x is not None else ""
+        if not t or not _DESIGNER_ENTITY_TYPE_PARAM_RE.match(t):
+            continue
+        if t not in out:
+            out.append(t)
+        if len(out) >= _MAX_DATA_SOURCE_ENTITY_TYPES_COUNT:
+            break
+    return out if out else None
+
+
+def _encode_data_source_entity_types_for_db(value: list[str] | None) -> str | None:
+    if value is None:
+        return None
+    norm: list[str] = []
+    for x in value:
+        t = str(x).strip() if x is not None else ""
+        if not t or not _DESIGNER_ENTITY_TYPE_PARAM_RE.match(t):
+            continue
+        if t not in norm:
+            norm.append(t)
+        if len(norm) >= _MAX_DATA_SOURCE_ENTITY_TYPES_COUNT:
+            break
+    if not norm:
+        return None
+    return json.dumps(norm)
+
+
+class _EntityPayloadFieldRowUpdate(BaseModel):
+    id: int = Field(..., ge=1)
+    dependent_on: str | None = None
+    data_entry_type: str | None = None
+    data_entry_properties: str | None = None
+    show_as: str | None = None
+    display_order: int | None = Field(default=None, ge=1)
+    help_text: str | None = None
+    allowed_options: list[str] | None = Field(
+        default=None, max_length=_MAX_ALLOWED_OPTIONS_COUNT
     )
+    data_source_entity_types: list[str] | None = Field(
+        default=None, max_length=_MAX_DATA_SOURCE_ENTITY_TYPES_COUNT
+    )
+
+    @field_validator("allowed_options", mode="before")
+    @classmethod
+    def _coerce_allowed_options(cls, v: Any) -> list[str] | None:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            raise ValueError("allowed_options must be an array of strings or null")
+        out: list[str] = []
+        for x in v:
+            if isinstance(x, str):
+                t = x.strip()
+            else:
+                t = str(x).strip() if x is not None else ""
+            if not t:
+                continue
+            if len(t) > _MAX_ALLOWED_OPTION_LEN:
+                t = t[:_MAX_ALLOWED_OPTION_LEN]
+            out.append(t)
+            if len(out) >= _MAX_ALLOWED_OPTIONS_COUNT:
+                break
+        return out if out else None
+
+    @field_validator("data_source_entity_types", mode="before")
+    @classmethod
+    def _coerce_data_source_entity_types(cls, v: Any) -> list[str] | None:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            raise ValueError("data_source_entity_types must be an array of strings or null")
+        out: list[str] = []
+        for x in v:
+            if isinstance(x, str):
+                t = x.strip()
+            else:
+                t = str(x).strip() if x is not None else ""
+            if not t:
+                continue
+            if not _DESIGNER_ENTITY_TYPE_PARAM_RE.match(t):
+                raise ValueError(f"Invalid entity type in data_source_entity_types: {t!r}")
+            if t not in out:
+                out.append(t)
+            if len(out) >= _MAX_DATA_SOURCE_ENTITY_TYPES_COUNT:
+                break
+        return out if out else None
+
+
+class _BulkEntityPayloadFieldUpdatesBody(BaseModel):
+    updates: list[_EntityPayloadFieldRowUpdate] = Field(
+        default_factory=list,
+        max_length=2000,
+    )
+
+
+class _DesignerDataControlsLayoutBody(BaseModel):
+    layout: dict[str, Any] = Field(default_factory=dict)
+
+
+def _normalize_catalog_editor_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped if stripped else None
+
+
+def _normalize_catalog_show_as(value: str | None) -> str | None:
+    base = _normalize_catalog_editor_text(value)
+    if base is None:
+        return None
+    return base[:512]
+
+
+@app.get(
+    "/designer/data-controls",
+    response_class=HTMLResponse,
+    name="designer_data_controls_page",
+)
+def designer_data_controls_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
+):
+    """Designer: browse field catalog (``firewall_config_entity_payload_fields``) per cache type."""
+    ctx = _designer_template_context(
+        request, sdb, db, designer_subnav_active="data_controls"
+    )
+    ctx["designer_catalog_data_entry_types"] = catalog_data_entry_type_dropdown_values()
+    return templates.TemplateResponse(request, "designer_data_controls.html", ctx)
+
+
+def _entity_payload_fields_list_payload(
+    db: Session, entity_type: str
+) -> dict[str, Any]:
+    """JSON list payload for ``firewall_config_entity_payload_fields`` (read-only)."""
+    et = str(entity_type or "").strip()
+    if not _DESIGNER_ENTITY_TYPE_PARAM_RE.match(et):
+        raise HTTPException(status_code=400, detail="Invalid entity type")
+    do = FirewallConfigEntityPayloadField.display_order
+    det_col = FirewallConfigEntityPayloadField.data_entry_type
+    hidden_last = case(
+        (func.lower(func.coalesce(det_col, "")) == "hidden", 1),
+        else_=0,
+    )
+    rows = (
+        db.query(FirewallConfigEntityPayloadField)
+        .filter(FirewallConfigEntityPayloadField.entity_type == et)
+        .order_by(
+            hidden_last.asc(),
+            case((do.is_(None), 1), else_=0),
+            do.asc(),
+            FirewallConfigEntityPayloadField.property_name.asc(),
+        )
+        .all()
+    )
+    return {
+        "ok": True,
+        "entity_type": et,
+        "fields": [
+            {
+                "id": r.id,
+                "property_name": r.property_name,
+                "json_value_kind": r.json_value_kind,
+                "dependent_on": r.dependent_on,
+                "data_entry_type": r.data_entry_type,
+                "data_entry_properties": r.data_entry_properties,
+                "show_as": r.show_as,
+                "display_order": r.display_order,
+                "help_text": r.help_text,
+                "allowed_options": _decode_allowed_options_from_db(r.allowed_options),
+                "data_source_entity_types": _decode_data_source_entity_types_from_db(
+                    r.data_source_entity_types
+                ),
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.get(
+    "/api/designer/entity-payload-fields/{entity_type}",
+    name="api_designer_entity_payload_fields",
+)
+def api_designer_entity_payload_fields(
+    entity_type: str,
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Rows from ``firewall_config_entity_payload_fields`` for one ``entity_type`` (sorted for display).
+
+    Non-hidden rows come first (by display order, then property name); ``data_entry_type`` of
+    ``hidden`` (case-insensitive) is sorted to the bottom of the list.
+    """
+    return _entity_payload_fields_list_payload(db, entity_type)
+
+
+@app.get(
+    "/api/firewalls/config-ui/entity-payload-fields/{entity_type}",
+    name="api_firewalls_config_ui_entity_payload_fields",
+)
+def api_firewalls_config_ui_entity_payload_fields(
+    entity_type: str,
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Field catalog for object-edit flyout (same rows as Designer Data Controls, read-only)."""
+    return _entity_payload_fields_list_payload(db, entity_type)
+
+
+@app.get(
+    "/api/firewalls/config-ui/data-controls-layout/{entity_type}",
+    name="api_firewalls_config_ui_data_controls_layout",
+)
+def api_firewalls_config_ui_data_controls_layout(
+    entity_type: str,
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    """Saved Data Controls layout graph for one entity type (positions, connections, logic)."""
+    try:
+        layout = get_layout_for_entity_type(entity_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    et = str(entity_type or "").strip()
+    return {"ok": True, "entity_type": et, "layout": layout}
+
+
+class _DesignerCachedObjectNamesBody(BaseModel):
+    firewall_ids: list[int] = Field(default_factory=list, max_length=256)
+    entity_types: list[str] = Field(default_factory=list, max_length=64)
+
+    @field_validator("firewall_ids", mode="before")
+    @classmethod
+    def _coerce_firewall_ids(cls, v: Any) -> list[int]:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("firewall_ids must be an array of integers")
+        out: list[int] = []
+        for x in v:
+            try:
+                n = int(x)
+            except (TypeError, ValueError):
+                continue
+            if n < 1 or n in out:
+                continue
+            out.append(n)
+            if len(out) >= 256:
+                break
+        return out
+
+    @field_validator("entity_types", mode="before")
+    @classmethod
+    def _coerce_entity_types(cls, v: Any) -> list[str]:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("entity_types must be an array of strings")
+        out: list[str] = []
+        for x in v:
+            t = str(x).strip() if x is not None else ""
+            if not t or not _DESIGNER_ENTITY_TYPE_PARAM_RE.match(t):
+                continue
+            if t not in out:
+                out.append(t)
+            if len(out) >= 64:
+                break
+        return out
+
+
+def _cached_external_names_by_type(
+    db: Session, firewall_ids: list[int], entity_types: list[str]
+) -> dict[str, list[str]]:
+    """Distinct ``external_name`` values from firewall config cache, grouped by ``entity_type``."""
+    out: dict[str, list[str]] = {et: [] for et in entity_types}
+    if not firewall_ids or not entity_types:
+        return out
+    buckets: dict[str, set[str]] = {et: set() for et in entity_types}
+    rows = chunked_in_query(
+        lambda chunk: (
+            db.query(FirewallConfigEntry.entity_type, FirewallConfigEntry.external_name)
+            .filter(
+                FirewallConfigEntry.firewall_id.in_(chunk),
+                FirewallConfigEntry.entity_type.in_(entity_types),
+            )
+            .all()
+        ),
+        firewall_ids,
+    )
+    for et, ext in rows:
+        if et not in buckets:
+            continue
+        t = str(ext).strip()
+        if t:
+            buckets[et].add(t)
+    for et in entity_types:
+        names = sorted(buckets.get(et, ()), key=lambda s: s.casefold())
+        out[et] = names
+    return out
+
+
+@app.post(
+    "/api/designer/config-cache/cached-object-names",
+    name="api_designer_config_cache_cached_object_names",
+)
+def api_designer_config_cache_cached_object_names(
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    body: _DesignerCachedObjectNamesBody,
+):
+    """
+    For the given firewalls, list distinct cached ``external_name`` values per ``entity_type``
+    (firewall config cache rows).
+    """
+    names_by_type = _cached_external_names_by_type(
+        db, body.firewall_ids, body.entity_types
+    )
+    return {"ok": True, "names_by_type": names_by_type}
+
+
+@app.get(
+    "/api/designer/named-control-ids",
+    name="api_designer_named_control_ids",
+)
+def api_designer_named_control_ids(
+    _: Annotated[str, Depends(designer_user_id_dep)],
+):
+    """Stable ``data-gc-designer-control-id`` values from Designer · Controls."""
+    return {"ok": True, "control_ids": designer_named_control_ids_sorted()}
+
+
+@app.put(
+    "/api/designer/entity-payload-fields/{entity_type}",
+    name="api_designer_entity_payload_fields_bulk_update",
+)
+def api_designer_entity_payload_fields_bulk_update(
+    entity_type: str,
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    body: _BulkEntityPayloadFieldUpdatesBody,
+):
+    """
+    Persist editor metadata for catalog rows (dependent_on, data_entry_type, data_entry_properties,
+    show_as, display_order, help_text, allowed_options). Only supplied row ids belonging to the path
+    ``entity_type`` are updated.
+    """
+    et = str(entity_type or "").strip()
+    if not _DESIGNER_ENTITY_TYPE_PARAM_RE.match(et):
+        raise HTTPException(status_code=400, detail="Invalid entity type")
+    if not body.updates:
+        return {"ok": True, "updated": 0}
+
+    updated = 0
+    for item in body.updates:
+        row = db.get(FirewallConfigEntityPayloadField, item.id)
+        if row is None or row.entity_type != et:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Catalog row not found for this type (id={item.id}).",
+            )
+        fs = item.model_fields_set
+        if "dependent_on" in fs:
+            row.dependent_on = _normalize_catalog_editor_text(item.dependent_on)
+        if "data_entry_properties" in fs:
+            row.data_entry_properties = _normalize_catalog_editor_text(
+                item.data_entry_properties
+            )
+        if "data_entry_type" in fs:
+            det_in = item.data_entry_type
+            det = None if det_in is None else (str(det_in).strip() or None)
+            if det is not None and det not in CATALOG_DATA_ENTRY_TYPE_ALLOWLIST:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid data_entry_type for row id={item.id}",
+                )
+            row.data_entry_type = det
+        if "show_as" in fs:
+            row.show_as = _normalize_catalog_show_as(item.show_as)
+        if "display_order" in fs:
+            row.display_order = item.display_order
+        if "help_text" in fs:
+            row.help_text = _normalize_catalog_editor_text(item.help_text)
+        if "allowed_options" in fs:
+            row.allowed_options = _encode_allowed_options_for_db(item.allowed_options)
+        if "data_source_entity_types" in fs:
+            row.data_source_entity_types = _encode_data_source_entity_types_for_db(
+                item.data_source_entity_types
+            )
+        updated += 1
+    db.commit()
+    return {"ok": True, "updated": updated}
+
+
+@app.post(
+    "/api/designer/entity-payload-fields/generate-missing",
+    name="api_designer_entity_payload_fields_generate_missing",
+)
+def api_designer_entity_payload_fields_generate_missing(
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    body: Annotated[dict[str, Any] | None, Body()] = None,
+):
+    """
+    Ensure the catalog table exists, then scan firewall and/or configuration config-cache rows.
+    Inserts missing catalog paths, then fills NULL ``data_entry_type`` for name/description-style
+    property paths (``text-single`` / ``text-multiline`` heuristics).
+    """
+    payload = body or {}
+    inc_fw = bool(payload.get("include_firewall_cache", True))
+    inc_cfg = bool(payload.get("include_configuration_cache", True))
+    if not inc_fw and not inc_cfg:
+        raise HTTPException(
+            status_code=400,
+            detail="Select at least one cache source (firewall and/or configuration).",
+        )
+    stats = backfill_missing_entity_payload_fields_from_cache(
+        db,
+        include_firewall_cache=inc_fw,
+        include_configuration_cache=inc_cfg,
+    )
+    return {"ok": True, **stats}
+
+
+@app.get(
+    "/api/designer/data-controls-layout/{entity_type}",
+    name="api_designer_data_controls_layout_get",
+)
+def api_designer_data_controls_layout_get(
+    entity_type: str,
+    _: Annotated[str, Depends(designer_user_id_dep)],
+):
+    try:
+        layout = get_layout_for_entity_type(entity_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "entity_type": entity_type, "layout": layout}
+
+
+@app.put(
+    "/api/designer/data-controls-layout/{entity_type}",
+    name="api_designer_data_controls_layout_put",
+)
+def api_designer_data_controls_layout_put(
+    entity_type: str,
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    body: _DesignerDataControlsLayoutBody,
+):
+    try:
+        saved = save_layout_for_entity_type(entity_type, body.layout)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "entity_type": entity_type, "layout": saved}
+
+
+@app.get(
+    "/api/designer/table-properties/{instance_id}",
+    name="api_designer_table_properties_get",
+)
+def api_designer_table_properties_get(
+    instance_id: str,
+    _user_id: Annotated[str, Depends(designer_user_id_dep)],
+):
+    if not INSTANCE_ID_RE.match(instance_id):
+        raise HTTPException(status_code=400, detail="Invalid instance id")
+    return {
+        "ok": True,
+        "instance_id": instance_id,
+        "properties": get_instance_props(instance_id),
+    }
+
+
+@app.put(
+    "/api/designer/table-properties/{instance_id}",
+    name="api_designer_table_properties_put",
+)
+def api_designer_table_properties_put(
+    instance_id: str,
+    _user_id: Annotated[str, Depends(designer_user_id_dep)],
+    body: Annotated[dict[str, Any], Body()],
+):
+    if not INSTANCE_ID_RE.match(instance_id):
+        raise HTTPException(status_code=400, detail="Invalid instance id")
+    try:
+        saved = save_instance_props(instance_id, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "instance_id": instance_id, "properties": saved}
+
+
+@app.get(
+    "/api/designer/modal-properties",
+    name="api_designer_modal_properties_get",
+)
+def api_designer_modal_properties_get(
+    _user_id: Annotated[str, Depends(designer_user_id_dep)],
+):
+    return {"ok": True, "properties": get_modal_props()}
+
+
+@app.put(
+    "/api/designer/modal-properties",
+    name="api_designer_modal_properties_put",
+)
+def api_designer_modal_properties_put(
+    _user_id: Annotated[str, Depends(designer_user_id_dep)],
+    body: Annotated[dict[str, Any], Body()],
+):
+    saved = save_modal_props(body)
+    return {"ok": True, "properties": saved}
+
+
+@app.get(
+    "/api/designer/entity-type-navigation",
+    name="api_designer_entity_type_navigation_get",
+)
+def api_designer_entity_type_navigation_get(
+    _user_id: Annotated[str, Depends(designer_user_id_dep)],
+):
+    return {"ok": True, **get_navigation_entries()}
+
+
+@app.put(
+    "/api/designer/entity-type-navigation",
+    name="api_designer_entity_type_navigation_put",
+)
+def api_designer_entity_type_navigation_put(
+    _user_id: Annotated[str, Depends(designer_user_id_dep)],
+    body: Annotated[dict[str, Any], Body()],
+):
+    try:
+        saved = save_navigation_entries(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **saved}
 
 
 def _address_management_template_context(
@@ -2633,14 +3634,29 @@ def _configuration_cache_entry_counts_by_id(db: Session) -> dict[int, int]:
     return {int(cid): int(n) for cid, n in rows}
 
 
-@app.get("/firewalls", response_class=HTMLResponse, name="firewalls_inventory_page")
-def firewalls_page(
+def _firewalls_v2_shell_context(
+    route: str,
+    *,
+    active_section_slug: str = "",
+    active_page_slug: str = "",
+) -> dict[str, Any]:
+    return {
+        "fw_v2_nav_tree": build_firewalls_v2_object_nav_tree(),
+        "fw_v2_route": route,
+        "fw_v2_active_section_slug": active_section_slug,
+        "fw_v2_active_page_slug": active_page_slug,
+    }
+
+
+def _firewalls_inventory_template_context(
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
-    sdb: Annotated[Session, Depends(get_secrets_db)],
-    _: Annotated[None, Depends(require_browser_session)],
-    tab: str = "",
-):
+    db: Session,
+    sdb: Session,
+    *,
+    tab: str,
+    top_nav_active: str,
+    **extra: Any,
+) -> dict[str, Any]:
     firewalls = db.query(Firewall).order_by(Firewall.id.desc()).all()
     fw_ids = [f.id for f in firewalls]
     fw_online_map = {int(f.id): firewall_is_online(f) for f in firewalls}
@@ -2663,18 +3679,173 @@ def firewalls_page(
             (f.host or "").casefold(),
         ),
     )
+    ctx: dict[str, Any] = {
+        "firewalls": firewalls,
+        "fw_online_map": fw_online_map,
+        "fw_cached_sync_entities": fw_cached_sync_entities,
+        "fw_last_sync_error": fw_last_sync_error,
+        "inventory_tab": inventory_tab,
+        "top_nav_active": top_nav_active,
+        "configurations": configurations,
+        "cfg_cache_entry_counts": cfg_cache_entry_counts,
+        "app_about": APP_ABOUT,
+        "auth_client_state": auth_client_state(request, sdb),
+        **template_nav_firewall_context(
+            request,
+            sdb,
+            db,
+            skip_global_fw_table_filter=True,
+            nav_firewall_rows=nav_fw_sorted,
+        ),
+        "url_firewall_update": str(request.url_for("gc_update_firewall")),
+        "url_firewall_delete_batch": str(
+            request.url_for("gc_firewalls_delete_batch")
+        ),
+        "url_firewall_create": str(request.url_for("gc_create_firewall")),
+        "url_configuration_update": str(request.url_for("gc_update_configuration")),
+        "url_configuration_delete_batch": str(
+            request.url_for("gc_configurations_delete_batch")
+        ),
+        "url_api_configurations_apply_to_firewalls_batch": str(
+            request.url_for("api_configurations_apply_to_firewalls_batch")
+        ),
+        "url_api_configurations_status_summary": str(
+            request.url_for("api_configurations_status_summary")
+        ),
+        "url_api_configuration_apply_to_member_firewalls_template": str(
+            request.url_for(
+                "api_configuration_apply_to_member_firewalls", configuration_id=0
+            )
+        ).replace("/0/", "/__CONFIG_ID__/"),
+        "url_configuration_create": str(request.url_for("gc_create_configuration")),
+        "firewall_label_by_id": {
+            int(f.id): ((f.name or f.host or str(f.id)).strip())
+            for f in nav_fw_sorted
+        },
+        "sync_entity_catalog": list_sync_entity_catalog(),
+        "firewall_tag_suggestions": _distinct_firewall_tag_suggestions(firewalls),
+    }
+    ctx.update(extra)
+    return ctx
+
+
+@app.get("/firewalls", response_class=HTMLResponse, name="firewalls_inventory_page")
+def firewalls_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+    tab: str = "",
+):
     return templates.TemplateResponse(
         request,
         "firewalls.html",
+        _firewalls_inventory_template_context(
+            request,
+            db,
+            sdb,
+            tab=tab,
+            top_nav_active="firewalls",
+        ),
+    )
+
+
+@app.get("/firewalls-v2", response_class=HTMLResponse, name="firewalls_v2_inventory_page")
+def firewalls_v2_inventory_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    tab: str = "",
+):
+    return templates.TemplateResponse(
+        request,
+        "firewalls.html",
+        _firewalls_inventory_template_context(
+            request,
+            db,
+            sdb,
+            tab=tab,
+            top_nav_active="firewalls_v2",
+            firewalls_layout_base="firewalls_v2_base.html",
+            fw_parent_href="/firewalls-v2",
+            fw_parent_label="Firewalls v2",
+            **_firewalls_v2_shell_context("inventory"),
+        ),
+    )
+
+
+@app.get(
+    "/firewalls-v2/o/{section_slug}/{page_slug}",
+    response_class=HTMLResponse,
+    name="firewalls_v2_object_page",
+)
+def firewalls_v2_object_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    section_slug: str,
+    page_slug: str,
+    tab: str | None = Query(None),
+):
+    tree = build_firewalls_v2_object_nav_tree()
+    sec, page = resolve_firewalls_v2_object_page(tree, section_slug, page_slug)
+    if not sec or not page:
+        raise HTTPException(status_code=404, detail="Unknown navigation page")
+    nav_doc = get_navigation_entries()
+    raw_entries = nav_doc.get("entries")
+    entries = raw_entries if isinstance(raw_entries, dict) else {}
+    page_tabs = [t for t in (page.get("tabs") or []) if isinstance(t, dict)]
+    nav_tabbed = len(page_tabs) > 0
+    sk = str(sec.get("section_key") or "")
+    pk = str(page.get("page_key") or "")
+    settings_rows: list[dict[str, str]] = []
+    if nav_tabbed:
+        active_tab, _ = resolve_firewalls_v2_active_tab({**page, "tabs": page_tabs}, tab)
+        if not active_tab:
+            raise HTTPException(status_code=404, detail="Unknown tab")
+        tab_label = str(active_tab.get("label") or "").strip()
+        tab_slug = str(active_tab.get("slug") or "").strip() or "tab"
+        locked_types = list_object_entity_types_for_nav_tab(
+            entries=entries,
+            section_key=sk,
+            page_key=pk,
+            tab_label=tab_label,
+        )
+        for et, dn in list_settings_entities_for_nav_tab(
+            entries=entries,
+            section_key=sk,
+            page_key=pk,
+            tab_label=tab_label,
+        ):
+            settings_rows.append({"entity_type": et, "display_name": dn})
+        table_instance_id = f"fw_v2_o_{section_slug}_{page_slug}_{tab_slug}"
+    else:
+        active_tab = None
+        locked_types = list_object_entity_types_for_nav_page(
+            entries=entries,
+            section_key=sk,
+            page_key=pk,
+        )
+        table_instance_id = f"fw_v2_o_{section_slug}_{page_slug}"
+    if not INSTANCE_ID_RE.match(table_instance_id):
+        raise HTTPException(status_code=400, detail="Invalid navigation path for table id")
+    show_object_table = (not nav_tabbed) or (len(locked_types) > 0)
+    firewalls = db.query(Firewall).order_by(Firewall.id.desc()).all()
+    nav_fw_sorted = sorted(
+        firewalls,
+        key=lambda f: (
+            0 if f.name else 1,
+            (f.name or "").casefold(),
+            (f.host or "").casefold(),
+        ),
+    )
+    return templates.TemplateResponse(
+        request,
+        "firewalls_v2_object_page.html",
         {
-            "firewalls": firewalls,
-            "fw_online_map": fw_online_map,
-            "fw_cached_sync_entities": fw_cached_sync_entities,
-            "fw_last_sync_error": fw_last_sync_error,
-            "inventory_tab": inventory_tab,
-            "top_nav_active": "firewalls",
-            "configurations": configurations,
-            "cfg_cache_entry_counts": cfg_cache_entry_counts,
+            "top_nav_active": "firewalls_v2",
             "app_about": APP_ABOUT,
             "auth_client_state": auth_client_state(request, sdb),
             **template_nav_firewall_context(
@@ -2684,33 +3855,20 @@ def firewalls_page(
                 skip_global_fw_table_filter=True,
                 nav_firewall_rows=nav_fw_sorted,
             ),
-            "url_firewall_update": str(request.url_for("gc_update_firewall")),
-            "url_firewall_delete_batch": str(
-                request.url_for("gc_firewalls_delete_batch")
+            **_firewalls_v2_shell_context(
+                "object",
+                active_section_slug=section_slug,
+                active_page_slug=page_slug,
             ),
-            "url_firewall_create": str(request.url_for("gc_create_firewall")),
-            "url_configuration_update": str(request.url_for("gc_update_configuration")),
-            "url_configuration_delete_batch": str(
-                request.url_for("gc_configurations_delete_batch")
-            ),
-            "url_api_configurations_apply_to_firewalls_batch": str(
-                request.url_for("api_configurations_apply_to_firewalls_batch")
-            ),
-            "url_api_configurations_status_summary": str(
-                request.url_for("api_configurations_status_summary")
-            ),
-            "url_api_configuration_apply_to_member_firewalls_template": str(
-                request.url_for(
-                    "api_configuration_apply_to_member_firewalls", configuration_id=0
-                )
-            ).replace("/0/", "/__CONFIG_ID__/"),
-            "url_configuration_create": str(request.url_for("gc_create_configuration")),
-            "firewall_label_by_id": {
-                int(f.id): ((f.name or f.host or str(f.id)).strip())
-                for f in nav_fw_sorted
-            },
-            "sync_entity_catalog": list_sync_entity_catalog(),
-            "firewall_tag_suggestions": _distinct_firewall_tag_suggestions(firewalls),
+            "fw_v2_section": sec,
+            "fw_v2_page": page,
+            "fw_v2_active_tab": active_tab,
+            "fw_v2_nav_tabbed": nav_tabbed,
+            "fw_v2_settings_entities": settings_rows,
+            "fw_v2_show_object_table": show_object_table,
+            "fw_v2_locked_entity_types": locked_types,
+            "fw_v2_table_instance_id": table_instance_id,
+            "hosts_services_entity_types": sorted(HOSTS_SERVICES_ENTITY_TYPES),
         },
     )
 
@@ -3394,15 +4552,22 @@ def api_configurations_hosts_services_table(
             description="Merge rows with the same identity across selected configurations.",
         ),
     ] = True,
+    combine_by: Annotated[
+        str,
+        Query(
+            description=(
+                "When combine is true: optional flattened column id to merge on; "
+                "empty uses default Sophos name rules."
+            ),
+        ),
+    ] = "",
 ):
-    et = (entity_type or "").strip()
-    if et not in HOSTS_SERVICES_ENTITY_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown entity_type. Allowed: {', '.join(sorted(HOSTS_SERVICES_ENTITY_TYPES))}.",
-        )
+    et = _parse_config_cache_table_entity_type(entity_type)
     ids = _parse_configuration_ids_query(configuration_ids)
-    return configuration_hosts_services_table_payload(db, ids, et, combine=combine)
+    cb = sanitize_hs_combine_by_column(combine_by)
+    return configuration_hosts_services_table_payload(
+        db, ids, et, combine=combine, combine_by=cb or None
+    )
 
 
 class ConfigurationIdsBody(BaseModel):
@@ -4084,6 +5249,23 @@ HOSTS_SERVICES_ENTITY_TYPES: frozenset[str] = frozenset(
     }
 )
 
+# Config-cache ``entity_type`` query param for flattened table APIs (firewall + configuration).
+_CONFIG_CACHE_TABLE_ENTITY_TYPE_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
+
+
+def _parse_config_cache_table_entity_type(entity_type: str) -> str:
+    et = (entity_type or "").strip()
+    if not _CONFIG_CACHE_TABLE_ENTITY_TYPE_RE.fullmatch(et):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid entity_type: use a config-cache id such as ip_host, firewall_rule, or ips_policy "
+                "(lowercase letters, digits, underscores)."
+            ),
+        )
+    return et
+
+
 HS_CACHED_MEMBER_ENTITY_TYPES: frozenset[str] = frozenset(
     {
         "ip_host",
@@ -4531,7 +5713,9 @@ def firewalls_system_administration_page(
                 request.url_for("api_task_queue_enqueue_netflow_configuration_update")
             ),
             "url_api_task_queue_enqueue_netflow_configuration_clear_batch": str(
-                request.url_for("api_task_queue_enqueue_netflow_configuration_clear_batch")
+                request.url_for(
+                    "api_task_queue_enqueue_netflow_configuration_clear_batch"
+                )
             ),
         },
     )
@@ -6071,6 +7255,7 @@ def _api_hosts_services_entities(
     db: Session,
     *,
     combine: bool = True,
+    combine_by: str = "",
     q: str = "",
     limit: int | None = None,
     offset: int = 0,
@@ -6096,6 +7281,8 @@ def _api_hosts_services_entities(
 
     if not fids and not cids:
         return _empty_hs()
+
+    combine_key = sanitize_hs_combine_by_column(combine_by)
 
     fw_result: dict[str, Any] | None = None
     if fids:
@@ -6134,10 +7321,12 @@ def _api_hosts_services_entities(
             parsed.append((ent, fw, data))
         if combine_eff:
             if entity_type == "ip_host":
-                fw_result = build_ip_host_table_rows_combined(parsed)
+                fw_result = build_ip_host_table_rows_combined(
+                    parsed, combine_by=combine_key or None
+                )
             else:
                 fw_result = build_hs_table_rows_combined(
-                    parsed, entity_type=entity_type
+                    parsed, entity_type=entity_type, combine_by=combine_key or None
                 )
         else:
             fw_result = build_hosts_services_table_rows(parsed, entity_type=entity_type)
@@ -6145,7 +7334,11 @@ def _api_hosts_services_entities(
     cfg_result: dict[str, Any] | None = None
     if cids:
         cfg_result = configuration_hosts_services_table_payload(
-            db, cids, entity_type, combine=combine_eff
+            db,
+            cids,
+            entity_type,
+            combine=combine_eff,
+            combine_by=combine_key or None,
         )
 
     if cfg_result is None:
@@ -6313,25 +7506,30 @@ def api_firewalls_hosts_services_table(
             description="Merge rows with the same identity across selected firewalls (per tab).",
         ),
     ] = True,
+    combine_by: Annotated[
+        str,
+        Query(
+            description=(
+                "When combine is true: optional flattened column id to merge on "
+                "(e.g. Description). Empty uses default Sophos name (+ type) rules."
+            ),
+        ),
+    ] = "",
     q: Annotated[str, Query(description="Server-side text search filter.")] = "",
     limit: Annotated[
         int | None, Query(ge=1, le=5000, description="Max rows to return.")
     ] = None,
     offset: Annotated[int, Query(ge=0, description="Row offset for paging.")] = 0,
 ):
-    """Flattened rows from firewall_config_entries for Hosts & Services tabs."""
-    et = (entity_type or "").strip()
-    if et not in HOSTS_SERVICES_ENTITY_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown entity_type. Allowed: {', '.join(sorted(HOSTS_SERVICES_ENTITY_TYPES))}.",
-        )
+    """Flattened rows from firewall (or configuration) config cache for any ``entity_type``."""
+    et = _parse_config_cache_table_entity_type(entity_type)
     return _api_hosts_services_entities(
         firewall_ids,
         configuration_ids,
         et,
         db,
         combine=combine,
+        combine_by=combine_by,
         q=q,
         limit=limit,
         offset=offset,
@@ -7532,13 +8730,11 @@ _TEST_FW_POPULATION_TOP10_COUNTRIES = (
     "Mexico",
 )
 
+
 def _layout_for_new_test_firewall(
     synthetic_layout_token: str | None,
 ) -> SyntheticFwPortLayout:
-    if (
-        os.environ.get("GROUND_CONTROL_UNDER_PYTEST") == "1"
-        and synthetic_layout_token
-    ):
+    if os.environ.get("GROUND_CONTROL_UNDER_PYTEST") == "1" and synthetic_layout_token:
         tok = synthetic_layout_token.strip()
         if tok == "vm4":
             return SyntheticFwPortLayout(vm=4)
@@ -8272,6 +9468,31 @@ def api_firewalls_cached_sync_entity_types(
         return {}
     m = _firewall_cached_sync_entity_map(db, ids)
     return {str(k): v for k, v in m.items()}
+
+
+@app.get(
+    "/api/firewalls/config-cache/distinct-entity-types",
+    name="api_firewalls_config_cache_distinct_entity_types",
+)
+def api_firewalls_config_cache_distinct_entity_types(
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs (optional)")
+    ] = "",
+    configuration_ids: Annotated[
+        str, Query(description="Comma-separated configuration IDs (optional)")
+    ] = "",
+):
+    """
+    Unique ``entity_type`` values present in ``firewall_config_entries`` and/or
+    ``configuration_config_entries`` for the given scopes. When both query params are empty,
+    returns distinct types across the whole cache.
+    """
+    fids = _parse_firewall_ids_query(firewall_ids)
+    cids = _parse_configuration_ids_query(configuration_ids)
+    types = _distinct_config_cache_entity_types_union(db, fids, cids)
+    return {"entity_types": types}
 
 
 @app.get(

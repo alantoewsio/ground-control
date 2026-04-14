@@ -1,0 +1,1335 @@
+{% extends "designer_base.html" %}
+{% set designer_subnav_active = "data_controls" %}
+{% block title %}Data Controls · Designer · Ground Control{% endblock %}
+{% block page_title %}Data Controls{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/navigation">Designer</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Data Controls</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Inspect top-level <code class="mono">payload_json</code> keys in
+  <code class="mono">firewall_config_entity_payload_fields</code> (populated during firewall config sync). Entity display
+  names and nav placement are edited on <a href="/designer/navigation">Designer · Navigation</a>.
+</p>
+{% endblock %}
+{% block content %}
+<script type="application/json" id="gc-designer-data-controls-entry-types">{{ designer_catalog_data_entry_types | tojson }}</script>
+<main class="layout single gc-designer gc-designer-data-controls-page" data-gc-designer-data-controls="1">
+  <section class="gc-designer__section gc-designer-data-controls__type-rail" aria-labelledby="gc-designer-data-controls-h">
+    <h2 id="gc-designer-data-controls-h" class="gc-designer__h2">Cached object type</h2>
+    <p class="gc-designer__note">
+      Choose a type to load its catalogued payload properties. If the list is empty, run a config sync so fields can be
+      discovered.
+    </p>
+    <div class="gc-designer-data-controls__toolbar settings-form">
+      <label
+        class="settings-form__field gc-designer-data-controls__type-field gc-designer-entity-nav-object-sel__field"
+      >
+        <span class="settings-form__label" id="gc-designer-data-controls-type-l">Select type</span>
+        <select
+          class="settings-form__input mono gc-designer-entity-nav-object-sel__select"
+          id="gc-designer-data-controls-type"
+          data-gc-designer-object-selector="data-controls-entity-type"
+          aria-labelledby="gc-designer-data-controls-type-l"
+        >
+          <option value="">Loading…</option>
+        </select>
+      </label>
+      <p class="gc-designer-data-controls__status muted" id="gc-designer-data-controls-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+  <div class="gc-designer-data-controls__main-col">
+  <section class="gc-designer__section gc-designer-data-controls__tabs-wrap" aria-label="Data controls editor tabs">
+    <div class="gc-tabs gc-designer-data-controls__tabs" role="tablist" aria-label="Data controls tabs">
+      <button
+        type="button"
+        class="gc-tabs__tab is-active"
+        id="gc-designer-data-controls-tab-catalog"
+        role="tab"
+        aria-selected="true"
+        aria-controls="gc-designer-data-controls-panel-catalog"
+        data-gc-dc-tab="catalog"
+      >
+        Field catalog
+      </button>
+      <button
+        type="button"
+        class="gc-tabs__tab"
+        id="gc-designer-data-controls-tab-layout"
+        role="tab"
+        aria-selected="false"
+        aria-controls="gc-designer-data-controls-panel-layout"
+        data-gc-dc-tab="layout"
+      >
+        Layout
+      </button>
+    </div>
+  </section>
+  <section
+    class="gc-designer__section"
+    id="gc-designer-data-controls-panel-catalog"
+    role="tabpanel"
+    aria-labelledby="gc-designer-data-controls-tab-catalog"
+    data-gc-dc-panel="catalog"
+    aria-hidden="false"
+  >
+    <h2 id="gc-designer-data-controls-fields-h" class="gc-designer__h2">Field catalog</h2>
+    <p class="gc-designer__note">
+      Scan synced cache entries and add any missing <code class="mono">payload_json</code> keys to the catalog:
+      top-level and nested object keys use dot-separated paths (e.g. <code class="mono">Parent.Child</code>).
+      Existing catalog rows are left unchanged.
+    </p>
+    <div class="gc-designer-data-controls__generate settings-form" role="group" aria-labelledby="gc-designer-data-controls-generate-h">
+      <span id="gc-designer-data-controls-generate-h" class="settings-form__label">Generate missing from cache</span>
+      <div class="gc-designer-data-controls__generate-row">
+        <label class="gc-designer-data-controls__check">
+          <input type="checkbox" id="gc-designer-data-controls-gen-fw" checked />
+          <span>Firewall cache</span>
+        </label>
+        <label class="gc-designer-data-controls__check">
+          <input type="checkbox" id="gc-designer-data-controls-gen-cfg" checked />
+          <span>Configuration cache</span>
+        </label>
+        <button type="button" class="button button--secondary" id="gc-designer-data-controls-generate">
+          Generate missing fields
+        </button>
+      </div>
+      <p class="gc-designer-data-controls__generate-status muted" id="gc-designer-data-controls-generate-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="gc-designer-data-controls__catalog-toolbar">
+      <button type="button" class="button button--primary" id="gc-designer-data-controls-save" disabled>
+        Save changes
+      </button>
+      <p class="gc-designer-data-controls__save-status muted" id="gc-designer-data-controls-save-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="gc-designer-data-controls__table-wrap">
+      <table class="data-table data-table--dense gc-designer-data-controls__table" aria-label="Fields for selected type">
+        <thead>
+          <tr>
+            <th scope="col" class="gc-designer-data-controls__th-drag">
+              <span class="gc-sr-only">Reorder</span>
+            </th>
+            <th scope="col">Property name</th>
+            <th scope="col">Show as</th>
+            <th scope="col">JSON value kind</th>
+            <th scope="col">Dependent on</th>
+            <th scope="col">Data entry type</th>
+            <th scope="col">Data source</th>
+            <th
+              scope="col"
+              title='JSON array of strings, e.g. [&quot;On&quot;,&quot;Off&quot;]. When set and type is selector, these become the segment buttons (overrides items in data entry properties).'
+            >
+              Allowed options
+            </th>
+            <th scope="col">Help text</th>
+            <th scope="col">Display order</th>
+            <th scope="col">Update</th>
+          </tr>
+        </thead>
+        <tbody id="gc-designer-data-controls-tbody">
+          <tr>
+            <td colspan="11" class="muted">Select an entity type above.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section
+    class="gc-designer__section"
+    id="gc-designer-data-controls-panel-layout"
+    role="tabpanel"
+    aria-labelledby="gc-designer-data-controls-tab-layout"
+    data-gc-dc-panel="layout"
+    aria-hidden="true"
+    hidden
+  >
+    <h2 class="gc-designer__h2">Layout</h2>
+    <p class="gc-designer__note">
+      Drag from output dots to input dots to define data wiring and visibility logic. Select a connector and press
+      <code class="mono">Delete</code> to remove it. Layout changes autosave per object type.
+    </p>
+    <div class="gc-designer-data-controls__layout-toolbar">
+      <button type="button" class="button button--secondary" id="gc-designer-data-controls-layout-reset">
+        Reset layout to defaults
+      </button>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-add-and"
+      >
+        Add AND block
+      </button>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-add-or"
+      >
+        Add OR block
+      </button>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-add-not"
+      >
+        Add NOT block
+      </button>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-add-if-value"
+      >
+        Add Value block
+      </button>
+      <div class="gc-designer-data-controls__layout-test-picker" id="gc-designer-data-controls-layout-test-picker">
+        <button
+          type="button"
+          class="settings-form__input mono gc-designer-data-controls__layout-test-trigger"
+          id="gc-designer-data-controls-layout-test-trigger"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+        >
+          Select test object…
+        </button>
+        <div
+          class="gc-designer-data-controls__layout-test-panel"
+          id="gc-designer-data-controls-layout-test-panel"
+          role="listbox"
+          hidden
+        >
+          <input
+            type="search"
+            class="settings-form__input mono gc-designer-data-controls__layout-test-search"
+            id="gc-designer-data-controls-layout-test-search"
+            placeholder="Filter objects…"
+            autocomplete="off"
+            aria-label="Filter test objects"
+          />
+          <ul class="gc-designer-data-controls__layout-test-options" id="gc-designer-data-controls-layout-test-options"></ul>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-test-btn"
+        disabled
+      >
+        Test connections
+      </button>
+    </div>
+    <p class="gc-designer-data-controls__layout-status muted" id="gc-designer-data-controls-layout-status" role="status" aria-live="polite"></p>
+    <div class="gc-designer-data-controls-layout" id="gc-designer-data-controls-layout-root">
+      <svg
+        class="gc-designer-data-controls-layout__edges"
+        id="gc-designer-data-controls-layout-edges"
+        aria-hidden="true"
+      ></svg>
+      <div class="gc-designer-data-controls-layout__canvas-wrap">
+        <div class="gc-designer-data-controls-layout__canvas" id="gc-designer-data-controls-layout-canvas">
+          <div
+            class="gc-designer-data-controls-layout__nodes"
+            id="gc-designer-data-controls-layout-nodes"
+            aria-label="Layout field canvas"
+          ></div>
+        </div>
+      </div>
+      <aside class="gc-designer-data-controls-layout__panel" aria-label="Object edit controls">
+        <header class="gc-designer-data-controls-layout__panel-head">
+          <h3 class="gc-designer-data-controls-layout__panel-title">Object edit pane</h3>
+          <p class="muted gc-designer-data-controls-layout__panel-note">
+            Controls selected in Field catalog appear here.
+          </p>
+        </header>
+        <div
+          class="settings-form gc-designer-data-controls-layout__controls"
+          id="gc-designer-data-controls-layout-controls"
+        ></div>
+      </aside>
+    </div>
+  </section>
+  </div>
+</main>
+<div
+  class="gc-designer-modal gc-designer-modal--dialog-center"
+  id="gc-designer-data-controls-test-modal"
+  hidden
+  aria-hidden="true"
+>
+  <button
+    type="button"
+    class="gc-designer-modal__backdrop"
+    tabindex="-1"
+    aria-label="Close"
+    id="gc-designer-data-controls-test-modal-backdrop"
+  ></button>
+  <div
+    class="gc-designer-modal__panel gc-designer-data-controls-test-modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gc-designer-data-controls-test-modal-title"
+  >
+    <header class="gc-designer-modal__header">
+      <h2 id="gc-designer-data-controls-test-modal-title" class="gc-designer-modal__title">Test selection</h2>
+      <button
+        type="button"
+        class="gc-designer-modal__close"
+        id="gc-designer-data-controls-test-modal-close"
+        aria-label="Close"
+      >
+        ×
+      </button>
+    </header>
+    <div class="gc-designer-modal__divider" aria-hidden="true"></div>
+    <div class="gc-designer-modal__body gc-designer-data-controls-test-modal__body"></div>
+    <footer class="gc-designer-modal__footer">
+      <button type="button" class="button button--primary" id="gc-designer-data-controls-test-modal-done">Close</button>
+    </footer>
+  </div>
+</div>
+<script src="/static/gc-designer-data-controls-entity-nav.js"></script>
+<script src="/static/gc-designer-data-controls-field-catalog.js"></script>
+<script src="/static/gc-designer-data-controls-layout.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  function trimStr(x) {
+    return String(x == null ? "" : x).replace(/^\s+|\s+$/g, "");
+  }
+
+  var typeSel = document.getElementById("gc-designer-data-controls-type");
+  var tbody = document.getElementById("gc-designer-data-controls-tbody");
+  var statusEl = document.getElementById("gc-designer-data-controls-status");
+  var genBtn = document.getElementById("gc-designer-data-controls-generate");
+  var genFw = document.getElementById("gc-designer-data-controls-gen-fw");
+  var genCfg = document.getElementById("gc-designer-data-controls-gen-cfg");
+  var genStatusEl = document.getElementById("gc-designer-data-controls-generate-status");
+  var saveBtn = document.getElementById("gc-designer-data-controls-save");
+  var saveStatusEl = document.getElementById("gc-designer-data-controls-save-status");
+  var rowInitials = {};
+  var allCachedEntityTypes = [];
+  var STORAGE_KEY_TAB = "gc.designer.dataControls.activeTab";
+  var STORAGE_KEY_ENTITY = "gc.designer.dataControls.entityType";
+  var appliedSavedEntityType = false;
+
+  function readStoredUiValue(key) {
+    try {
+      return String(localStorage.getItem(key) || "");
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function writeStoredUiValue(key, value) {
+    try {
+      var v = String(value || "").trim();
+      if (!v) localStorage.removeItem(key);
+      else localStorage.setItem(key, v);
+    } catch (e) {}
+  }
+
+  function wireTabPersistence() {
+    document.querySelectorAll("[data-gc-dc-tab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        writeStoredUiValue(STORAGE_KEY_TAB, btn.getAttribute("data-gc-dc-tab") || "");
+      });
+    });
+  }
+
+  function applyStoredTabSelection() {
+    var tab = readStoredUiValue(STORAGE_KEY_TAB);
+    if (tab !== "layout" && tab !== "catalog") return;
+    var btn = document.querySelector('[data-gc-dc-tab="' + tab + '"]');
+    if (btn) btn.click();
+  }
+
+  function sortedEntityTypeList(arr) {
+    if (!arr || !Array.isArray(arr)) return [];
+    var o = {};
+    arr.forEach(function (t) {
+      var k = String(t != null ? t : "").trim();
+      if (k) o[k] = true;
+    });
+    return Object.keys(o).sort(function (a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+  }
+
+  function parseEntryTypeValues() {
+    var el = document.getElementById("gc-designer-data-controls-entry-types");
+    if (!el || !el.textContent) return [];
+    try {
+      var a = JSON.parse(el.textContent);
+      return Array.isArray(a) ? a : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  var catalogEntryTypeValues = parseEntryTypeValues();
+  var draggingTr = null;
+
+  var ENTRY_PROP_FLYOUT_KIND = {
+    "ip-address": "ip",
+    "ip-list": "ip",
+    "ip-ipv4": "ip",
+    "ip-ipv6": "ip",
+    "ip-constraint": "ip",
+    "text-single": "text",
+    "text-multiline": "text",
+    "text-config": "text",
+    selector: "selector",
+    "dropdown-shared": "dd-shared",
+    "dropdown-single": "dd-single",
+    "dropdown-multi": "dd-multi",
+  };
+
+  function entryTypeHasPropsFlyout(t) {
+    return !!ENTRY_PROP_FLYOUT_KIND[String(t || "").trim()];
+  }
+
+  function catalogPropsControlNode(controlId) {
+    var cid = String(controlId || "").trim();
+    if (cid === "selector") {
+      return (
+        document.getElementById("gc-designer-option-selector") ||
+        document.querySelector('[data-gc-designer-control-id="selector"]')
+      );
+    }
+    if (cid === "ip-ipv4" || cid === "ip-ipv6" || cid === "ip-list") {
+      return document.querySelector('[data-gc-designer-control-id="ip-address"]');
+    }
+    return document.querySelector(
+      '[data-gc-designer-control-id="' + cid.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"]'
+    );
+  }
+
+  function catalogApplyPropsFromTextarea(controlId, raw) {
+    if (typeof window.gcDesignerControlsSetPropertiesFor !== "function") return;
+    var node = catalogPropsControlNode(controlId);
+    var s = String(raw || "").trim();
+    if (!s) s = "{}";
+    try {
+      JSON.parse(s);
+    } catch (e) {
+      s = "{}";
+    }
+    window.gcDesignerControlsSetPropertiesFor(controlId, s, node || undefined);
+  }
+
+  function catalogOpenEntryPropsFlyout(controlId) {
+    var cid = String(controlId || "").trim();
+    if (cid.indexOf('"') !== -1) return;
+    if (typeof window.gcOpenDesignerIpFieldPropertiesFlyout === "function" && ENTRY_PROP_FLYOUT_KIND[cid] === "ip") {
+      window.gcOpenDesignerIpFieldPropertiesFlyout();
+      return;
+    }
+    if (typeof window.gcOpenDesignerTextFieldPropertiesFlyout === "function" && ENTRY_PROP_FLYOUT_KIND[cid] === "text") {
+      window.gcOpenDesignerTextFieldPropertiesFlyout();
+      return;
+    }
+    if (typeof window.gcOpenDesignerSelectorPropertiesFlyout === "function" && ENTRY_PROP_FLYOUT_KIND[cid] === "selector") {
+      window.gcOpenDesignerSelectorPropertiesFlyout();
+      return;
+    }
+    if (typeof window.gcOpenDesignerDropdownPropertiesFlyout === "function") {
+      var k = ENTRY_PROP_FLYOUT_KIND[cid];
+      if (k === "dd-shared") window.gcOpenDesignerDropdownPropertiesFlyout("shared");
+      else if (k === "dd-single") window.gcOpenDesignerDropdownPropertiesFlyout("single");
+      else if (k === "dd-multi") window.gcOpenDesignerDropdownPropertiesFlyout("multi");
+    }
+  }
+
+  function openDataEntryPropsFlyoutForRow(tr) {
+    var sel = tr.querySelector(".gc-designer-data-controls__select-det");
+    var ta = tr.querySelector(".gc-designer-data-controls__input-props");
+    if (!sel || !ta) return;
+    var controlId = String(sel.value || "").trim();
+    if (!entryTypeHasPropsFlyout(controlId)) return;
+    var kind = ENTRY_PROP_FLYOUT_KIND[controlId];
+    catalogApplyPropsFromTextarea(controlId, ta.value);
+    window.__gcDesignerCatalogPropsCtx = {
+      flyoutKind: kind,
+      controlId: controlId,
+      textarea: ta,
+    };
+    catalogOpenEntryPropsFlyout(controlId);
+  }
+
+  function syncPropsSetForRow(tr) {
+    var sel = tr.querySelector(".gc-designer-data-controls__select-det");
+    var btn = tr.querySelector(".gc-designer-data-controls__props-set");
+    if (!btn || !sel) return;
+    var t = String(sel.value || "").trim();
+    var show = entryTypeHasPropsFlyout(t);
+    btn.hidden = !show;
+    btn.disabled = !show;
+  }
+
+  window.gcDesignerCatalogDataEntryPropsAfterFlyoutSave = function (kind) {
+    var ctx = window.__gcDesignerCatalogPropsCtx;
+    if (!ctx || ctx.flyoutKind !== kind) return;
+    var cid = ctx.controlId;
+    var node = catalogPropsControlNode(cid);
+    if (typeof window.gcDesignerControlsGetPropertiesFor !== "function") return;
+    var o = window.gcDesignerControlsGetPropertiesFor(cid, node || undefined);
+    if (o) {
+      try {
+        ctx.textarea.value = JSON.stringify(o);
+      } catch (e) {
+        ctx.textarea.value = "{}";
+      }
+      ctx.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    window.__gcDesignerCatalogPropsCtx = null;
+  };
+
+  window.gcDesignerCatalogDataEntryPropsOnFlyoutCancel = function (kind) {
+    var ctx = window.__gcDesignerCatalogPropsCtx;
+    if (ctx && ctx.flyoutKind === kind) window.__gcDesignerCatalogPropsCtx = null;
+  };
+
+  function setSaveStatus(msg) {
+    if (saveStatusEl) saveStatusEl.textContent = msg || "";
+  }
+
+  function setStatus(msg) {
+    if (statusEl) statusEl.textContent = msg || "";
+  }
+
+  function setGenStatus(msg) {
+    if (genStatusEl) genStatusEl.textContent = msg || "";
+  }
+
+  function captureInitial(f) {
+    return {
+      dependent_on: f.dependent_on == null ? "" : String(f.dependent_on),
+      data_entry_type: f.data_entry_type == null ? "" : String(f.data_entry_type),
+      data_entry_properties:
+        f.data_entry_properties == null ? "" : String(f.data_entry_properties),
+      show_as: f.show_as == null ? "" : String(f.show_as),
+      display_order:
+        f.display_order == null || f.display_order === ""
+          ? ""
+          : String(f.display_order),
+      help_text: f.help_text == null ? "" : String(f.help_text),
+      allowed_options:
+        f.allowed_options == null || !Array.isArray(f.allowed_options) || !f.allowed_options.length
+          ? ""
+          : JSON.stringify(f.allowed_options),
+      data_source_entity_types:
+        f.data_source_entity_types == null ||
+        !Array.isArray(f.data_source_entity_types) ||
+        !f.data_source_entity_types.length
+          ? ""
+          : JSON.stringify(sortedEntityTypeList(f.data_source_entity_types)),
+    };
+  }
+
+  function currentRowState(tr) {
+    var depIn = tr.querySelector(".gc-designer-data-controls__input-dep");
+    var detSel = tr.querySelector(".gc-designer-data-controls__select-det");
+    var propsIn = tr.querySelector(".gc-designer-data-controls__input-props");
+    var showIn = tr.querySelector(".gc-designer-data-controls__input-show-as");
+    var helpTa = tr.querySelector(".gc-designer-data-controls__input-help");
+    var ordIn = tr.querySelector(".gc-designer-data-controls__input-order");
+    var aoTa = tr.querySelector(".gc-designer-data-controls__input-allowed-options");
+    var dsHid = tr.querySelector(".gc-designer-data-controls__input-data-source");
+    return {
+      dependent_on: depIn ? depIn.value : "",
+      data_entry_type: detSel ? detSel.value : "",
+      data_entry_properties: propsIn
+        ? propsIn.value
+        : String(tr.getAttribute("data-entry-properties") || ""),
+      show_as: showIn ? showIn.value : "",
+      help_text: helpTa ? helpTa.value : "",
+      display_order: ordIn ? ordIn.value : "",
+      allowed_options: aoTa ? aoTa.value : "",
+      data_source_entity_types: dsHid ? dsHid.value : "",
+    };
+  }
+
+  function parseDisplayOrderForSave(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return null;
+    var n = parseInt(s, 10);
+    if (!isNaN(n) && n >= 1) return n;
+    return null;
+  }
+
+  function strEqEditor(a, b) {
+    return String(a || "").trim() === String(b || "").trim();
+  }
+
+  function isRowDirty(tr) {
+    var id = tr.getAttribute("data-field-id");
+    var ini = rowInitials[id];
+    if (!ini) return false;
+    var cur = currentRowState(tr);
+    return (
+      !strEqEditor(cur.dependent_on, ini.dependent_on) ||
+      !strEqEditor(cur.data_entry_type, ini.data_entry_type) ||
+      !strEqEditor(cur.data_entry_properties, ini.data_entry_properties) ||
+      !strEqEditor(cur.show_as, ini.show_as) ||
+      !strEqEditor(cur.help_text, ini.help_text) ||
+      !strEqEditor(cur.display_order, ini.display_order) ||
+      !strEqEditor(cur.allowed_options, ini.allowed_options) ||
+      !strEqEditor(cur.data_source_entity_types, ini.data_source_entity_types)
+    );
+  }
+
+  function refreshRowDirtyUi(tr) {
+    var cell = tr.querySelector(".gc-designer-data-controls__dirty-cell");
+    if (cell) cell.textContent = isRowDirty(tr) ? "Pending" : "—";
+  }
+
+  function refreshSaveAvailability() {
+    if (!saveBtn || !tbody) return;
+    var type = typeSel ? String(typeSel.value || "").trim() : "";
+    var any = false;
+    if (type) {
+      tbody.querySelectorAll("tr[data-field-id]").forEach(function (tr) {
+        if (isRowDirty(tr)) any = true;
+      });
+    }
+    saveBtn.disabled = !type || !any;
+  }
+
+  function parseEditorJsonArray(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return [];
+    try {
+      var j = JSON.parse(s);
+      if (!Array.isArray(j)) return [];
+      return j
+        .map(function (x) {
+          return String(x == null ? "" : x).trim();
+        })
+        .filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function readCatalogRowsForLayout() {
+    if (!tbody) return [];
+    var out = [];
+    tbody.querySelectorAll("tr[data-field-id]").forEach(function (tr) {
+      var cur = currentRowState(tr);
+      out.push({
+        id: String(tr.getAttribute("data-field-id") || ""),
+        property_name: String(tr.getAttribute("data-property-name") || "").trim(),
+        data_entry_type: String(cur.data_entry_type || "").trim(),
+        data_entry_properties: String(cur.data_entry_properties || ""),
+        allowed_options: parseEditorJsonArray(cur.allowed_options),
+        show_as: String(cur.show_as || "").trim(),
+        help_text: String(cur.help_text || ""),
+      });
+    });
+    return out;
+  }
+
+  function emitCatalogChanged() {
+    var entityType = typeSel ? String(typeSel.value || "").trim() : "";
+    var fields = readCatalogRowsForLayout();
+    window.__gcDesignerDataControlsCatalogState = {
+      entity_type: entityType,
+      fields: fields,
+    };
+    try {
+      document.dispatchEvent(
+        new CustomEvent("gc-designer-data-controls-catalog-changed", {
+          detail: { entity_type: entityType, fields: fields },
+        }),
+      );
+    } catch (e) {}
+  }
+
+  function fillDataEntrySelect(sel, current) {
+    if (!sel) return;
+    sel.innerHTML = "";
+    var o0 = document.createElement("option");
+    o0.value = "";
+    o0.textContent = "(None)";
+    sel.appendChild(o0);
+    catalogEntryTypeValues.forEach(function (cid) {
+      var o = document.createElement("option");
+      o.value = cid;
+      o.textContent = cid;
+      sel.appendChild(o);
+    });
+    var cur = String(current || "").trim();
+    if (cur) {
+      var has = false;
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === cur) {
+          has = true;
+          break;
+        }
+      }
+      if (!has) {
+        var leg = document.createElement("option");
+        leg.value = cur;
+        leg.textContent = cur + " (not in Controls)";
+        sel.appendChild(leg);
+      }
+      sel.value = cur;
+    } else {
+      sel.value = "";
+    }
+  }
+
+  function renumberDisplayOrdersFromDom() {
+    if (!tbody) return;
+    var rows = tbody.querySelectorAll("tr[data-field-id]");
+    var i = 0;
+    rows.forEach(function (tr) {
+      i += 1;
+      var inp = tr.querySelector(".gc-designer-data-controls__input-order");
+      if (inp) inp.value = String(i);
+    });
+    rows.forEach(function (tr) {
+      refreshRowDirtyUi(tr);
+    });
+    refreshSaveAvailability();
+    emitCatalogChanged();
+  }
+
+  function getDragAfterRow(container, y) {
+    var rows = [].slice.call(container.querySelectorAll("tr[data-field-id]"));
+    var closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+    rows.forEach(function (child) {
+      if (child.classList.contains("gc-designer-data-controls__tr--dragging")) return;
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        closest = { offset: offset, element: child };
+      }
+    });
+    return closest.element;
+  }
+
+  function renderRows(fields) {
+    if (!tbody) return;
+    rowInitials = {};
+    tbody.innerHTML = "";
+    setSaveStatus("");
+    draggingTr = null;
+    if (!fields || !fields.length) {
+      var tr0 = document.createElement("tr");
+      var td0 = document.createElement("td");
+      td0.colSpan = 11;
+      td0.className = "muted";
+      td0.textContent = "No catalogued fields for this type yet (run config sync).";
+      tr0.appendChild(td0);
+      tbody.appendChild(tr0);
+      if (saveBtn) saveBtn.disabled = true;
+      emitCatalogChanged();
+      return;
+    }
+    fields.forEach(function (f) {
+      var id = f.id;
+      var tr = document.createElement("tr");
+      tr.setAttribute("data-field-id", String(id));
+      tr.setAttribute(
+        "data-property-name",
+        f.property_name != null ? String(f.property_name) : "",
+      );
+      tr.setAttribute(
+        "data-entry-properties",
+        f.data_entry_properties == null ? "" : String(f.data_entry_properties),
+      );
+
+      var tdDrag = document.createElement("td");
+      tdDrag.className = "gc-designer-data-controls__drag-cell";
+      var dragBtn = document.createElement("button");
+      dragBtn.type = "button";
+      dragBtn.className = "gc-designer-data-controls__drag-handle";
+      dragBtn.setAttribute("aria-label", "Drag to reorder row");
+      dragBtn.draggable = true;
+      dragBtn.innerHTML =
+        '<span aria-hidden="true" class="gc-designer-data-controls__drag-grip">\u22ee\u22ee</span>';
+      tdDrag.appendChild(dragBtn);
+      tr.appendChild(tdDrag);
+
+      var tdName = document.createElement("td");
+      tdName.className = "mono";
+      tdName.textContent = f.property_name != null ? String(f.property_name) : "—";
+      tr.appendChild(tdName);
+
+      var tdShow = document.createElement("td");
+      var inShow = document.createElement("input");
+      inShow.type = "text";
+      inShow.className =
+        "settings-form__input mono gc-designer-data-controls__input-show-as";
+      inShow.value =
+        f.show_as == null || f.show_as === "" ? "" : String(f.show_as);
+      inShow.setAttribute(
+        "aria-label",
+        "Show as for " + String(f.property_name || "")
+      );
+      tdShow.appendChild(inShow);
+      tr.appendChild(tdShow);
+
+      var tdKind = document.createElement("td");
+      tdKind.className = "mono";
+      tdKind.textContent = f.json_value_kind != null ? String(f.json_value_kind) : "—";
+      tr.appendChild(tdKind);
+
+      var tdDep = document.createElement("td");
+      var inDep = document.createElement("input");
+      inDep.type = "text";
+      inDep.className = "settings-form__input mono gc-designer-data-controls__input-dep";
+      inDep.value =
+        f.dependent_on == null || f.dependent_on === "" ? "" : String(f.dependent_on);
+      inDep.setAttribute("aria-label", "Dependent on for " + String(f.property_name || ""));
+      tdDep.appendChild(inDep);
+      tr.appendChild(tdDep);
+
+      var tdDet = document.createElement("td");
+      var selDet = document.createElement("select");
+      selDet.className = "settings-form__input mono gc-designer-data-controls__select-det";
+      selDet.setAttribute("aria-label", "Data entry type for " + String(f.property_name || ""));
+      fillDataEntrySelect(selDet, f.data_entry_type);
+      tdDet.appendChild(selDet);
+      tr.appendChild(tdDet);
+
+      var tdDs = document.createElement("td");
+      tdDs.className = "gc-designer-data-controls__td-data-source";
+      var inDs = document.createElement("input");
+      inDs.type = "hidden";
+      inDs.className = "gc-designer-data-controls__input-data-source";
+      inDs.id = "gc-designer-data-controls-ds-" + String(id);
+      var dsSel = sortedEntityTypeList(f.data_source_entity_types);
+      inDs.value = dsSel.length ? JSON.stringify(dsSel) : "";
+      var wrapDs = document.createElement("div");
+      tdDs.appendChild(inDs);
+      tdDs.appendChild(wrapDs);
+      tr.appendChild(tdDs);
+      if (typeof globalThis.gcDesignerDcBindDataSourceUI === "function") {
+        globalThis.gcDesignerDcBindDataSourceUI(
+          wrapDs,
+          inDs,
+          f.data_source_entity_types || [],
+          allCachedEntityTypes,
+          function () {
+            refreshRowDirtyUi(tr);
+            refreshSaveAvailability();
+          },
+        );
+      }
+
+      var tdAo = document.createElement("td");
+      var taAo = document.createElement("textarea");
+      taAo.rows = 2;
+      taAo.className =
+        "settings-form__input mono gc-designer-data-controls__input-allowed-options";
+      taAo.placeholder = '["On","Off"]';
+      taAo.value =
+        f.allowed_options == null ||
+        !Array.isArray(f.allowed_options) ||
+        !f.allowed_options.length
+          ? ""
+          : JSON.stringify(f.allowed_options);
+      taAo.setAttribute(
+        "aria-label",
+        "Allowed selector options (JSON array) for " + String(f.property_name || "")
+      );
+      tdAo.appendChild(taAo);
+      tr.appendChild(tdAo);
+
+      var tdHelp = document.createElement("td");
+      var taHelp = document.createElement("textarea");
+      taHelp.rows = 3;
+      taHelp.className =
+        "settings-form__input mono gc-designer-data-controls__input-help";
+      taHelp.value =
+        f.help_text == null || f.help_text === "" ? "" : String(f.help_text);
+      taHelp.setAttribute(
+        "aria-label",
+        "Help text for " + String(f.property_name || "")
+      );
+      tdHelp.appendChild(taHelp);
+      tr.appendChild(tdHelp);
+
+      var tdOrd = document.createElement("td");
+      var inOrd = document.createElement("input");
+      inOrd.type = "number";
+      inOrd.min = "1";
+      inOrd.step = "1";
+      inOrd.className =
+        "settings-form__input mono gc-designer-data-controls__input-order";
+      inOrd.value =
+        f.display_order != null && f.display_order !== ""
+          ? String(f.display_order)
+          : "";
+      inOrd.setAttribute(
+        "aria-label",
+        "Display order for " + String(f.property_name || "")
+      );
+      tdOrd.appendChild(inOrd);
+      tr.appendChild(tdOrd);
+
+      var tdUpd = document.createElement("td");
+      tdUpd.className = "gc-designer-data-controls__dirty-cell muted";
+      tdUpd.textContent = "—";
+      tr.appendChild(tdUpd);
+
+      tbody.appendChild(tr);
+      rowInitials[String(id)] = captureInitial(f);
+      syncPropsSetForRow(tr);
+    });
+    refreshSaveAvailability();
+    emitCatalogChanged();
+  }
+
+  function loadFields(entityType) {
+    if (!entityType) {
+      if (tbody) {
+        tbody.innerHTML =
+          '<tr><td colspan="11" class="muted">Select an entity type above.</td></tr>';
+      }
+      setStatus("");
+      emitCatalogChanged();
+      return;
+    }
+    setStatus("Loading fields…");
+    var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(entityType);
+    fetch(url, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, j: j };
+        });
+      })
+      .then(function (res) {
+        if (!res.ok || !res.j || !res.j.fields) {
+          setStatus("Could not load fields.");
+          renderRows([]);
+          return;
+        }
+        setStatus(res.j.fields.length ? res.j.fields.length + " field(s)" : "No rows");
+        renderRows(res.j.fields);
+      })
+      .catch(function () {
+        setStatus("Request failed.");
+        renderRows([]);
+      });
+  }
+
+  function syncAllCachedEntityTypesFromTypeSelect() {
+    allCachedEntityTypes = [];
+    if (!typeSel) return;
+    typeSel.querySelectorAll("option").forEach(function (o) {
+      var v = trimStr(o.value);
+      if (v) allCachedEntityTypes.push(v);
+    });
+    allCachedEntityTypes.sort(function (a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+  }
+
+  function loadEntityTypes() {
+    if (!typeSel) return;
+    typeSel.innerHTML = '<option value="">Loading…</option>';
+    typeSel.disabled = false;
+    if (typeof globalThis.gcDesignerHydrateObjectSelectorDropdown !== "function") {
+      typeSel.innerHTML = "";
+      var optBad = document.createElement("option");
+      optBad.value = "";
+      optBad.textContent = "Object selector script unavailable";
+      optBad.disabled = true;
+      typeSel.appendChild(optBad);
+      typeSel.disabled = true;
+      return;
+    }
+    globalThis.gcDesignerHydrateObjectSelectorDropdown(typeSel, function () {
+      syncAllCachedEntityTypesFromTypeSelect();
+      if (appliedSavedEntityType) return;
+      appliedSavedEntityType = true;
+      var saved = readStoredUiValue(STORAGE_KEY_ENTITY);
+      if (!saved) return;
+      var has = false;
+      typeSel.querySelectorAll("option").forEach(function (o) {
+        if (String(o.value || "").trim() === saved) has = true;
+      });
+      if (!has) return;
+      typeSel.value = saved;
+      typeSel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  if (tbody) {
+    tbody.addEventListener("input", function (ev) {
+      var tr = ev.target && ev.target.closest ? ev.target.closest("tr[data-field-id]") : null;
+      if (tr) {
+        refreshRowDirtyUi(tr);
+        refreshSaveAvailability();
+        emitCatalogChanged();
+      }
+    });
+    tbody.addEventListener("change", function (ev) {
+      var tr = ev.target && ev.target.closest ? ev.target.closest("tr[data-field-id]") : null;
+      if (tr) {
+        if (ev.target.matches && ev.target.matches(".gc-designer-data-controls__select-det")) {
+          syncPropsSetForRow(tr);
+        }
+        refreshRowDirtyUi(tr);
+        refreshSaveAvailability();
+        emitCatalogChanged();
+      }
+    });
+    tbody.addEventListener("click", function (ev) {
+      var b = ev.target.closest && ev.target.closest(".gc-designer-data-controls__props-set");
+      if (!b || !tbody.contains(b)) return;
+      var tr = b.closest("tr[data-field-id]");
+      if (tr) openDataEntryPropsFlyoutForRow(tr);
+    });
+    tbody.addEventListener("dragstart", function (e) {
+      var h = e.target.closest && e.target.closest(".gc-designer-data-controls__drag-handle");
+      if (!h || !tbody.contains(h)) return;
+      draggingTr = h.closest("tr[data-field-id]");
+      if (!draggingTr) return;
+      draggingTr.classList.add("gc-designer-data-controls__tr--dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", draggingTr.getAttribute("data-field-id") || "");
+    });
+    tbody.addEventListener("dragend", function () {
+      if (draggingTr) {
+        draggingTr.classList.remove("gc-designer-data-controls__tr--dragging");
+      }
+      draggingTr = null;
+    });
+    tbody.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      if (!draggingTr) return;
+      var after = getDragAfterRow(tbody, e.clientY);
+      if (after == null) {
+        tbody.appendChild(draggingTr);
+      } else if (after !== draggingTr) {
+        tbody.insertBefore(draggingTr, after);
+      }
+      renumberDisplayOrdersFromDom();
+    });
+    tbody.addEventListener("drop", function (e) {
+      e.preventDefault();
+    });
+  }
+
+  function parseDataSourceEntityTypesForSave(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return { value: null };
+    var j;
+    try {
+      j = JSON.parse(s);
+    } catch (e) {
+      return { err: "Data source must be valid JSON (array of entity type strings)." };
+    }
+    if (!Array.isArray(j)) {
+      return { err: "Data source must be a JSON array of strings." };
+    }
+    var out = sortedEntityTypeList(j);
+    return { value: out.length ? out : null };
+  }
+
+  function parseAllowedOptionsForSave(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return { value: null };
+    var j;
+    try {
+      j = JSON.parse(s);
+    } catch (e) {
+      return { err: "Allowed options must be valid JSON (array of strings)." };
+    }
+    if (!Array.isArray(j)) {
+      return { err: "Allowed options must be a JSON array of strings." };
+    }
+    var out = [];
+    for (var i = 0; i < j.length; i++) {
+      var t = String(j[i] != null ? j[i] : "").trim();
+      if (t) out.push(t);
+    }
+    return { value: out.length ? out : null };
+  }
+
+  function saveCatalogChanges() {
+    var et = typeSel ? String(typeSel.value || "").trim() : "";
+    if (!et || !tbody || !saveBtn || saveBtn.disabled) return;
+    var updates = [];
+    var parseErr = null;
+    tbody.querySelectorAll("tr[data-field-id]").forEach(function (tr) {
+      if (!isRowDirty(tr)) return;
+      var id = parseInt(tr.getAttribute("data-field-id"), 10);
+      if (!id) return;
+      var cur = currentRowState(tr);
+      var ao = parseAllowedOptionsForSave(cur.allowed_options);
+      if (ao.err) {
+        parseErr = ao.err;
+        return;
+      }
+      var ds = parseDataSourceEntityTypesForSave(cur.data_source_entity_types);
+      if (ds.err) {
+        parseErr = ds.err;
+        return;
+      }
+      updates.push({
+        id: id,
+        dependent_on: cur.dependent_on.trim() ? cur.dependent_on.trim() : null,
+        data_entry_type: cur.data_entry_type.trim() ? cur.data_entry_type.trim() : null,
+        data_entry_properties: cur.data_entry_properties.trim()
+          ? cur.data_entry_properties.trim()
+          : null,
+        show_as: cur.show_as.trim() ? cur.show_as.trim() : null,
+        help_text: cur.help_text.trim() ? cur.help_text.trim() : null,
+        display_order: parseDisplayOrderForSave(cur.display_order),
+        allowed_options: ao.value,
+        data_source_entity_types: ds.value,
+      });
+    });
+    if (parseErr) {
+      setSaveStatus(parseErr);
+      return;
+    }
+    if (!updates.length) return;
+    saveBtn.disabled = true;
+    setSaveStatus("Saving…");
+    var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+    fetch(url, {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Requested-With": "Ground-Control",
+      },
+      body: JSON.stringify({ updates: updates }),
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, status: r.status, j: j };
+        });
+      })
+      .then(function (res) {
+        if (!res.ok || !res.j || !res.j.ok) {
+          var det = res.j && res.j.detail;
+          setSaveStatus(
+            typeof det === "string"
+              ? det
+              : "Save failed (" + (res.status || "?") + ")."
+          );
+          refreshSaveAvailability();
+          return;
+        }
+        var n = res.j.updated != null ? res.j.updated : updates.length;
+        setSaveStatus("Saved " + n + " row(s).");
+        loadFields(et);
+      })
+      .catch(function () {
+        setSaveStatus("Save request failed.");
+        refreshSaveAvailability();
+      });
+  }
+
+  globalThis.gcDesignerDataControlsSetFieldDataEntryType = function (fieldId, nextVal) {
+    return new Promise(function (resolve) {
+      var et = typeSel ? String(typeSel.value || "").trim() : "";
+      var fid = parseInt(String(fieldId || ""), 10);
+      if (!et || !fid || !tbody) {
+        resolve(false);
+        return;
+      }
+      var tr = tbody.querySelector('tr[data-field-id="' + String(fid) + '"]');
+      if (!tr) {
+        resolve(false);
+        return;
+      }
+      var detSel = tr.querySelector(".gc-designer-data-controls__select-det");
+      if (!detSel) {
+        resolve(false);
+        return;
+      }
+      var v = String(nextVal || "").trim();
+      var has = false;
+      detSel.querySelectorAll("option").forEach(function (opt) {
+        if (String(opt.value || "") === v) has = true;
+      });
+      if (!has && v) {
+        var leg = document.createElement("option");
+        leg.value = v;
+        leg.textContent = v + " (not in Controls)";
+        detSel.appendChild(leg);
+      }
+      detSel.value = v;
+      syncPropsSetForRow(tr);
+      refreshRowDirtyUi(tr);
+      refreshSaveAvailability();
+      setSaveStatus("Saving…");
+      var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+      fetch(url, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({
+          updates: [
+            {
+              id: fid,
+              data_entry_type: v || null,
+            },
+          ],
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var det = res.j && res.j.detail;
+            setSaveStatus(
+              typeof det === "string"
+                ? det
+                : "Save failed (" + (res.status || "?") + ").",
+            );
+            resolve(false);
+            return;
+          }
+          setSaveStatus("Saved.");
+          loadFields(et);
+          resolve(true);
+        })
+        .catch(function () {
+          setSaveStatus("Save request failed.");
+          resolve(false);
+        });
+    });
+  };
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", saveCatalogChanges);
+  }
+
+  if (typeSel) {
+    typeSel.addEventListener("change", function () {
+      var cur = String(typeSel.value || "").trim();
+      writeStoredUiValue(STORAGE_KEY_ENTITY, cur);
+      loadFields(cur);
+      emitCatalogChanged();
+    });
+  }
+
+  function runGenerateMissing() {
+    if (!genBtn) return;
+    var incFw = genFw ? !!genFw.checked : true;
+    var incCfg = genCfg ? !!genCfg.checked : true;
+    if (!incFw && !incCfg) {
+      setGenStatus("Select at least one cache source.");
+      return;
+    }
+    genBtn.disabled = true;
+    setGenStatus("Scanning cache…");
+    fetch("/api/designer/entity-payload-fields/generate-missing", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Requested-With": "Ground-Control",
+      },
+      body: JSON.stringify({
+        include_firewall_cache: incFw,
+        include_configuration_cache: incCfg,
+      }),
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, status: r.status, j: j };
+        });
+      })
+      .then(function (res) {
+        genBtn.disabled = false;
+        if (!res.ok || !res.j) {
+          var det = res.j && res.j.detail;
+          setGenStatus(
+            typeof det === "string"
+              ? det
+              : "Request failed (" + (res.status || "?") + ")."
+          );
+          return;
+        }
+        if (!res.j.ok) {
+          setGenStatus("Could not complete generate.");
+          return;
+        }
+        var scanned = res.j.entries_scanned != null ? res.j.entries_scanned : "—";
+        var ins = res.j.rows_inserted != null ? res.j.rows_inserted : "—";
+        var inf =
+          res.j.data_entry_types_inferred != null ? res.j.data_entry_types_inferred : "—";
+        setGenStatus(
+          "Scanned " +
+            scanned +
+            " cache row(s); inserted " +
+            ins +
+            " catalog row(s); inferred data entry type on " +
+            inf +
+            " existing row(s)."
+        );
+        var cur = typeSel ? String(typeSel.value || "").trim() : "";
+        if (cur) loadFields(cur);
+      })
+      .catch(function () {
+        genBtn.disabled = false;
+        setGenStatus("Request failed.");
+      });
+  }
+
+  if (genBtn) {
+    genBtn.addEventListener("click", runGenerateMissing);
+  }
+
+  function wireTestModalClose() {
+    var modal = document.getElementById("gc-designer-data-controls-test-modal");
+    if (!modal) return;
+    function close() {
+      if (typeof globalThis.gcDesignerDcCloseCachedNamesTestModal === "function") {
+        globalThis.gcDesignerDcCloseCachedNamesTestModal();
+      }
+    }
+    var bd = document.getElementById("gc-designer-data-controls-test-modal-backdrop");
+    var xb = document.getElementById("gc-designer-data-controls-test-modal-close");
+    var dn = document.getElementById("gc-designer-data-controls-test-modal-done");
+    if (bd) bd.addEventListener("click", close);
+    if (xb) xb.addEventListener("click", close);
+    if (dn) dn.addEventListener("click", close);
+  }
+  wireTestModalClose();
+
+  wireTabPersistence();
+  applyStoredTabSelection();
+  emitCatalogChanged();
+  loadEntityTypes();
+})();
+</script>
+{% endblock %}
+
+{% block app_content_overlays %}
+<div class="gc-designer-catalog-props-sandbox" aria-hidden="true">
+  {% include "partials/gc_designer_controls_main_demo.html" %}
+</div>
+{% include "partials/gc_designer_controls_flyouts_overlay.html" %}
+{% endblock %}
+
+{% block scripts %}
+{% include "partials/gc_designer_controls_scripts.html" %}
+{% endblock %}

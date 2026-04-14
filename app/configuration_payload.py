@@ -205,6 +205,7 @@ def configuration_hosts_services_table_payload(
     entity_type: str,
     *,
     combine: bool = True,
+    combine_by: str | None = None,
 ) -> dict[str, Any]:
     if not configuration_ids:
         empty: dict[str, Any] = {
@@ -223,9 +224,11 @@ def configuration_hosts_services_table_payload(
     parsed = _parsed_configuration_entries(db, configuration_ids, entity_type)
     if combine:
         if entity_type == "ip_host":
-            payload = build_ip_host_table_rows_combined(parsed)
+            payload = build_ip_host_table_rows_combined(parsed, combine_by=combine_by)
         else:
-            payload = build_hs_table_rows_combined(parsed, entity_type=entity_type)
+            payload = build_hs_table_rows_combined(
+                parsed, entity_type=entity_type, combine_by=combine_by
+            )
     else:
         payload = build_hosts_services_table_rows(parsed, entity_type=entity_type)
 

@@ -1,4 +1,4 @@
-{% extends "firewalls_base.html" %}
+{% extends firewalls_layout_base|default("firewalls_base.html") %}
 {% set fw_subnav_active = "inventory" %}
 {% set inventory_tab = inventory_tab | default("firewalls") %}
 {% block title %}{% if inventory_tab == "configurations" %}Configurations · Firewalls · Ground Control{% else %}Firewalls · Ground Control{% endif %}{% endblock %}
@@ -7,7 +7,7 @@
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol class="breadcrumbs__list">
     <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
-    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="{{ fw_parent_href|default('/firewalls') }}">{{ fw_parent_label|default('Firewalls') }}</a></li>
     <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">
       {% if inventory_tab == "configurations" %}Configurations{% else %}Inventory{% endif %}
     </li>
@@ -430,7 +430,8 @@
                   <td class="mono" data-gc-col="device_hostname">{{ (fw.device_hostname or "—") | truncate(48) }}</td>
                   <td class="mono" data-gc-col="serial">{{ (fw.serial_number or "—") | truncate(32) }}</td>
                   <td class="mono" data-gc-col="model">{{ (fw.model or "—") | truncate(40) }}</td>
-                  <td class="mono" data-gc-col="firmware_version">{{ (fw.firmware_version or "—") | truncate(40) }}</td>
+                  {% set _fw_fc = firmware_inventory_cell(fw.firmware_version) %}
+                  <td class="mono" data-gc-col="firmware_version"{% if _fw_fc[1] %} title="{{ _fw_fc[1] | e }}"{% endif %}>{{ _fw_fc[0] | e }}</td>
                   <td data-gc-col="tls" class="gc-table-toggle-cell">
                     <span class="gc-table-toggle gc-table-toggle--static gc-table-toggle--{{ 'on' if fw.verify_ssl else 'off' }}" role="img" aria-label="TLS verify {{ 'on' if fw.verify_ssl else 'off' }}">
                       <span class="gc-table-toggle__track" aria-hidden="true"><span class="gc-table-toggle__thumb"></span></span>
@@ -626,16 +627,6 @@
         <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-fw-edit-tab-sync" data-gc-fw-edit-tab="sync">
           Sync
         </button>
-        <button
-          type="button"
-          class="gc-tabs__tab"
-          role="tab"
-          aria-selected="false"
-          id="gc-fw-edit-tab-properties"
-          data-gc-fw-edit-tab="properties"
-        >
-          Properties
-        </button>
       </div>
       <div class="gc-if-flyout__scroll">
         <div class="gc-tab-panels gc-fw-inv-flyout__tab-panels">
@@ -645,6 +636,36 @@
             aria-labelledby="gc-fw-edit-tab-connection"
             id="gc-fw-edit-panel-connection"
           >
+            <div class="gc-if-flyout__field">
+              <span class="gc-if-flyout__label" id="gc-fw-edit-tags-l">Tags <span class="muted">(optional)</span></span>
+              <p class="gc-fw-inv-flyout__hint muted" style="margin-top: 0">
+                Same pill tag control as Designer · Controls. Suggestions come from your inventory.
+              </p>
+              <div class="gc-designer-tags" id="gc-fw-edit-tag-editor" data-gc-designer-tag-editor>
+                <input type="hidden" class="gc-designer-tags__hidden" name="tags_json" id="gc-fw-edit-tags-json" value="[]" />
+                <div class="gc-designer-tags__combo">
+                  <div class="gc-designer-tags__field" role="group" aria-labelledby="gc-fw-edit-tags-l">
+                    <div class="gc-designer-tags__chips" aria-live="polite"></div>
+                    <div class="gc-designer-tags__input-shell">
+                      <div class="gc-designer-tags__mirror" aria-hidden="true">
+                        <span class="gc-designer-tags__typed-mirror"></span><span class="gc-designer-tags__ghost"></span>
+                      </div>
+                      <input
+                        type="text"
+                        class="gc-designer-tags__input mono gc-if-flyout__input"
+                        id="gc-fw-edit-tags-input"
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-autocomplete="list"
+                        aria-expanded="false"
+                        placeholder="Add tag…"
+                      />
+                    </div>
+                  </div>
+                  <ul class="gc-designer-tags__suggest" role="listbox" hidden aria-label="Tag suggestions"></ul>
+                </div>
+              </div>
+            </div>
             <div class="gc-if-flyout__field">
               <label class="gc-if-flyout__label" for="edit-fw-name">Name <span class="muted">(optional)</span></label>
               <input type="text" id="edit-fw-name" name="name" class="gc-if-flyout__input" autocomplete="off" placeholder="e.g. NYC primary" />
@@ -728,35 +749,23 @@
             hidden
           >
             <p class="gc-fw-inv-flyout__hint muted">
-              Cached objects for the Network page. Only checked types are requested when you sync.
+              Cached objects for the Network page. Only checked types are requested when you sync. Grouping and labels match
+              <span class="mono">Designer · Navigation</span> · object selector list.
             </p>
-            <div id="gc-fw-sync-toggles" class="gc-fw-sync-toggles" aria-label="Object types to sync"></div>
-          </div>
-          <div
-            class="gc-tab-panel gc-if-flyout__form-body"
-            role="tabpanel"
-            aria-labelledby="gc-fw-edit-tab-properties"
-            id="gc-fw-edit-panel-properties"
-            hidden
-          >
-            <datalist id="gc-fw-edit-tag-names-datalist"></datalist>
-            <div class="gc-fw-kv-tags" data-gc-fw-kv-tags>
-              <label class="gc-if-flyout__label">Tags <span class="muted">(optional)</span></label>
-              <p class="gc-fw-inv-flyout__hint muted">Name can be an existing tag from your inventory or a new one. Value is optional and stored for your records only.</p>
-              <div class="gc-fw-kv-tags__table-wrap">
-                <table class="gc-fw-kv-tags__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Name</th>
-                      <th scope="col">Value <span class="muted">(optional)</span></th>
-                      <th class="gc-fw-kv-tags__col-actions" scope="col" aria-label="Remove row"></th>
-                    </tr>
-                  </thead>
-                  <tbody data-gc-fw-kv-tbody></tbody>
-                </table>
+            <fieldset class="gc-if-flyout__field gc-fw-inv-flyout__sync-entity-types">
+              <legend class="gc-if-flyout__label" id="gc-fw-edit-sync-object-selector-l">Object types</legend>
+              <div class="gc-fw-edit-sync-object-selector-toolbar">
+                <button type="button" class="btn btn--secondary" id="gc-fw-edit-sync-select-all">Select all</button>
+                <button type="button" class="btn btn--secondary" id="gc-fw-edit-sync-clear-selection">Clear selection</button>
               </div>
-              <input type="hidden" name="tags_json" data-gc-fw-kv-tags-hidden value="[]" />
-            </div>
+              <div
+                id="gc-fw-edit-sync-object-selector-list"
+                class="gc-designer-object-selector-list gc-fw-sync-toggles"
+                data-gc-designer-object-selector="object-selector-list"
+                role="group"
+                aria-labelledby="gc-fw-edit-sync-object-selector-l"
+              ></div>
+            </fieldset>
           </div>
         </div>
       </div>
@@ -789,6 +798,8 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="/static/gc-designer-data-controls-entity-nav.js"></script>
+<script src="/static/gc-designer-tag-editor.js"></script>
 <script>
   (function () {
     var SYNC_CATALOG = {{ sync_entity_catalog | tojson }};
@@ -814,7 +825,6 @@
     ];
     var GC_TAG_MAX_LEN = 64;
     var GC_TAG_MAX_COUNT = 50;
-    var GC_TAG_VALUE_MAX_LEN = 512;
     var FIREWALL_TAG_SUGGESTIONS = {{ firewall_tag_suggestions | tojson }};
     if (!Array.isArray(FIREWALL_TAG_SUGGESTIONS)) FIREWALL_TAG_SUGGESTIONS = [];
     var LS_KEY = "ground-control-fw-columns-v1";
@@ -1136,158 +1146,29 @@
       }
     }
 
-    function gcFwKvTagParseJson(raw) {
-      var rows = [];
+    function gcFwTagsJsonToNames(jsonStr) {
+      var names = [];
+      var seen = Object.create(null);
       try {
-        var a = JSON.parse(raw || "[]");
-        if (!Array.isArray(a)) return rows;
+        var a = JSON.parse(jsonStr || "[]");
+        if (!Array.isArray(a)) return names;
         a.forEach(function (x) {
+          var n = "";
           if (typeof x === "string") {
-            var u = String(x).trim().slice(0, GC_TAG_MAX_LEN);
-            if (u) rows.push({ name: u, value: "" });
+            n = String(x).trim().slice(0, GC_TAG_MAX_LEN);
           } else if (x && typeof x === "object") {
             var rn = x.name != null ? String(x.name) : x.n != null ? String(x.n) : "";
-            var n = rn.trim().slice(0, GC_TAG_MAX_LEN);
-            var rv = x.value != null ? String(x.value) : x.v != null ? String(x.v) : "";
-            var v = rv.trim().slice(0, GC_TAG_VALUE_MAX_LEN);
-            if (n) rows.push({ name: n, value: v });
+            n = rn.trim().slice(0, GC_TAG_MAX_LEN);
           }
+          if (!n) return;
+          var k = n.toLowerCase();
+          if (seen[k]) return;
+          seen[k] = true;
+          if (names.length >= GC_TAG_MAX_COUNT) return;
+          names.push(n);
         });
       } catch (e) {}
-      return rows;
-    }
-
-    function gcFwKvTagsUsedLowerExcept(tbody, exceptRow) {
-      var have = Object.create(null);
-      var trs = tbody.querySelectorAll("tr");
-      for (var i = 0; i < trs.length; i++) {
-        var tr = trs[i];
-        if (tr === exceptRow) continue;
-        var inp = tr.querySelector("[data-gc-kv-name]");
-        var v = inp && String(inp.value || "").trim();
-        if (v) have[v.toLowerCase()] = true;
-      }
-      return have;
-    }
-
-    function gcFwKvTagsRefreshDatalist(focusRow) {
-      var dl = document.getElementById("gc-fw-edit-tag-names-datalist");
-      if (!dl) return;
-      var tb = document.querySelector("#edit-firewall-form [data-gc-fw-kv-tbody]");
-      if (!tb) {
-        dl.innerHTML = "";
-        return;
-      }
-      var ex = gcFwKvTagsUsedLowerExcept(tb, focusRow || null);
-      dl.innerHTML = "";
-      (FIREWALL_TAG_SUGGESTIONS || []).forEach(function (t) {
-        if (t == null || String(t) === "") return;
-        var s = String(t);
-        if (ex[s.toLowerCase()]) return;
-        var opt = document.createElement("option");
-        opt.value = s;
-        dl.appendChild(opt);
-      });
-    }
-
-    function gcFwKvTagsSyncToHidden(root) {
-      var h = root && root.querySelector("[data-gc-fw-kv-tags-hidden]");
-      var tb = root && root.querySelector("[data-gc-fw-kv-tbody]");
-      if (!h || !tb) return;
-      var items = [];
-      var seen = Object.create(null);
-      tb.querySelectorAll("tr").forEach(function (tr) {
-        var ni = tr.querySelector("[data-gc-kv-name]");
-        var vi = tr.querySelector("[data-gc-kv-value]");
-        var name = ni && String(ni.value || "").trim().slice(0, GC_TAG_MAX_LEN);
-        if (!name) return;
-        var k = name.toLowerCase();
-        if (seen[k]) return;
-        seen[k] = true;
-        if (items.length >= GC_TAG_MAX_COUNT) return;
-        var val = vi && String(vi.value || "").trim().slice(0, GC_TAG_VALUE_MAX_LEN);
-        items.push(val ? { name: name, value: val } : name);
-      });
-      h.value = JSON.stringify(items);
-    }
-
-    function gcFwKvTagsEnsureTrailingBlank(tb) {
-      if (!tb) return;
-      var rows = tb.querySelectorAll("tr");
-      if (!rows.length) {
-        gcFwKvTagsAppendRow(tb, "", "");
-        return;
-      }
-      var last = rows[rows.length - 1];
-      var ni = last.querySelector("[data-gc-kv-name]");
-      var lastName = ni && String(ni.value || "").trim();
-      if (lastName) gcFwKvTagsAppendRow(tb, "", "");
-    }
-
-    function gcFwKvTagsAppendRow(tb, name, value) {
-      var removeSvg =
-        '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11H7v-2h10v2z"/></svg>';
-      var tr = document.createElement("tr");
-      tr.innerHTML =
-        '<td><input type="text" class="gc-if-flyout__input" data-gc-kv-name list="gc-fw-edit-tag-names-datalist" maxlength="' +
-        GC_TAG_MAX_LEN +
-        '" value="' +
-        escapeAttr(name || "") +
-        '" autocomplete="off" spellcheck="false" aria-label="Tag name" /></td>' +
-        '<td><input type="text" class="gc-if-flyout__input" data-gc-kv-value maxlength="' +
-        GC_TAG_VALUE_MAX_LEN +
-        '" value="' +
-        escapeAttr(value || "") +
-        '" autocomplete="off" placeholder="Optional" aria-label="Tag value (optional)" /></td>' +
-        '<td class="gc-fw-kv-tags__col-actions"><button type="button" class="gc-fw-kv-tags__remove icon-btn" aria-label="Remove tag">' +
-        removeSvg +
-        "</button></td>";
-      tb.appendChild(tr);
-    }
-
-    function gcFwKvTagsLoad(root, jsonStr) {
-      var tb = root && root.querySelector("[data-gc-fw-kv-tbody]");
-      if (!tb) return;
-      tb.innerHTML = "";
-      var rows = gcFwKvTagParseJson(jsonStr);
-      if (!rows.length) gcFwKvTagsAppendRow(tb, "", "");
-      else {
-        rows.forEach(function (r) {
-          gcFwKvTagsAppendRow(tb, r.name, r.value || "");
-        });
-      }
-      gcFwKvTagsEnsureTrailingBlank(tb);
-      gcFwKvTagsSyncToHidden(root);
-      gcFwKvTagsRefreshDatalist(null);
-    }
-
-    function bindGcFwKvTags(root) {
-      if (!root || root.dataset.gcFwKvTagsBound === "1") return;
-      root.dataset.gcFwKvTagsBound = "1";
-      var tb = root.querySelector("[data-gc-fw-kv-tbody]");
-      if (!tb) return;
-      tb.addEventListener("focusin", function (e) {
-        var t = e.target;
-        if (t && t.matches && t.matches("[data-gc-kv-name]")) gcFwKvTagsRefreshDatalist(t.closest("tr"));
-      });
-      tb.addEventListener("input", function (e) {
-        var t = e.target;
-        if (t && t.matches && (t.matches("[data-gc-kv-name]") || t.matches("[data-gc-kv-value]"))) {
-          if (t.matches("[data-gc-kv-name]")) gcFwKvTagsEnsureTrailingBlank(tb);
-          gcFwKvTagsSyncToHidden(root);
-        }
-      });
-      tb.addEventListener("click", function (e) {
-        var btn = e.target && e.target.closest && e.target.closest(".gc-fw-kv-tags__remove");
-        if (!btn) return;
-        var tr = btn.closest("tr");
-        if (!tr || !tb.contains(tr)) return;
-        tr.remove();
-        if (!tb.querySelector("tr")) gcFwKvTagsAppendRow(tb, "", "");
-        gcFwKvTagsEnsureTrailingBlank(tb);
-        gcFwKvTagsSyncToHidden(root);
-        gcFwKvTagsRefreshDatalist(null);
-      });
+      return names;
     }
 
     function gcTagEditorLoadFromJsonAttr(root, jsonStr) {
@@ -1354,12 +1235,21 @@
     applyColVis(colVis);
     syncFilterEmptyColspan();
 
+    var gcFwEditTagEditorRoot = document.getElementById("gc-fw-edit-tag-editor");
+    var gcFwEditTagEditorApi = null;
+    if (gcFwEditTagEditorRoot && typeof window.gcDesignerTagEditorInit === "function") {
+      window.gcDesignerTagEditorInit(gcFwEditTagEditorRoot, {
+        tagPool: FIREWALL_TAG_SUGGESTIONS,
+        maxTagLen: GC_TAG_MAX_LEN,
+        maxTagCount: GC_TAG_MAX_COUNT,
+      });
+      gcFwEditTagEditorApi = gcFwEditTagEditorRoot._gcDesignerTagApi || null;
+    }
+
     var addTagRoot = document.querySelector("#add-firewall-form [data-gc-tag-editor]");
     var batchTagRoot = document.querySelector("#gc-fw-tags-dialog [data-gc-fw-batch-tag-editor]");
-    var editKvTagsRoot = document.querySelector("#edit-firewall-form [data-gc-fw-kv-tags]");
     if (addTagRoot) gcTagEditorBind(addTagRoot);
     if (batchTagRoot) gcTagEditorBind(batchTagRoot);
-    if (editKvTagsRoot) bindGcFwKvTags(editKvTagsRoot);
 
     var filtersDrawerEl = document.getElementById("gc-fw-filters-drawer");
     /** "global" = table follows top-bar firewall scope (and Name facet mirrors it); "saved" = localStorage + session facet snapshot only. */
@@ -2466,7 +2356,6 @@
     var gcFwEditTabPanels = {
       connection: document.getElementById("gc-fw-edit-panel-connection"),
       sync: document.getElementById("gc-fw-edit-panel-sync"),
-      properties: document.getElementById("gc-fw-edit-panel-properties"),
     };
 
     function gcFwEditFlyoutApplyTabs() {
@@ -2537,8 +2426,13 @@
         intInp.value = String(mi);
       }
       syncEditMonitorIntervalUi();
-      var kvRoot = editForm && editForm.querySelector("[data-gc-fw-kv-tags]");
-      if (kvRoot) gcFwKvTagsLoad(kvRoot, tr.getAttribute("data-fw-tags-json"));
+      var tagsJson = tr.getAttribute("data-fw-tags-json");
+      if (gcFwEditTagEditorApi) {
+        gcFwEditTagEditorApi.setTags(gcFwTagsJsonToNames(tagsJson));
+        if (typeof window.gcDesignerTagEditorMarkSaved === "function" && gcFwEditTagEditorRoot) {
+          window.gcDesignerTagEditorMarkSaved(gcFwEditTagEditorRoot, gcFwEditTagEditorApi.getTags());
+        }
+      }
       editFlyout.hidden = false;
       editFlyout.setAttribute("aria-hidden", "false");
       if (flyoutPanel) {
@@ -2594,41 +2488,76 @@
       flyoutBackdrop.addEventListener("click", closeEditFlyout);
     }
 
-    function buildSyncToggleRows() {
-      var root = document.getElementById("gc-fw-sync-toggles");
-      if (!root || !SYNC_CATALOG || !SYNC_CATALOG.length) return;
-      var prefs = loadSyncEntityPrefs();
-      root.innerHTML = (SYNC_CATALOG || [])
-        .map(function (x) {
-          var on = !!prefs[x.id];
-          return (
-            '<div class="gc-if-flyout__field gc-if-flyout__field--toggle gc-fw-sync-toggles__row">' +
-            '<label class="gc-if-flyout__toggle-label">' +
-            '<input type="checkbox" class="gc-fw-sync-entity-cb" data-sync-entity-id="' +
-            escapeHtml(x.id) +
-            '" ' +
-            (on ? "checked" : "") +
-            " />" +
-            "<span>" +
-            escapeHtml(x.label) +
-            "</span>" +
-            "</label>" +
-            "</div>"
-          );
-        })
-        .join("");
-      root.querySelectorAll(".gc-fw-sync-entity-cb").forEach(function (cb) {
-        cb.addEventListener("change", function () {
-          var pr = loadSyncEntityPrefs();
-          var eid = cb.getAttribute("data-sync-entity-id");
-          if (eid) pr[eid] = cb.checked;
-          persistSyncEntityPrefs(pr);
-          refreshInventorySyncColumn();
-          applyRowFilter();
-        });
+    function applySyncPrefsToObjectSelectorList(root) {
+      if (!root) return;
+      var pr = loadSyncEntityPrefs();
+      root.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+        var id = cb.value;
+        if (!id) return;
+        if (Object.prototype.hasOwnProperty.call(pr, id)) cb.checked = !!pr[id];
+        else cb.checked = true;
       });
     }
-    buildSyncToggleRows();
+
+    function persistObjectSelectorListStateToPrefs(root) {
+      if (!root) return;
+      var pr = loadSyncEntityPrefs();
+      root.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+        var eid = cb.value;
+        if (eid) pr[eid] = cb.checked;
+      });
+      persistSyncEntityPrefs(pr);
+      refreshInventorySyncColumn();
+      applyRowFilter();
+    }
+
+    function refreshFwEditSyncObjectSelectorList() {
+      var root = document.getElementById("gc-fw-edit-sync-object-selector-list");
+      if (!root || typeof window.gcDesignerHydrateObjectSelectorList !== "function") return;
+      window.gcDesignerHydrateObjectSelectorList(root, function () {
+        applySyncPrefsToObjectSelectorList(root);
+      });
+    }
+
+    function mountFwEditSyncObjectSelectorList() {
+      var root = document.getElementById("gc-fw-edit-sync-object-selector-list");
+      if (!root || root.dataset.gcFwSyncObjectListBound === "1") return;
+      root.dataset.gcFwSyncObjectListBound = "1";
+      root.addEventListener("change", function (e) {
+        var t = e.target;
+        if (!t.matches || !t.matches("input.gc-designer-object-selector-list__cb")) return;
+        persistObjectSelectorListStateToPrefs(root);
+      });
+      var selAll = document.getElementById("gc-fw-edit-sync-select-all");
+      var clrSel = document.getElementById("gc-fw-edit-sync-clear-selection");
+      if (selAll && selAll.dataset.gcFwSyncBulkBound !== "1") {
+        selAll.dataset.gcFwSyncBulkBound = "1";
+        selAll.addEventListener("click", function () {
+          var r = document.getElementById("gc-fw-edit-sync-object-selector-list");
+          if (!r) return;
+          r.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+            cb.checked = true;
+          });
+          persistObjectSelectorListStateToPrefs(r);
+        });
+      }
+      if (clrSel && clrSel.dataset.gcFwSyncBulkBound !== "1") {
+        clrSel.dataset.gcFwSyncBulkBound = "1";
+        clrSel.addEventListener("click", function () {
+          var r = document.getElementById("gc-fw-edit-sync-object-selector-list");
+          if (!r) return;
+          r.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+            cb.checked = false;
+          });
+          persistObjectSelectorListStateToPrefs(r);
+        });
+      }
+      refreshFwEditSyncObjectSelectorList();
+    }
+    mountFwEditSyncObjectSelectorList();
+    document.addEventListener("gc-config-cache-synced", function () {
+      refreshFwEditSyncObjectSelectorList();
+    });
 
     function fwInventorySyncErrorDetailText(res) {
       var body = res.body || {};
@@ -3015,8 +2944,6 @@
     if (editForm) {
       editForm.addEventListener("submit", function (e) {
         e.preventDefault();
-        var kvR = document.querySelector("#edit-firewall-form [data-gc-fw-kv-tags]");
-        if (kvR) gcFwKvTagsSyncToHidden(kvR);
         var idField = document.getElementById("edit-fw-id");
         if (!idField || !String(idField.value || "").trim()) {
           alert("Missing firewall id. Close and open the panel again.");

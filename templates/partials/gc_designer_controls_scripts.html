@@ -1,0 +1,4443 @@
+<script src="/static/gc-option-selector.js?v={{ app_about.app_version if app_about is defined else '1' }}"></script>
+<script>
+(function () {
+  "use strict";
+
+  function gcDesignerCatalogNotifyFlyoutSave(kind) {
+    try {
+      if (typeof window.gcDesignerCatalogDataEntryPropsAfterFlyoutSave === "function") {
+        window.gcDesignerCatalogDataEntryPropsAfterFlyoutSave(kind);
+      }
+    } catch (eCat) {}
+  }
+
+  function gcDesignerCatalogNotifyFlyoutCancel(kind) {
+    try {
+      if (typeof window.gcDesignerCatalogDataEntryPropsOnFlyoutCancel === "function") {
+        window.gcDesignerCatalogDataEntryPropsOnFlyoutCancel(kind);
+      }
+    } catch (eCan) {}
+  }
+
+  function designerParseSelectorItemsAttr(grp) {
+    if (window.gcOptionSelectorParseItemsAttr) return window.gcOptionSelectorParseItemsAttr(grp);
+    if (!grp) return null;
+    var raw = grp.getAttribute("data-gc-designer-selector-items");
+    if (!raw) return null;
+    try {
+      var j = JSON.parse(raw);
+      return Array.isArray(j) ? j.map(function (x) { return String(x); }) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function designerOptionSelectorRebuild(grp, items, opts) {
+    if (window.gcOptionSelectorRebuild) {
+      window.gcOptionSelectorRebuild(grp, items, opts);
+      return;
+    }
+    opts = opts || {};
+    var prevLabel = opts.preserveSelectedLabel;
+    if (prevLabel == null && grp) {
+      var cur = grp.querySelector(".gc-option-selector__btn.primary");
+      if (cur) prevLabel = cur.textContent.trim();
+    }
+    var labels = (Array.isArray(items) ? items : [])
+      .map(function (x) {
+        return String(x).trim();
+      })
+      .filter(function (s) {
+        return s !== "";
+      });
+    if (!labels.length) labels = ["On", "Off"];
+    grp.setAttribute("data-gc-designer-selector-items", JSON.stringify(labels));
+    grp.innerHTML = "";
+    labels.forEach(function (label) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn gc-option-selector__btn";
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = label;
+      grp.appendChild(btn);
+    });
+    var btns = grp.querySelectorAll(".gc-option-selector__btn");
+    var picked = false;
+    if (prevLabel) {
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].textContent.trim() === prevLabel) {
+          btns[i].classList.add("primary");
+          btns[i].setAttribute("aria-pressed", "true");
+          picked = true;
+          break;
+        }
+      }
+    }
+    if (!picked && btns[0]) {
+      btns[0].classList.add("primary");
+      btns[0].setAttribute("aria-pressed", "true");
+    }
+  }
+
+  function designerSelectorItemsAsText(grp) {
+    if (window.gcOptionSelectorItemsAsText) return window.gcOptionSelectorItemsAsText(grp);
+    var fromAttr = designerParseSelectorItemsAttr(grp);
+    if (fromAttr && fromAttr.length) return fromAttr.join("\n");
+    var lines = [];
+    if (grp) {
+      grp.querySelectorAll(".gc-option-selector__btn").forEach(function (b) {
+        lines.push(b.textContent.trim());
+      });
+    }
+    return lines.join("\n");
+  }
+
+  function designerSelectorApplyText(grp, text) {
+    var lines = String(text || "")
+      .split(/\r?\n/)
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(function (s) {
+        return s !== "";
+      });
+    designerOptionSelectorRebuild(grp, lines, {});
+  }
+
+  function gcDesignerSelectorRowsClear(container) {
+    if (!container) return;
+    container.innerHTML = "";
+  }
+
+  function gcDesignerSelectorRowsAppend(container, value) {
+    if (!container) return;
+    var row = document.createElement("div");
+    row.className = "gc-designer-selector-items-row gc-designer__row";
+    row.setAttribute(
+      "style",
+      "display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;width:100%"
+    );
+    var inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "settings-form__input";
+    inp.style.flex = "1";
+    inp.style.minWidth = "8rem";
+    inp.value = value == null ? "" : String(value);
+    inp.setAttribute("aria-label", "Segment label");
+    inp.autocomplete = "off";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn--secondary gc-designer-selector-items-remove-row";
+    btn.textContent = "Remove";
+    row.appendChild(inp);
+    row.appendChild(btn);
+    container.appendChild(row);
+  }
+
+  function gcDesignerSelectorRowsFromGroup(container, grp) {
+    if (!container || !grp) return;
+    var text = designerSelectorItemsAsText(grp);
+    var parts = String(text || "")
+      .split(/\r?\n/)
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(function (s) {
+        return s !== "";
+      });
+    gcDesignerSelectorRowsClear(container);
+    if (!parts.length) {
+      gcDesignerSelectorRowsAppend(container, "On");
+      gcDesignerSelectorRowsAppend(container, "Off");
+    } else {
+      parts.forEach(function (p) {
+        gcDesignerSelectorRowsAppend(container, p);
+      });
+    }
+  }
+
+  function gcDesignerSelectorRowsReadText(container) {
+    if (!container) return "";
+    var lines = [];
+    container.querySelectorAll(".gc-designer-selector-items-row input[type='text']").forEach(function (inp) {
+      var s = String(inp.value || "").trim();
+      if (s !== "") lines.push(s);
+    });
+    return lines.join("\n");
+  }
+
+  function gcDesignerSelectorRowsSnapshot(container) {
+    if (!container) return [];
+    return Array.prototype.map.call(
+      container.querySelectorAll(".gc-designer-selector-items-row input[type='text']"),
+      function (inp) {
+        return String(inp.value || "");
+      }
+    );
+  }
+
+  function gcDesignerSelectorRowsRestore(container, snap) {
+    if (!container) return;
+    gcDesignerSelectorRowsClear(container);
+    if (snap && snap.length) {
+      snap.forEach(function (v) {
+        gcDesignerSelectorRowsAppend(container, v);
+      });
+    } else {
+      gcDesignerSelectorRowsAppend(container, "On");
+      gcDesignerSelectorRowsAppend(container, "Off");
+    }
+  }
+
+  function gcDesignerEnsureSelectorRowsDelegation(container) {
+    if (!container || container.getAttribute("data-gc-selector-rows-delegation") === "1") return;
+    container.setAttribute("data-gc-selector-rows-delegation", "1");
+    container.addEventListener("click", function (e) {
+      var rm = e.target.closest(".gc-designer-selector-items-remove-row");
+      if (!rm || !container.contains(rm)) return;
+      var row = rm.closest(".gc-designer-selector-items-row");
+      if (!row) return;
+      row.remove();
+      if (!container.querySelector(".gc-designer-selector-items-row")) {
+        gcDesignerSelectorRowsAppend(container, "");
+      }
+    });
+  }
+
+  var IPV4_RE = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)$/;
+
+  function ipv4ToInt(s) {
+    var p = s.split(".").map(function (x) {
+      return parseInt(x, 10);
+    });
+    return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
+  }
+
+  function intToIpv4(n) {
+    n = n >>> 0;
+    return [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+  }
+
+  function cidrMask4(prefix) {
+    if (prefix < 0 || prefix > 32) return null;
+    if (prefix === 0) return 0;
+    return (0xffffffff << (32 - prefix)) >>> 0;
+  }
+
+  function parseCidrV4(cidr) {
+    var m = String(cidr || "")
+      .trim()
+      .match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/);
+    if (!m) return null;
+    if (!IPV4_RE.test(m[1])) return null;
+    var prefix = parseInt(m[2], 10);
+    if (prefix < 0 || prefix > 32) return null;
+    var mask = cidrMask4(prefix);
+    if (mask === null) return null;
+    var raw = ipv4ToInt(m[1]);
+    return { network: raw & mask, mask: mask, prefix: prefix };
+  }
+
+  function ipv4InCidr(ipStr, cidrSpec) {
+    var c = parseCidrV4(cidrSpec);
+    if (!c) return null;
+    if (!IPV4_RE.test(ipStr)) return false;
+    var ip = ipv4ToInt(ipStr);
+    return (ip & c.mask) === (c.network & c.mask);
+  }
+
+  function isIpv4NetworkAddress(ipStr, prefix) {
+    if (!IPV4_RE.test(ipStr)) return false;
+    if (prefix < 0 || prefix > 32) return false;
+    var mask = cidrMask4(prefix);
+    if (mask === null) return false;
+    return (ipv4ToInt(ipStr) & mask) === ipv4ToInt(ipStr);
+  }
+
+  function normalizeIpv4Network(ipStr, prefix) {
+    if (!IPV4_RE.test(ipStr)) return null;
+    if (prefix < 0 || prefix > 32) return null;
+    var mask = cidrMask4(prefix);
+    if (mask === null) return null;
+    return intToIpv4(ipv4ToInt(ipStr) & mask);
+  }
+
+  function expandIpv6Hextets(host) {
+    var zone = host.indexOf("%");
+    if (zone !== -1) host = host.slice(0, zone);
+    host = host.trim();
+    if (!host) return null;
+    if (host.indexOf("::") === -1) {
+      var parts = host.split(":");
+      if (parts.length !== 8) return null;
+      var out = [];
+      for (var i = 0; i < 8; i++) {
+        var v = parseInt(parts[i], 16);
+        if (!Number.isFinite(v) || v < 0 || v > 0xffff) return null;
+        out.push(v);
+      }
+      return out;
+    }
+    var sides = host.split("::");
+    if (sides.length !== 2) return null;
+    var left = sides[0] ? sides[0].split(":").filter(Boolean) : [];
+    var right = sides[1] ? sides[1].split(":").filter(Boolean) : [];
+    var missing = 8 - left.length - right.length;
+    if (missing < 0) return null;
+    var outL = [];
+    for (var a = 0; a < left.length; a++) {
+      var va = parseInt(left[a], 16);
+      if (!Number.isFinite(va) || va < 0 || va > 0xffff) return null;
+      outL.push(va);
+    }
+    for (var b = 0; b < missing; b++) outL.push(0);
+    for (var c = 0; c < right.length; c++) {
+      var vc = parseInt(right[c], 16);
+      if (!Number.isFinite(vc) || vc < 0 || vc > 0xffff) return null;
+      outL.push(vc);
+    }
+    if (outL.length !== 8) return null;
+    return outL;
+  }
+
+  function hextetsToBigInt(words) {
+    var v = 0n;
+    for (var i = 0; i < 8; i++) v = (v << 16n) + BigInt(words[i]);
+    return v;
+  }
+
+  function ipv6PrefixMask(prefix) {
+    if (prefix < 0 || prefix > 128) return null;
+    if (prefix === 0) return 0n;
+    return ((1n << BigInt(prefix)) - 1n) << BigInt(128 - prefix);
+  }
+
+  function bigIntToExpandedIpv6(v) {
+    var parts = [];
+    for (var i = 0; i < 8; i++) {
+      parts.push(Number((v >> BigInt(112 - 16 * i)) & 0xffffn));
+    }
+    return parts
+      .map(function (x) {
+        return x.toString(16);
+      })
+      .join(":");
+  }
+
+  function parseCidrV6(cidr) {
+    var s = String(cidr || "").trim();
+    var ix = s.lastIndexOf("/");
+    if (ix === -1) return null;
+    var addr = s.slice(0, ix).trim();
+    var prefix = parseInt(s.slice(ix + 1), 10);
+    if (!Number.isFinite(prefix) || prefix < 0 || prefix > 128) return null;
+    var words = expandIpv6Hextets(addr);
+    if (!words) return null;
+    var mask = ipv6PrefixMask(prefix);
+    if (mask === null) return null;
+    var network = hextetsToBigInt(words) & mask;
+    return { network: network, mask: mask, prefix: prefix };
+  }
+
+  function ipv6InCidr(ipHost, cidrSpec) {
+    var c = parseCidrV6(cidrSpec);
+    if (!c) return null;
+    var words = expandIpv6Hextets(ipHost);
+    if (!words) return false;
+    var ip = hextetsToBigInt(words);
+    return (ip & c.mask) === (c.network & c.mask);
+  }
+
+  function isIpv6NetworkAddress(ipHost, prefix) {
+    var words = expandIpv6Hextets(ipHost);
+    if (!words) return false;
+    if (prefix < 0 || prefix > 128) return false;
+    var mask = ipv6PrefixMask(prefix);
+    if (mask === null) return false;
+    var ip = hextetsToBigInt(words);
+    return (ip & mask) === ip;
+  }
+
+  function normalizeIpv6Network(ipHost, prefix) {
+    var words = expandIpv6Hextets(ipHost);
+    if (!words) return null;
+    if (prefix < 0 || prefix > 128) return null;
+    var mask = ipv6PrefixMask(prefix);
+    if (mask === null) return null;
+    return bigIntToExpandedIpv6(hextetsToBigInt(words) & mask);
+  }
+
+  function isValidIpv6Shape(s) {
+    s = String(s || "").trim();
+    if (!s) return true;
+    var zone = s.indexOf("%");
+    if (zone !== -1) s = s.slice(0, zone);
+    try {
+      new URL("http://[" + s + "]");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function readOptsFromInput(el) {
+    return {
+      withinCidr: el.getAttribute("data-gc-ip-within-cidr") || "",
+      rangeLo: el.getAttribute("data-gc-ip-range-lo") || "",
+      rangeHi: el.getAttribute("data-gc-ip-range-hi") || "",
+      prefix: el.getAttribute("data-gc-ip-prefix") || "",
+      cidrPrefixMin: el.getAttribute("data-gc-ip-cidr-prefix-min") || "",
+      cidrPrefixMax: el.getAttribute("data-gc-ip-cidr-prefix-max") || "",
+      storedPrefix: el.getAttribute("data-gc-ip-prefix-length") || "",
+      requireNetwork: el.getAttribute("data-gc-ip-require-network") === "true",
+      requireValueCidr: el.getAttribute("data-gc-ip-require-value-cidr") === "true",
+      autocorrect: el.getAttribute("data-gc-ip-autocorrect") === "true",
+    };
+  }
+
+  function hasAppliedIpConstraints(el) {
+    if (!el || !el.attributes) return false;
+    for (var i = 0; i < el.attributes.length; i++) {
+      if (el.attributes[i].name.indexOf("data-gc-ip-") === 0) return true;
+    }
+    return false;
+  }
+
+  function cidrPrefixBoundsActive(opts, maxPfx) {
+    if (!opts.withinCidr) return false;
+    var loN = opts.cidrPrefixMin !== "" ? parseInt(opts.cidrPrefixMin, 10) : null;
+    var hiN = opts.cidrPrefixMax !== "" ? parseInt(opts.cidrPrefixMax, 10) : null;
+    var hasLo = loN !== null && Number.isFinite(loN);
+    var hasHi = hiN !== null && Number.isFinite(hiN);
+    if (!hasLo && !hasHi) return false;
+    var lo = hasLo ? loN : 0;
+    var hi = hasHi ? hiN : maxPfx;
+    if (lo < 0 || hi > maxPfx || lo > hi) return false;
+    return { lo: lo, hi: hi };
+  }
+
+  function validateIpv4(val, opts) {
+    var s = String(val || "").trim();
+    if (!s) return { ok: true, msg: "" };
+    var ix = s.lastIndexOf("/");
+    var host;
+    var userPfx = null;
+    if (ix === -1) {
+      host = s;
+    } else {
+      host = s.slice(0, ix).trim();
+      userPfx = parseInt(s.slice(ix + 1), 10);
+      if (!Number.isFinite(userPfx) || userPfx < 0 || userPfx > 32) {
+        return { ok: false, msg: "IPv4 prefix must be a number from 0 to 32." };
+      }
+    }
+    if (!IPV4_RE.test(host)) {
+      return { ok: false, msg: "Enter a dotted IPv4 address (four octets 0–255)." };
+    }
+    var bounds = cidrPrefixBoundsActive(opts, 32);
+    if (bounds === false && opts.withinCidr && (opts.cidrPrefixMin || opts.cidrPrefixMax)) {
+      var loC = opts.cidrPrefixMin !== "" ? parseInt(opts.cidrPrefixMin, 10) : null;
+      var hiC = opts.cidrPrefixMax !== "" ? parseInt(opts.cidrPrefixMax, 10) : null;
+      if (
+        (loC !== null && (!Number.isFinite(loC) || loC < 0 || loC > 32)) ||
+        (hiC !== null && (!Number.isFinite(hiC) || hiC < 0 || hiC > 32)) ||
+        (Number.isFinite(loC) && Number.isFinite(hiC) && loC > hiC)
+      ) {
+        return { ok: false, msg: "Invalid data-gc-ip-cidr-prefix-min/max for IPv4 (0–32, min ≤ max)." };
+      }
+    }
+    if (bounds !== false) {
+      if (userPfx === null) {
+        return {
+          ok: false,
+          msg: "Enter IPv4 as address/prefix; /prefix must be " + bounds.lo + "–" + bounds.hi + " (CIDR bounds).",
+        };
+      }
+      if (userPfx < bounds.lo || userPfx > bounds.hi) {
+        return {
+          ok: false,
+          msg: "IPv4 /prefix must be between " + bounds.lo + " and " + bounds.hi + ".",
+        };
+      }
+    }
+    if (opts.withinCidr) {
+      var inC = ipv4InCidr(host, opts.withinCidr);
+      if (inC === null) {
+        return { ok: false, msg: "Invalid CIDR in data-gc-ip-within-cidr (use a.b.c.d/p)." };
+      }
+      if (!inC) {
+        return { ok: false, msg: "IPv4 is not inside the configured subnet (" + opts.withinCidr + ")." };
+      }
+    }
+    if (opts.rangeLo && opts.rangeHi) {
+      if (!IPV4_RE.test(opts.rangeLo) || !IPV4_RE.test(opts.rangeHi)) {
+        return { ok: false, msg: "Range bounds are not valid IPv4 addresses." };
+      }
+      var ip = ipv4ToInt(host);
+      var lo = ipv4ToInt(opts.rangeLo);
+      var hi = ipv4ToInt(opts.rangeHi);
+      if (lo > hi) {
+        return { ok: false, msg: "Range low must be ≤ high." };
+      }
+      if (ip < lo || ip > hi) {
+        return { ok: false, msg: "IPv4 is outside the configured range " + opts.rangeLo + " – " + opts.rangeHi + "." };
+      }
+    }
+    if (opts.requireNetwork) {
+      var pfx = parseInt(opts.prefix, 10);
+      if (!Number.isFinite(pfx) || pfx < 0 || pfx > 32) {
+        return { ok: false, msg: "Set data-gc-ip-prefix (0–32) for IPv4 network-address check." };
+      }
+      if (!isIpv4NetworkAddress(host, pfx)) {
+        return { ok: false, msg: "IPv4 must be the network address for /" + pfx + " (host bits must be 0)." };
+      }
+    }
+    if (opts.requireValueCidr) {
+      if (userPfx === null && opts.storedPrefix) {
+        userPfx = parseInt(opts.storedPrefix, 10);
+      }
+      if (userPfx === null || !Number.isFinite(userPfx)) {
+        return { ok: false, msg: "Enter IPv4 CIDR as address/prefix (e.g. 10.1.2.3/16)." };
+      }
+      if (!isIpv4NetworkAddress(host, userPfx)) {
+        return {
+          ok: false,
+          msg: "IPv4 host must be the /" + userPfx + " network address (tab away to normalize).",
+        };
+      }
+    }
+    return { ok: true, msg: "" };
+  }
+
+  function validateIpv6(val, opts) {
+    var s = String(val || "").trim();
+    if (!s) return { ok: true, msg: "" };
+    var ix = s.lastIndexOf("/");
+    var left;
+    var userPfx6 = null;
+    if (ix === -1) {
+      left = s;
+    } else {
+      left = s.slice(0, ix).trim();
+      userPfx6 = parseInt(s.slice(ix + 1), 10);
+      if (!Number.isFinite(userPfx6) || userPfx6 < 0 || userPfx6 > 128) {
+        return { ok: false, msg: "IPv6 prefix must be a number from 0 to 128." };
+      }
+    }
+    if (!isValidIpv6Shape(left)) {
+      return { ok: false, msg: "Enter a valid IPv6 address (e.g. 2001:db8::1 or ::1)." };
+    }
+    var zone = left.indexOf("%");
+    var host = zone !== -1 ? left.slice(0, zone) : left;
+    var bounds6 = cidrPrefixBoundsActive(opts, 128);
+    if (bounds6 === false && opts.withinCidr && (opts.cidrPrefixMin || opts.cidrPrefixMax)) {
+      var lo6 = opts.cidrPrefixMin !== "" ? parseInt(opts.cidrPrefixMin, 10) : null;
+      var hi6 = opts.cidrPrefixMax !== "" ? parseInt(opts.cidrPrefixMax, 10) : null;
+      if (
+        (lo6 !== null && (!Number.isFinite(lo6) || lo6 < 0 || lo6 > 128)) ||
+        (hi6 !== null && (!Number.isFinite(hi6) || hi6 < 0 || hi6 > 128)) ||
+        (Number.isFinite(lo6) && Number.isFinite(hi6) && lo6 > hi6)
+      ) {
+        return { ok: false, msg: "Invalid data-gc-ip-cidr-prefix-min/max for IPv6 (0–128, min ≤ max)." };
+      }
+    }
+    if (bounds6 !== false) {
+      if (userPfx6 === null) {
+        return {
+          ok: false,
+          msg: "Enter IPv6 as address/prefix; /prefix must be " + bounds6.lo + "–" + bounds6.hi + " (CIDR bounds).",
+        };
+      }
+      if (userPfx6 < bounds6.lo || userPfx6 > bounds6.hi) {
+        return {
+          ok: false,
+          msg: "IPv6 /prefix must be between " + bounds6.lo + " and " + bounds6.hi + ".",
+        };
+      }
+    }
+    if (opts.withinCidr) {
+      var in6 = ipv6InCidr(host, opts.withinCidr);
+      if (in6 === null) {
+        return { ok: false, msg: "Invalid IPv6 CIDR in data-gc-ip-within-cidr (use addr/prefix)." };
+      }
+      if (!in6) {
+        return { ok: false, msg: "IPv6 is not inside the configured subnet (" + opts.withinCidr + ")." };
+      }
+    }
+    if (opts.rangeLo || opts.rangeHi) {
+      return {
+        ok: false,
+        msg: "IPv4 range is set on this field; use CIDR for IPv6 or clear range options.",
+      };
+    }
+    if (opts.requireNetwork) {
+      var pfx6 = parseInt(opts.prefix, 10);
+      if (!Number.isFinite(pfx6) || pfx6 < 0 || pfx6 > 128) {
+        return { ok: false, msg: "Set data-gc-ip-prefix (0–128) for IPv6 network-address check." };
+      }
+      if (!isIpv6NetworkAddress(host, pfx6)) {
+        return { ok: false, msg: "IPv6 must be the network address for /" + pfx6 + " (host bits must be 0)." };
+      }
+    }
+    if (opts.requireValueCidr) {
+      if (userPfx6 === null && opts.storedPrefix) {
+        userPfx6 = parseInt(opts.storedPrefix, 10);
+      }
+      if (userPfx6 === null || !Number.isFinite(userPfx6)) {
+        return { ok: false, msg: "Enter IPv6 CIDR as address/prefix (e.g. 2001:db8::/32)." };
+      }
+      if (!isIpv6NetworkAddress(host, userPfx6)) {
+        return {
+          ok: false,
+          msg: "IPv6 host must be the /" + userPfx6 + " network address (tab away to normalize).",
+        };
+      }
+    }
+    return { ok: true, msg: "" };
+  }
+
+  function autocorrectIpv4Value(s, opts) {
+    s = String(s || "");
+    if (opts.requireValueCidr) {
+      var ix0 = s.lastIndexOf("/");
+      var hp;
+      var pfxV;
+      if (ix0 === -1) {
+        hp = s.trim();
+        pfxV = opts.storedPrefix ? parseInt(opts.storedPrefix, 10) : NaN;
+      } else {
+        hp = s.slice(0, ix0).trim();
+        pfxV = parseInt(s.slice(ix0 + 1), 10);
+      }
+      if (!IPV4_RE.test(hp) || !Number.isFinite(pfxV) || pfxV < 0 || pfxV > 32) return s;
+      var nv = normalizeIpv4Network(hp, pfxV);
+      return nv != null ? nv : s;
+    }
+    if (!opts.autocorrect) return s;
+    var ix = s.lastIndexOf("/");
+    var hostPart = (ix === -1 ? s : s.slice(0, ix)).trim();
+    var slashSuffix = ix === -1 ? "" : s.slice(ix);
+    if (!IPV4_RE.test(hostPart)) return s;
+    var pfx = null;
+    if (opts.withinCidr) {
+      var c = parseCidrV4(opts.withinCidr);
+      if (c) pfx = c.prefix;
+    }
+    if (pfx === null && opts.prefix) {
+      pfx = parseInt(opts.prefix, 10);
+    }
+    if (pfx === null || !Number.isFinite(pfx) || pfx < 0 || pfx > 32) return s;
+    var n = normalizeIpv4Network(hostPart, pfx);
+    return n != null ? n + slashSuffix : s;
+  }
+
+  function autocorrectIpv6Value(s, opts) {
+    s = String(s || "");
+    if (opts.requireValueCidr) {
+      var ixv = s.lastIndexOf("/");
+      var leftV;
+      var pfxV6;
+      if (ixv === -1) {
+        leftV = s.trim();
+        pfxV6 = opts.storedPrefix ? parseInt(opts.storedPrefix, 10) : NaN;
+      } else {
+        leftV = s.slice(0, ixv).trim();
+        pfxV6 = parseInt(s.slice(ixv + 1), 10);
+      }
+      if (!isValidIpv6Shape(leftV) || !Number.isFinite(pfxV6) || pfxV6 < 0 || pfxV6 > 128) return s;
+      var zoneV = leftV.indexOf("%");
+      var hostV = zoneV !== -1 ? leftV.slice(0, zoneV) : leftV;
+      var zoneSufV = zoneV !== -1 ? leftV.slice(zoneV) : "";
+      var nv6 = normalizeIpv6Network(hostV.trim(), pfxV6);
+      return nv6 != null ? nv6 + zoneSufV : s;
+    }
+    if (!opts.autocorrect) return s;
+    var ix = s.lastIndexOf("/");
+    var left = (ix === -1 ? s : s.slice(0, ix)).trim();
+    var slashSuffix = ix === -1 ? "" : s.slice(ix);
+    if (!isValidIpv6Shape(left)) return s;
+    var zone = left.indexOf("%");
+    var host = zone !== -1 ? left.slice(0, zone) : left;
+    var suffix = zone !== -1 ? left.slice(zone) : "";
+    var pfx = null;
+    if (opts.withinCidr) {
+      var c6 = parseCidrV6(opts.withinCidr);
+      if (c6) pfx = c6.prefix;
+    }
+    if (pfx === null && opts.prefix) {
+      pfx = parseInt(opts.prefix, 10);
+    }
+    if (pfx === null || !Number.isFinite(pfx) || pfx < 0 || pfx > 128) return s;
+    var n = normalizeIpv6Network(host.trim(), pfx);
+    return n != null ? n + suffix + slashSuffix : s;
+  }
+
+  function canShowAutocorrectPreview(opts) {
+    return !!(opts && (opts.autocorrect || opts.requireValueCidr));
+  }
+
+  function computeCorrectionTarget(raw, family, opts) {
+    if (!canShowAutocorrectPreview(opts)) return null;
+    if (!String(raw || "").trim()) return null;
+    if (opts.requireValueCidr) {
+      var ix = String(raw).lastIndexOf("/");
+      var hp;
+      var pfx;
+      if (ix !== -1) {
+        hp = String(raw).slice(0, ix).trim();
+        pfx = parseInt(String(raw).slice(ix + 1), 10);
+      } else {
+        hp = String(raw).trim();
+        pfx = opts.storedPrefix ? parseInt(opts.storedPrefix, 10) : NaN;
+      }
+      if (family === "ipv4") {
+        if (!IPV4_RE.test(hp) || !Number.isFinite(pfx) || pfx < 0 || pfx > 32) return null;
+        var net = normalizeIpv4Network(hp, pfx);
+        if (!net) return null;
+        var mask = intToIpv4(cidrMask4(pfx));
+        var before = String(raw).trim();
+        if (before === net && ix === -1 && isIpv4NetworkAddress(hp, pfx)) return null;
+        if (net === hp && ix !== -1) return net + " · " + mask;
+        if (net === hp && ix === -1) return null;
+        return net + " · " + mask;
+      }
+      var z = hp.indexOf("%");
+      var hostOnly = z !== -1 ? hp.slice(0, z) : hp;
+      var zoneSuf = z !== -1 ? hp.slice(z) : "";
+      if (!isValidIpv6Shape(hp) || !Number.isFinite(pfx) || pfx < 0 || pfx > 128) return null;
+      var nv = normalizeIpv6Network(hostOnly, pfx);
+      if (!nv) return null;
+      var full = nv + zoneSuf;
+      var mb = ipv6PrefixMask(pfx);
+      var maskStr = mb !== null ? bigIntToExpandedIpv6(mb) : "";
+      var maskShort = maskStr.length > 28 ? "/" + pfx : maskStr;
+      var before6 = String(raw).trim();
+      if (before6 === full && ix === -1 && isIpv6NetworkAddress(hostOnly, pfx)) return null;
+      if (full === hp && ix !== -1) return full + " · " + maskShort;
+      if (full === before6 && ix === -1) return null;
+      return full + " · " + maskShort;
+    }
+    var corrected =
+      family === "ipv4" ? autocorrectIpv4Value(raw, opts) : autocorrectIpv6Value(raw, opts);
+    var before = String(raw).trim();
+    var after = String(corrected).trim();
+    if (before === after) return null;
+    return after;
+  }
+
+  function optsFromConstraintPanel(family) {
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var mode = modeEl ? modeEl.value : "none";
+    var cidrV4El = document.getElementById("gc-designer-ip-cidr-v4");
+    var cidrV6El = document.getElementById("gc-designer-ip-cidr-v6");
+    var loEl = document.getElementById("gc-designer-ip-range-lo");
+    var hiEl = document.getElementById("gc-designer-ip-range-hi");
+    var pfxEl = document.getElementById("gc-designer-ip-prefix");
+    var cidrPfxMinEl = document.getElementById("gc-designer-ip-cidr-pfx-min");
+    var cidrPfxMaxEl = document.getElementById("gc-designer-ip-cidr-pfx-max");
+    var autoEl = document.getElementById("gc-designer-ip-autocorrect");
+    var o = {
+      withinCidr: "",
+      rangeLo: "",
+      rangeHi: "",
+      prefix: "",
+      cidrPrefixMin: "",
+      cidrPrefixMax: "",
+      storedPrefix: "",
+      requireNetwork: false,
+      requireValueCidr: false,
+      autocorrect: false,
+    };
+    var pfxStr = pfxEl && pfxEl.value !== "" ? String(pfxEl.value) : "";
+    if (mode === "cidr-subnet") {
+      var v4c = cidrV4El && cidrV4El.value.trim();
+      var v6c = cidrV6El && cidrV6El.value.trim();
+      if (family === "ipv4" && v4c) o.withinCidr = v4c;
+      if (family === "ipv6" && v6c) o.withinCidr = v6c;
+      var cMin = cidrPfxMinEl && cidrPfxMinEl.value !== "" ? String(cidrPfxMinEl.value) : "";
+      var cMax = cidrPfxMaxEl && cidrPfxMaxEl.value !== "" ? String(cidrPfxMaxEl.value) : "";
+      if (family === "ipv4" && v4c && (cMin || cMax)) {
+        if (cMin) o.cidrPrefixMin = cMin;
+        if (cMax) o.cidrPrefixMax = cMax;
+      }
+      if (family === "ipv6" && v6c && (cMin || cMax)) {
+        if (cMin) o.cidrPrefixMin = cMin;
+        if (cMax) o.cidrPrefixMax = cMax;
+      }
+    } else if (mode === "ip-range" && family === "ipv4") {
+      if (loEl && loEl.value.trim()) o.rangeLo = loEl.value.trim();
+      if (hiEl && hiEl.value.trim()) o.rangeHi = hiEl.value.trim();
+    } else if (mode === "network-only") {
+      o.requireNetwork = true;
+      if (pfxStr) o.prefix = pfxStr;
+    } else if (mode === "value-cidr") {
+      o.requireValueCidr = true;
+    } else if (mode === "none" && autoEl && autoEl.checked && pfxStr) {
+      o.prefix = pfxStr;
+    }
+    if (autoEl && autoEl.checked) {
+      o.autocorrect = true;
+      if (pfxStr && mode !== "cidr-subnet" && mode !== "value-cidr" && !o.prefix) {
+        o.prefix = pfxStr;
+      }
+    }
+    return o;
+  }
+
+  function designerIpOpts(inputEl, family) {
+    if (hasAppliedIpConstraints(inputEl)) return readOptsFromInput(inputEl);
+    return optsFromConstraintPanel(family);
+  }
+
+  function sampleIpv4InCidr(cidrSpec) {
+    var c = parseCidrV4(cidrSpec);
+    if (!c) return "192.0.2.1";
+    var hostMax = (0xffffffff >>> c.prefix) >>> 0;
+    if (hostMax <= 1) return intToIpv4(c.network);
+    var cand = (c.network + Math.min(10, hostMax - 1)) >>> 0;
+    return intToIpv4(cand);
+  }
+
+  function sampleIpv6InCidr(cidrSpec) {
+    var c = parseCidrV6(cidrSpec);
+    if (!c) return "2001:db8::1";
+    var candidates = [
+      "2001:db8::1",
+      "2001:db8:0:1::1",
+      "2001:db8:0:1::abcd",
+      "::1",
+      "fe80::1",
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      var h = candidates[i].split("%")[0];
+      if (ipv6InCidr(h, cidrSpec)) return candidates[i];
+    }
+    return bigIntToExpandedIpv6(c.network + 1n);
+  }
+
+  function pickDemoPrefix(bounds, maxPfx) {
+    if (bounds === false) return Math.min(24, maxPfx);
+    var mid = Math.floor((bounds.lo + bounds.hi) / 2);
+    return Math.max(bounds.lo, Math.min(bounds.hi, mid));
+  }
+
+  function exampleIpv4Placeholder(opts) {
+    var ex = "192.0.2.1";
+    var bounds = cidrPrefixBoundsActive(opts, 32);
+    if (opts.withinCidr) {
+      ex = sampleIpv4InCidr(opts.withinCidr);
+      if (bounds !== false) ex = ex + "/" + pickDemoPrefix(bounds, 32);
+    } else if (opts.rangeLo && opts.rangeHi && IPV4_RE.test(opts.rangeLo) && IPV4_RE.test(opts.rangeHi)) {
+      var a = ipv4ToInt(opts.rangeLo);
+      var b = ipv4ToInt(opts.rangeHi);
+      ex = a <= b ? intToIpv4(Math.floor((a + b) / 2)) : opts.rangeLo;
+    } else if (opts.requireNetwork) {
+      var p = parseInt(opts.prefix, 10);
+      if (Number.isFinite(p) && p >= 0 && p <= 32) {
+        var n = normalizeIpv4Network("10.20.30.0", p);
+        ex = n != null ? n : "10.0.0.0";
+      } else {
+        ex = "10.0.0.0";
+      }
+    } else if (opts.requireValueCidr) {
+      ex = "10.1.0.0/16";
+    } else if (opts.autocorrect && opts.prefix) {
+      var p2 = parseInt(opts.prefix, 10);
+      if (Number.isFinite(p2) && p2 >= 0 && p2 <= 32) {
+        var n2 = normalizeIpv4Network("192.0.2.17", p2);
+        if (n2 != null) ex = n2;
+      }
+    }
+    return ex;
+  }
+
+  function exampleIpv6Placeholder(opts) {
+    var ex = "2001:db8::1";
+    var bounds = cidrPrefixBoundsActive(opts, 128);
+    if (opts.withinCidr) {
+      ex = sampleIpv6InCidr(opts.withinCidr);
+      if (bounds !== false) ex = ex + "/" + pickDemoPrefix(bounds, 128);
+    } else if (opts.requireNetwork) {
+      var p = parseInt(opts.prefix, 10);
+      if (Number.isFinite(p) && p >= 0 && p <= 128) {
+        var n = normalizeIpv6Network("2001:db8:1::", p);
+        ex = n != null ? n : "2001::";
+      } else {
+        ex = "2001::";
+      }
+    } else if (opts.requireValueCidr) {
+      ex = "2001:db8::/32";
+    } else if (opts.autocorrect && opts.prefix) {
+      var p2 = parseInt(opts.prefix, 10);
+      if (Number.isFinite(p2) && p2 >= 0 && p2 <= 128) {
+        var n2 = normalizeIpv6Network("2001:db8::cafe", p2);
+        if (n2 != null) ex = n2;
+      }
+    }
+    return ex;
+  }
+
+  function describeIpv4Constraints(opts) {
+    var parts = [];
+    parts.push("Empty allowed.");
+    parts.push("Non-empty values must be a dotted IPv4 address.");
+    if (opts.withinCidr) {
+      parts.push("Must fall inside " + opts.withinCidr + ".");
+      var b = cidrPrefixBoundsActive(opts, 32);
+      if (b !== false) {
+        parts.push("Enter host/prefix; prefix must be between /" + b.lo + " and /" + b.hi + ".");
+      }
+    }
+    if (opts.rangeLo && opts.rangeHi) {
+      parts.push("Must be between " + opts.rangeLo + " and " + opts.rangeHi + " inclusive.");
+    }
+    if (opts.requireNetwork) {
+      if (opts.prefix) {
+        parts.push("Must be the /" + opts.prefix + " network address (host bits zero).");
+      } else {
+        parts.push("Network-address mode: set prefix length in IP field properties.");
+      }
+    }
+    if (opts.requireValueCidr) {
+      parts.push(
+        "Enter IPv4 CIDR (address/prefix). On blur: network address in the field, subnet mask in a pill, and data-gc-ip-network-address / data-gc-ip-netmask / data-gc-ip-prefix-length set."
+      );
+    }
+    if (opts.autocorrect) {
+      if (opts.withinCidr) {
+        parts.push("On blur, host bits are cleared for the containment subnet mask.");
+      } else if (opts.prefix) {
+        parts.push("On blur, host bits are cleared for /" + opts.prefix + ".");
+      } else {
+        parts.push("Auto-correct on blur needs a prefix length or Within CIDR on this field.");
+      }
+    }
+    return parts.join(" ");
+  }
+
+  function describeIpv6Constraints(opts) {
+    var parts = [];
+    parts.push("Empty allowed.");
+    parts.push("Non-empty values must be a valid IPv6 address.");
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var mode = modeEl ? modeEl.value : "none";
+    if (mode === "ip-range") {
+      parts.push("IPv4 range mode only constrains the IPv4 field.");
+    }
+    if (opts.withinCidr) {
+      parts.push("Must fall inside " + opts.withinCidr + ".");
+      var b = cidrPrefixBoundsActive(opts, 128);
+      if (b !== false) {
+        parts.push("Enter host/prefix; prefix must be between /" + b.lo + " and /" + b.hi + ".");
+      }
+    }
+    if (opts.requireNetwork) {
+      if (opts.prefix) {
+        parts.push("Must be the /" + opts.prefix + " network address (host bits zero).");
+      } else {
+        parts.push("Network-address mode: set prefix length in IP field properties.");
+      }
+    }
+    if (opts.requireValueCidr) {
+      parts.push(
+        "Enter IPv6 CIDR (address/prefix). On blur: network in the field, mask (or /prefix) in a pill, and data-gc-ip-network-address / data-gc-ip-netmask / data-gc-ip-prefix-length set."
+      );
+    }
+    if (opts.autocorrect) {
+      if (opts.withinCidr) {
+        parts.push("On blur, host bits are cleared for the containment subnet mask.");
+      } else if (opts.prefix) {
+        parts.push("On blur, host bits are cleared for /" + opts.prefix + ".");
+      } else {
+        parts.push("Auto-correct on blur needs a prefix length or Within CIDR on this field.");
+      }
+    }
+    return parts.join(" ");
+  }
+
+  function refreshDesignerIpHints() {
+    var ipv4Inp = document.getElementById("gc-designer-controls-ipv4");
+    var ipv6Inp = document.getElementById("gc-designer-controls-ipv6");
+    var lab4 = document.getElementById("gc-designer-ipv4-l");
+    var lab6 = document.getElementById("gc-designer-ipv6-l");
+    var hint4 = document.getElementById("gc-designer-ipv4-constraints");
+    var hint6 = document.getElementById("gc-designer-ipv6-constraints");
+    if (!ipv4Inp || !ipv6Inp) return;
+    var o4 = optsFromConstraintPanel("ipv4");
+    var o6 = optsFromConstraintPanel("ipv6");
+    var p4 = exampleIpv4Placeholder(o4);
+    var p6 = exampleIpv6Placeholder(o6);
+    var d4 = describeIpv4Constraints(o4);
+    var d6 = describeIpv6Constraints(o6);
+    ipv4Inp.placeholder = p4;
+    ipv6Inp.placeholder = p6;
+    if (lab4) lab4.setAttribute("title", d4);
+    if (lab6) lab6.setAttribute("title", d6);
+    if (hint4) hint4.textContent = d4;
+    if (hint6) hint6.textContent = d6;
+  }
+
+  function clearValueCidrUi(input, pill) {
+    if (pill) {
+      pill.textContent = "";
+      pill.hidden = true;
+      pill.setAttribute("aria-hidden", "true");
+      pill.removeAttribute("title");
+    }
+    var wrap = input ? input.closest(".gc-ip-field") : null;
+    if (wrap) wrap.classList.remove("gc-ip-field--composite");
+    if (input) {
+      input.removeAttribute("data-gc-ip-network-address");
+      input.removeAttribute("data-gc-ip-netmask");
+      input.removeAttribute("data-gc-ip-prefix-length");
+    }
+  }
+
+  function syncValueCidrMaskPill(input, pill, family, pfx) {
+    if (!input || !pill || !Number.isFinite(pfx)) return;
+    var wrap = input.closest(".gc-ip-field");
+    var v = input.value.trim();
+    if (family === "ipv4") {
+      if (!IPV4_RE.test(v)) return;
+      var net = normalizeIpv4Network(v, pfx);
+      if (!net) return;
+      if (net !== v) input.value = net;
+      var mask = intToIpv4(cidrMask4(pfx));
+      pill.textContent = mask;
+      pill.hidden = false;
+      pill.setAttribute("aria-hidden", "false");
+      pill.setAttribute("title", "Subnet mask /" + pfx);
+      input.setAttribute("data-gc-ip-network-address", net);
+      input.setAttribute("data-gc-ip-netmask", mask);
+      input.setAttribute("data-gc-ip-prefix-length", String(pfx));
+      if (wrap) wrap.classList.add("gc-ip-field--composite");
+    } else {
+      var ixz = v.indexOf("%");
+      var hostOnly = ixz !== -1 ? v.slice(0, ixz) : v;
+      var zoneSuf = ixz !== -1 ? v.slice(ixz) : "";
+      if (!isValidIpv6Shape(v)) return;
+      var nv = normalizeIpv6Network(hostOnly, pfx);
+      if (!nv) return;
+      var full = nv + zoneSuf;
+      if (full !== v) input.value = full;
+      var mb = ipv6PrefixMask(pfx);
+      var maskStr = mb !== null ? bigIntToExpandedIpv6(mb) : "";
+      var pillText = maskStr.length > 28 ? "/" + pfx : maskStr;
+      pill.textContent = pillText;
+      pill.hidden = false;
+      pill.setAttribute("aria-hidden", "false");
+      pill.setAttribute("title", maskStr ? "Mask: " + maskStr : "");
+      input.setAttribute("data-gc-ip-network-address", full);
+      input.setAttribute("data-gc-ip-netmask", maskStr);
+      input.setAttribute("data-gc-ip-prefix-length", String(pfx));
+      if (wrap) wrap.classList.add("gc-ip-field--composite");
+    }
+  }
+
+  function wireIpField(input, errEl, okEl, previewEl, maskPillEl, family, getOpts) {
+    if (!input || !errEl) return;
+
+    function hidePreview() {
+      if (!previewEl) return;
+      previewEl.textContent = "";
+      previewEl.hidden = true;
+    }
+
+    function apply() {
+      var opts = getOpts();
+      var rawBefore = input.value;
+      hidePreview();
+      var savedPfx = NaN;
+      if (opts.requireValueCidr) {
+        var ix0 = rawBefore.lastIndexOf("/");
+        if (ix0 !== -1) {
+          savedPfx = parseInt(rawBefore.slice(ix0 + 1), 10);
+        } else {
+          savedPfx = parseInt(
+            opts.storedPrefix || input.getAttribute("data-gc-ip-prefix-length") || "",
+            10
+          );
+        }
+      }
+      var validateOpts = Object.assign({}, opts);
+      if (opts.requireValueCidr && Number.isFinite(savedPfx)) {
+        validateOpts.storedPrefix = String(savedPfx);
+      }
+      if (family === "ipv4") {
+        input.value = autocorrectIpv4Value(rawBefore, validateOpts);
+      } else {
+        input.value = autocorrectIpv6Value(rawBefore, validateOpts);
+      }
+      if (!opts.requireValueCidr && maskPillEl) {
+        clearValueCidrUi(input, maskPillEl);
+      }
+      var r =
+        family === "ipv4"
+          ? validateIpv4(input.value, validateOpts)
+          : validateIpv6(input.value, validateOpts);
+      if (opts.requireValueCidr && r.ok && maskPillEl && Number.isFinite(savedPfx)) {
+        syncValueCidrMaskPill(input, maskPillEl, family, savedPfx);
+      } else if (opts.requireValueCidr && !r.ok && maskPillEl) {
+        clearValueCidrUi(input, maskPillEl);
+      }
+      input.setAttribute("aria-invalid", r.ok ? "false" : "true");
+      if (r.ok) {
+        errEl.textContent = "";
+        errEl.hidden = true;
+      } else {
+        errEl.textContent = r.msg;
+        errEl.hidden = false;
+      }
+      var showOk = r.ok && input.value.trim() !== "";
+      if (okEl) {
+        okEl.hidden = !showOk;
+        okEl.setAttribute("aria-hidden", showOk ? "false" : "true");
+      }
+    }
+
+    input.addEventListener("blur", apply);
+    input.addEventListener("input", function () {
+      var opts2 = getOpts();
+      if (!opts2.requireValueCidr && maskPillEl) {
+        clearValueCidrUi(input, maskPillEl);
+      }
+      var v = input.value.trim();
+      var target = computeCorrectionTarget(input.value, family, opts2);
+      var validateInput = Object.assign({}, opts2);
+      if (opts2.requireValueCidr) {
+        var ixV = input.value.lastIndexOf("/");
+        if (ixV !== -1) {
+          validateInput.storedPrefix = input.value.slice(ixV + 1);
+        }
+      }
+      var r2 =
+        family === "ipv4"
+          ? validateIpv4(input.value, validateInput)
+          : validateIpv6(input.value, validateInput);
+
+      if (target) {
+        errEl.textContent = "";
+        errEl.hidden = true;
+        if (previewEl) {
+          previewEl.textContent = "Will be corrected to " + target + " when you leave this field.";
+          previewEl.hidden = false;
+        }
+        input.setAttribute("aria-invalid", "false");
+      } else {
+        hidePreview();
+        input.setAttribute("aria-invalid", r2.ok || v === "" ? "false" : "true");
+        if (r2.ok || v === "") {
+          errEl.textContent = "";
+          errEl.hidden = true;
+        } else {
+          errEl.textContent = r2.msg;
+          errEl.hidden = false;
+        }
+      }
+
+      var showOk2 = r2.ok && v !== "" && !target;
+      if (okEl) {
+        okEl.hidden = !showOk2;
+        okEl.setAttribute("aria-hidden", showOk2 ? "false" : "true");
+      }
+    });
+  }
+
+  function applyConstraintPanelToInputs(ipv4, ipv6, panel) {
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var cidrV4El = document.getElementById("gc-designer-ip-cidr-v4");
+    var cidrV6El = document.getElementById("gc-designer-ip-cidr-v6");
+    var loEl = document.getElementById("gc-designer-ip-range-lo");
+    var hiEl = document.getElementById("gc-designer-ip-range-hi");
+    var pfxEl = document.getElementById("gc-designer-ip-prefix");
+    var cidrPfxMinEl = document.getElementById("gc-designer-ip-cidr-pfx-min");
+    var cidrPfxMaxEl = document.getElementById("gc-designer-ip-cidr-pfx-max");
+    var autoEl = document.getElementById("gc-designer-ip-autocorrect");
+    var statusEl = document.getElementById("gc-designer-ip-opts-status");
+    if (!modeEl || !ipv4 || !ipv6) return;
+
+    function clearAttrs(el) {
+      el.removeAttribute("data-gc-ip-within-cidr");
+      el.removeAttribute("data-gc-ip-range-lo");
+      el.removeAttribute("data-gc-ip-range-hi");
+      el.removeAttribute("data-gc-ip-prefix");
+      el.removeAttribute("data-gc-ip-cidr-prefix-min");
+      el.removeAttribute("data-gc-ip-cidr-prefix-max");
+      el.removeAttribute("data-gc-ip-require-network");
+      el.removeAttribute("data-gc-ip-require-value-cidr");
+      el.removeAttribute("data-gc-ip-network-address");
+      el.removeAttribute("data-gc-ip-netmask");
+      el.removeAttribute("data-gc-ip-prefix-length");
+      el.removeAttribute("data-gc-ip-autocorrect");
+    }
+
+    clearAttrs(ipv4);
+    clearAttrs(ipv6);
+    var mode = modeEl.value;
+    var pfxStr = pfxEl && pfxEl.value !== "" ? String(pfxEl.value) : "";
+
+    if (mode === "cidr-subnet") {
+      var v4c = cidrV4El && cidrV4El.value.trim();
+      var v6c = cidrV6El && cidrV6El.value.trim();
+      if (v4c) ipv4.setAttribute("data-gc-ip-within-cidr", v4c);
+      if (v6c) ipv6.setAttribute("data-gc-ip-within-cidr", v6c);
+      var cMin = cidrPfxMinEl && cidrPfxMinEl.value !== "" ? String(cidrPfxMinEl.value) : "";
+      var cMax = cidrPfxMaxEl && cidrPfxMaxEl.value !== "" ? String(cidrPfxMaxEl.value) : "";
+      if (v4c && (cMin || cMax)) {
+        if (cMin) ipv4.setAttribute("data-gc-ip-cidr-prefix-min", cMin);
+        if (cMax) ipv4.setAttribute("data-gc-ip-cidr-prefix-max", cMax);
+      }
+      if (v6c && (cMin || cMax)) {
+        if (cMin) ipv6.setAttribute("data-gc-ip-cidr-prefix-min", cMin);
+        if (cMax) ipv6.setAttribute("data-gc-ip-cidr-prefix-max", cMax);
+      }
+    } else if (mode === "ip-range") {
+      if (loEl && loEl.value.trim()) ipv4.setAttribute("data-gc-ip-range-lo", loEl.value.trim());
+      if (hiEl && hiEl.value.trim()) ipv4.setAttribute("data-gc-ip-range-hi", hiEl.value.trim());
+    } else if (mode === "network-only") {
+      ipv4.setAttribute("data-gc-ip-require-network", "true");
+      ipv6.setAttribute("data-gc-ip-require-network", "true");
+      if (pfxStr) {
+        ipv4.setAttribute("data-gc-ip-prefix", pfxStr);
+        ipv6.setAttribute("data-gc-ip-prefix", pfxStr);
+      }
+    } else if (mode === "value-cidr") {
+      ipv4.setAttribute("data-gc-ip-require-value-cidr", "true");
+      ipv6.setAttribute("data-gc-ip-require-value-cidr", "true");
+    } else if (mode === "none" && autoEl && autoEl.checked && pfxStr) {
+      ipv4.setAttribute("data-gc-ip-prefix", pfxStr);
+      ipv6.setAttribute("data-gc-ip-prefix", pfxStr);
+    }
+
+    if (autoEl && autoEl.checked) {
+      ipv4.setAttribute("data-gc-ip-autocorrect", "true");
+      ipv6.setAttribute("data-gc-ip-autocorrect", "true");
+      if (pfxStr) {
+        if (!ipv4.hasAttribute("data-gc-ip-prefix") && mode !== "cidr-subnet" && mode !== "value-cidr") {
+          ipv4.setAttribute("data-gc-ip-prefix", pfxStr);
+        }
+        if (!ipv6.hasAttribute("data-gc-ip-prefix") && mode !== "cidr-subnet" && mode !== "value-cidr") {
+          ipv6.setAttribute("data-gc-ip-prefix", pfxStr);
+        }
+      }
+    }
+
+    if (statusEl) {
+      statusEl.textContent =
+        "Applied mode: " +
+        modeEl.value +
+        ". Attributes: " +
+        [ipv4, ipv6]
+          .map(function (inp) {
+            return (
+              inp.id +
+              " → " +
+              Array.from(inp.attributes)
+                .filter(function (a) {
+                  return a.name.indexOf("data-gc-ip-") === 0;
+                })
+                .map(function (a) {
+                  return a.name + '="' + a.value + '"';
+                })
+                .join(" ")
+            );
+          })
+          .join(" | ");
+    }
+
+    refreshDesignerIpHints();
+    ipv4.dispatchEvent(new Event("blur"));
+    ipv6.dispatchEvent(new Event("blur"));
+  }
+
+  function clearConstraintPanel(ipv4, ipv6) {
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var cidrV4El = document.getElementById("gc-designer-ip-cidr-v4");
+    var cidrV6El = document.getElementById("gc-designer-ip-cidr-v6");
+    var loEl = document.getElementById("gc-designer-ip-range-lo");
+    var hiEl = document.getElementById("gc-designer-ip-range-hi");
+    var pfxEl = document.getElementById("gc-designer-ip-prefix");
+    var cidrPfxMinEl = document.getElementById("gc-designer-ip-cidr-pfx-min");
+    var cidrPfxMaxEl = document.getElementById("gc-designer-ip-cidr-pfx-max");
+    var autoEl = document.getElementById("gc-designer-ip-autocorrect");
+    var statusEl = document.getElementById("gc-designer-ip-opts-status");
+    if (modeEl) modeEl.value = "none";
+    if (cidrV4El) cidrV4El.value = "";
+    if (cidrV6El) cidrV6El.value = "";
+    if (loEl) loEl.value = "";
+    if (hiEl) hiEl.value = "";
+    if (pfxEl) pfxEl.value = "24";
+    if (cidrPfxMinEl) cidrPfxMinEl.value = "";
+    if (cidrPfxMaxEl) cidrPfxMaxEl.value = "";
+    if (autoEl) autoEl.checked = true;
+    ipv4.removeAttribute("data-gc-ip-within-cidr");
+    ipv4.removeAttribute("data-gc-ip-range-lo");
+    ipv4.removeAttribute("data-gc-ip-range-hi");
+    ipv4.removeAttribute("data-gc-ip-prefix");
+    ipv4.removeAttribute("data-gc-ip-cidr-prefix-min");
+    ipv4.removeAttribute("data-gc-ip-cidr-prefix-max");
+    ipv4.removeAttribute("data-gc-ip-require-network");
+    ipv4.removeAttribute("data-gc-ip-require-value-cidr");
+    ipv4.removeAttribute("data-gc-ip-network-address");
+    ipv4.removeAttribute("data-gc-ip-netmask");
+    ipv4.removeAttribute("data-gc-ip-prefix-length");
+    ipv4.removeAttribute("data-gc-ip-autocorrect");
+    ipv6.removeAttribute("data-gc-ip-within-cidr");
+    ipv6.removeAttribute("data-gc-ip-range-lo");
+    ipv6.removeAttribute("data-gc-ip-range-hi");
+    ipv6.removeAttribute("data-gc-ip-prefix");
+    ipv6.removeAttribute("data-gc-ip-cidr-prefix-min");
+    ipv6.removeAttribute("data-gc-ip-cidr-prefix-max");
+    ipv6.removeAttribute("data-gc-ip-require-network");
+    ipv6.removeAttribute("data-gc-ip-require-value-cidr");
+    ipv6.removeAttribute("data-gc-ip-network-address");
+    ipv6.removeAttribute("data-gc-ip-netmask");
+    ipv6.removeAttribute("data-gc-ip-prefix-length");
+    ipv6.removeAttribute("data-gc-ip-autocorrect");
+    if (statusEl) statusEl.textContent = "Constraints cleared.";
+    refreshDesignerIpHints();
+    ipv4.dispatchEvent(new Event("blur"));
+    ipv6.dispatchEvent(new Event("blur"));
+  }
+
+  var ipv4In = document.getElementById("gc-designer-controls-ipv4");
+  var ipv6In = document.getElementById("gc-designer-controls-ipv6");
+
+  wireIpField(
+    ipv4In,
+    document.getElementById("gc-designer-ipv4-err"),
+    document.getElementById("gc-designer-ipv4-ok"),
+    document.getElementById("gc-designer-ipv4-correct-preview"),
+    document.getElementById("gc-designer-ipv4-mask-pill"),
+    "ipv4",
+    function () {
+      return designerIpOpts(ipv4In, "ipv4");
+    }
+  );
+  wireIpField(
+    ipv6In,
+    document.getElementById("gc-designer-ipv6-err"),
+    document.getElementById("gc-designer-ipv6-ok"),
+    document.getElementById("gc-designer-ipv6-correct-preview"),
+    document.getElementById("gc-designer-ipv6-mask-pill"),
+    "ipv6",
+    function () {
+      return designerIpOpts(ipv6In, "ipv6");
+    }
+  );
+
+  function syncDesignerIpFamilyPanels() {
+    var famSel = document.getElementById("gc-designer-ip-family");
+    var v4w = document.getElementById("gc-designer-ip-fields-v4");
+    var v6w = document.getElementById("gc-designer-ip-fields-v6");
+    if (!famSel || !v4w || !v6w) return;
+    var is6 = famSel.value === "IPv6";
+    v4w.hidden = is6;
+    v6w.hidden = !is6;
+  }
+
+  function getDesignerDemoIpFamily() {
+    var famSel = document.getElementById("gc-designer-ip-family");
+    return famSel && famSel.value === "IPv6" ? "IPv6" : "IPv4";
+  }
+
+  function setDesignerDemoIpFamily(fam) {
+    var famSel = document.getElementById("gc-designer-ip-family");
+    if (!famSel) return;
+    var s = String(fam || "").trim().toLowerCase();
+    famSel.value = s === "ipv6" ? "IPv6" : "IPv4";
+    syncDesignerIpFamilyPanels();
+  }
+
+  var famSelEl = document.getElementById("gc-designer-ip-family");
+  if (famSelEl) {
+    famSelEl.addEventListener("change", function () {
+      syncDesignerIpFamilyPanels();
+      if (famSelEl.value === "IPv6") {
+        if (ipv6In) {
+          try {
+            ipv6In.focus();
+          } catch (e1) {}
+        }
+      } else if (ipv4In) {
+        try {
+          ipv4In.focus();
+        } catch (e2) {}
+      }
+      refreshDesignerIpHints();
+    });
+  }
+  syncDesignerIpFamilyPanels();
+
+  function gcDesignerControlsSyncScrollLock() {
+    var anyOpen = document.querySelector(".gc-designer-modal:not([hidden])");
+    document.body.classList.toggle("gc-designer-modal-open", !!anyOpen);
+    document.querySelectorAll(".gc-designer-modal-overlay-slot").forEach(function (slot) {
+      var openIn = slot.querySelector(".gc-designer-modal:not([hidden])");
+      slot.classList.toggle("gc-designer-modal-overlay-slot--open", !!openIn);
+    });
+  }
+
+  function gcDesignerControlsOpenExclusiveModal(root) {
+    if (!root) return;
+    document.querySelectorAll(".gc-designer-controls-flyout-modal").forEach(function (m) {
+      if (m !== root) m.hidden = true;
+    });
+    root.hidden = false;
+    gcDesignerControlsSyncScrollLock();
+  }
+
+  function gcDesignerControlsCloseFlyoutModal(root) {
+    if (!root) return;
+    root.hidden = true;
+    gcDesignerControlsSyncScrollLock();
+  }
+
+  window.gcDesignerControlsSyncScrollLock = gcDesignerControlsSyncScrollLock;
+  window.gcDesignerControlsOpenExclusiveModal = gcDesignerControlsOpenExclusiveModal;
+  window.gcDesignerControlsCloseFlyoutModal = gcDesignerControlsCloseFlyoutModal;
+
+  var ipPropsFlyoutRoot = document.getElementById("gc-designer-ip-props-flyout");
+  var ipPropsOpenBtn = document.getElementById("gc-designer-ip-props-open");
+  var ipPropsFlyoutSnapshot = null;
+
+  function snapshotIpConstraintPanel() {
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var cidrV4El = document.getElementById("gc-designer-ip-cidr-v4");
+    var cidrV6El = document.getElementById("gc-designer-ip-cidr-v6");
+    var loEl = document.getElementById("gc-designer-ip-range-lo");
+    var hiEl = document.getElementById("gc-designer-ip-range-hi");
+    var pfxEl = document.getElementById("gc-designer-ip-prefix");
+    var cidrPfxMinEl = document.getElementById("gc-designer-ip-cidr-pfx-min");
+    var cidrPfxMaxEl = document.getElementById("gc-designer-ip-cidr-pfx-max");
+    var autoEl = document.getElementById("gc-designer-ip-autocorrect");
+    return {
+      mode: modeEl ? modeEl.value : "none",
+      cidrV4: cidrV4El ? cidrV4El.value : "",
+      cidrV6: cidrV6El ? cidrV6El.value : "",
+      rangeLo: loEl ? loEl.value : "",
+      rangeHi: hiEl ? hiEl.value : "",
+      prefix: pfxEl ? pfxEl.value : "",
+      cidrPfxMin: cidrPfxMinEl ? cidrPfxMinEl.value : "",
+      cidrPfxMax: cidrPfxMaxEl ? cidrPfxMaxEl.value : "",
+      auto: !!(autoEl && autoEl.checked),
+    };
+  }
+
+  function restoreIpConstraintPanel(s) {
+    if (!s) return;
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var cidrV4El = document.getElementById("gc-designer-ip-cidr-v4");
+    var cidrV6El = document.getElementById("gc-designer-ip-cidr-v6");
+    var loEl = document.getElementById("gc-designer-ip-range-lo");
+    var hiEl = document.getElementById("gc-designer-ip-range-hi");
+    var pfxEl = document.getElementById("gc-designer-ip-prefix");
+    var cidrPfxMinEl = document.getElementById("gc-designer-ip-cidr-pfx-min");
+    var cidrPfxMaxEl = document.getElementById("gc-designer-ip-cidr-pfx-max");
+    var autoEl = document.getElementById("gc-designer-ip-autocorrect");
+    if (modeEl) modeEl.value = s.mode || "none";
+    if (cidrV4El) cidrV4El.value = s.cidrV4 || "";
+    if (cidrV6El) cidrV6El.value = s.cidrV6 || "";
+    if (loEl) loEl.value = s.rangeLo || "";
+    if (hiEl) hiEl.value = s.rangeHi || "";
+    if (pfxEl) pfxEl.value = s.prefix !== undefined && s.prefix !== "" ? s.prefix : "24";
+    if (cidrPfxMinEl) cidrPfxMinEl.value = s.cidrPfxMin || "";
+    if (cidrPfxMaxEl) cidrPfxMaxEl.value = s.cidrPfxMax || "";
+    if (autoEl) autoEl.checked = s.auto;
+  }
+
+  function hydrateIpConstraintPanelFromDemo(ipv4, ipv6) {
+    var modeEl = document.getElementById("gc-designer-ip-constraint-mode");
+    var cidrV4El = document.getElementById("gc-designer-ip-cidr-v4");
+    var cidrV6El = document.getElementById("gc-designer-ip-cidr-v6");
+    var loEl = document.getElementById("gc-designer-ip-range-lo");
+    var hiEl = document.getElementById("gc-designer-ip-range-hi");
+    var pfxEl = document.getElementById("gc-designer-ip-prefix");
+    var cidrPfxMinEl = document.getElementById("gc-designer-ip-cidr-pfx-min");
+    var cidrPfxMaxEl = document.getElementById("gc-designer-ip-cidr-pfx-max");
+    var autoEl = document.getElementById("gc-designer-ip-autocorrect");
+    if (!modeEl || !ipv4 || !ipv6) return;
+
+    if (!hasAppliedIpConstraints(ipv4) && !hasAppliedIpConstraints(ipv6)) {
+      refreshDesignerIpHints();
+      return;
+    }
+
+    var o4 = readOptsFromInput(ipv4);
+    var o6 = readOptsFromInput(ipv6);
+
+    function clearPanelFields() {
+      if (cidrV4El) cidrV4El.value = "";
+      if (cidrV6El) cidrV6El.value = "";
+      if (loEl) loEl.value = "";
+      if (hiEl) hiEl.value = "";
+      if (cidrPfxMinEl) cidrPfxMinEl.value = "";
+      if (cidrPfxMaxEl) cidrPfxMaxEl.value = "";
+    }
+
+    if (o4.requireValueCidr || o6.requireValueCidr) {
+      modeEl.value = "value-cidr";
+      clearPanelFields();
+      if (pfxEl) pfxEl.value = "24";
+      if (autoEl) autoEl.checked = !!(o4.autocorrect || o6.autocorrect);
+    } else if (o4.requireNetwork || o6.requireNetwork) {
+      modeEl.value = "network-only";
+      clearPanelFields();
+      var pfxN = o4.prefix || o6.prefix || "24";
+      if (pfxEl) pfxEl.value = String(pfxN);
+      if (autoEl) autoEl.checked = !!(o4.autocorrect || o6.autocorrect);
+    } else if (o4.rangeLo || o4.rangeHi) {
+      modeEl.value = "ip-range";
+      clearPanelFields();
+      if (loEl) loEl.value = o4.rangeLo || "";
+      if (hiEl) loEl.value = o4.rangeHi || "";
+      if (pfxEl) pfxEl.value = o4.prefix || o6.prefix || "24";
+      if (autoEl) autoEl.checked = !!(o4.autocorrect || o6.autocorrect);
+    } else if (o4.withinCidr || o6.withinCidr) {
+      modeEl.value = "cidr-subnet";
+      clearPanelFields();
+      if (cidrV4El) cidrV4El.value = o4.withinCidr || "";
+      if (cidrV6El) cidrV6El.value = o6.withinCidr || "";
+      if (cidrPfxMinEl) cidrPfxMinEl.value = o4.cidrPrefixMin || o6.cidrPrefixMin || "";
+      if (cidrPfxMaxEl) cidrPfxMaxEl.value = o4.cidrPrefixMax || o6.cidrPrefixMax || "";
+      if (pfxEl) pfxEl.value = o4.prefix || o6.prefix || "24";
+      if (autoEl) autoEl.checked = !!(o4.autocorrect || o6.autocorrect);
+    } else if (o4.prefix || o6.prefix || o4.autocorrect || o6.autocorrect) {
+      modeEl.value = "none";
+      clearPanelFields();
+      var pfxNone = o4.prefix || o6.prefix || "24";
+      if (pfxEl) pfxEl.value = String(pfxNone);
+      if (autoEl) autoEl.checked = !!(o4.autocorrect || o6.autocorrect);
+    } else {
+      modeEl.value = "none";
+      clearPanelFields();
+      if (pfxEl) pfxEl.value = "24";
+      if (autoEl) autoEl.checked = true;
+    }
+
+    refreshDesignerIpHints();
+  }
+
+  function openGcDesignerIpFieldPropertiesFlyout() {
+    if (!ipPropsFlyoutRoot) return;
+    hydrateIpConstraintPanelFromDemo(ipv4In, ipv6In);
+    ipPropsFlyoutSnapshot = snapshotIpConstraintPanel();
+    gcDesignerControlsOpenExclusiveModal(ipPropsFlyoutRoot);
+    var modeSelect = document.getElementById("gc-designer-ip-constraint-mode");
+    if (modeSelect) {
+      modeSelect.focus();
+    } else {
+      var saveBtn = document.getElementById("gc-designer-ip-props-flyout-save");
+      if (saveBtn) saveBtn.focus();
+    }
+  }
+
+  function closeGcDesignerIpFieldPropertiesFlyout() {
+    if (!ipPropsFlyoutRoot) return;
+    gcDesignerControlsCloseFlyoutModal(ipPropsFlyoutRoot);
+    if (ipPropsOpenBtn) ipPropsOpenBtn.focus();
+  }
+
+  if (ipPropsOpenBtn) {
+    ipPropsOpenBtn.addEventListener("click", openGcDesignerIpFieldPropertiesFlyout);
+  }
+  var ipPropsSaveBtn = document.getElementById("gc-designer-ip-props-flyout-save");
+  if (ipPropsSaveBtn) {
+    ipPropsSaveBtn.addEventListener("click", function () {
+      applyConstraintPanelToInputs(ipv4In, ipv6In);
+      gcDesignerCatalogNotifyFlyoutSave("ip");
+      ipPropsFlyoutSnapshot = null;
+      closeGcDesignerIpFieldPropertiesFlyout();
+    });
+  }
+  var ipPropsCancelBtn = document.getElementById("gc-designer-ip-props-flyout-cancel");
+  if (ipPropsCancelBtn) {
+    ipPropsCancelBtn.addEventListener("click", function () {
+      gcDesignerCatalogNotifyFlyoutCancel("ip");
+      restoreIpConstraintPanel(ipPropsFlyoutSnapshot);
+      ipPropsFlyoutSnapshot = null;
+      refreshDesignerIpHints();
+      if (ipv4In) ipv4In.dispatchEvent(new Event("blur"));
+      if (ipv6In) ipv6In.dispatchEvent(new Event("blur"));
+      closeGcDesignerIpFieldPropertiesFlyout();
+    });
+  }
+
+  var ctlIpAddress = document.querySelector('[data-gc-designer-control-id="ip-address"]');
+  if (ctlIpAddress) ctlIpAddress.gcOpenIpFieldPropertiesFlyout = openGcDesignerIpFieldPropertiesFlyout;
+  window.gcOpenDesignerIpFieldPropertiesFlyout = openGcDesignerIpFieldPropertiesFlyout;
+
+  document.getElementById("gc-designer-ip-clear-opts") &&
+    document.getElementById("gc-designer-ip-clear-opts").addEventListener("click", function () {
+      clearConstraintPanel(ipv4In, ipv6In);
+    });
+
+  document.getElementById("gc-designer-ip-test-valid") &&
+    document.getElementById("gc-designer-ip-test-valid").addEventListener("click", function () {
+      var mode = document.getElementById("gc-designer-ip-constraint-mode");
+      var c4 = document.getElementById("gc-designer-ip-cidr-v4");
+      var c6 = document.getElementById("gc-designer-ip-cidr-v6");
+      var lo = document.getElementById("gc-designer-ip-range-lo");
+      var hi = document.getElementById("gc-designer-ip-range-hi");
+      var m = mode ? mode.value : "none";
+      if (m === "cidr-subnet") {
+        if (c4 && !c4.value.trim()) c4.value = "192.168.0.0/16";
+        if (c6 && !c6.value.trim()) c6.value = "2001:db8::/32";
+        var cmin = document.getElementById("gc-designer-ip-cidr-pfx-min");
+        var cmax = document.getElementById("gc-designer-ip-cidr-pfx-max");
+        if (cmin && cmin.value === "") cmin.value = "20";
+        if (cmax && cmax.value === "") cmax.value = "28";
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "192.168.50.10/24";
+        ipv6In.value = "2001:db8:0:1::abcd/64";
+      } else if (m === "ip-range") {
+        if (lo && !lo.value.trim()) lo.value = "10.0.0.1";
+        if (hi && !hi.value.trim()) hi.value = "10.0.0.50";
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "10.0.0.25";
+        ipv6In.value = "2001:db8::1";
+      } else if (m === "network-only") {
+        var pfxEl = document.getElementById("gc-designer-ip-prefix");
+        if (pfxEl) pfxEl.value = "16";
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "10.0.0.0";
+        ipv6In.value = "2001::";
+      } else if (m === "value-cidr") {
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "10.1.2.3/16";
+        ipv6In.value = "2001:db8:0:1:2::/48";
+      } else {
+        ipv4In.value = "192.0.2.1";
+        ipv6In.value = "2001:db8::1";
+      }
+      ipv4In.dispatchEvent(new Event("blur"));
+      ipv6In.dispatchEvent(new Event("blur"));
+    });
+
+  var constraintPanel = document.getElementById("gc-designer-ip-constraint-panel");
+  if (constraintPanel) {
+    constraintPanel.addEventListener("input", refreshDesignerIpHints);
+    constraintPanel.addEventListener("change", refreshDesignerIpHints);
+  }
+
+  document.getElementById("gc-designer-ip-test-invalid") &&
+    document.getElementById("gc-designer-ip-test-invalid").addEventListener("click", function () {
+      var mode = document.getElementById("gc-designer-ip-constraint-mode");
+      var c4 = document.getElementById("gc-designer-ip-cidr-v4");
+      var c6 = document.getElementById("gc-designer-ip-cidr-v6");
+      var lo = document.getElementById("gc-designer-ip-range-lo");
+      var hi = document.getElementById("gc-designer-ip-range-hi");
+      var m = mode ? mode.value : "none";
+      if (m === "cidr-subnet") {
+        if (c4 && !c4.value.trim()) c4.value = "192.168.0.0/16";
+        if (c6 && !c6.value.trim()) c6.value = "2001:db8::/32";
+        var cmin2 = document.getElementById("gc-designer-ip-cidr-pfx-min");
+        var cmax2 = document.getElementById("gc-designer-ip-cidr-pfx-max");
+        if (cmin2 && cmin2.value === "") cmin2.value = "20";
+        if (cmax2 && cmax2.value === "") cmax2.value = "28";
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "192.168.50.10/12";
+        ipv6In.value = "2001:db8:0:1::abcd/12";
+      } else if (m === "ip-range") {
+        if (lo && !lo.value.trim()) lo.value = "10.0.0.1";
+        if (hi && !hi.value.trim()) hi.value = "10.0.0.50";
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "10.1.0.1";
+        ipv6In.value = "2001:db8::1";
+      } else if (m === "network-only") {
+        var pfxEl2 = document.getElementById("gc-designer-ip-prefix");
+        if (pfxEl2) pfxEl2.value = "16";
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "10.0.0.5";
+        ipv6In.value = "2001::1";
+      } else if (m === "value-cidr") {
+        applyConstraintPanelToInputs(ipv4In, ipv6In);
+        ipv4In.value = "10.1.1.1";
+        ipv6In.value = "2001:db8::1";
+      } else {
+        ipv4In.value = "999.1.1.1";
+        ipv6In.value = "gggg::1";
+      }
+      ipv4In.dispatchEvent(new Event("blur"));
+      ipv6In.dispatchEvent(new Event("blur"));
+    });
+
+  function readAllGcIpAttrs(el) {
+    var o = {};
+    if (!el || !el.attributes) return o;
+    for (var ai = 0; ai < el.attributes.length; ai++) {
+      var n = el.attributes[ai].name;
+      if (n.indexOf("data-gc-ip-") === 0) o[n] = el.attributes[ai].value;
+    }
+    return o;
+  }
+
+  function clearAllGcIpAttrs(el) {
+    if (!el || !el.attributes) return;
+    var rm = [];
+    for (var bi = 0; bi < el.attributes.length; bi++) {
+      var n2 = el.attributes[bi].name;
+      if (n2.indexOf("data-gc-ip-") === 0) rm.push(n2);
+    }
+    for (var ri = 0; ri < rm.length; ri++) el.removeAttribute(rm[ri]);
+  }
+
+  function writeAllGcIpAttrs(el, attrs) {
+    clearAllGcIpAttrs(el);
+    if (!el || !attrs || typeof attrs !== "object") return;
+    Object.keys(attrs).forEach(function (k) {
+      if (k.indexOf("data-gc-ip-") !== 0) return;
+      var v = attrs[k];
+      if (v != null && String(v) !== "") el.setAttribute(k, String(v));
+    });
+  }
+
+  window.__gcDesignerControlsBridge = window.__gcDesignerControlsBridge || {};
+  window.__gcDesignerControlsBridge.ip = {
+    readAllGcIpAttrs: readAllGcIpAttrs,
+    clearAllGcIpAttrs: clearAllGcIpAttrs,
+    writeAllGcIpAttrs: writeAllGcIpAttrs,
+    snapshotConstraintPanel: snapshotIpConstraintPanel,
+    restoreConstraintPanel: restoreIpConstraintPanel,
+    applyConstraintPanelToInputs: function () {
+      if (ipv4In && ipv6In) applyConstraintPanelToInputs(ipv4In, ipv6In);
+    },
+    clearConstraints: function () {
+      if (ipv4In && ipv6In) clearConstraintPanel(ipv4In, ipv6In);
+    },
+    getIpv4Input: function () {
+      return ipv4In;
+    },
+    getIpv6Input: function () {
+      return ipv6In;
+    },
+    getIpFamily: getDesignerDemoIpFamily,
+    setIpFamily: setDesignerDemoIpFamily,
+    syncFamilyPanels: syncDesignerIpFamilyPanels,
+    refreshHints: refreshDesignerIpHints,
+    hasAppliedIpConstraints: hasAppliedIpConstraints,
+    readOptsFromInput: readOptsFromInput,
+    wireCatalogIpInput: function (input, errEl, okEl, previewEl, maskPillEl, family) {
+      wireIpField(input, errEl, okEl, previewEl, maskPillEl, family, function () {
+        return readOptsFromInput(input);
+      });
+    },
+  };
+
+  window.__gcDesignerSelectorUi = {
+    ensureRowsDelegation: gcDesignerEnsureSelectorRowsDelegation,
+    rowsFromGroup: gcDesignerSelectorRowsFromGroup,
+    rowsSnapshot: gcDesignerSelectorRowsSnapshot,
+    rowsAppend: gcDesignerSelectorRowsAppend,
+    rowsReadText: gcDesignerSelectorRowsReadText,
+    rowsRestore: gcDesignerSelectorRowsRestore,
+    applyText: designerSelectorApplyText,
+  };
+
+  refreshDesignerIpHints();
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+
+  var selUi = window.__gcDesignerSelectorUi || {};
+
+  var TEXT_CHARSET_CAP = {
+    iphost: 60,
+    "name-60": 60,
+    "name-50": 50,
+    description: 255,
+  };
+
+  function charsetRuleMessage(profile, value) {
+    if (!profile || !value) return null;
+    if (value.indexOf(",") !== -1) {
+      if (profile === "description") return null;
+      return "Comma is not allowed for this preset.";
+    }
+    if (profile === "iphost") {
+      var c0 = value.charAt(0);
+      if (c0 === "#" || c0 === ",") return "First character cannot be # or comma.";
+    }
+    return null;
+  }
+
+  function applyTextPanel() {
+    var minEl = document.getElementById("gc-designer-text-minlen");
+    var maxSingleEl = document.getElementById("gc-designer-text-maxlen-single");
+    var maxMultiEl = document.getElementById("gc-designer-text-maxlen-multi");
+    var charsetEl = document.getElementById("gc-designer-text-charset");
+    var single = document.getElementById("gc-designer-text-single");
+    var multi = document.getElementById("gc-designer-text-multi");
+    if (!single || !multi) return;
+
+    var minV = minEl ? Math.max(0, parseInt(minEl.value, 10) || 0) : 0;
+    var maxS = maxSingleEl ? Math.max(1, parseInt(maxSingleEl.value, 10) || 1) : 60;
+    var maxM = maxMultiEl ? Math.max(1, parseInt(maxMultiEl.value, 10) || 1) : 500;
+    var profile = charsetEl && charsetEl.value ? charsetEl.value : "";
+
+    var cap = profile ? TEXT_CHARSET_CAP[profile] : null;
+    if (cap != null && maxS > cap) maxS = cap;
+
+    single.minLength = minV;
+    single.maxLength = maxS;
+    single.setAttribute("data-gc-text-charset", profile);
+    multi.maxLength = maxM;
+  }
+
+  function validateTextFields() {
+    var single = document.getElementById("gc-designer-text-single");
+    var multi = document.getElementById("gc-designer-text-multi");
+    var errS = document.getElementById("gc-designer-text-single-err");
+    var errM = document.getElementById("gc-designer-text-multi-err");
+    if (!single || !multi) return;
+
+    var v = single.value;
+    var profile = single.getAttribute("data-gc-text-charset") || "";
+    var msg = null;
+    if (v.length < single.minLength) msg = "Value is shorter than min length (" + single.minLength + ").";
+    else if (v.length > single.maxLength) msg = "Value exceeds max length (" + single.maxLength + ").";
+    else msg = charsetRuleMessage(profile, v);
+
+    if (errS) {
+      if (msg) {
+        errS.textContent = msg;
+        errS.hidden = false;
+      } else {
+        errS.textContent = "";
+        errS.hidden = true;
+      }
+    }
+
+    var vm = multi.value;
+    var msgM = null;
+    if (vm.length > multi.maxLength) msgM = "Value exceeds max length (" + multi.maxLength + ").";
+    if (errM) {
+      if (msgM) {
+        errM.textContent = msgM;
+        errM.hidden = false;
+      } else {
+        errM.textContent = "";
+        errM.hidden = true;
+      }
+    }
+  }
+
+  function snapshotTextPropsPanel() {
+    var minEl = document.getElementById("gc-designer-text-minlen");
+    var maxSingleEl = document.getElementById("gc-designer-text-maxlen-single");
+    var maxMultiEl = document.getElementById("gc-designer-text-maxlen-multi");
+    var charsetEl = document.getElementById("gc-designer-text-charset");
+    return {
+      min: minEl ? minEl.value : "0",
+      maxS: maxSingleEl ? maxSingleEl.value : "60",
+      maxM: maxMultiEl ? maxMultiEl.value : "500",
+      charset: charsetEl ? charsetEl.value : "",
+    };
+  }
+
+  function restoreTextPropsPanel(s) {
+    if (!s) return;
+    var minEl = document.getElementById("gc-designer-text-minlen");
+    var maxSingleEl = document.getElementById("gc-designer-text-maxlen-single");
+    var maxMultiEl = document.getElementById("gc-designer-text-maxlen-multi");
+    var charsetEl = document.getElementById("gc-designer-text-charset");
+    if (minEl) minEl.value = s.min;
+    if (maxSingleEl) maxSingleEl.value = s.maxS;
+    if (maxMultiEl) maxMultiEl.value = s.maxM;
+    if (charsetEl) charsetEl.value = s.charset;
+  }
+
+  var textPropsSnapshot = null;
+
+  function hydrateTextPropsPanelFromDemo() {
+    var minEl = document.getElementById("gc-designer-text-minlen");
+    var maxSingleEl = document.getElementById("gc-designer-text-maxlen-single");
+    var maxMultiEl = document.getElementById("gc-designer-text-maxlen-multi");
+    var charsetEl = document.getElementById("gc-designer-text-charset");
+    var single = document.getElementById("gc-designer-text-single");
+    var multi = document.getElementById("gc-designer-text-multi");
+    if (!single || !multi) return;
+    if (minEl) minEl.value = String(single.minLength);
+    if (maxSingleEl) maxSingleEl.value = String(single.maxLength);
+    if (maxMultiEl) maxMultiEl.value = String(multi.maxLength);
+    if (charsetEl) charsetEl.value = single.getAttribute("data-gc-text-charset") || "";
+  }
+
+  function openGcDesignerTextFieldPropertiesFlyout() {
+    var root = document.getElementById("gc-designer-text-props-flyout");
+    if (!root) return;
+    hydrateTextPropsPanelFromDemo();
+    textPropsSnapshot = snapshotTextPropsPanel();
+    if (window.gcDesignerControlsOpenExclusiveModal) {
+      window.gcDesignerControlsOpenExclusiveModal(root);
+    } else {
+      root.hidden = false;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    var first = document.getElementById("gc-designer-text-minlen");
+    if (first) first.focus();
+  }
+
+  function closeGcDesignerTextFieldPropertiesFlyout() {
+    var root = document.getElementById("gc-designer-text-props-flyout");
+    if (!root) return;
+    if (window.gcDesignerControlsCloseFlyoutModal) {
+      window.gcDesignerControlsCloseFlyoutModal(root);
+    } else {
+      root.hidden = true;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    var textPropsOpenBtn = document.getElementById("gc-designer-text-props-open");
+    if (textPropsOpenBtn) textPropsOpenBtn.focus();
+  }
+
+  var textPropsOpenBtn = document.getElementById("gc-designer-text-props-open");
+  if (textPropsOpenBtn) {
+    textPropsOpenBtn.addEventListener("click", openGcDesignerTextFieldPropertiesFlyout);
+  }
+
+  document.addEventListener("click", function (ev) {
+    var saveHit = ev.target.closest && ev.target.closest("#gc-designer-text-props-flyout-save");
+    var cancelHit = ev.target.closest && ev.target.closest("#gc-designer-text-props-flyout-cancel");
+    if (!saveHit && !cancelHit) return;
+    ev.preventDefault();
+    var root = document.getElementById("gc-designer-text-props-flyout");
+    function shutTextFlyout() {
+      if (!root) return;
+      if (window.gcDesignerControlsCloseFlyoutModal) {
+        window.gcDesignerControlsCloseFlyoutModal(root);
+      } else {
+        root.hidden = true;
+        if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+      }
+      var ob = document.getElementById("gc-designer-text-props-open");
+      if (ob) ob.focus();
+    }
+    if (saveHit) {
+      try {
+        applyTextPanel();
+        validateTextFields();
+        gcDesignerCatalogNotifyFlyoutSave("text");
+        textPropsSnapshot = null;
+      } finally {
+        shutTextFlyout();
+      }
+    } else {
+      try {
+        gcDesignerCatalogNotifyFlyoutCancel("text");
+        restoreTextPropsPanel(textPropsSnapshot);
+        textPropsSnapshot = null;
+      } finally {
+        shutTextFlyout();
+      }
+    }
+  });
+
+  var ctlTextS = document.querySelector('[data-gc-designer-control-id="text-single"]');
+  var ctlTextM = document.querySelector('[data-gc-designer-control-id="text-multiline"]');
+  if (ctlTextS) ctlTextS.gcOpenTextFieldPropertiesFlyout = openGcDesignerTextFieldPropertiesFlyout;
+  if (ctlTextM) ctlTextM.gcOpenTextFieldPropertiesFlyout = openGcDesignerTextFieldPropertiesFlyout;
+  window.gcOpenDesignerTextFieldPropertiesFlyout = openGcDesignerTextFieldPropertiesFlyout;
+
+  var selectorPropsSnapshot = null;
+
+  function openGcDesignerSelectorPropertiesFlyout() {
+    var root = document.getElementById("gc-designer-selector-props-flyout");
+    var grp = document.getElementById("gc-designer-option-selector");
+    var rowsEl = document.getElementById("gc-designer-selector-items-rows");
+    if (!root || !grp || !rowsEl || !selUi.ensureRowsDelegation || !selUi.rowsFromGroup || !selUi.rowsSnapshot) return;
+    selUi.ensureRowsDelegation(rowsEl);
+    selUi.rowsFromGroup(rowsEl, grp);
+    selectorPropsSnapshot = selUi.rowsSnapshot(rowsEl);
+    if (window.gcDesignerControlsOpenExclusiveModal) {
+      window.gcDesignerControlsOpenExclusiveModal(root);
+    } else {
+      root.hidden = false;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    var firstInp = rowsEl.querySelector("input[type='text']");
+    if (firstInp) firstInp.focus();
+  }
+
+  function closeGcDesignerSelectorPropertiesFlyout() {
+    var root = document.getElementById("gc-designer-selector-props-flyout");
+    if (!root) return;
+    if (window.gcDesignerControlsCloseFlyoutModal) {
+      window.gcDesignerControlsCloseFlyoutModal(root);
+    } else {
+      root.hidden = true;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    var openBtn = document.getElementById("gc-designer-selector-props-open");
+    if (openBtn) openBtn.focus();
+  }
+
+  document.addEventListener("click", function (ev) {
+    var opener = ev.target.closest && ev.target.closest("#gc-designer-selector-props-open");
+    if (!opener) return;
+    ev.preventDefault();
+    openGcDesignerSelectorPropertiesFlyout();
+  });
+
+  var selectorAddRowBtn = document.getElementById("gc-designer-selector-items-add-row");
+  if (selectorAddRowBtn) {
+    selectorAddRowBtn.addEventListener("click", function () {
+      var rowsEl = document.getElementById("gc-designer-selector-items-rows");
+      if (!rowsEl || !selUi.ensureRowsDelegation || !selUi.rowsAppend) return;
+      selUi.ensureRowsDelegation(rowsEl);
+      selUi.rowsAppend(rowsEl, "");
+      var inputs = rowsEl.querySelectorAll("input[type='text']");
+      var last = inputs[inputs.length - 1];
+      if (last) last.focus();
+    });
+  }
+
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var saveHit = ev.target.closest && ev.target.closest("#gc-designer-selector-props-flyout-save");
+      var cancelHit = ev.target.closest && ev.target.closest("#gc-designer-selector-props-flyout-cancel");
+      if (!saveHit && !cancelHit) return;
+      ev.preventDefault();
+      var grp = document.getElementById("gc-designer-option-selector");
+      var rowsEl = document.getElementById("gc-designer-selector-items-rows");
+      if (saveHit) {
+        try {
+          if (grp && rowsEl && selUi.applyText && selUi.rowsReadText) {
+            selUi.applyText(grp, selUi.rowsReadText(rowsEl));
+          }
+          gcDesignerCatalogNotifyFlyoutSave("selector");
+          selectorPropsSnapshot = null;
+        } finally {
+          closeGcDesignerSelectorPropertiesFlyout();
+        }
+      } else {
+        try {
+          gcDesignerCatalogNotifyFlyoutCancel("selector");
+          if (rowsEl && selUi.rowsRestore) selUi.rowsRestore(rowsEl, selectorPropsSnapshot);
+          selectorPropsSnapshot = null;
+        } finally {
+          closeGcDesignerSelectorPropertiesFlyout();
+        }
+      }
+    },
+    true
+  );
+
+  var ctlSelector = document.getElementById("gc-designer-selector-control-label");
+  if (ctlSelector) ctlSelector.gcOpenSelectorPropertiesFlyout = openGcDesignerSelectorPropertiesFlyout;
+  window.gcOpenDesignerSelectorPropertiesFlyout = openGcDesignerSelectorPropertiesFlyout;
+
+  (function mountDesignerToggleDemos() {
+    var onoffBtn = document.getElementById("gc-designer-toggle-onoff");
+    var onoffState = document.getElementById("gc-designer-toggle-onoff-state");
+    function syncOnoffUi(on) {
+      if (!onoffBtn) return;
+      onoffBtn.classList.toggle("gc-table-toggle--on", !!on);
+      onoffBtn.setAttribute("aria-checked", on ? "true" : "false");
+      if (onoffState) onoffState.textContent = on ? "On" : "Off";
+    }
+    if (onoffBtn) {
+      syncOnoffUi(onoffBtn.getAttribute("aria-checked") === "true");
+      onoffBtn.addEventListener("click", function () {
+        var cur = onoffBtn.getAttribute("aria-checked") === "true";
+        syncOnoffUi(!cur);
+      });
+    }
+  })();
+
+  var singleIn = document.getElementById("gc-designer-text-single");
+  var multiIn = document.getElementById("gc-designer-text-multi");
+  if (singleIn) {
+    ["input", "blur", "change"].forEach(function (ev) {
+      singleIn.addEventListener(ev, validateTextFields);
+    });
+  }
+  if (multiIn) {
+    ["input", "blur", "change"].forEach(function (ev) {
+      multiIn.addEventListener(ev, validateTextFields);
+    });
+  }
+  applyTextPanel();
+  validateTextFields();
+
+  var ddRoots = [];
+
+  var LIST_COL_LABELS = {
+    __firewall: "Scope",
+    entity_type: "Type",
+    HostType: "Host type",
+    Description: "Description",
+    IPAddress: "IP address",
+  };
+
+  function escapeAttr(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function getCell(row, key) {
+    var cells = row.cells || {};
+    if (key === "__name") return String(cells.__name != null ? cells.__name : "").trim();
+    if (key === "__firewall") return String(cells.__firewall || cells.__firewalls || "").trim();
+    if (key === "entity_type") return String(row.entity_type || "").trim();
+    return String(cells[key] != null ? cells[key] : "").trim();
+  }
+
+  function hostTypeSlug(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return "";
+    s = s.replace(/([a-z])([A-Z])/g, "$1 $2");
+    return s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function iconClasses(row) {
+    var et = row.entity_type || "";
+    var base = "gc-designer-dd__icon gc-designer-dd__icon--et-" + et.replace(/_/g, "-");
+    if (et !== "ip_host") return base;
+    var ht = hostTypeSlug((row.flat && row.flat.HostType) || "");
+    return base + (ht ? " gc-designer-dd__icon--ht-" + ht : "");
+  }
+
+  function rowStableValue(row) {
+    var et = row.entity_type || "";
+    var sid =
+      row.firewall_id != null
+        ? "f:" + row.firewall_id
+        : row.configuration_id != null
+          ? "c:" + row.configuration_id
+          : "x";
+    return et + "|" + sid + "|" + row.config_entry_id;
+  }
+
+  function readScopeFromSource(fs) {
+    var scopeEl = fs.querySelector("[data-gc-dd-scope]");
+    var custom = scopeEl && scopeEl.value === "custom";
+    var fw = "";
+    var cfg = "";
+    if (!custom) {
+      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        var a = globalThis.gcGetSelectedFirewallIds();
+        if (a && a.length) fw = a.join(",");
+      }
+      if (typeof globalThis.gcGetSelectedConfigurationIds === "function") {
+        var b = globalThis.gcGetSelectedConfigurationIds();
+        if (b && b.length) cfg = b.join(",");
+      }
+    } else {
+      var fwi = fs.querySelector("[data-gc-dd-fw-ids]");
+      var cfi = fs.querySelector("[data-gc-dd-cfg-ids]");
+      fw = fwi ? String(fwi.value || "").trim().replace(/\s+/g, "") : "";
+      cfg = cfi ? String(cfi.value || "").trim().replace(/\s+/g, "") : "";
+    }
+    return { custom: custom, firewall_ids: fw, configuration_ids: cfg };
+  }
+
+  function readCheckedValues(fs, sel) {
+    var out = [];
+    fs.querySelectorAll(sel).forEach(function (cb) {
+      if (cb.checked) out.push(cb.value);
+    });
+    return out;
+  }
+
+  /** One row per (entity_type, display name) so multi-firewall scope does not repeat the same label. */
+  function dedupeDesignerDdRowsByName(rows) {
+    var seen = Object.create(null);
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var name = (getCell(r, "__name") || r.external_name || "").trim();
+      var et = String(r.entity_type || "");
+      var key = et + "\0" + name.toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = true;
+      out.push(r);
+    }
+    return out;
+  }
+
+  function renderRowHtml(row, cols, isMulti) {
+    var primary = getCell(row, "__name") || row.external_name || "—";
+    var metaParts = [];
+    for (var i = 0; i < cols.length; i++) {
+      var k = cols[i];
+      if (k === "__name") continue;
+      var v = getCell(row, k);
+      if (!v) continue;
+      metaParts.push((LIST_COL_LABELS[k] || k) + ": " + v);
+    }
+    var meta = metaParts.join(" · ");
+    var val = rowStableValue(row);
+    var iconCl = iconClasses(row);
+    var inner =
+      '<span class="' +
+      iconCl +
+      '" aria-hidden="true"></span><span class="gc-designer-dd__row-text"><span class="gc-designer-dd__primary">' +
+      escapeHtml(primary) +
+      "</span>" +
+      (meta ? '<span class="gc-designer-dd__meta">' + escapeHtml(meta) + "</span>" : "") +
+      "</span>";
+    if (!isMulti) {
+      return (
+        '<li role="option" aria-selected="false" tabindex="-1" data-value="' +
+        escapeAttr(val) +
+        '" data-gc-dd-primary="' +
+        escapeAttr(primary) +
+        '">' +
+        inner +
+        "</li>"
+      );
+    }
+    return (
+      '<li role="option" aria-selected="false" tabindex="-1" data-value="' +
+      escapeAttr(val) +
+      '" data-gc-dd-primary="' +
+      escapeAttr(primary) +
+      '"><label class="gc-designer-dd__check"><input type="checkbox" />' +
+      inner +
+      "</label></li>"
+    );
+  }
+
+  function applyRowsToList(root, merged, cols, statusEl, typesCount) {
+    var list = root.querySelector(".gc-designer-dd__list");
+    if (!list) return;
+    var isMulti = root.classList.contains("gc-designer-dd--multi");
+    root._gcDdCachedRows = merged;
+    if (!merged.length) {
+      list.innerHTML =
+        '<li class="gc-designer-dd__empty" role="presentation" style="cursor:default;color:var(--text-muted,#64748b)">No cached rows for this scope.</li>';
+    } else {
+      var html = "";
+      for (var mi = 0; mi < merged.length; mi++) {
+        html += renderRowHtml(merged[mi], cols, isMulti);
+      }
+      list.innerHTML = html;
+    }
+    if (statusEl) {
+      statusEl.textContent =
+        merged.length + " object(s) from " + typesCount + " type request(s).";
+      statusEl.classList.remove("is-error");
+    }
+    var search = root.querySelector(".gc-designer-dd__search");
+    if (search) search.value = "";
+    if (root._gcDdFilterList) root._gcDdFilterList();
+    if (isMulti && root._gcDdRefreshMultiLabel) root._gcDdRefreshMultiLabel();
+    if (!isMulti) {
+      var tr = root.querySelector(".gc-designer-dd__trigger");
+      if (tr) {
+        tr.textContent = "Choose…";
+        tr.removeAttribute("data-gc-dd-value");
+      }
+    }
+  }
+
+  function designerDdSourceFs(root) {
+    if (!root || !root.id) return null;
+    var byId = document.getElementById(root.id + "-source-fieldset");
+    return byId || root.querySelector(".gc-designer-dd__source");
+  }
+
+  function readDdEntityTypesFromRoot(root, fs) {
+    var types = [];
+    var j = root && root.getAttribute("data-gc-dd-entity-types");
+    if (j) {
+      try {
+        var arr = JSON.parse(j);
+        if (Array.isArray(arr)) {
+          arr.forEach(function (x) {
+            var t = String(x != null ? x : "").trim();
+            if (t && types.indexOf(t) === -1) types.push(t);
+          });
+        }
+      } catch (eDdEt) {}
+    }
+    if (!types.length && fs) types = readCheckedValues(fs, "[data-gc-dd-entity-type]");
+    return types;
+  }
+
+  function readDdListColsFromRoot(root, fs) {
+    var cols = [];
+    if (fs) cols = readCheckedValues(fs, "[data-gc-dd-list-col]");
+    if (!cols.length) cols = ["__firewall", "entity_type"];
+    return cols;
+  }
+
+  function readDdScopeForRoot(root, fs) {
+    if (root && root.getAttribute("data-gc-object-edit-dd") === "1") {
+      return readMemberLookupScopeFromRoot(root);
+    }
+    if (!fs) return { firewall_ids: "", configuration_ids: "" };
+    return readScopeFromSource(fs);
+  }
+
+  function loadDesignerDdFromCache(root, statusEl, quietEmptyScope) {
+    var fs = designerDdSourceFs(root);
+    var list = root.querySelector(".gc-designer-dd__list");
+    if (!list) return;
+    var scope = readDdScopeForRoot(root, fs);
+    var types = readDdEntityTypesFromRoot(root, fs);
+    var cols = readDdListColsFromRoot(root, fs);
+    if (!types.length) {
+      if (statusEl && !quietEmptyScope) {
+        statusEl.textContent = "Select at least one object type.";
+        statusEl.classList.add("is-error");
+      }
+      return;
+    }
+    if (!scope.firewall_ids && !scope.configuration_ids) {
+      if (statusEl) {
+        if (quietEmptyScope) {
+          statusEl.textContent = "";
+          statusEl.classList.remove("is-error");
+        } else {
+          statusEl.textContent =
+            root.getAttribute("data-gc-object-edit-dd") === "1"
+              ? "Select at least one firewall in the flyout."
+              : scope.custom
+                ? "Enter at least one firewall or configuration id."
+                : "No firewalls or configurations in scope — use the top-bar selector or choose Custom IDs.";
+          statusEl.classList.add("is-error");
+        }
+      }
+      return;
+    }
+    if (statusEl) {
+      statusEl.classList.remove("is-error");
+      statusEl.textContent = "Loading…";
+    }
+    var urls = types.map(function (et) {
+      return (
+        "/api/firewalls/hosts-services/table?entity_type=" +
+        encodeURIComponent(et) +
+        "&firewall_ids=" +
+        encodeURIComponent(scope.firewall_ids) +
+        "&configuration_ids=" +
+        encodeURIComponent(scope.configuration_ids) +
+        "&combine=false&limit=800"
+      );
+    });
+    Promise.all(
+      urls.map(function (url) {
+        return fetch(url, { credentials: "same-origin" }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        });
+      }),
+    )
+      .then(function (payloads) {
+        var merged = [];
+        for (var pi = 0; pi < payloads.length; pi++) {
+          var rows = payloads[pi].rows || [];
+          for (var ri = 0; ri < rows.length; ri++) merged.push(rows[ri]);
+        }
+        merged.sort(function (a, b) {
+          var an = (getCell(a, "__name") || "").toLowerCase();
+          var bn = (getCell(b, "__name") || "").toLowerCase();
+          if (an !== bn) return an < bn ? -1 : 1;
+          return String(a.entity_type || "").localeCompare(String(b.entity_type || ""));
+        });
+        merged = dedupeDesignerDdRowsByName(merged);
+        applyRowsToList(root, merged, cols, statusEl, types.length);
+      })
+      .catch(function () {
+        if (statusEl) {
+          statusEl.textContent = "Load failed (network or API error).";
+          statusEl.classList.add("is-error");
+        }
+      });
+  }
+
+  function bindObjectEditDdAutoReload(root, statusId) {
+    if (!root || root.dataset.gcObjEditDdReloadBound === "1") return;
+    root.dataset.gcObjEditDdReloadBound = "1";
+    var statusEl = document.getElementById(statusId);
+    function reload() {
+      root._gcDdCachedRows = null;
+      loadDesignerDdFromCache(root, statusEl, true);
+    }
+    document.addEventListener("gc-firewall-selection-changed", reload);
+    document.addEventListener(
+      "change",
+      function (ev) {
+        var t = ev.target;
+        if (
+          !t ||
+          !t.matches ||
+          !t.matches(
+            "#gc-designer-flyout-object-edit-modal [data-gc-fw-ms] input[type=\"checkbox\"], #gc-designer-flyout-object-edit-modal [data-gc-cfg-ms] input[type=\"checkbox\"]",
+          )
+        )
+          return;
+        if (!root.closest("#gc-designer-flyout-object-edit-modal")) return;
+        reload();
+      },
+      true,
+    );
+    loadDesignerDdFromCache(root, statusEl, true);
+  }
+
+  function bindDesignerDdAutoLoad(root, statusId) {
+    var fs = designerDdSourceFs(root);
+    if (!fs) {
+      if (root && root.getAttribute("data-gc-object-edit-dd") === "1") {
+        bindObjectEditDdAutoReload(root, statusId);
+      }
+      return;
+    }
+    var statusEl = document.getElementById(statusId);
+    var sel = fs.querySelector("[data-gc-dd-scope]");
+    var debounceT = null;
+    function scheduleLoadDebounced() {
+      if (debounceT) clearTimeout(debounceT);
+      debounceT = setTimeout(function () {
+        debounceT = null;
+        loadDesignerDdFromCache(root, statusEl, false);
+      }, 350);
+    }
+    function syncCustomVisibility() {
+      var custom = sel && sel.value === "custom";
+      fs.querySelectorAll("[data-gc-dd-custom-wrap]").forEach(function (el) {
+        el.hidden = !custom;
+      });
+    }
+    if (sel) {
+      sel.addEventListener("change", function () {
+        syncCustomVisibility();
+        root._gcDdCachedRows = null;
+        loadDesignerDdFromCache(root, statusEl, false);
+      });
+    }
+    syncCustomVisibility();
+    fs.querySelectorAll("[data-gc-dd-fw-ids], [data-gc-dd-cfg-ids]").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        if (!sel || sel.value !== "custom") return;
+        root._gcDdCachedRows = null;
+        scheduleLoadDebounced();
+      });
+      inp.addEventListener("change", function () {
+        if (!sel || sel.value !== "custom") return;
+        root._gcDdCachedRows = null;
+        if (debounceT) clearTimeout(debounceT);
+        debounceT = null;
+        loadDesignerDdFromCache(root, statusEl, false);
+      });
+    });
+  }
+
+  function reloadDesignerDdIfGlobalScope(root, statusId) {
+    if (!root) return;
+    var fs = designerDdSourceFs(root);
+    var sel = fs && fs.querySelector("[data-gc-dd-scope]");
+    if (!sel || sel.value === "custom") return;
+    root._gcDdCachedRows = null;
+    loadDesignerDdFromCache(root, document.getElementById(statusId), false);
+  }
+
+  function readMemberLookupScopeFromRoot(controlRoot) {
+    var modal = controlRoot.closest("#gc-designer-flyout-object-edit-modal");
+    if (modal) {
+      var ms = modal.querySelector("[data-gc-fw-ms], [data-gc-cfg-ms]");
+      if (ms) {
+        var useCfg = ms.hasAttribute("data-gc-cfg-ms");
+        var idAttr = useCfg ? "data-gc-cfg-id" : "data-gc-fw-id";
+        var ids = [];
+        ms.querySelectorAll("input[type=\"checkbox\"][" + idAttr + "]").forEach(function (cb) {
+          if (!cb.checked) return;
+          var n = parseInt(String(cb.getAttribute(idAttr) || ""), 10);
+          if (!isNaN(n) && n > 0) ids.push(n);
+        });
+        if (ids.length) {
+          if (useCfg) return { firewall_ids: "", configuration_ids: ids.join(",") };
+          return { firewall_ids: ids.join(","), configuration_ids: "" };
+        }
+      }
+    }
+    var fw = "";
+    var cfg = "";
+    if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+      var a = globalThis.gcGetSelectedFirewallIds();
+      if (a && a.length) fw = a.join(",");
+    }
+    if (typeof globalThis.gcGetSelectedConfigurationIds === "function") {
+      var b = globalThis.gcGetSelectedConfigurationIds();
+      if (b && b.length) cfg = b.join(",");
+    }
+    return { firewall_ids: fw, configuration_ids: cfg };
+  }
+
+  function loadMemberLookupFromCache(root, statusEl, quietEmptyScope) {
+    var fs = designerDdSourceFs(root);
+    var list = root.querySelector(".gc-designer-dd__list");
+    if (!list) return;
+    var scope = readMemberLookupScopeFromRoot(root);
+    var types = [];
+    var catJson = root.getAttribute("data-gc-ml-catalog-entity-types");
+    if (catJson) {
+      try {
+        var arr = JSON.parse(catJson);
+        if (Array.isArray(arr)) {
+          arr.forEach(function (x) {
+            var t = String(x != null ? x : "").trim();
+            if (t && types.indexOf(t) === -1) types.push(t);
+          });
+        }
+      } catch (eMlCat) {}
+    }
+    if (!types.length && fs) {
+      types = readCheckedValues(fs, "[data-gc-ml-entity-type]");
+    }
+    var cols = fs ? readCheckedValues(fs, "[data-gc-ml-list-col]") : [];
+    if (!cols.length) cols = ["__firewall", "entity_type"];
+    if (!types.length) {
+      if (statusEl && !quietEmptyScope) {
+        statusEl.textContent = "Select at least one object type.";
+        statusEl.classList.add("is-error");
+      }
+      return;
+    }
+    if (!scope.firewall_ids && !scope.configuration_ids) {
+      if (statusEl) {
+        if (quietEmptyScope) {
+          statusEl.textContent = "";
+          statusEl.classList.remove("is-error");
+        } else {
+          statusEl.textContent =
+            "No firewalls or configurations in scope — select some in the Object edit flyout or use the top bar.";
+          statusEl.classList.add("is-error");
+        }
+      }
+      return;
+    }
+    if (statusEl) {
+      statusEl.classList.remove("is-error");
+      statusEl.textContent = "Loading…";
+    }
+    var urls = types.map(function (et) {
+      return (
+        "/api/firewalls/hosts-services/table?entity_type=" +
+        encodeURIComponent(et) +
+        "&firewall_ids=" +
+        encodeURIComponent(scope.firewall_ids) +
+        "&configuration_ids=" +
+        encodeURIComponent(scope.configuration_ids) +
+        "&combine=false&limit=800"
+      );
+    });
+    Promise.all(
+      urls.map(function (url) {
+        return fetch(url, { credentials: "same-origin" }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        });
+      }),
+    )
+      .then(function (payloads) {
+        var merged = [];
+        for (var pi = 0; pi < payloads.length; pi++) {
+          var rows = payloads[pi].rows || [];
+          for (var ri = 0; ri < rows.length; ri++) merged.push(rows[ri]);
+        }
+        merged.sort(function (a, b) {
+          var an = (getCell(a, "__name") || "").toLowerCase();
+          var bn = (getCell(b, "__name") || "").toLowerCase();
+          if (an !== bn) return an < bn ? -1 : 1;
+          return String(a.entity_type || "").localeCompare(String(b.entity_type || ""));
+        });
+        merged = dedupeDesignerDdRowsByName(merged);
+        applyRowsToList(root, merged, cols, statusEl, types.length);
+      })
+      .catch(function () {
+        if (statusEl) {
+          statusEl.textContent = "Load failed (network or API error).";
+          statusEl.classList.add("is-error");
+        }
+      });
+  }
+
+  function memberLookupStatusElement(root) {
+    if (!root) return null;
+    var attr = root.getAttribute("data-gc-member-lookup-status-id");
+    if (attr) return document.getElementById(attr);
+    if (root.id) {
+      return (
+        document.getElementById(root.id + "-load-status") || document.getElementById(root.id + "-ml-status")
+      );
+    }
+    return null;
+  }
+
+  function reloadMemberLookupRootsInObjectEditModal() {
+    var modal = document.getElementById("gc-designer-flyout-object-edit-modal");
+    if (!modal) return;
+    modal.querySelectorAll("[data-gc-designer-member-lookup]").forEach(function (el) {
+      loadMemberLookupFromCache(el, memberLookupStatusElement(el), true);
+    });
+  }
+
+  function reloadObjectEditDdFromFlyoutFw() {
+    var modal = document.getElementById("gc-designer-flyout-object-edit-modal");
+    if (!modal) return;
+    modal.querySelectorAll("[data-gc-object-edit-dd=\"1\"]").forEach(function (el) {
+      var st = memberLookupStatusElement(el);
+      if (!st && el.id) st = document.getElementById(el.id + "-dd-status");
+      el._gcDdCachedRows = null;
+      loadDesignerDdFromCache(el, st, true);
+    });
+  }
+
+  function bindMemberLookupAutoReload(root) {
+    if (!root || root.dataset.gcMemberLookupReloadBound === "1") return;
+    root.dataset.gcMemberLookupReloadBound = "1";
+    document.addEventListener("gc-firewall-selection-changed", function () {
+      root._gcDdCachedRows = null;
+      loadMemberLookupFromCache(root, memberLookupStatusElement(root), false);
+    });
+    document.addEventListener(
+      "change",
+      function (ev) {
+        var t = ev.target;
+        if (!t || !t.matches || !t.matches("#gc-designer-flyout-object-edit-modal [data-gc-fw-ms] input[type=\"checkbox\"], #gc-designer-flyout-object-edit-modal [data-gc-cfg-ms] input[type=\"checkbox\"]"))
+          return;
+        if (!root.closest("#gc-designer-flyout-object-edit-modal")) return;
+        root._gcDdCachedRows = null;
+        loadMemberLookupFromCache(root, memberLookupStatusElement(root), false);
+      },
+      true,
+    );
+  }
+
+  function snapshotMemberLookupSourceFs(fs) {
+    if (!fs) return null;
+    var ent = [];
+    var cols = [];
+    fs.querySelectorAll("[data-gc-ml-entity-type]").forEach(function (cb) {
+      if (cb.checked) ent.push(cb.value);
+    });
+    fs.querySelectorAll("[data-gc-ml-list-col]").forEach(function (cb) {
+      if (cb.checked) cols.push(cb.value);
+    });
+    var multiR = document.getElementById("gc-designer-ml-mode-multi");
+    return {
+      multi: !!(multiR && multiR.checked),
+      entity: ent,
+      cols: cols,
+    };
+  }
+
+  function restoreMemberLookupSourceFs(fs, s) {
+    if (!fs || !s) return;
+    var multiR = document.getElementById("gc-designer-ml-mode-multi");
+    var singleR = document.getElementById("gc-designer-ml-mode-single");
+    if (s.multi) {
+      if (multiR) multiR.checked = true;
+    } else {
+      if (singleR) singleR.checked = true;
+    }
+    fs.querySelectorAll("[data-gc-ml-entity-type]").forEach(function (cb) {
+      cb.checked = s.entity.indexOf(cb.value) !== -1;
+    });
+    fs.querySelectorAll("[data-gc-ml-list-col]").forEach(function (cb) {
+      cb.checked = s.cols.indexOf(cb.value) !== -1;
+    });
+  }
+
+  function restoreMemberLookupSourceFsCatalog(fs, s) {
+    if (!fs || !s) return;
+    var multi = !!s.multi;
+    fs.querySelectorAll("[data-gc-ml-entity-type]").forEach(function (cb) {
+      cb.checked = (s.entity || []).indexOf(cb.value) !== -1;
+    });
+    fs.querySelectorAll("[data-gc-ml-list-col]").forEach(function (cb) {
+      cb.checked = (s.cols || []).indexOf(cb.value) !== -1;
+    });
+    var multiR = fs.querySelector("[data-gc-ml-mode-multi]");
+    var singleR = fs.querySelector("[data-gc-ml-mode-single]");
+    if (multiR && singleR) {
+      if (multi) multiR.checked = true;
+      else singleR.checked = true;
+    }
+  }
+
+  function snapshotMemberLookupSourceFsFromFieldset(fs) {
+    if (!fs) return null;
+    var ent = [];
+    var cols = [];
+    fs.querySelectorAll("[data-gc-ml-entity-type]").forEach(function (cb) {
+      if (cb.checked) ent.push(cb.value);
+    });
+    fs.querySelectorAll("[data-gc-ml-list-col]").forEach(function (cb) {
+      if (cb.checked) cols.push(cb.value);
+    });
+    var multiR = fs.querySelector("[data-gc-ml-mode-multi]");
+    return {
+      multi: !!(multiR && multiR.checked),
+      entity: ent,
+      cols: cols,
+    };
+  }
+
+  if (!globalThis.__gcDesignerMlFwHookChained) {
+    globalThis.__gcDesignerMlFwHookChained = true;
+    (function chainMemberLookupFlyoutFwHook() {
+      var prev = globalThis.gcHsOnFlyoutFirewallSelectionChange;
+      globalThis.gcHsOnFlyoutFirewallSelectionChange = function (root) {
+        if (typeof prev === "function") {
+          try {
+            prev(root);
+          } catch (ePrev) {}
+        }
+        reloadMemberLookupRootsInObjectEditModal();
+        reloadObjectEditDdFromFlyoutFw();
+      };
+    })();
+  }
+
+  function wireSearchableDropdown(root) {
+    if (!root) return;
+    var shell = root.querySelector(".gc-designer-dd__shell");
+    var panel = root.querySelector(".gc-designer-dd__panel");
+    var search = root.querySelector(".gc-designer-dd__search");
+    var trigger = root.querySelector(".gc-designer-dd__trigger");
+    var list = root.querySelector(".gc-designer-dd__list");
+    if (!shell || !trigger || !list) return;
+
+    ddRoots.push(root);
+
+    var isMemberLookup = root.classList.contains("gc-designer-member-lookup");
+    var mlToolbar = root.querySelector(".gc-designer-member-lookup__toolbar");
+    var mlSelectAll = root.querySelector(".gc-designer-member-lookup__select-all");
+
+    function isMultiNow() {
+      return root.classList.contains("gc-designer-dd--multi");
+    }
+
+    function setOpen(open) {
+      if (panel) panel.hidden = !open;
+      trigger.setAttribute("aria-expanded", open ? "true" : "false");
+      if (mlToolbar) mlToolbar.hidden = !open || !isMultiNow() || !isMemberLookup;
+      if (open && search && !root.classList.contains("gc-designer-dd--no-search")) {
+        try {
+          search.focus();
+        } catch (e1) {}
+      }
+    }
+
+    function filterList() {
+      var q = (search && search.value ? search.value : "").trim().toLowerCase();
+      var items = list.querySelectorAll("li[role='option']");
+      for (var i = 0; i < items.length; i++) {
+        var li = items[i];
+        var t = li.textContent.trim().toLowerCase();
+        li.hidden = q && t.indexOf(q) === -1;
+      }
+    }
+
+    root._gcDdFilterList = filterList;
+
+    if (search) search.addEventListener("input", filterList);
+
+    function refreshMultiLabel() {
+      if (!isMultiNow()) return;
+      var labels = [];
+      var boxes = list.querySelectorAll("input[type='checkbox']");
+      for (var i = 0; i < boxes.length; i++) {
+        if (boxes[i].checked) {
+          var liM = boxes[i].closest("li");
+          var pl = liM ? liM.getAttribute("data-gc-dd-primary") : "";
+          if (pl) labels.push(pl);
+        }
+      }
+      trigger.textContent = labels.length ? labels.join(", ") : "None selected";
+    }
+    root._gcDdRefreshMultiLabel = refreshMultiLabel;
+
+    trigger.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var opening = panel ? panel.hidden : true;
+      if (opening) {
+        for (var j = 0; j < ddRoots.length; j++) {
+          var other = ddRoots[j];
+          if (other !== root && other._gcDdSetOpen) other._gcDdSetOpen(false);
+        }
+      }
+      setOpen(opening);
+    });
+
+    list.addEventListener("click", function (e) {
+      if (isMultiNow()) return;
+      var li = e.target.closest("li[role='option']");
+      if (!li || li.hidden) return;
+      var opts = list.querySelectorAll("li[role='option']");
+      for (var oi = 0; oi < opts.length; oi++) {
+        opts[oi].setAttribute("aria-selected", opts[oi] === li ? "true" : "false");
+      }
+      var pl = li.getAttribute("data-gc-dd-primary") || li.textContent.trim();
+      trigger.textContent = pl;
+      trigger.setAttribute("data-gc-dd-value", li.getAttribute("data-value") || "");
+      setOpen(false);
+    });
+
+    list.addEventListener("change", function (e) {
+      if (!isMultiNow()) return;
+      if (e.target && e.target.matches && e.target.matches("input[type='checkbox']")) {
+        var liC = e.target.closest("li");
+        if (liC) liC.setAttribute("aria-selected", e.target.checked ? "true" : "false");
+        refreshMultiLabel();
+      }
+    });
+
+    if (mlSelectAll && isMemberLookup) {
+      mlSelectAll.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!isMultiNow()) return;
+        list.querySelectorAll("li[role='option']").forEach(function (li) {
+          if (li.hidden) return;
+          var cb = li.querySelector("input[type='checkbox']");
+          if (cb && !cb.disabled) cb.checked = true;
+          li.setAttribute("aria-selected", "true");
+        });
+        refreshMultiLabel();
+      });
+    }
+
+    if (isMultiNow()) refreshMultiLabel();
+
+    root._gcDdSetOpen = setOpen;
+    shell.addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+  }
+
+  var ddSingle = document.getElementById("gc-designer-dd-single");
+  var ddMulti = document.getElementById("gc-designer-dd-multi");
+  bindDesignerDdAutoLoad(ddSingle, "gc-designer-dd-single-load-status");
+  bindDesignerDdAutoLoad(ddMulti, "gc-designer-dd-multi-load-status");
+  wireSearchableDropdown(ddSingle);
+  wireSearchableDropdown(ddMulti);
+
+  var mlRoot = document.getElementById("gc-designer-member-lookup");
+  var mlFsPage = designerDdSourceFs(mlRoot);
+  if (mlRoot) {
+    wireSearchableDropdown(mlRoot);
+    bindMemberLookupAutoReload(mlRoot);
+    if (mlFsPage) {
+      mlFsPage.querySelectorAll("[data-gc-ml-entity-type], [data-gc-ml-list-col]").forEach(function (el) {
+        el.addEventListener("change", function () {
+          mlRoot._gcDdCachedRows = null;
+          loadMemberLookupFromCache(mlRoot, memberLookupStatusElement(mlRoot), false);
+        });
+      });
+    }
+    loadMemberLookupFromCache(mlRoot, memberLookupStatusElement(mlRoot), false);
+  }
+
+  var mlFlyout = document.getElementById("gc-designer-member-lookup-props-flyout");
+  var mlOpenBtn = document.getElementById("gc-designer-ml-props-open");
+  var mlFlyoutSnapshot = null;
+
+  function syncMlDemoListStructure() {
+    if (!mlRoot) return;
+    var wantMulti = mlRoot.classList.contains("gc-designer-dd--multi");
+    var lst = mlRoot.querySelector(".gc-designer-dd__list");
+    if (lst) {
+      lst.classList.toggle("gc-designer-dd__list--multi", wantMulti);
+      lst.setAttribute("aria-multiselectable", wantMulti ? "true" : "false");
+    }
+  }
+
+  function openMemberLookupPropsFlyout() {
+    if (!mlFlyout || !mlFsPage) return;
+    mlFlyoutSnapshot = snapshotMemberLookupSourceFs(mlFsPage);
+    if (window.gcDesignerControlsOpenExclusiveModal) {
+      window.gcDesignerControlsOpenExclusiveModal(mlFlyout);
+    } else {
+      mlFlyout.hidden = false;
+    }
+    var f = document.getElementById("gc-designer-ml-mode-single");
+    if (f) f.focus();
+  }
+
+  function closeMemberLookupPropsFlyout() {
+    if (!mlFlyout) return;
+    if (window.gcDesignerControlsCloseFlyoutModal) {
+      window.gcDesignerControlsCloseFlyoutModal(mlFlyout);
+    } else {
+      mlFlyout.hidden = true;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    if (mlOpenBtn) mlOpenBtn.focus();
+  }
+
+  if (mlOpenBtn) mlOpenBtn.addEventListener("click", openMemberLookupPropsFlyout);
+  var mlFlySave = document.getElementById("gc-designer-member-lookup-props-flyout-save");
+  if (mlFlySave) {
+    mlFlySave.addEventListener("click", function () {
+      if (mlRoot) {
+        var multiOn = document.getElementById("gc-designer-ml-mode-multi");
+        mlRoot.classList.toggle("gc-designer-dd--multi", !!(multiOn && multiOn.checked));
+        syncMlDemoListStructure();
+        mlRoot._gcDdCachedRows = null;
+        loadMemberLookupFromCache(mlRoot, memberLookupStatusElement(mlRoot), false);
+      }
+      gcDesignerCatalogNotifyFlyoutSave("member-lookup");
+      mlFlyoutSnapshot = null;
+      closeMemberLookupPropsFlyout();
+    });
+  }
+  var mlFlyCancel = document.getElementById("gc-designer-member-lookup-props-flyout-cancel");
+  if (mlFlyCancel) {
+    mlFlyCancel.addEventListener("click", function () {
+      gcDesignerCatalogNotifyFlyoutCancel("member-lookup");
+      restoreMemberLookupSourceFs(mlFsPage, mlFlyoutSnapshot);
+      if (mlRoot) {
+        var multiOn2 = document.getElementById("gc-designer-ml-mode-multi");
+        mlRoot.classList.toggle("gc-designer-dd--multi", !!(multiOn2 && multiOn2.checked));
+        syncMlDemoListStructure();
+        mlRoot._gcDdCachedRows = null;
+        loadMemberLookupFromCache(mlRoot, memberLookupStatusElement(mlRoot), false);
+      }
+      mlFlyoutSnapshot = null;
+      closeMemberLookupPropsFlyout();
+    });
+  }
+  var mlRefresh = document.getElementById("gc-designer-member-lookup-refresh");
+  if (mlRefresh) {
+    mlRefresh.addEventListener("click", function () {
+      if (mlRoot) {
+        mlRoot._gcDdCachedRows = null;
+        loadMemberLookupFromCache(mlRoot, memberLookupStatusElement(mlRoot), false);
+      }
+    });
+  }
+
+  function gcOpenMemberLookupPropertiesFlyout() {
+    openMemberLookupPropsFlyout();
+  }
+  window.gcOpenMemberLookupPropertiesFlyout = gcOpenMemberLookupPropertiesFlyout;
+
+  var mlCtl = document.querySelector('[data-gc-designer-control-id="member-lookup"]');
+  if (mlCtl) {
+    mlCtl.gcOpenMemberLookupPropertiesFlyout = gcOpenMemberLookupPropertiesFlyout;
+  }
+
+  document.addEventListener("gc-firewall-selection-changed", function () {
+    reloadDesignerDdIfGlobalScope(ddSingle, "gc-designer-dd-single-load-status");
+    reloadDesignerDdIfGlobalScope(ddMulti, "gc-designer-dd-multi-load-status");
+  });
+
+  var sref = document.getElementById("gc-designer-dd-single-refresh");
+  var mref = document.getElementById("gc-designer-dd-multi-refresh");
+  if (sref) {
+    sref.addEventListener("click", function () {
+      loadDesignerDdFromCache(ddSingle, document.getElementById("gc-designer-dd-single-load-status"), false);
+    });
+  }
+  if (mref) {
+    mref.addEventListener("click", function () {
+      loadDesignerDdFromCache(ddMulti, document.getElementById("gc-designer-dd-multi-load-status"), false);
+    });
+  }
+
+  var fsSingle = designerDdSourceFs(ddSingle);
+  var fsMulti = designerDdSourceFs(ddMulti);
+
+  function designerDdSyncCustomWrapForFs(fs) {
+    if (!fs) return;
+    var sel = fs.querySelector("[data-gc-dd-scope]");
+    var custom = sel && sel.value === "custom";
+    fs.querySelectorAll("[data-gc-dd-custom-wrap]").forEach(function (el) {
+      el.hidden = !custom;
+    });
+  }
+
+  function snapshotDdSourceFs(fs) {
+    if (!fs) return null;
+    var scope = fs.querySelector("[data-gc-dd-scope]");
+    var fwi = fs.querySelector("[data-gc-dd-fw-ids]");
+    var cfi = fs.querySelector("[data-gc-dd-cfg-ids]");
+    var ent = [];
+    var cols = [];
+    fs.querySelectorAll("[data-gc-dd-entity-type]").forEach(function (cb) {
+      if (cb.checked) ent.push(cb.value);
+    });
+    fs.querySelectorAll("[data-gc-dd-list-col]").forEach(function (cb) {
+      if (cb.checked) cols.push(cb.value);
+    });
+    return {
+      scope: scope ? scope.value : "global",
+      fw: fwi ? fwi.value : "",
+      cfg: cfi ? cfi.value : "",
+      entity: ent,
+      cols: cols,
+    };
+  }
+
+  function restoreDdSourceFs(fs, s) {
+    if (!fs || !s) return;
+    var scope = fs.querySelector("[data-gc-dd-scope]");
+    if (scope) scope.value = s.scope || "global";
+    var fwi = fs.querySelector("[data-gc-dd-fw-ids]");
+    var cfi = fs.querySelector("[data-gc-dd-cfg-ids]");
+    if (fwi) fwi.value = s.fw || "";
+    if (cfi) cfi.value = s.cfg || "";
+    fs.querySelectorAll("[data-gc-dd-entity-type]").forEach(function (cb) {
+      cb.checked = s.entity.indexOf(cb.value) !== -1;
+    });
+    fs.querySelectorAll("[data-gc-dd-list-col]").forEach(function (cb) {
+      cb.checked = s.cols.indexOf(cb.value) !== -1;
+    });
+  }
+  if (fsSingle) {
+    fsSingle.querySelectorAll("[data-gc-dd-entity-type]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        ddSingle._gcDdCachedRows = null;
+        loadDesignerDdFromCache(ddSingle, document.getElementById("gc-designer-dd-single-load-status"), false);
+      });
+    });
+    fsSingle.querySelectorAll("[data-gc-dd-list-col]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        var cols = readCheckedValues(fsSingle, "[data-gc-dd-list-col]");
+        if (ddSingle._gcDdCachedRows) {
+          applyRowsToList(
+            ddSingle,
+            ddSingle._gcDdCachedRows,
+            cols,
+            document.getElementById("gc-designer-dd-single-load-status"),
+            readCheckedValues(fsSingle, "[data-gc-dd-entity-type]").length,
+          );
+        }
+      });
+    });
+  }
+  if (fsMulti) {
+    fsMulti.querySelectorAll("[data-gc-dd-entity-type]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        ddMulti._gcDdCachedRows = null;
+        loadDesignerDdFromCache(ddMulti, document.getElementById("gc-designer-dd-multi-load-status"), false);
+      });
+    });
+    fsMulti.querySelectorAll("[data-gc-dd-list-col]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        var cols = readCheckedValues(fsMulti, "[data-gc-dd-list-col]");
+        if (ddMulti._gcDdCachedRows) {
+          applyRowsToList(
+            ddMulti,
+            ddMulti._gcDdCachedRows,
+            cols,
+            document.getElementById("gc-designer-dd-multi-load-status"),
+            readCheckedValues(fsMulti, "[data-gc-dd-entity-type]").length,
+          );
+        }
+      });
+    });
+  }
+
+  document.addEventListener("click", function () {
+    [ddSingle, ddMulti].forEach(function (el) {
+      if (el && el._gcDdSetOpen) el._gcDdSetOpen(false);
+    });
+  });
+
+  var showSearch = document.getElementById("gc-designer-dd-show-search");
+  function syncDdSearchVisibility() {
+    var on = showSearch && showSearch.checked;
+    [ddSingle, ddMulti].forEach(function (el) {
+      if (!el) return;
+      el.classList.toggle("gc-designer-dd--no-search", !on);
+    });
+  }
+  if (showSearch) {
+    showSearch.addEventListener("change", syncDdSearchVisibility);
+    syncDdSearchVisibility();
+  }
+
+  var ddSharedFlyout = document.getElementById("gc-designer-dd-shared-props-flyout");
+  var ddSharedOpenBtn = document.getElementById("gc-designer-dd-shared-props-open");
+  var ddSharedSnapshot = null;
+
+  function snapshotDdSharedPanel() {
+    var cb = document.getElementById("gc-designer-dd-show-search");
+    return { search: !!(cb && cb.checked) };
+  }
+
+  function restoreDdSharedPanel(s) {
+    if (!s) return;
+    var cb = document.getElementById("gc-designer-dd-show-search");
+    if (cb) cb.checked = s.search;
+  }
+
+  function hydrateDdSharedCheckboxFromDemo() {
+    var cb = document.getElementById("gc-designer-dd-show-search");
+    var s = document.getElementById("gc-designer-dd-single");
+    if (!cb || !s) return;
+    cb.checked = !s.classList.contains("gc-designer-dd--no-search");
+  }
+
+  function openDdSharedPropsFlyout() {
+    if (!ddSharedFlyout) return;
+    hydrateDdSharedCheckboxFromDemo();
+    ddSharedSnapshot = snapshotDdSharedPanel();
+    if (window.gcDesignerControlsOpenExclusiveModal) {
+      window.gcDesignerControlsOpenExclusiveModal(ddSharedFlyout);
+    } else {
+      ddSharedFlyout.hidden = false;
+    }
+    var cbf = document.getElementById("gc-designer-dd-show-search");
+    if (cbf) cbf.focus();
+  }
+
+  function closeDdSharedPropsFlyout() {
+    if (!ddSharedFlyout) return;
+    if (window.gcDesignerControlsCloseFlyoutModal) {
+      window.gcDesignerControlsCloseFlyoutModal(ddSharedFlyout);
+    } else {
+      ddSharedFlyout.hidden = true;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    if (ddSharedOpenBtn) ddSharedOpenBtn.focus();
+  }
+
+  if (ddSharedOpenBtn) ddSharedOpenBtn.addEventListener("click", openDdSharedPropsFlyout);
+  var ddSharedSave = document.getElementById("gc-designer-dd-shared-props-flyout-save");
+  if (ddSharedSave) {
+    ddSharedSave.addEventListener("click", function () {
+      syncDdSearchVisibility();
+      gcDesignerCatalogNotifyFlyoutSave("dd-shared");
+      ddSharedSnapshot = null;
+      closeDdSharedPropsFlyout();
+    });
+  }
+  var ddSharedCancel = document.getElementById("gc-designer-dd-shared-props-flyout-cancel");
+  if (ddSharedCancel) {
+    ddSharedCancel.addEventListener("click", function () {
+      gcDesignerCatalogNotifyFlyoutCancel("dd-shared");
+      restoreDdSharedPanel(ddSharedSnapshot);
+      syncDdSearchVisibility();
+      ddSharedSnapshot = null;
+      closeDdSharedPropsFlyout();
+    });
+  }
+
+  var ddSingleFlyout = document.getElementById("gc-designer-dd-single-props-flyout");
+  var ddSingleOpenBtn = document.getElementById("gc-designer-dd-single-props-open");
+  var ddSingleFlyoutSnapshot = null;
+
+  function openDdSinglePropsFlyout() {
+    if (!ddSingleFlyout || !fsSingle) return;
+    designerDdSyncCustomWrapForFs(fsSingle);
+    ddSingleFlyoutSnapshot = snapshotDdSourceFs(fsSingle);
+    if (window.gcDesignerControlsOpenExclusiveModal) {
+      window.gcDesignerControlsOpenExclusiveModal(ddSingleFlyout);
+    } else {
+      ddSingleFlyout.hidden = false;
+    }
+    var sc = fsSingle.querySelector("[data-gc-dd-scope]");
+    if (sc) sc.focus();
+  }
+
+  function closeDdSinglePropsFlyout() {
+    if (!ddSingleFlyout) return;
+    if (window.gcDesignerControlsCloseFlyoutModal) {
+      window.gcDesignerControlsCloseFlyoutModal(ddSingleFlyout);
+    } else {
+      ddSingleFlyout.hidden = true;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    if (ddSingleOpenBtn) ddSingleOpenBtn.focus();
+  }
+
+  if (ddSingleOpenBtn) ddSingleOpenBtn.addEventListener("click", openDdSinglePropsFlyout);
+  var ddSingleFlySave = document.getElementById("gc-designer-dd-single-props-flyout-save");
+  if (ddSingleFlySave) {
+    ddSingleFlySave.addEventListener("click", function () {
+      designerDdSyncCustomWrapForFs(fsSingle);
+      loadDesignerDdFromCache(ddSingle, document.getElementById("gc-designer-dd-single-load-status"), false);
+      gcDesignerCatalogNotifyFlyoutSave("dd-single");
+      ddSingleFlyoutSnapshot = null;
+      closeDdSinglePropsFlyout();
+    });
+  }
+  var ddSingleFlyCancel = document.getElementById("gc-designer-dd-single-props-flyout-cancel");
+  if (ddSingleFlyCancel) {
+    ddSingleFlyCancel.addEventListener("click", function () {
+      gcDesignerCatalogNotifyFlyoutCancel("dd-single");
+      restoreDdSourceFs(fsSingle, ddSingleFlyoutSnapshot);
+      designerDdSyncCustomWrapForFs(fsSingle);
+      ddSingle._gcDdCachedRows = null;
+      loadDesignerDdFromCache(ddSingle, document.getElementById("gc-designer-dd-single-load-status"), false);
+      ddSingleFlyoutSnapshot = null;
+      closeDdSinglePropsFlyout();
+    });
+  }
+
+  var ddMultiFlyout = document.getElementById("gc-designer-dd-multi-props-flyout");
+  var ddMultiOpenBtn = document.getElementById("gc-designer-dd-multi-props-open");
+  var ddMultiFlyoutSnapshot = null;
+
+  function openDdMultiPropsFlyout() {
+    if (!ddMultiFlyout || !fsMulti) return;
+    designerDdSyncCustomWrapForFs(fsMulti);
+    ddMultiFlyoutSnapshot = snapshotDdSourceFs(fsMulti);
+    if (window.gcDesignerControlsOpenExclusiveModal) {
+      window.gcDesignerControlsOpenExclusiveModal(ddMultiFlyout);
+    } else {
+      ddMultiFlyout.hidden = false;
+    }
+    var sc2 = fsMulti.querySelector("[data-gc-dd-scope]");
+    if (sc2) sc2.focus();
+  }
+
+  function closeDdMultiPropsFlyout() {
+    if (!ddMultiFlyout) return;
+    if (window.gcDesignerControlsCloseFlyoutModal) {
+      window.gcDesignerControlsCloseFlyoutModal(ddMultiFlyout);
+    } else {
+      ddMultiFlyout.hidden = true;
+      if (window.gcDesignerControlsSyncScrollLock) window.gcDesignerControlsSyncScrollLock();
+    }
+    if (ddMultiOpenBtn) ddMultiOpenBtn.focus();
+  }
+
+  if (ddMultiOpenBtn) ddMultiOpenBtn.addEventListener("click", openDdMultiPropsFlyout);
+  var ddMultiFlySave = document.getElementById("gc-designer-dd-multi-props-flyout-save");
+  if (ddMultiFlySave) {
+    ddMultiFlySave.addEventListener("click", function () {
+      designerDdSyncCustomWrapForFs(fsMulti);
+      loadDesignerDdFromCache(ddMulti, document.getElementById("gc-designer-dd-multi-load-status"), false);
+      gcDesignerCatalogNotifyFlyoutSave("dd-multi");
+      ddMultiFlyoutSnapshot = null;
+      closeDdMultiPropsFlyout();
+    });
+  }
+  var ddMultiFlyCancel = document.getElementById("gc-designer-dd-multi-props-flyout-cancel");
+  if (ddMultiFlyCancel) {
+    ddMultiFlyCancel.addEventListener("click", function () {
+      gcDesignerCatalogNotifyFlyoutCancel("dd-multi");
+      restoreDdSourceFs(fsMulti, ddMultiFlyoutSnapshot);
+      designerDdSyncCustomWrapForFs(fsMulti);
+      ddMulti._gcDdCachedRows = null;
+      loadDesignerDdFromCache(ddMulti, document.getElementById("gc-designer-dd-multi-load-status"), false);
+      ddMultiFlyoutSnapshot = null;
+      closeDdMultiPropsFlyout();
+    });
+  }
+
+  function gcOpenDesignerDropdownPropertiesFlyout(which) {
+    var w = String(which || "").toLowerCase();
+    if (w === "shared") openDdSharedPropsFlyout();
+    else if (w === "single") openDdSinglePropsFlyout();
+    else if (w === "multi") openDdMultiPropsFlyout();
+  }
+  window.gcOpenDesignerDropdownPropertiesFlyout = gcOpenDesignerDropdownPropertiesFlyout;
+
+  var ddCtlShared = document.querySelector('[data-gc-designer-control-id="dropdown-shared"]');
+  var ddCtlSingle = document.querySelector('[data-gc-designer-control-id="dropdown-single"]');
+  var ddCtlMulti = document.querySelector('[data-gc-designer-control-id="dropdown-multi"]');
+  if (ddCtlShared) {
+    ddCtlShared.gcOpenDropdownPropertiesFlyout = function () {
+      gcOpenDesignerDropdownPropertiesFlyout("shared");
+    };
+  }
+  if (ddCtlSingle) {
+    ddCtlSingle.gcOpenDropdownPropertiesFlyout = function () {
+      gcOpenDesignerDropdownPropertiesFlyout("single");
+    };
+  }
+  if (ddCtlMulti) {
+    ddCtlMulti.gcOpenDropdownPropertiesFlyout = function () {
+      gcOpenDesignerDropdownPropertiesFlyout("multi");
+    };
+  }
+
+  window.__gcDesignerControlsBridge = window.__gcDesignerControlsBridge || {};
+  window.__gcDesignerControlsBridge.text = {
+    snapshotPanel: snapshotTextPropsPanel,
+    restorePanel: restoreTextPropsPanel,
+    applyPanel: applyTextPanel,
+    validate: validateTextFields,
+  };
+  window.__gcDesignerControlsBridge.ddFieldRuntime = {
+    loadDesignerDdFromCache: loadDesignerDdFromCache,
+    wireSearchableDropdown: wireSearchableDropdown,
+    bindDesignerDdAutoLoad: bindDesignerDdAutoLoad,
+    designerDdSourceFs: designerDdSourceFs,
+    restoreDdSourceFs: restoreDdSourceFs,
+    loadMemberLookupFromCache: loadMemberLookupFromCache,
+    bindMemberLookupAutoReload: bindMemberLookupAutoReload,
+    restoreMemberLookupSourceFsCatalog: restoreMemberLookupSourceFsCatalog,
+    snapshotMemberLookupSourceFsFromFieldset: snapshotMemberLookupSourceFsFromFieldset,
+    memberLookupStatusElement: memberLookupStatusElement,
+  };
+
+  window.__gcDesignerControlsBridge.memberLookup = {
+    getRoot: function () {
+      return document.getElementById("gc-designer-member-lookup");
+    },
+    snapshotSource: function () {
+      var r = document.getElementById("gc-designer-member-lookup");
+      return snapshotMemberLookupSourceFs(designerDdSourceFs(r));
+    },
+    restoreSource: function (s) {
+      var r = document.getElementById("gc-designer-member-lookup");
+      restoreMemberLookupSourceFs(designerDdSourceFs(r), s);
+      if (r && s && s.multi != null) {
+        r.classList.toggle("gc-designer-dd--multi", !!s.multi);
+        var lst = r.querySelector(".gc-designer-dd__list");
+        if (lst) {
+          lst.classList.toggle("gc-designer-dd__list--multi", !!s.multi);
+          lst.setAttribute("aria-multiselectable", s.multi ? "true" : "false");
+        }
+      }
+    },
+    reload: function () {
+      var r = document.getElementById("gc-designer-member-lookup");
+      if (r) {
+        r._gcDdCachedRows = null;
+        loadMemberLookupFromCache(r, memberLookupStatusElement(r), false);
+      }
+    },
+    openPropertiesFlyout: gcOpenMemberLookupPropertiesFlyout,
+  };
+
+  window.__gcDesignerControlsBridge.dd = {
+    getShowSearchEl: function () {
+      return document.getElementById("gc-designer-dd-show-search");
+    },
+    snapshotSingleSource: function () {
+      return snapshotDdSourceFs(fsSingle);
+    },
+    snapshotMultiSource: function () {
+      return snapshotDdSourceFs(fsMulti);
+    },
+    restoreSingleSource: function (s) {
+      if (fsSingle) {
+        restoreDdSourceFs(fsSingle, s);
+        designerDdSyncCustomWrapForFs(fsSingle);
+      }
+    },
+    restoreMultiSource: function (s) {
+      if (fsMulti) {
+        restoreDdSourceFs(fsMulti, s);
+        designerDdSyncCustomWrapForFs(fsMulti);
+      }
+    },
+    reloadSingle: function () {
+      loadDesignerDdFromCache(ddSingle, document.getElementById("gc-designer-dd-single-load-status"), false);
+    },
+    reloadMulti: function () {
+      loadDesignerDdFromCache(ddMulti, document.getElementById("gc-designer-dd-multi-load-status"), false);
+    },
+    syncDdSearchVisibility: syncDdSearchVisibility,
+    getDdSingle: function () {
+      return ddSingle;
+    },
+    getDdMulti: function () {
+      return ddMulti;
+    },
+  };
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+
+  var TAG_POOL = [
+    "aws",
+    "azure",
+    "backup",
+    "corp",
+    "critical",
+    "core",
+    "datacenter",
+    "development",
+    "dmz",
+    "edge",
+    "guest",
+    "lab",
+    "monitoring",
+    "pci",
+    "production",
+    "reviewed",
+    "sofos-sync",
+    "staging",
+    "tenant-a",
+    "tenant-b",
+    "vpn",
+    "wifi",
+  ];
+
+  var TAG_COLOR_PALETTE = [
+    { bg: "#0d9488", fg: "#fff", border: "#0f766e", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#2563eb", fg: "#fff", border: "#1d4ed8", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#7c3aed", fg: "#fff", border: "#6d28d9", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#db2777", fg: "#fff", border: "#be185d", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#ea580c", fg: "#fff", border: "#c2410c", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#ca8a04", fg: "#111", border: "#a16207", rm: "rgba(0,0,0,0.55)" },
+    { bg: "#16a34a", fg: "#fff", border: "#15803d", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#0891b2", fg: "#fff", border: "#0e7490", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#4f46e5", fg: "#fff", border: "#4338ca", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#9333ea", fg: "#fff", border: "#7e22ce", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#e11d48", fg: "#fff", border: "#be123c", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#0f766e", fg: "#fff", border: "#115e59", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#0369a1", fg: "#fff", border: "#075985", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#a21caf", fg: "#fff", border: "#86198f", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#b45309", fg: "#fff", border: "#92400e", rm: "rgba(255,255,255,0.85)" },
+    { bg: "#047857", fg: "#fff", border: "#065f46", rm: "rgba(255,255,255,0.85)" },
+  ];
+
+  var designerTagEditors = [];
+
+  function fnv1aLower(s) {
+    var h = 2166136261;
+    var str = String(s || "").toLowerCase();
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function tagColorForLabel(label) {
+    var idx = fnv1aLower(label) % TAG_COLOR_PALETTE.length;
+    return TAG_COLOR_PALETTE[idx];
+  }
+
+  function designerTagsSavedSet() {
+    if (!globalThis.__gcDesignerTagsSaved) globalThis.__gcDesignerTagsSaved = new Set();
+    return globalThis.__gcDesignerTagsSaved;
+  }
+
+  function isTagSaved(label) {
+    return designerTagsSavedSet().has(String(label).toLowerCase());
+  }
+
+  function applyPillVisual(span, label) {
+    span.classList.remove("gc-designer-tags__pill--unsaved", "gc-designer-tags__pill--saved");
+    span.style.removeProperty("background-color");
+    span.style.removeProperty("color");
+    span.style.removeProperty("border-color");
+    span.style.removeProperty("--pill-bg");
+    span.style.removeProperty("--pill-fg");
+    span.style.removeProperty("--pill-border");
+    span.style.removeProperty("--pill-rm");
+    var rm = span.querySelector(".gc-designer-tags__pill-remove");
+    if (rm) {
+      rm.style.removeProperty("color");
+    }
+    if (isTagSaved(label)) {
+      var c = tagColorForLabel(label);
+      span.classList.add("gc-designer-tags__pill--saved");
+      span.style.setProperty("--pill-bg", c.bg);
+      span.style.setProperty("--pill-fg", c.fg);
+      span.style.setProperty("--pill-border", c.border);
+      span.style.setProperty("--pill-rm", c.rm);
+      if (rm) rm.style.color = c.rm;
+    } else {
+      span.classList.add("gc-designer-tags__pill--unsaved");
+    }
+  }
+
+  function saveAllDesignerTags() {
+    var s = designerTagsSavedSet();
+    designerTagEditors.forEach(function (ed) {
+      ed.getTags().forEach(function (t) {
+        s.add(String(t).toLowerCase());
+      });
+    });
+    designerTagEditors.forEach(function (ed) {
+      ed.rerender();
+    });
+  }
+
+  function designerTagsInit(root) {
+    if (!root || root.dataset.gcDesignerTagBound === "1") return;
+    root.dataset.gcDesignerTagBound = "1";
+
+    var hidden = root.querySelector(".gc-designer-tags__hidden");
+    var field = root.querySelector(".gc-designer-tags__field");
+    var chips = field ? field.querySelector(".gc-designer-tags__chips") : null;
+    var input = field ? field.querySelector(".gc-designer-tags__input") : null;
+    var suggest = root.querySelector(".gc-designer-tags__suggest");
+    var mirrorTyped = root.querySelector(".gc-designer-tags__typed-mirror");
+    var mirrorGhost = root.querySelector(".gc-designer-tags__ghost");
+    var inputShell = root.querySelector(".gc-designer-tags__input-shell");
+
+    if (!field || !chips || !input || !suggest) return;
+
+    if (!suggest.id) {
+      suggest.id = (root.id || "gc-designer-tags") + "-listbox";
+    }
+    input.setAttribute("aria-controls", suggest.id);
+
+    var state = {
+      tags: [],
+      highlightIdx: -1,
+      focused: false,
+    };
+
+    function tagSet() {
+      var o = Object.create(null);
+      state.tags.forEach(function (t) {
+        o[String(t).toLowerCase()] = true;
+      });
+      return o;
+    }
+
+    function syncHidden() {
+      if (hidden) hidden.value = JSON.stringify(state.tags);
+    }
+
+    function filterCandidates(q) {
+      var ql = (q || "").trim().toLowerCase();
+      var have = tagSet();
+      var out = TAG_POOL.filter(function (t) {
+        if (have[String(t).toLowerCase()]) return false;
+        if (!ql) return true;
+        return String(t).toLowerCase().indexOf(ql) !== -1;
+      });
+      out.sort(function (a, b) {
+        var al = String(a).toLowerCase();
+        var bl = String(b).toLowerCase();
+        var ap = ql && al.indexOf(ql) === 0 ? 0 : 1;
+        var bp = ql && bl.indexOf(ql) === 0 ? 0 : 1;
+        if (ap !== bp) return ap - bp;
+        return al.localeCompare(bl);
+      });
+      return out;
+    }
+
+    function getGhostSuffix(typed, candidates) {
+      var q = typed;
+      if (!q) return "";
+      if (!candidates.length) return "";
+      var first = candidates[0];
+      if (first.toLowerCase().indexOf(q.toLowerCase()) !== 0) return "";
+      return first.slice(q.length);
+    }
+
+    function updateMirrorAndSuggest() {
+      var typed = input.value;
+      var c = filterCandidates(typed);
+      var ghost = getGhostSuffix(typed, c);
+      if (mirrorTyped) mirrorTyped.textContent = typed;
+      if (mirrorGhost) mirrorGhost.textContent = ghost;
+
+      if (!state.focused) {
+        suggest.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        return;
+      }
+      if (!c.length) {
+        suggest.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        state.highlightIdx = -1;
+        return;
+      }
+      var max = 10;
+      var slice = c.slice(0, max);
+      if (state.highlightIdx < 0 || state.highlightIdx >= slice.length) state.highlightIdx = 0;
+      suggest.innerHTML = "";
+      slice.forEach(function (tag, idx) {
+        var li = document.createElement("li");
+        li.setAttribute("role", "presentation");
+        if (idx === state.highlightIdx) li.classList.add("is-active");
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "gc-designer-tags__suggest-btn";
+        btn.setAttribute("role", "option");
+        btn.textContent = tag;
+        btn.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+        });
+        btn.addEventListener("click", function () {
+          addTag(tag);
+        });
+        li.appendChild(btn);
+        suggest.appendChild(li);
+      });
+      suggest.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    }
+
+    function addTag(raw) {
+      var t = String(raw || "").trim();
+      if (!t) return;
+      var k = t.toLowerCase();
+      for (var i = 0; i < state.tags.length; i++) {
+        if (String(state.tags[i]).toLowerCase() === k) return;
+      }
+      state.tags.push(t);
+      input.value = "";
+      state.highlightIdx = -1;
+      syncHidden();
+      render();
+      updateMirrorAndSuggest();
+      try {
+        input.focus();
+      } catch (eF) {}
+    }
+
+    function removeTagIndex(i) {
+      if (i < 0 || i >= state.tags.length) return;
+      state.tags.splice(i, 1);
+      syncHidden();
+      render();
+      updateMirrorAndSuggest();
+    }
+
+    function createPillNode(label, indexInTags, forMeasure) {
+      var span = document.createElement("span");
+      span.className = "gc-designer-tags__pill";
+      span.setAttribute("data-tag", label);
+      var t = document.createElement("span");
+      t.className = "gc-designer-tags__pill-text";
+      t.textContent = label;
+      span.appendChild(t);
+      if (!forMeasure && indexInTags >= 0) {
+        var rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "gc-designer-tags__pill-remove";
+        rm.setAttribute("aria-label", "Remove " + label);
+        rm.innerHTML = "\u00d7";
+        rm.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+        });
+        rm.addEventListener("click", function (e) {
+          e.stopPropagation();
+          removeTagIndex(indexInTags);
+        });
+        span.appendChild(rm);
+      }
+      applyPillVisual(span, label);
+      return span;
+    }
+
+    function createOverflowNode(n) {
+      var span = document.createElement("span");
+      span.className = "gc-designer-tags__pill gc-designer-tags__pill--overflow";
+      span.setAttribute("aria-hidden", "true");
+      var t = document.createElement("span");
+      t.className = "gc-designer-tags__pill-text";
+      t.textContent = "+" + n;
+      span.appendChild(t);
+      return span;
+    }
+
+    var measureEl = null;
+    function ensureMeasure() {
+      if (measureEl) return measureEl;
+      measureEl = document.createElement("div");
+      measureEl.className = "gc-designer-tags__measure";
+      measureEl.setAttribute("aria-hidden", "true");
+      root.appendChild(measureEl);
+      return measureEl;
+    }
+
+    function measureRowWidth(tagsSlice, overflowCount) {
+      var m = ensureMeasure();
+      m.innerHTML = "";
+      for (var i = 0; i < tagsSlice.length; i++) {
+        m.appendChild(createPillNode(tagsSlice[i], -1, true));
+      }
+      if (overflowCount > 0) {
+        m.appendChild(createOverflowNode(overflowCount));
+      }
+      return m.scrollWidth;
+    }
+
+    function renderCollapsedChips() {
+      var tags = state.tags;
+      var avail = field.clientWidth - 16;
+      if (avail < 48) avail = 220;
+      chips.innerHTML = "";
+      var n = tags.length;
+      if (n === 0) return;
+      var k = n;
+      while (k > 0) {
+        var over = n - k;
+        var w = measureRowWidth(tags.slice(0, k), over);
+        if (w <= avail) break;
+        k--;
+      }
+      var over = n - k;
+      for (var i = 0; i < k; i++) {
+        chips.appendChild(createPillNode(tags[i], i, false));
+      }
+      if (over > 0) {
+        chips.appendChild(createOverflowNode(over));
+      }
+    }
+
+    function renderExpandedChips() {
+      chips.innerHTML = "";
+      state.tags.forEach(function (t, i) {
+        chips.appendChild(createPillNode(t, i, false));
+      });
+    }
+
+    function render() {
+      if (state.focused) {
+        root.classList.remove("is-collapsed");
+        renderExpandedChips();
+      } else {
+        root.classList.add("is-collapsed");
+        renderCollapsedChips();
+      }
+    }
+
+    var blurTimer = null;
+    function queueBlurCollapse() {
+      if (blurTimer) clearTimeout(blurTimer);
+      blurTimer = setTimeout(function () {
+        blurTimer = null;
+        state.focused = false;
+        suggest.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        render();
+      }, 130);
+    }
+
+    function cancelBlurCollapse() {
+      if (blurTimer) clearTimeout(blurTimer);
+      blurTimer = null;
+    }
+
+    field.addEventListener("mousedown", function (e) {
+      if (e.target.closest(".gc-designer-tags__pill-remove")) return;
+      if (!inputShell.contains(e.target)) {
+        e.preventDefault();
+        input.focus();
+      }
+    });
+
+    input.addEventListener("focus", function () {
+      cancelBlurCollapse();
+      state.focused = true;
+      render();
+      updateMirrorAndSuggest();
+    });
+    input.addEventListener("blur", function () {
+      queueBlurCollapse();
+    });
+    input.addEventListener("input", function () {
+      state.highlightIdx = -1;
+      updateMirrorAndSuggest();
+    });
+    input.addEventListener("keydown", function (e) {
+      var sl = suggest && !suggest.hidden;
+      var opts = suggest ? suggest.querySelectorAll(".gc-designer-tags__suggest-btn") : [];
+      if (e.key === "ArrowDown" && sl && opts.length) {
+        e.preventDefault();
+        state.highlightIdx = Math.min(state.highlightIdx + 1, opts.length - 1);
+        updateMirrorAndSuggest();
+        return;
+      }
+      if (e.key === "ArrowUp" && sl && opts.length) {
+        e.preventDefault();
+        state.highlightIdx = Math.max(state.highlightIdx - 1, 0);
+        updateMirrorAndSuggest();
+        return;
+      }
+      if (e.key === "Enter") {
+        var typed = input.value.trim();
+        var c = filterCandidates(typed);
+        if (sl && state.highlightIdx >= 0 && opts[state.highlightIdx]) {
+          e.preventDefault();
+          addTag(opts[state.highlightIdx].textContent);
+          return;
+        }
+        if (typed && c.length) {
+          e.preventDefault();
+          var exact = null;
+          for (var ci = 0; ci < c.length; ci++) {
+            if (String(c[ci]).toLowerCase() === typed.toLowerCase()) {
+              exact = c[ci];
+              break;
+            }
+          }
+          if (exact) addTag(exact);
+          else addTag(c[0]);
+          return;
+        }
+        if (typed) {
+          e.preventDefault();
+          addTag(typed);
+        }
+      }
+      if (e.key === "Escape") {
+        if (suggest && !suggest.hidden) {
+          e.preventDefault();
+          suggest.hidden = true;
+          input.setAttribute("aria-expanded", "false");
+          state.highlightIdx = -1;
+        }
+      }
+    });
+
+    window.addEventListener("resize", function () {
+      if (!state.focused) render();
+    });
+
+    if (typeof ResizeObserver !== "undefined") {
+      var ro = new ResizeObserver(function () {
+        if (!state.focused) render();
+      });
+      ro.observe(field);
+    }
+
+    var api = {
+      getTags: function () {
+        return state.tags.slice();
+      },
+      setTags: function (arr) {
+        state.tags = Array.isArray(arr) ? arr.map(function (x) { return String(x); }) : [];
+        syncHidden();
+        render();
+        updateMirrorAndSuggest();
+      },
+      rerender: function () {
+        render();
+        updateMirrorAndSuggest();
+      },
+    };
+    designerTagEditors.push(api);
+    root._gcDesignerTagApi = api;
+
+    render();
+    syncHidden();
+  }
+
+  designerTagsInit(document.getElementById("gc-designer-tag-editor"));
+  designerTagsInit(document.getElementById("gc-designer-tag-editor-b"));
+
+  var saveBtn = document.getElementById("gc-designer-tags-save");
+  if (saveBtn) saveBtn.addEventListener("click", saveAllDesignerTags);
+
+  window.__gcDesignerControlsBridge = window.__gcDesignerControlsBridge || {};
+  window.__gcDesignerControlsBridge.tags = {
+    getSavedLabels: function () {
+      return Array.from(designerTagsSavedSet());
+    },
+    initEditor: designerTagsInit,
+  };
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+
+  function parseJsonArg(x) {
+    if (x == null) return {};
+    if (typeof x === "string") {
+      try {
+        return JSON.parse(x);
+      } catch (e) {
+        return {};
+      }
+    }
+    return typeof x === "object" ? x : {};
+  }
+
+  function optionSelectorGroupFromLabelEl(el) {
+    var prev = el.previousElementSibling;
+    if (prev && prev.matches && prev.matches("[data-gc-option-selector]")) return prev;
+    var sample = el.closest(".gc-designer__sample");
+    if (sample) {
+      var g = sample.querySelector("[data-gc-option-selector]");
+      if (g) return g;
+    }
+    return null;
+  }
+
+  function designerParseSelectorItemsAttr(grp) {
+    if (window.gcOptionSelectorParseItemsAttr) return window.gcOptionSelectorParseItemsAttr(grp);
+    if (!grp) return null;
+    var raw = grp.getAttribute("data-gc-designer-selector-items");
+    if (!raw) return null;
+    try {
+      var j = JSON.parse(raw);
+      return Array.isArray(j) ? j.map(function (x) { return String(x); }) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function designerOptionSelectorRebuild(grp, items, opts) {
+    if (window.gcOptionSelectorRebuild) {
+      window.gcOptionSelectorRebuild(grp, items, opts);
+      return;
+    }
+    opts = opts || {};
+    var prevLabel = opts.preserveSelectedLabel;
+    if (prevLabel == null && grp) {
+      var cur = grp.querySelector(".gc-option-selector__btn.primary");
+      if (cur) prevLabel = cur.textContent.trim();
+    }
+    var labels = (Array.isArray(items) ? items : [])
+      .map(function (x) {
+        return String(x).trim();
+      })
+      .filter(function (s) {
+        return s !== "";
+      });
+    if (!labels.length) labels = ["On", "Off"];
+    grp.setAttribute("data-gc-designer-selector-items", JSON.stringify(labels));
+    grp.innerHTML = "";
+    labels.forEach(function (label) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn gc-option-selector__btn";
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = label;
+      grp.appendChild(btn);
+    });
+    var btns = grp.querySelectorAll(".gc-option-selector__btn");
+    var picked = false;
+    if (prevLabel) {
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].textContent.trim() === prevLabel) {
+          btns[i].classList.add("primary");
+          btns[i].setAttribute("aria-pressed", "true");
+          picked = true;
+          break;
+        }
+      }
+    }
+    if (!picked && btns[0]) {
+      btns[0].classList.add("primary");
+      btns[0].setAttribute("aria-pressed", "true");
+    }
+  }
+
+  function tagEditorRootFromControlEl(el) {
+    var prev = el.previousElementSibling;
+    if (!prev) return null;
+    var r = prev.querySelector && prev.querySelector(".gc-designer-tags[data-gc-designer-tag-editor]");
+    return r || null;
+  }
+
+  function designerDdGetSingleSelection(root) {
+    var tr = root && root.querySelector(".gc-designer-dd__trigger");
+    if (!tr) return { value: "", label: "" };
+    return {
+      value: tr.getAttribute("data-gc-dd-value") || "",
+      label: String(tr.textContent || "").trim(),
+    };
+  }
+
+  function designerDdSetSingleSelection(root, value) {
+    var list = root && root.querySelector(".gc-designer-dd__list");
+    var trigger = root && root.querySelector(".gc-designer-dd__trigger");
+    if (!trigger || !list) return;
+    var sv = value == null ? "" : String(value);
+    if (sv === "") {
+      trigger.textContent = "Choose…";
+      trigger.removeAttribute("data-gc-dd-value");
+      list.querySelectorAll("li[role='option']").forEach(function (li) {
+        li.setAttribute("aria-selected", "false");
+      });
+      return;
+    }
+    var opts = list.querySelectorAll("li[role='option']");
+    for (var i = 0; i < opts.length; i++) {
+      var li = opts[i];
+      if (li.getAttribute("data-value") === sv) {
+        var pl = li.getAttribute("data-gc-dd-primary") || li.textContent.trim();
+        trigger.textContent = pl;
+        trigger.setAttribute("data-gc-dd-value", sv);
+        list.querySelectorAll("li[role='option']").forEach(function (x) {
+          x.setAttribute("aria-selected", x === li ? "true" : "false");
+        });
+        return;
+      }
+    }
+  }
+
+  function designerDdGetMultiSelection(root) {
+    var out = [];
+    var list = root && root.querySelector(".gc-designer-dd__list");
+    if (!list) return out;
+    list.querySelectorAll("li[role='option']").forEach(function (li) {
+      var cb = li.querySelector("input[type='checkbox']");
+      if (cb && cb.checked) {
+        out.push({
+          value: li.getAttribute("data-value") || "",
+          label: li.getAttribute("data-gc-dd-primary") || "",
+        });
+      }
+    });
+    return out;
+  }
+
+  function designerDdSetMultiSelection(root, items) {
+    var list = root && root.querySelector(".gc-designer-dd__list");
+    if (!list) return;
+    var want = Object.create(null);
+    (Array.isArray(items) ? items : []).forEach(function (x) {
+      var v = typeof x === "string" ? x : x && x.value;
+      if (v != null && String(v) !== "") want[String(v)] = true;
+    });
+    list.querySelectorAll("li[role='option']").forEach(function (li) {
+      var v = li.getAttribute("data-value");
+      var cb = li.querySelector("input[type='checkbox']");
+      if (!cb) return;
+      cb.checked = !!want[String(v)];
+      li.setAttribute("aria-selected", cb.checked ? "true" : "false");
+    });
+    if (root._gcDdRefreshMultiLabel) root._gcDdRefreshMultiLabel();
+  }
+
+  function getPropsForControl(controlId, el) {
+    var B = window.__gcDesignerControlsBridge || {};
+    var out = { controlId: controlId };
+
+    if (controlId === "edit-flyout") {
+      var row = el.closest(".gc-designer__row, .gc-designer__sample");
+      var btn = row && row.querySelector("button[id]");
+      out.pattern = "edit-flyout";
+      out.configureButtonId = btn ? btn.id : null;
+      return out;
+    }
+
+    if (controlId === "ip-constraint") {
+      var ipB = B.ip;
+      if (!ipB) return out;
+      out.panel = ipB.snapshotConstraintPanel();
+      out.appliedIpv4Attributes = ipB.readAllGcIpAttrs(ipB.getIpv4Input());
+      out.appliedIpv6Attributes = ipB.readAllGcIpAttrs(ipB.getIpv6Input());
+      return out;
+    }
+
+    if (controlId === "ip-address") {
+      var ipA = B.ip;
+      if (!ipA) return out;
+      var famA = ipA.getIpFamily ? ipA.getIpFamily() : "IPv4";
+      out.IPFamily = famA;
+      var inpA = famA === "IPv6" ? ipA.getIpv6Input() : ipA.getIpv4Input();
+      out.value = inpA ? inpA.value : "";
+      out.appliedIpAttributes = ipA.readAllGcIpAttrs(inpA);
+      out.usesAppliedIpConstraints = inpA ? ipA.hasAppliedIpConstraints(inpA) : false;
+      out.effectiveConstraintOptions = inpA ? ipA.readOptsFromInput(inpA) : {};
+      return out;
+    }
+
+    if (controlId === "ip-list") {
+      var ipL = B.ip;
+      if (!ipL) return out;
+      var famL = ipL.getIpFamily ? ipL.getIpFamily() : "IPv4";
+      out.IPFamily = famL;
+      out.ipfamily = famL;
+      var inpL = famL === "IPv6" ? ipL.getIpv6Input() : ipL.getIpv4Input();
+      out.readonly = !!(inpL && inpL.readOnly);
+      out.value = inpL ? inpL.value : "";
+      out.appliedIpAttributes = ipL.readAllGcIpAttrs(inpL);
+      out.usesAppliedIpConstraints = inpL ? ipL.hasAppliedIpConstraints(inpL) : false;
+      out.effectiveConstraintOptions = inpL ? ipL.readOptsFromInput(inpL) : {};
+      return out;
+    }
+
+    if (controlId === "ip-ipv4" || controlId === "ip-ipv6") {
+      var ip2 = B.ip;
+      if (!ip2) return out;
+      var inp = controlId === "ip-ipv4" ? ip2.getIpv4Input() : ip2.getIpv6Input();
+      out.IPFamily = controlId === "ip-ipv6" ? "IPv6" : "IPv4";
+      out.value = inp ? inp.value : "";
+      out.appliedIpAttributes = ip2.readAllGcIpAttrs(inp);
+      out.usesAppliedIpConstraints = inp ? ip2.hasAppliedIpConstraints(inp) : false;
+      out.effectiveConstraintOptions = inp ? ip2.readOptsFromInput(inp) : {};
+      return out;
+    }
+
+    if (controlId === "text-config") {
+      var tB = B.text;
+      if (!tB) return out;
+      var p = tB.snapshotPanel();
+      out.minLengthSingle = p.min;
+      out.maxLengthSingle = p.maxS;
+      out.maxLengthMulti = p.maxM;
+      out.charset = p.charset;
+      return out;
+    }
+
+    if (controlId === "text-single") {
+      var sin = document.getElementById("gc-designer-text-single");
+      if (sin) {
+        out.value = sin.value;
+        out.minLength = sin.minLength;
+        out.maxLength = sin.maxLength;
+        out.charset = sin.getAttribute("data-gc-text-charset") || "";
+      }
+      return out;
+    }
+
+    if (controlId === "text-multiline") {
+      var mul = document.getElementById("gc-designer-text-multi");
+      if (mul) {
+        out.value = mul.value;
+        out.maxLength = mul.maxLength;
+      }
+      return out;
+    }
+
+    if (controlId === "toggle-onoff") {
+      var sw = document.getElementById("gc-designer-toggle-onoff");
+      if (sw) out.checked = sw.getAttribute("aria-checked") === "true";
+      return out;
+    }
+
+    if (controlId === "toggle-checkbox") {
+      var tcb = document.getElementById("gc-designer-toggle-checkbox");
+      if (tcb) out.checked = !!tcb.checked;
+      return out;
+    }
+
+    if (controlId === "selector") {
+      var grp = optionSelectorGroupFromLabelEl(el);
+      var itemsParsed = grp ? designerParseSelectorItemsAttr(grp) : null;
+      out.items = itemsParsed ? itemsParsed.slice() : [];
+      out.options = [];
+      if (grp) {
+        var selNative = grp.querySelector("select.gc-option-selector__native");
+        if (selNative) {
+          Array.prototype.forEach.call(selNative.options, function (opt) {
+            out.options.push({ label: opt.textContent.trim(), selected: opt.selected });
+          });
+        } else {
+          grp.querySelectorAll(".gc-option-selector__btn").forEach(function (b) {
+            out.options.push({ label: b.textContent.trim(), selected: b.getAttribute("aria-pressed") === "true" });
+          });
+        }
+      }
+      if (!out.items.length && grp) {
+        out.items = out.options.map(function (o) {
+          return o.label;
+        });
+      }
+      var sel = out.options.filter(function (o) {
+        return o.selected;
+      });
+      out.selectedLabel = sel.length ? sel[0].label : "";
+      return out;
+    }
+
+    if (controlId === "tag-editor") {
+      var troot = tagEditorRootFromControlEl(el);
+      var api = troot && troot._gcDesignerTagApi;
+      out.tags = api ? api.getTags() : [];
+      out.editorRootId = troot && troot.id ? troot.id : null;
+      return out;
+    }
+
+    if (controlId === "tag-save") {
+      var tagBr = B.tags;
+      out.savedCommittedTagLabels = tagBr && tagBr.getSavedLabels ? tagBr.getSavedLabels() : [];
+      return out;
+    }
+
+    if (controlId === "dropdown-shared") {
+      var sh = B.dd && B.dd.getShowSearchEl && B.dd.getShowSearchEl();
+      out.showSearchInPanels = !!(sh && sh.checked);
+      return out;
+    }
+
+    if (controlId === "member-lookup") {
+      var mlBr = B.memberLookup;
+      if (!mlBr || !mlBr.getRoot) return out;
+      var mroot = mlBr.getRoot();
+      out.source = mlBr.snapshotSource ? mlBr.snapshotSource() : null;
+      if (mroot && mroot.classList.contains("gc-designer-dd--multi")) {
+        out.selection = designerDdGetMultiSelection(mroot);
+      } else {
+        out.selection = designerDdGetSingleSelection(mroot);
+      }
+      return out;
+    }
+
+    if (controlId === "dropdown-single") {
+      var dB = B.dd;
+      if (!dB) return out;
+      out.source = dB.snapshotSingleSource ? dB.snapshotSingleSource() : null;
+      out.selection = designerDdGetSingleSelection(dB.getDdSingle && dB.getDdSingle());
+      return out;
+    }
+
+    if (controlId === "dropdown-multi") {
+      var dB2 = B.dd;
+      if (!dB2) return out;
+      out.source = dB2.snapshotMultiSource ? dB2.snapshotMultiSource() : null;
+      out.selection = designerDdGetMultiSelection(dB2.getDdMulti && dB2.getDdMulti());
+      return out;
+    }
+
+    return out;
+  }
+
+  function setPropsForControl(controlId, el, raw) {
+    var j = parseJsonArg(raw);
+    var B = window.__gcDesignerControlsBridge || {};
+
+    if (controlId === "edit-flyout" || controlId === "tag-save") {
+      return true;
+    }
+
+    if (controlId === "ip-constraint") {
+      var ipB = B.ip;
+      if (!ipB) return false;
+      if (j.panel) ipB.restoreConstraintPanel(j.panel);
+      if (j.panel && j.applyConstraintPanelToInputs !== false) ipB.applyConstraintPanelToInputs();
+      if (j.appliedIpv4Attributes) ipB.writeAllGcIpAttrs(ipB.getIpv4Input(), j.appliedIpv4Attributes);
+      if (j.appliedIpv6Attributes) ipB.writeAllGcIpAttrs(ipB.getIpv6Input(), j.appliedIpv6Attributes);
+      ipB.refreshHints();
+      var i4 = ipB.getIpv4Input();
+      var i6 = ipB.getIpv6Input();
+      if (i4) i4.dispatchEvent(new Event("blur"));
+      if (i6) i6.dispatchEvent(new Event("blur"));
+      return true;
+    }
+
+    if (controlId === "ip-address") {
+      var ipA = B.ip;
+      if (!ipA) return false;
+      if (j.IPFamily != null && ipA.setIpFamily) ipA.setIpFamily(j.IPFamily);
+      else if (ipA.syncFamilyPanels) ipA.syncFamilyPanels();
+      var famA = ipA.getIpFamily ? ipA.getIpFamily() : "IPv4";
+      var inpA = famA === "IPv6" ? ipA.getIpv6Input() : ipA.getIpv4Input();
+      if (!inpA) return false;
+      if (j.clearAppliedIpAttributes) ipA.clearAllGcIpAttrs(inpA);
+      else if (j.appliedIpAttributes) ipA.writeAllGcIpAttrs(inpA, j.appliedIpAttributes);
+      if (j.value != null) inpA.value = String(j.value);
+      ipA.refreshHints();
+      inpA.dispatchEvent(new Event("blur"));
+      return true;
+    }
+
+    if (controlId === "ip-list") {
+      var ipList = B.ip;
+      if (!ipList) return false;
+      var nextFam = j.IPFamily != null ? j.IPFamily : j.ipfamily;
+      if (nextFam != null && ipList.setIpFamily) ipList.setIpFamily(nextFam);
+      else if (ipList.syncFamilyPanels) ipList.syncFamilyPanels();
+      var famList = ipList.getIpFamily ? ipList.getIpFamily() : "IPv4";
+      var inpList = famList === "IPv6" ? ipList.getIpv6Input() : ipList.getIpv4Input();
+      if (!inpList) return false;
+      if (j.clearAppliedIpAttributes) ipList.clearAllGcIpAttrs(inpList);
+      else if (j.appliedIpAttributes) ipList.writeAllGcIpAttrs(inpList, j.appliedIpAttributes);
+      if (j.readonly != null) inpList.readOnly = !!j.readonly;
+      if (j.value != null) inpList.value = String(j.value);
+      ipList.refreshHints();
+      inpList.dispatchEvent(new Event("blur"));
+      return true;
+    }
+
+    if (controlId === "ip-ipv4" || controlId === "ip-ipv6") {
+      var ip2 = B.ip;
+      if (!ip2) return false;
+      var inp = controlId === "ip-ipv4" ? ip2.getIpv4Input() : ip2.getIpv6Input();
+      if (!inp) return false;
+      if (j.clearAppliedIpAttributes) ip2.clearAllGcIpAttrs(inp);
+      else if (j.appliedIpAttributes) ip2.writeAllGcIpAttrs(inp, j.appliedIpAttributes);
+      if (j.value != null) inp.value = String(j.value);
+      ip2.refreshHints();
+      inp.dispatchEvent(new Event("blur"));
+      return true;
+    }
+
+    if (controlId === "text-config") {
+      var tB = B.text;
+      if (!tB) return false;
+      var cur = tB.snapshotPanel();
+      tB.restorePanel({
+        min: j.minLengthSingle != null ? String(j.minLengthSingle) : cur.min,
+        maxS: j.maxLengthSingle != null ? String(j.maxLengthSingle) : cur.maxS,
+        maxM: j.maxLengthMulti != null ? String(j.maxLengthMulti) : cur.maxM,
+        charset: j.charset != null ? String(j.charset) : cur.charset,
+      });
+      tB.applyPanel();
+      tB.validate();
+      return true;
+    }
+
+    if (controlId === "text-single") {
+      var sin = document.getElementById("gc-designer-text-single");
+      if (!sin) return false;
+      if (j.value != null) sin.value = String(j.value);
+      if (j.minLength != null) sin.minLength = Math.max(0, parseInt(j.minLength, 10) || 0);
+      if (j.maxLength != null) sin.maxLength = Math.max(1, parseInt(j.maxLength, 10) || 1);
+      if (j.charset != null) sin.setAttribute("data-gc-text-charset", String(j.charset));
+      B.text && B.text.validate && B.text.validate();
+      return true;
+    }
+
+    if (controlId === "text-multiline") {
+      var mul = document.getElementById("gc-designer-text-multi");
+      if (!mul) return false;
+      if (j.value != null) mul.value = String(j.value);
+      if (j.maxLength != null) mul.maxLength = Math.max(1, parseInt(j.maxLength, 10) || 1);
+      B.text && B.text.validate && B.text.validate();
+      return true;
+    }
+
+    if (controlId === "toggle-onoff") {
+      var sw2 = document.getElementById("gc-designer-toggle-onoff");
+      var st = document.getElementById("gc-designer-toggle-onoff-state");
+      if (!sw2) return false;
+      if (j.checked != null) {
+        var on = !!j.checked;
+        sw2.classList.toggle("gc-table-toggle--on", on);
+        sw2.setAttribute("aria-checked", on ? "true" : "false");
+        if (st) st.textContent = on ? "On" : "Off";
+      }
+      return true;
+    }
+
+    if (controlId === "toggle-checkbox") {
+      var tcb2 = document.getElementById("gc-designer-toggle-checkbox");
+      if (!tcb2) return false;
+      if (j.checked != null) tcb2.checked = !!j.checked;
+      return true;
+    }
+
+    if (controlId === "selector") {
+      var grp = optionSelectorGroupFromLabelEl(el);
+      if (!grp) return false;
+      var wantLabel =
+        j.selectedLabel != null
+          ? String(j.selectedLabel).trim()
+          : j.label != null
+            ? String(j.label).trim()
+            : "";
+      var idx = j.selectedIndex != null ? parseInt(j.selectedIndex, 10) : NaN;
+      if (Array.isArray(j.items)) {
+        designerOptionSelectorRebuild(grp, j.items, {});
+        if (window.gcOptionSelectorSetSelection) {
+          window.gcOptionSelectorSetSelection(grp, wantLabel, idx);
+        }
+        return true;
+      }
+      if (window.gcOptionSelectorSetSelection) {
+        window.gcOptionSelectorSetSelection(grp, wantLabel, idx);
+        return true;
+      }
+      return false;
+    }
+
+    if (controlId === "tag-editor") {
+      var troot = tagEditorRootFromControlEl(el);
+      var api = troot && troot._gcDesignerTagApi;
+      if (!api || !api.setTags) return false;
+      if (Array.isArray(j.tags)) api.setTags(j.tags);
+      return true;
+    }
+
+    if (controlId === "dropdown-shared") {
+      var sh = B.dd && B.dd.getShowSearchEl && B.dd.getShowSearchEl();
+      if (!sh) return false;
+      if (j.showSearchInPanels != null) sh.checked = !!j.showSearchInPanels;
+      B.dd.syncDdSearchVisibility && B.dd.syncDdSearchVisibility();
+      return true;
+    }
+
+    if (controlId === "member-lookup") {
+      var mlBr2 = B.memberLookup;
+      if (!mlBr2) return false;
+      if (j.source) {
+        mlBr2.restoreSource(j.source);
+        mlBr2.reload();
+      }
+      var mroot2 = mlBr2.getRoot();
+      if (mroot2 && j.selection != null) {
+        if (mroot2.classList.contains("gc-designer-dd--multi")) {
+          designerDdSetMultiSelection(mroot2, j.selection);
+        } else {
+          var svMl = j.selection && j.selection.value != null ? j.selection.value : j.selectedValue;
+          designerDdSetSingleSelection(mroot2, svMl);
+        }
+      }
+      return true;
+    }
+
+    if (controlId === "dropdown-single") {
+      var dB = B.dd;
+      if (!dB) return false;
+      if (j.source) {
+        dB.restoreSingleSource(j.source);
+        dB.reloadSingle();
+      }
+      if (j.selection && j.selection.value != null) {
+        designerDdSetSingleSelection(dB.getDdSingle(), j.selection.value);
+      } else if (j.selectedValue != null) {
+        designerDdSetSingleSelection(dB.getDdSingle(), j.selectedValue);
+      }
+      return true;
+    }
+
+    if (controlId === "dropdown-multi") {
+      var dB2 = B.dd;
+      if (!dB2) return false;
+      if (j.source) {
+        dB2.restoreMultiSource(j.source);
+        dB2.reloadMulti();
+      }
+      if (j.selection != null) designerDdSetMultiSelection(dB2.getDdMulti(), j.selection);
+      return true;
+    }
+
+    return false;
+  }
+
+  document.querySelectorAll("[data-gc-designer-control-id]").forEach(function (el) {
+    el.gcGetProperties = function () {
+      var cid = el.getAttribute("data-gc-designer-control-id") || "";
+      return getPropsForControl(cid, el);
+    };
+    el.gcSetProperties = function (json) {
+      var cid = el.getAttribute("data-gc-designer-control-id") || "";
+      return setPropsForControl(cid, el, json);
+    };
+  });
+
+  function gcDesignerControlsResolveDemoNode(controlId, el) {
+    if (el) return el;
+    var cid = String(controlId || "").trim();
+    if (cid === "ip-ipv4" || cid === "ip-ipv6" || cid === "ip-list") {
+      return document.querySelector('[data-gc-designer-control-id="ip-address"]');
+    }
+    return document.querySelector('[data-gc-designer-control-id="' + cid.replace(/"/g, "") + '"]');
+  }
+
+  window.gcDesignerControlsGetPropertiesFor = function (controlId, el) {
+    var node = gcDesignerControlsResolveDemoNode(controlId, el);
+    if (!node) return null;
+    return getPropsForControl(controlId, node);
+  };
+
+  window.gcDesignerControlsSetPropertiesFor = function (controlId, json, el) {
+    var node = gcDesignerControlsResolveDemoNode(controlId, el);
+    if (!node) return false;
+    return setPropsForControl(controlId, node, json);
+  };
+
+  window.__gcDesignerControlsBridge.catalogFieldUi = {
+    selectorRebuild: designerOptionSelectorRebuild,
+    ddSetSingleSelection: designerDdSetSingleSelection,
+    ddSetMultiSelection: designerDdSetMultiSelection,
+  };
+})();
+</script>

@@ -10,7 +10,7 @@ Console with ANSI-colored output when the child emits escape sequences (``FORCE_
 Runs in the repository root context. **Native** mode stops listeners on the configured
 HTTP/HTTPS ports (matching scripts/restart-dev.ps1), then launches ``uv run python main.py``
 (or ``python main.py`` when ``uv`` is unavailable). **Docker** mode: **Start** runs ``docker compose up -d`` (no image build). **Restart** runs
-``docker compose restart`` on the service. Split-button dropdowns offer ``build --no-cache`` then ``up --force-recreate`` (on Windows, native ``tk.Menu`` / ``tk_popup``; elsewhere, the same card panel as the app menu), and
+``docker compose restart`` on the service. Split carets open checked menus (plain **Start** / **Restart** plus rebuild options); the main face runs the selected mode (Windows: native ``tk.Menu`` / ``tk_popup``; elsewhere: card panel like the app menu), including
 a full rebuild (``build --no-cache`` then ``up --force-recreate --no-deps``); the console shows ``docker compose logs -f`` output.
 
 Install launcher extras: ``uv sync --group tray``
@@ -32,6 +32,7 @@ from __future__ import annotations
 import collections
 import ctypes
 import dataclasses
+import io
 import json
 import math
 import os
@@ -41,13 +42,15 @@ import re
 import secrets
 import shlex
 import shutil
+import struct
 import subprocess
 import sys
 import threading
 import time
+import wave
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 # --- repo on path (for app.config port helpers) ---
 def _resolve_repo_root() -> Path:
@@ -110,21 +113,36 @@ _SPLIT_DROPDOWN_MIN_WIDTH = 252
 _SPLIT_DROPDOWN_MIN_HEIGHT = 72
 _SPLIT_DROPDOWN_GAP_BELOW_ANCHOR_PX = 4
 
-_BRAND_ICO_NAME = "ground_control_launcher.ico"
+# Dashboard Start / Restart split: main button runs the checked mode; caret opens radio-style menu.
+_SPLIT_MODE_PLAIN = "plain"
+_SPLIT_MODE_REBUILD = "rebuild"
+_SPLIT_MODE_FULL = "full"
+_LABEL_MENU_START = "Start"
+_LABEL_MENU_START_BUILD = "Start + Build"
+_LABEL_MENU_RESTART = "Restart"
+_LABEL_MENU_RESTART_REBUILD = "Restart + rebuild"
+_LABEL_MENU_FULL_REBUILD = "Full rebuild (DESTRUCTIVE)"
+_LABEL_BTN_FULL_REBUILD = "Full rebuild"
+
+_BRAND_ICO_FALLBACK = Path("assets") / "ground_control_launcher.ico"
+_BRAND_FAVICON_ICO = Path("static") / "favicon.ico"
 
 
 def _brand_icon_path() -> Path | None:
-    """Login-art launcher icon: ``assets/…`` beside the repo, or bundled under PyInstaller."""
-    rel = Path("assets") / _BRAND_ICO_NAME
+    """Web favicon art for tray / Tk title bar, or bundled under PyInstaller; else assets fallback."""
+    candidates = (_BRAND_FAVICON_ICO, _BRAND_ICO_FALLBACK)
     if getattr(sys, "frozen", False):
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
-            bundled = Path(meipass) / rel
-            if bundled.is_file():
-                return bundled
-    rooted = _REPO_ROOT / rel
-    if rooted.is_file():
-        return rooted
+            base = Path(meipass)
+            for rel in candidates:
+                bundled = base / rel
+                if bundled.is_file():
+                    return bundled
+    for rel in candidates:
+        rooted = _REPO_ROOT / rel
+        if rooted.is_file():
+            return rooted
     return None
 
 
@@ -786,6 +804,92 @@ def _subprocess_no_window_kw() -> dict[str, int]:
         return {}
     cf = _windows_subprocess_creationflags()
     return {"creationflags": cf} if cf else {}
+
+
+def _synthesize_running_chime_wav() -> bytes:
+    """Short pleasant two-tone chime (major third) as mono 16-bit WAV bytes."""
+    sample_rate = 22050
+
+    def tone_samples(freq: float, duration_s: float) -> list[int]:
+        n = max(1, int(sample_rate * duration_s))
+        fade = max(1, min(n // 4, int(sample_rate * 0.025)))
+        out: list[int] = []
+        for i in range(n):
+            env = 1.0
+            if i < fade:
+                env = i / fade
+            elif i >= n - fade:
+                env = (n - 1 - i) / fade
+            v = int(32767 * 0.2 * env * math.sin(2 * math.pi * freq * (i / sample_rate)))
+            if v > 32767:
+                v = 32767
+            elif v < -32768:
+                v = -32768
+            out.append(v)
+        return out
+
+    gap = [0] * int(sample_rate * 0.1)
+    pcm = tone_samples(523.25, 0.18) + gap + tone_samples(659.25, 0.22)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(b"".join(struct.pack("<h", s) for s in pcm))
+    return buf.getvalue()
+
+
+def _play_running_chime_wav(wav_bytes: bytes) -> None:
+    if not wav_bytes:
+        return
+    if sys.platform == "win32":
+        import winsound
+
+        winsound.PlaySound(wav_bytes, winsound.SND_MEMORY | winsound.SND_ASYNC)
+        return
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+        tf.write(wav_bytes)
+        path = tf.name
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(
+                ["afplay", path],
+                check=False,
+                capture_output=True,
+                timeout=15,
+                **_subprocess_no_window_kw(),
+            )
+            return
+        for cmd in (["paplay", path], ["aplay", "-q", path]):
+            try:
+                r = subprocess.run(
+                    cmd,
+                    check=False,
+                    capture_output=True,
+                    timeout=15,
+                    **_subprocess_no_window_kw(),
+                )
+            except OSError:
+                continue
+            if r.returncode == 0:
+                break
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def _play_running_chime_async() -> None:
+    def _run() -> None:
+        try:
+            _play_running_chime_wav(_synthesize_running_chime_wav())
+        except Exception:
+            pass
+
+    threading.Thread(target=_run, name="gc-running-chime", daemon=True).start()
 
 
 def _format_argv_for_console(argv: Sequence[str]) -> str:
@@ -1638,6 +1742,7 @@ class GcTrayApp:
         self._status_anim_job: str | None = None
         self._status_anim_frame: int = 0
         self._status_photo: Any = None
+        self._last_status_key_for_chime: str | None = None
         self._run_mode_var: Any = None
         self._autostart_var: Any = None
         self._settings_run_fr: Any = None
@@ -1675,6 +1780,8 @@ class GcTrayApp:
         self._mb_start_split: Any = None
         self._frm_restart_split: Any = None
         self._mb_restart_split: Any = None
+        self._start_split_mode_var: Any = None
+        self._restart_split_mode_var: Any = None
         self._split_tools_popup: Any = None
         self._split_tools_anchor: Any = None
         # Windows: native ``Menu.tk_popup`` for split carets (borderless ``Toplevel`` is unreliable).
@@ -2194,6 +2301,12 @@ class GcTrayApp:
         lab.configure(text=f"Uptime: {_format_uptime_duration(elapsed)}")
 
     def _update_status_indicator(self) -> None:
+        state_key, title = self._status_tuple()
+        prev = self._last_status_key_for_chime
+        if state_key == "running" and prev is not None and prev != "running":
+            _play_running_chime_async()
+        self._last_status_key_for_chime = state_key
+
         cnv = self._status_canvas
         lab = self._status_label
         if cnv is None or lab is None:
@@ -2206,7 +2319,6 @@ class GcTrayApp:
         except self._tk.TclError:
             self._update_status_bar()
             return
-        state_key, title = self._status_tuple()
         lab.configure(text=title)
         if state_key in ("starting", "stopping"):
             self._ensure_status_animation_running()
@@ -2262,6 +2374,164 @@ class GcTrayApp:
             return False
         return not self._docker_container_running(force=True)
 
+    def _ensure_split_mode_vars(self) -> None:
+        if self._start_split_mode_var is not None:
+            return
+        self._start_split_mode_var = self._tk.StringVar(master=self._root, value=_SPLIT_MODE_PLAIN)
+        self._restart_split_mode_var = self._tk.StringVar(master=self._root, value=_SPLIT_MODE_PLAIN)
+
+    def _clamp_start_split_mode_if_stale(self) -> None:
+        """Docker start+rebuild / full modes only apply when the service container is stopped."""
+        self._ensure_split_mode_vars()
+        if self._run_mode != "docker":
+            self._start_split_mode_var.set(_SPLIT_MODE_PLAIN)
+            self._restart_split_mode_var.set(_SPLIT_MODE_PLAIN)
+            return
+        if self._docker_container_running(force=True):
+            if self._start_split_mode_var.get() in (_SPLIT_MODE_REBUILD, _SPLIT_MODE_FULL):
+                self._start_split_mode_var.set(_SPLIT_MODE_PLAIN)
+
+    def _prepare_split_dropdown_before_open(self) -> None:
+        self._clamp_start_split_mode_if_stale()
+        self._apply_start_restart_button_faces()
+
+    def _start_split_row_enabled(self, key: str) -> bool:
+        if self._run_mode != "docker":
+            return key == _SPLIT_MODE_PLAIN
+        if key == _SPLIT_MODE_PLAIN:
+            return self._can_start()
+        return self._can_start_rebuild_docker()
+
+    def _restart_split_row_enabled(self, key: str) -> bool:
+        if self._run_mode != "docker":
+            return key == _SPLIT_MODE_PLAIN
+        if key == _SPLIT_MODE_PLAIN:
+            return self._can_restart()
+        return self._can_rebuild_docker()
+
+    def _can_invoke_selected_start(self) -> bool:
+        self._ensure_split_mode_vars()
+        v = self._start_split_mode_var.get()
+        if self._run_mode != "docker":
+            return v == _SPLIT_MODE_PLAIN and self._can_start()
+        if v == _SPLIT_MODE_PLAIN:
+            return self._can_start()
+        if v in (_SPLIT_MODE_REBUILD, _SPLIT_MODE_FULL):
+            return self._can_start_rebuild_docker()
+        return False
+
+    def _can_invoke_selected_restart(self) -> bool:
+        self._ensure_split_mode_vars()
+        v = self._restart_split_mode_var.get()
+        if self._run_mode != "docker":
+            return v == _SPLIT_MODE_PLAIN and self._can_restart()
+        if v == _SPLIT_MODE_PLAIN:
+            return self._can_restart()
+        if v in (_SPLIT_MODE_REBUILD, _SPLIT_MODE_FULL):
+            return self._can_rebuild_docker()
+        return False
+
+    def _invoke_start_for_current_mode(self) -> None:
+        self._ensure_split_mode_vars()
+        v = self._start_split_mode_var.get()
+        if v == _SPLIT_MODE_PLAIN:
+            self.start_gc()
+        elif v == _SPLIT_MODE_REBUILD:
+            self.docker_start_rebuild_gc()
+        elif v == _SPLIT_MODE_FULL:
+            self.docker_full_rebuild_gc(require_container_stopped=True)
+
+    def _invoke_restart_for_current_mode(self) -> None:
+        self._ensure_split_mode_vars()
+        v = self._restart_split_mode_var.get()
+        if v == _SPLIT_MODE_PLAIN:
+            self.restart_gc()
+        elif v == _SPLIT_MODE_REBUILD:
+            self.docker_rebuild_gc()
+        elif v == _SPLIT_MODE_FULL:
+            self.docker_full_rebuild_gc(require_container_stopped=False)
+
+    def _invoke_selected_start(self) -> None:
+        self._invoke_start_for_current_mode()
+
+    def _invoke_selected_restart(self) -> None:
+        self._invoke_restart_for_current_mode()
+
+    def _apply_start_restart_button_faces(self) -> None:
+        self._ensure_split_mode_vars()
+        sv = self._start_split_mode_var.get()
+        rv = self._restart_split_mode_var.get()
+        btn_s = self._btn_start
+        if btn_s is not None:
+            try:
+                if sv == _SPLIT_MODE_PLAIN:
+                    btn_s.configure(text=_LABEL_MENU_START, image=self._photo_btn_start)
+                elif sv == _SPLIT_MODE_REBUILD:
+                    btn_s.configure(text=_LABEL_MENU_START_BUILD, image=self._photo_btn_start_rebuild)
+                else:
+                    btn_s.configure(text=_LABEL_BTN_FULL_REBUILD, image=self._photo_btn_rebuild)
+            except self._tk.TclError:
+                pass
+        btn_r = self._btn_restart
+        if btn_r is not None:
+            try:
+                if rv == _SPLIT_MODE_PLAIN:
+                    btn_r.configure(text=_LABEL_MENU_RESTART, image=self._photo_btn_restart)
+                elif rv == _SPLIT_MODE_REBUILD:
+                    btn_r.configure(text=_LABEL_MENU_RESTART_REBUILD, image=self._photo_btn_rebuild)
+                else:
+                    btn_r.configure(text=_LABEL_BTN_FULL_REBUILD, image=self._photo_btn_rebuild)
+            except self._tk.TclError:
+                pass
+
+    def _start_primary_tooltip_text(self) -> str:
+        self._ensure_split_mode_vars()
+        v = self._start_split_mode_var.get()
+        if v == _SPLIT_MODE_PLAIN:
+            return "Start Ground Control"
+        if v == _SPLIT_MODE_REBUILD:
+            return "Docker: build --no-cache, then up --force-recreate (container stopped)"
+        return "Docker: full rebuild — build --no-cache, then up --force-recreate --no-deps"
+
+    def _restart_primary_tooltip_text(self) -> str:
+        self._ensure_split_mode_vars()
+        v = self._restart_split_mode_var.get()
+        if v == _SPLIT_MODE_PLAIN:
+            return _TOOLTIP_RESTART
+        if v == _SPLIT_MODE_REBUILD:
+            return "Docker: build --no-cache, then up --force-recreate"
+        return "Docker: full rebuild — build --no-cache, then up --force-recreate --no-deps"
+
+    def _on_win32_start_split_pick(self) -> None:
+        self._apply_start_restart_button_faces()
+        if self._can_invoke_selected_start():
+            self._invoke_start_for_current_mode()
+
+    def _on_win32_restart_split_pick(self) -> None:
+        self._apply_start_restart_button_faces()
+        if self._can_invoke_selected_restart():
+            self._invoke_restart_for_current_mode()
+
+    def _styled_pick_start_mode(self, value: str, enabled: bool) -> None:
+        if not enabled:
+            return
+        self._ensure_split_mode_vars()
+        self._start_split_mode_var.set(value)
+        self._close_split_tools_popup()
+        self._apply_start_restart_button_faces()
+        if self._can_invoke_selected_start():
+            self._invoke_start_for_current_mode()
+
+    def _styled_pick_restart_mode(self, value: str, enabled: bool) -> None:
+        if not enabled:
+            return
+        self._ensure_split_mode_vars()
+        self._restart_split_mode_var.set(value)
+        self._close_split_tools_popup()
+        self._apply_start_restart_button_faces()
+        if self._can_invoke_selected_restart():
+            self._invoke_restart_for_current_mode()
+
     def _build_win32_split_menus(self) -> None:
         """``tk.Menu`` + ``tk_popup`` for Start/Restart carets (Windows only).
 
@@ -2271,51 +2541,96 @@ class GcTrayApp:
         """
         tk = self._tk
         mroot = self._root
+        self._ensure_split_mode_vars()
+        v0 = self._start_split_mode_var
+        v1 = self._restart_split_mode_var
         self._menu_start_split_win = tk.Menu(mroot, tearoff=0)
-        self._menu_start_split_win.add_command(
-            label="Start + Build",
+        self._menu_start_split_win.add_radiobutton(
+            label=_LABEL_MENU_START,
+            image=self._photo_btn_start,
+            compound=tk.LEFT,
+            variable=v0,
+            value=_SPLIT_MODE_PLAIN,
+            command=self._on_win32_start_split_pick,
+        )
+        self._menu_start_split_win.add_radiobutton(
+            label=_LABEL_MENU_START_BUILD,
             image=self._photo_btn_start_rebuild,
             compound=tk.LEFT,
-            command=self.docker_start_rebuild_gc,
+            variable=v0,
+            value=_SPLIT_MODE_REBUILD,
+            command=self._on_win32_start_split_pick,
         )
-        self._menu_start_split_win.add_command(
-            label="Full rebuild (DESTRUCTIVE)",
+        self._menu_start_split_win.add_radiobutton(
+            label=_LABEL_MENU_FULL_REBUILD,
             image=self._photo_btn_rebuild,
             compound=tk.LEFT,
-            command=lambda: self.docker_full_rebuild_gc(require_container_stopped=True),
+            variable=v0,
+            value=_SPLIT_MODE_FULL,
+            command=self._on_win32_start_split_pick,
         )
         self._menu_restart_split_win = tk.Menu(mroot, tearoff=0)
-        self._menu_restart_split_win.add_command(
-            label="Restart + rebuild",
-            image=self._photo_btn_rebuild,
+        self._menu_restart_split_win.add_radiobutton(
+            label=_LABEL_MENU_RESTART,
+            image=self._photo_btn_restart,
             compound=tk.LEFT,
-            command=self.docker_rebuild_gc,
+            variable=v1,
+            value=_SPLIT_MODE_PLAIN,
+            command=self._on_win32_restart_split_pick,
         )
-        self._menu_restart_split_win.add_command(
-            label="Full rebuild (DESTRUCTIVE)",
+        self._menu_restart_split_win.add_radiobutton(
+            label=_LABEL_MENU_RESTART_REBUILD,
             image=self._photo_btn_rebuild,
             compound=tk.LEFT,
-            command=lambda: self.docker_full_rebuild_gc(require_container_stopped=False),
+            variable=v1,
+            value=_SPLIT_MODE_REBUILD,
+            command=self._on_win32_restart_split_pick,
+        )
+        self._menu_restart_split_win.add_radiobutton(
+            label=_LABEL_MENU_FULL_REBUILD,
+            image=self._photo_btn_rebuild,
+            compound=tk.LEFT,
+            variable=v1,
+            value=_SPLIT_MODE_FULL,
+            command=self._on_win32_restart_split_pick,
         )
         self._sync_win32_split_menus()
 
     def _sync_win32_split_menus(self) -> None:
-        """Enable/disable Windows native split menus to match Docker availability."""
+        """Enable/disable Windows split menu rows (native + radio selection)."""
         tk = self._tk
         m0 = self._menu_start_split_win
         if m0 is not None:
-            st0 = tk.NORMAL if self._can_start_rebuild_docker() else tk.DISABLED
             try:
-                m0.entryconfigure(0, state=st0)
-                m0.entryconfigure(1, state=st0)
+                m0.entryconfigure(
+                    0,
+                    state=(tk.NORMAL if self._start_split_row_enabled(_SPLIT_MODE_PLAIN) else tk.DISABLED),
+                )
+                m0.entryconfigure(
+                    1,
+                    state=(tk.NORMAL if self._start_split_row_enabled(_SPLIT_MODE_REBUILD) else tk.DISABLED),
+                )
+                m0.entryconfigure(
+                    2,
+                    state=(tk.NORMAL if self._start_split_row_enabled(_SPLIT_MODE_FULL) else tk.DISABLED),
+                )
             except self._tk.TclError:
                 pass
         m1 = self._menu_restart_split_win
         if m1 is not None:
-            st1 = tk.NORMAL if self._can_rebuild_docker() else tk.DISABLED
             try:
-                m1.entryconfigure(0, state=st1)
-                m1.entryconfigure(1, state=st1)
+                m1.entryconfigure(
+                    0,
+                    state=(tk.NORMAL if self._restart_split_row_enabled(_SPLIT_MODE_PLAIN) else tk.DISABLED),
+                )
+                m1.entryconfigure(
+                    1,
+                    state=(tk.NORMAL if self._restart_split_row_enabled(_SPLIT_MODE_REBUILD) else tk.DISABLED),
+                )
+                m1.entryconfigure(
+                    2,
+                    state=(tk.NORMAL if self._restart_split_row_enabled(_SPLIT_MODE_FULL) else tk.DISABLED),
+                )
             except self._tk.TclError:
                 pass
 
@@ -2343,6 +2658,7 @@ class GcTrayApp:
             return
         self._close_top_app_menu()
         self._close_split_tools_popup()
+        self._prepare_split_dropdown_before_open()
         self._sync_win32_split_menus()
         pos = self._win32_split_menu_popup_xy(self._frm_start_split)
         if pos is None:
@@ -2362,6 +2678,7 @@ class GcTrayApp:
             return
         self._close_top_app_menu()
         self._close_split_tools_popup()
+        self._prepare_split_dropdown_before_open()
         self._sync_win32_split_menus()
         pos = self._win32_split_menu_popup_xy(self._frm_restart_split)
         if pos is None:
@@ -2372,15 +2689,8 @@ class GcTrayApp:
         except self._tk.TclError:
             pass
 
-    def _open_styled_split_tools_dropdown(
-        self,
-        anchor_widget: Any,
-        rows: list[tuple[str, Any, object, bool]],
-    ) -> None:
-        """Card-style panel matching the hamburger app menu (not native ``Menu``).
-
-        *anchor_widget* is the full split frame (Start+▼ or Restart+▼) so the panel sits under it.
-        """
+    def _open_styled_split_mode_dropdown(self, anchor_widget: Any, *, is_start: bool) -> None:
+        """Card-style checked menu for Start or Restart split (non-Windows)."""
         dw = self._dash_win
         if dw is None or anchor_widget is None:
             return
@@ -2390,15 +2700,49 @@ class GcTrayApp:
         except self._tk.TclError:
             return
 
+        self._prepare_split_dropdown_before_open()
+        mode_var = self._start_split_mode_var if is_start else self._restart_split_mode_var
+        if is_start:
+            rows: list[tuple[str, str, Any, bool]] = [
+                (_SPLIT_MODE_PLAIN, _LABEL_MENU_START, self._photo_btn_start, self._start_split_row_enabled(_SPLIT_MODE_PLAIN)),
+                (
+                    _SPLIT_MODE_REBUILD,
+                    _LABEL_MENU_START_BUILD,
+                    self._photo_btn_start_rebuild,
+                    self._start_split_row_enabled(_SPLIT_MODE_REBUILD),
+                ),
+                (
+                    _SPLIT_MODE_FULL,
+                    _LABEL_MENU_FULL_REBUILD,
+                    self._photo_btn_rebuild,
+                    self._start_split_row_enabled(_SPLIT_MODE_FULL),
+                ),
+            ]
+        else:
+            rows = [
+                (_SPLIT_MODE_PLAIN, _LABEL_MENU_RESTART, self._photo_btn_restart, self._restart_split_row_enabled(_SPLIT_MODE_PLAIN)),
+                (
+                    _SPLIT_MODE_REBUILD,
+                    _LABEL_MENU_RESTART_REBUILD,
+                    self._photo_btn_rebuild,
+                    self._restart_split_row_enabled(_SPLIT_MODE_REBUILD),
+                ),
+                (
+                    _SPLIT_MODE_FULL,
+                    _LABEL_MENU_FULL_REBUILD,
+                    self._photo_btn_rebuild,
+                    self._restart_split_row_enabled(_SPLIT_MODE_FULL),
+                ),
+            ]
+
         self._close_split_tools_popup()
         self._close_top_app_menu()
 
         tk = self._tk
         pal = self._app_menu_palette()
         ff = self._charts_ui_font()
+        cur = mode_var.get()
 
-        # Same pattern as ``_open_top_app_menu``: ``Toplevel(dashboard)``, ``withdraw`` until
-        # content is packed, then ``_finalize_card_dropdown_popup`` synchronously (no ``after_idle``).
         popup = tk.Toplevel(dw)
         self._split_tools_popup = popup
         self._split_tools_anchor = anchor_widget
@@ -2418,16 +2762,32 @@ class GcTrayApp:
             sep.pack(fill=tk.X, padx=12, pady=4)
 
         first = True
-        for text, photo, command, enabled in rows:
+        for value, text, photo, enabled in rows:
             if not first:
                 add_separator()
             first = False
 
             row_fr = tk.Frame(inner, bg=pal["card"], cursor=("hand2" if enabled else "arrow"))
             hover_widgets: list[Any] = []
+
+            mark_w = tk.Frame(row_fr, bg=pal["card"], width=22)
+            mark_w.pack_propagate(False)
+            mark_w.pack(side=tk.LEFT)
+            check_lbl = tk.Label(
+                mark_w,
+                text=("\u2713" if value == cur else ""),
+                bg=pal["card"],
+                fg=(pal["fg"] if enabled else pal["fg_muted"]),
+                font=(ff, 11),
+                width=2,
+                anchor="center",
+            )
+            check_lbl.pack(expand=True)
+            hover_widgets.append(check_lbl)
+
             if photo is not None:
                 ic = tk.Label(row_fr, image=photo, bg=pal["card"])
-                ic.pack(side=tk.LEFT, padx=(12, 4), pady=11)
+                ic.pack(side=tk.LEFT, padx=(4, 4), pady=11)
                 hover_widgets.append(ic)
 
             lb = tk.Label(
@@ -2437,29 +2797,27 @@ class GcTrayApp:
                 fg=(pal["fg"] if enabled else pal["fg_muted"]),
                 font=(ff, 11),
                 anchor="w",
-                padx=((0 if photo is not None else 14), 14),
+                padx=(0, 14),
                 pady=11,
             )
             lb.pack(side=tk.LEFT, fill=tk.X, expand=True)
             hover_widgets.append(lb)
 
-            def make_run(cmd: object, ok: bool):
+            def make_pick(val: str, ok: bool, start_side: bool):
                 def run(_e: Any = None) -> None:
-                    if not ok:
-                        return
-                    self._close_split_tools_popup()
-                    if cmd is not None:
-                        cmd()  # type: ignore[misc]
+                    if start_side:
+                        self._styled_pick_start_mode(val, ok)
+                    else:
+                        self._styled_pick_restart_mode(val, ok)
 
                 return run
 
-            run_fn = make_run(command, enabled)
+            run_fn = make_pick(value, enabled, is_start)
             if enabled:
                 row_fr.bind("<Button-1>", run_fn)
                 lb.bind("<Button-1>", run_fn)
                 for w in hover_widgets:
-                    if w is not lb:
-                        w.bind("<Button-1>", run_fn)
+                    w.bind("<Button-1>", run_fn)
                 self._app_menu_attach_row_hover(row_fr, hover_widgets, pal["card"], pal["hover"])
             row_fr.pack(fill=tk.X)
 
@@ -2475,7 +2833,6 @@ class GcTrayApp:
         except self._tk.TclError:
             vy, vh = 0, int(dw.winfo_screenheight())
         gap = _SPLIT_DROPDOWN_GAP_BELOW_ANCHOR_PX
-        # Match hamburger menu: left-align with anchor; clamp to virtual desktop in finalize.
         x = bx
         y = by + bh + gap
         if y + ph > vy + vh - 12:
@@ -2503,7 +2860,7 @@ class GcTrayApp:
                 self._post_restart_split_menu()
 
     def _post_start_split_menu(self) -> None:
-        """Open Start extras under the Start split; styled like the app menu."""
+        """Open Start mode menu under the Start split; styled like the app menu."""
         frm = self._frm_start_split
         if frm is None:
             return
@@ -2512,22 +2869,10 @@ class GcTrayApp:
                 return
         except self._tk.TclError:
             return
-        en = self._can_start_rebuild_docker()
-        self._open_styled_split_tools_dropdown(
-            frm,
-            [
-                ("Start + Build", self._photo_btn_start_rebuild, self.docker_start_rebuild_gc, en),
-                (
-                    "Full rebuild (DESTRUCTIVE)",
-                    self._photo_btn_rebuild,
-                    lambda: self.docker_full_rebuild_gc(require_container_stopped=True),
-                    en,
-                ),
-            ],
-        )
+        self._open_styled_split_mode_dropdown(frm, is_start=True)
 
     def _post_restart_split_menu(self) -> None:
-        """Open Restart extras under the Restart split; styled like the app menu."""
+        """Open Restart mode menu under the Restart split; styled like the app menu."""
         frm = self._frm_restart_split
         if frm is None:
             return
@@ -2536,19 +2881,7 @@ class GcTrayApp:
                 return
         except self._tk.TclError:
             return
-        en = self._can_rebuild_docker()
-        self._open_styled_split_tools_dropdown(
-            frm,
-            [
-                ("Restart + rebuild", self._photo_btn_rebuild, self.docker_rebuild_gc, en),
-                (
-                    "Full rebuild (DESTRUCTIVE)",
-                    self._photo_btn_rebuild,
-                    lambda: self.docker_full_rebuild_gc(require_container_stopped=False),
-                    en,
-                ),
-            ],
-        )
+        self._open_styled_split_mode_dropdown(frm, is_start=False)
 
     def _build_menu(self) -> Menu:
         return Menu(
@@ -3010,8 +3343,9 @@ class GcTrayApp:
     def _bind_hover_tooltip(
         self,
         widget: Any,
-        text: str,
+        text: str = "",
         *,
+        text_getter: Callable[[], str] | None = None,
         tip_vertical: str = "below",
     ) -> None:
         """Show a short-delay hover tooltip (theme-aware).
@@ -3066,9 +3400,10 @@ class GcTrayApp:
                 pass
             tip.configure(bg=bg_tip)
             ff = self._charts_ui_font()
+            display = text_getter() if text_getter is not None else text
             lbl = tk.Label(
                 tip,
-                text=text,
+                text=display,
                 bg=bg_tip,
                 fg=fg_tip,
                 font=(ff, 9),
@@ -4010,15 +4345,16 @@ class GcTrayApp:
                 self._photo_btn_restart,
                 self._photo_btn_rebuild,
             ) = _make_dashboard_toolbar_photos(self._root)
+        self._ensure_split_mode_vars()
         if sys.platform == "win32":
             self._build_win32_split_menus()
         self._frm_start_split = ttk.Frame(btn_row)
         self._btn_start = ttk.Button(
             self._frm_start_split,
-            text="Start",
+            text=_LABEL_MENU_START,
             image=self._photo_btn_start,
             compound=self._tk.LEFT,
-            command=self.start_gc,
+            command=self._invoke_selected_start,
         )
         self._btn_start.pack(side=self._tk.LEFT, fill=self._tk.Y)
         self._mb_start_split = ttk.Button(
@@ -4048,10 +4384,10 @@ class GcTrayApp:
         self._frm_restart_split = ttk.Frame(btn_row)
         self._btn_restart = ttk.Button(
             self._frm_restart_split,
-            text="Restart",
+            text=_LABEL_MENU_RESTART,
             image=self._photo_btn_restart,
             compound=self._tk.LEFT,
-            command=self.restart_gc,
+            command=self._invoke_selected_restart,
         )
         self._btn_restart.pack(side=self._tk.LEFT, fill=self._tk.Y)
         self._mb_restart_split = ttk.Button(
@@ -4069,8 +4405,9 @@ class GcTrayApp:
             )
         self._frm_restart_split.pack(side=self._tk.LEFT, padx=(0, 6))
 
-        self._bind_hover_tooltip(self._btn_start, "Start Ground Control")
-        self._bind_hover_tooltip(self._btn_restart, _TOOLTIP_RESTART)
+        self._apply_start_restart_button_faces()
+        self._bind_hover_tooltip(self._btn_start, text_getter=self._start_primary_tooltip_text)
+        self._bind_hover_tooltip(self._btn_restart, text_getter=self._restart_primary_tooltip_text)
 
         if self._run_mode_var is None:
             self._run_mode_var = self._tk.StringVar(value=self._run_mode)
@@ -5085,7 +5422,11 @@ class GcTrayApp:
             and hasattr(self, "_btn_start")
         ):
             try:
-                self._btn_start.config(state=(self._tk.NORMAL if self._can_start() else self._tk.DISABLED))
+                self._clamp_start_split_mode_if_stale()
+                self._apply_start_restart_button_faces()
+                self._btn_start.config(
+                    state=(self._tk.NORMAL if self._can_invoke_selected_start() else self._tk.DISABLED)
+                )
                 mb0 = getattr(self, "_mb_start_split", None)
                 if mb0 is not None:
                     mb0.config(
@@ -5096,7 +5437,9 @@ class GcTrayApp:
                         )
                     )
                 self._btn_stop.config(state=(self._tk.NORMAL if self._can_stop() else self._tk.DISABLED))
-                self._btn_restart.config(state=(self._tk.NORMAL if self._can_restart() else self._tk.DISABLED))
+                self._btn_restart.config(
+                    state=(self._tk.NORMAL if self._can_invoke_selected_restart() else self._tk.DISABLED)
+                )
                 mb1 = getattr(self, "_mb_restart_split", None)
                 if mb1 is not None:
                     mb1.config(

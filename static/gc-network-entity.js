@@ -2,7 +2,10 @@
  * One network config table (interfaces / VLANs / zones): facets, search, column picker, fetch.
  * @param {object} cfg
  * @param {string} cfg.prefix - ID prefix e.g. "gc-net-if"
- * @param {string} cfg.apiUrl
+ * @param {string} [cfg.apiUrl] - Table JSON endpoint (omit when `resolveTableFetchUrl` is set)
+ * @param {function(object): object} [cfg.transformTablePayload] - Map API JSON immediately before render (reorder columns, adjust labels, etc.)
+ * @param {function({ firewallIds: number[], configurationIds: number[], idsQueryParam: string }): string} [cfg.resolveTableFetchUrl] - Build full fetch URL including query string; when set, `apiUrl` is optional
+ * @param {function({ firewallIds: number[], configurationIds: number[], idsQueryParam: string }): Promise<object>} [cfg.fetchTablePayload] - Async loader for table JSON; when set, used instead of `fetch`/`resolveTableFetchUrl`
  * @param {string} cfg.lsKey - localStorage key for column visibility
  * @param {string} cfg.dataRowClass - e.g. "gc-net-if-data-row"
  * @param {string} cfg.colPickerAttr - data attribute on col checkboxes e.g. "data-gc-net-if-col"
@@ -18,6 +21,7 @@
  * @param {boolean} [cfg.nameAsZonePill] - render __name column as colored pills (zones tab)
  * @param {boolean} [cfg.rowClickable] - if true, rows are clickable and store row payload on the tr
  * @param {function(HTMLElement): void} [cfg.onRowClick] - called with tr (use tr._gcNetRow)
+ * @param {boolean} [cfg.skipListCellModalBind] - When rowClickable + onRowClick: still render multi-value pill previews but do not bind gcTableBindListCell (its handler stops propagation and blocks row clicks)
  * @param {function(object): void} [cfg.afterRenderFromApi] - called after table body built from API payload
  * @param {string} [cfg.idsQueryParam] - `"configuration_ids"` when the table is configuration-scoped (combined-view copy tooltips / missing-scope wording)
  * @param {{ inputId: string, param: string }} [cfg.combineQuery] - append boolean query param from checkbox
@@ -27,7 +31,8 @@
  * @param {string} [cfg.rowAriaEntitySingular] - e.g. "IP host" for aria-label on clickable rows
  * @param {string} [cfg.apiEntityType] - appended as entity_type= for hosts/services multi-entity endpoints
  * @param {{ excludeSystemStorageKey: string, excludeSystemDefault?: boolean, bulkRowSelect?: boolean }} [cfg.ipHostTable] - IP host: lock column, exclude-system facet, row filter, optional row checkboxes
- * @param {boolean} [cfg.bulkRowSelect] - Row checkboxes + select-all (without ipHostTable extras)
+ * @param {boolean|function(): boolean} [cfg.bulkRowSelect] - Row checkboxes + select-all (without ipHostTable extras); a function is re-evaluated on each render
+ * @param {boolean|function(): boolean} [cfg.tableReadOnly] - Bool and interactive cells as static text; row selection checkboxes disabled; re-evaluated each render when a function
  * @param {boolean} [cfg.bulkSelectCheckedByDefault] - When bulkRowSelect: new rows get checked checkboxes (e.g. IPS policy delete selection)
  * @param {function(object): boolean} [cfg.bulkSelectDisableRow] - When bulkRowSelect: return true to disable a row's checkbox (e.g. non-deletable entity_type)
  * @param {string} [cfg.bulkSelectDisableHint] - When bulkSelectDisableRow disables a row: title and aria-label (default: delete-table wording)
@@ -392,12 +397,23 @@ function gcCreateNetworkEntityTable(cfg) {
 
   let prefix = cfg.prefix;
   let apiUrl = cfg.apiUrl;
+  let transformTablePayload =
+    typeof cfg.transformTablePayload === "function" ? cfg.transformTablePayload : null;
+  let resolveTableFetchUrl =
+    typeof cfg.resolveTableFetchUrl === "function" ? cfg.resolveTableFetchUrl : null;
+  let fetchTablePayload =
+    typeof cfg.fetchTablePayload === "function" ? cfg.fetchTablePayload : null;
   let lsKey = cfg.lsKey;
   let dataRowClass = cfg.dataRowClass;
   let colPickerAttr = cfg.colPickerAttr;
   let L = cfg.labels;
   let rowClickable = !!cfg.rowClickable;
   let rowPayloadOnly = !!cfg.rowPayloadOnly;
+  let skipListCellModalBind = !!(
+    cfg.skipListCellModalBind &&
+    rowClickable &&
+    typeof cfg.onRowClick === "function"
+  );
   let interactiveBoolColIds =
     Array.isArray(cfg.interactiveBoolColIds) && cfg.interactiveBoolColIds.length
       ? cfg.interactiveBoolColIds.map(function (x) {
@@ -465,6 +481,12 @@ function gcCreateNetworkEntityTable(cfg) {
     if (id) firewallPillNameColSet[id] = true;
   });
   let afterRenderFromApi = typeof cfg.afterRenderFromApi === "function" ? cfg.afterRenderFromApi : null;
+  let onColVisPersist = typeof cfg.onColVisPersist === "function" ? cfg.onColVisPersist : null;
+  /** Optional: host-specific table design / settings as JSON (e.g. designer sandbox). */
+  let getTablePropertiesJson =
+    typeof cfg.getTablePropertiesJson === "function" ? cfg.getTablePropertiesJson : null;
+  let setTablePropertiesJson =
+    typeof cfg.setTablePropertiesJson === "function" ? cfg.setTablePropertiesJson : null;
   let combineQuery = cfg.combineQuery || null;
   if (combineQuery && combineQuery.param && !combineQuery.inputId) {
     combineQuery.inputId = prefix + "-combine";
@@ -503,8 +525,28 @@ function gcCreateNetworkEntityTable(cfg) {
       : null;
   let interfaceZonePresenceFacet = !!cfg.interfaceZonePresenceFacet;
   let COL_ZONE_PRESENCE = "__zone_presence";
-  let bulkRowSelect =
-    !!(ipHostTable && ipHostTable.bulkRowSelect) || !!cfg.bulkRowSelect;
+  function isBulkRowSelect() {
+    if (ipHostTable && ipHostTable.bulkRowSelect) return true;
+    if (typeof cfg.bulkRowSelect === "function") {
+      try {
+        return !!cfg.bulkRowSelect();
+      } catch (eBr) {
+        return false;
+      }
+    }
+    return !!cfg.bulkRowSelect;
+  }
+
+  function isTableReadOnly() {
+    if (typeof cfg.tableReadOnly === "function") {
+      try {
+        return !!cfg.tableReadOnly();
+      } catch (eRo) {
+        return false;
+      }
+    }
+    return !!cfg.tableReadOnly;
+  }
   let bulkSelectCheckedByDefault = !!cfg.bulkSelectCheckedByDefault;
   let bulkSelectDisableRow =
     typeof cfg.bulkSelectDisableRow === "function" ? cfg.bulkSelectDisableRow : null;
@@ -708,6 +750,10 @@ function gcCreateNetworkEntityTable(cfg) {
   let lazyMountInProgress = false;
   let lazyMountTotalRows = 0;
 
+  function syncTableReadOnlyClass() {
+    if (table) table.classList.toggle("gc-net-entity-table--read-only", isTableReadOnly());
+  }
+
   let entityTypeQuickFilterOn = !!cfg.entityTypeQuickFilter;
   let quickEntityMigrateKey =
     entityTypeQuickFilterOn && prefix ? "gc-quick-entity:" + prefix : null;
@@ -815,7 +861,7 @@ function gcCreateNetworkEntityTable(cfg) {
     });
     if (visible < 1 && COLS.length) d[COLS[0].id] = true;
     if (ipHostTable && Object.prototype.hasOwnProperty.call(d, COL_LOCK)) d[COL_LOCK] = true;
-    if (bulkRowSelect) d[COL_SELECT] = true;
+    if (isBulkRowSelect()) d[COL_SELECT] = true;
     return d;
   }
 
@@ -828,7 +874,7 @@ function gcCreateNetworkEntityTable(cfg) {
   function applyColVis(vis) {
     if (!table) return;
     COLS.forEach(function (c) {
-      let on = bulkRowSelect && c.id === COL_SELECT ? true : !!vis[c.id];
+      let on = isBulkRowSelect() && c.id === COL_SELECT ? true : !!vis[c.id];
       table.querySelectorAll('[data-gc-col="' + c.id + '"]').forEach(function (el) {
         el.classList.toggle("gc-col-hidden", !on);
       });
@@ -1164,6 +1210,15 @@ function gcCreateNetworkEntityTable(cfg) {
     }
     let tri = boolTriState(v);
     if (tri !== null) {
+      if (isTableReadOnly()) {
+        return (
+          '<span class="gc-table-readonly-bool muted" aria-label="' +
+          (tri ? "On" : "Off") +
+          '">' +
+          (tri ? "On" : "Off") +
+          "</span>"
+        );
+      }
       if (interfaceStatusColumnVisual && colId === COL_STATUS) {
         let rawSt = v != null ? String(v).trim() : "";
         let ariaSt = rawSt || (tri ? "On" : "Off");
@@ -1352,7 +1407,7 @@ function gcCreateNetworkEntityTable(cfg) {
 
   function skipColFacetPicker(colId) {
     if (actionButtonColSet[colId]) return true;
-    if (bulkRowSelect && colId === COL_SELECT) return true;
+    if (isBulkRowSelect() && colId === COL_SELECT) return true;
     if (!ipHostTable) return false;
     if (colId === COL_LOCK) return true;
     return false;
@@ -1548,30 +1603,33 @@ function gcCreateNetworkEntityTable(cfg) {
         countEl.textContent = "Showing " + visible + " of " + total + " " + L.countPlural;
       }
     }
-    if (bulkRowSelect) syncIpHostSelectAllHeader();
+    if (isBulkRowSelect()) syncIpHostSelectAllHeader();
   }
 
   function syncBulkRowActionToolbar() {
-    if (!bulkRowSelect) return;
-    let n = 0;
-    if (tbody) {
-      tbody.querySelectorAll("tr." + dataRowClass + " input.gc-hs-row-select:checked").forEach(function (r) {
-        if (r.disabled) return;
-        n++;
-      });
-    }
     let btn = document.getElementById(prefix + "-delete-selected");
-    if (btn) {
-      btn.disabled = n < 1 || !tbody;
-    }
-    let syncBtn = document.getElementById(prefix + "-combine-sync-selected");
-    if (syncBtn) {
-      let combineOn = true;
-      if (combineQuery && combineQuery.inputId) {
-        let cbxComb = document.getElementById(combineQuery.inputId);
-        combineOn = !cbxComb || cbxComb.checked;
+    if (isBulkRowSelect()) {
+      let n = 0;
+      if (tbody) {
+        tbody.querySelectorAll("tr." + dataRowClass + " input.gc-hs-row-select:checked").forEach(function (r) {
+          if (r.disabled) return;
+          n++;
+        });
       }
-      syncBtn.disabled = n < 1 || !combineOn;
+      if (btn) {
+        btn.disabled = n < 1 || !tbody || isTableReadOnly();
+      }
+      let syncBtn = document.getElementById(prefix + "-combine-sync-selected");
+      if (syncBtn) {
+        let combineOn = true;
+        if (combineQuery && combineQuery.inputId) {
+          let cbxComb = document.getElementById(combineQuery.inputId);
+          combineOn = !cbxComb || cbxComb.checked;
+        }
+        syncBtn.disabled = n < 1 || !combineOn;
+      }
+    } else if (btn) {
+      btn.disabled = true;
     }
     if (onBulkSelectionChange) {
       try {
@@ -1581,7 +1639,7 @@ function gcCreateNetworkEntityTable(cfg) {
   }
 
   function syncIpHostSelectAllHeader() {
-    if (!bulkRowSelect || !tbody) {
+    if (!isBulkRowSelect() || !tbody) {
       syncBulkRowActionToolbar();
       return;
     }
@@ -1607,7 +1665,7 @@ function gcCreateNetworkEntityTable(cfg) {
   }
 
   function bindIpHostSelectAllOnce() {
-    if (!bulkRowSelect || !tbody) return;
+    if (!isBulkRowSelect() || !tbody) return;
     let cb = document.getElementById(prefix + "-select-all");
     if (!cb || cb.dataset.gcHsSelectAllBound === "1") return;
     cb.dataset.gcHsSelectAllBound = "1";
@@ -1624,7 +1682,7 @@ function gcCreateNetworkEntityTable(cfg) {
   }
 
   function getDeleteConfigEntryIdsFromSelection() {
-    if (!bulkRowSelect || !tbody) return [];
+    if (!isBulkRowSelect() || !tbody) return [];
     let seen = {};
     let out = [];
     tbody.querySelectorAll("tr." + dataRowClass + ' input[data-gc-hs-row-select]:checked').forEach(function (cbx) {
@@ -2228,7 +2286,7 @@ function gcCreateNetworkEntityTable(cfg) {
   }
 
   function bindCombineSyncSelectedOnce() {
-    if (!combineSyncSelectedCfg || !bulkRowSelect || !combineQuery) return;
+    if (!combineSyncSelectedCfg || !isBulkRowSelect() || !combineQuery) return;
     let btn = document.getElementById(prefix + "-combine-sync-selected");
     let wrap = document.getElementById(prefix + "-combine-sync-wrap");
     if (!btn || btn.dataset.gcCombineSyncBound === "1") return;
@@ -2291,8 +2349,35 @@ function gcCreateNetworkEntityTable(cfg) {
     updateFacetChrome();
     syncQuickEntityTypeNavFromFacets();
     if (table) table.removeAttribute("aria-busy");
+    syncTableReadOnlyClass();
     if (globalThis.gcTableSort && table) globalThis.gcTableSort.bindTable(table);
     syncBulkRowActionToolbar();
+  }
+
+  /** Flex on <td> breaks table column layout when multiple pill columns exist; wrap content instead. */
+  function wrapGcNetEntityPillCellContent(td) {
+    if (!td) return;
+    if (
+      !td.classList.contains("gc-net-firewall-pills") &&
+      !td.classList.contains("gc-hs-multi-pills")
+    ) {
+      return;
+    }
+    if (!td.firstChild) return;
+    if (
+      td.childNodes.length === 1 &&
+      td.firstChild.nodeType === 1 &&
+      td.firstChild.classList &&
+      td.firstChild.classList.contains("gc-cell-flex-pills")
+    ) {
+      return;
+    }
+    let wrap = document.createElement("div");
+    wrap.className = "gc-cell-flex-pills";
+    while (td.firstChild) {
+      wrap.appendChild(td.firstChild);
+    }
+    td.appendChild(wrap);
   }
 
   function buildDataTrFromRow(row) {
@@ -2306,24 +2391,29 @@ function gcCreateNetworkEntityTable(cfg) {
     if (rowPayloadOnly || (rowClickable && onRowClick)) {
       tr._gcNetRow = row;
     }
+    /* Always wire rowClick when configured: callers (e.g. Firewalls v2) gate behavior inside onRowClick
+       (e.g. read-only preview). If we skip listeners whenever isTableReadOnly() is true at render time,
+       toggling read-only off does not re-bind until refresh — and a stale true would block clicks entirely. */
     if (rowClickable && onRowClick) {
-      tr.classList.add("gc-net-entity-row--clickable");
-      tr.setAttribute("role", "button");
-      tr.setAttribute("tabindex", "0");
-      let disp = String(cells[COL_NAME] != null ? cells[COL_NAME] : "").trim() || rowAriaEntitySingular;
-      let et0 = row.entity_type;
-      let subj =
-        et0 === "vlan"
-          ? "VLAN"
-          : et0 === "bridge_pair"
-            ? "bridge pair"
-            : et0 === "alias"
-              ? "alias"
-              : rowAriaEntitySingular;
-      tr.setAttribute(
-        "aria-label",
-        sysHost ? "View read-only " + subj + " " + disp : "Edit " + subj + " " + disp,
-      );
+      if (!isTableReadOnly()) {
+        tr.classList.add("gc-net-entity-row--clickable");
+        tr.setAttribute("role", "button");
+        tr.setAttribute("tabindex", "0");
+        let disp = String(cells[COL_NAME] != null ? cells[COL_NAME] : "").trim() || rowAriaEntitySingular;
+        let et0 = row.entity_type;
+        let subj =
+          et0 === "vlan"
+            ? "VLAN"
+            : et0 === "bridge_pair"
+              ? "bridge pair"
+              : et0 === "alias"
+                ? "alias"
+                : rowAriaEntitySingular;
+        tr.setAttribute(
+          "aria-label",
+          sysHost ? "View read-only " + subj + " " + disp : "Edit " + subj + " " + disp,
+        );
+      }
       tr.addEventListener("click", function (e) {
         if (
           e.target.closest &&
@@ -2378,6 +2468,11 @@ function gcCreateNetworkEntityTable(cfg) {
         cbx.addEventListener("change", function () {
           syncIpHostSelectAllHeader();
         });
+        if (isTableReadOnly()) {
+          cbx.disabled = true;
+          cbx.setAttribute("aria-label", "Row selection disabled in read-only preview");
+          cbx.title = "Read-only preview";
+        }
         if (bulkSelectCheckedByDefault && !cbx.disabled) cbx.checked = true;
         let inner = document.createElement("div");
         inner.className = "gc-table-select-cell-inner";
@@ -2477,50 +2572,67 @@ function gcCreateNetworkEntityTable(cfg) {
       } else if (c.id === COL_TYPE && rowEntityTypeUsesInterfaceTypeIcon(row.entity_type)) {
         html = entityTypeIconHtml(row.entity_type);
       } else if (interactiveBoolColSet[c.id]) {
-        let triI = boolTriState(v != null ? String(v) : "");
-        if (triI === null) {
+        if (isTableReadOnly()) {
+          let triI = boolTriState(v != null ? String(v) : "");
           html =
-            '<span class="muted" title="Run a configuration sync that includes IPS switch, DoS settings, and spoof prevention">—</span>';
+            triI === null
+              ? '<span class="muted" title="Run a configuration sync that includes IPS switch, DoS settings, and spoof prevention">—</span>'
+              : '<span class="gc-table-readonly-bool muted" aria-label="' +
+                (triI ? "On" : "Off") +
+                '">' +
+                (triI ? "On" : "Off") +
+                "</span>";
         } else {
-          html = boolToggleButtonHtml(
-            triI,
-            triI ? "IPS enabled; click to disable" : "IPS disabled; click to enable",
-            interactiveBoolTitle,
-          );
+          let triI = boolTriState(v != null ? String(v) : "");
+          if (triI === null) {
+            html =
+              '<span class="muted" title="Run a configuration sync that includes IPS switch, DoS settings, and spoof prevention">—</span>';
+          } else {
+            html = boolToggleButtonHtml(
+              triI,
+              triI ? "IPS enabled; click to disable" : "IPS disabled; click to enable",
+              interactiveBoolTitle,
+            );
+          }
         }
       } else if (actionButtonColSet[c.id]) {
-        let cfgTitle = ("Configure " + String(c.label || "").trim()).trim();
-        let pt = actionButtonPreToggleByCol[c.id];
-        let btnBase = actionButtonPrimary ? "btn primary" : "btn btn--secondary";
-        let cfgBtnHtml =
-          '<button type="button" class="' +
-          btnBase +
-          ' gc-table-action-configure-btn" data-gc-action-col="' +
-          escapeHtml(c.id) +
-          '" title="' +
-          escapeHtml(cfgTitle) +
-          '">Configure</button>';
-        if (pt && typeof pt.rowKey === "string" && pt.rowKey.trim()) {
-          let rk = pt.rowKey.trim();
-          let onSp = !!row[rk];
-          let tglTitle =
-            typeof pt.toggleTitle === "string" && pt.toggleTitle.trim()
-              ? pt.toggleTitle.trim()
-              : "Toggle spoof prevention for this firewall";
-          let tglHtml = boolToggleButtonHtml(
-            onSp,
-            onSp ? "Spoof prevention on; click to turn off" : "Spoof prevention off; click to turn on",
-            tglTitle,
-            "gc-ips-spoof-table-toggle",
-          );
-          html =
-            '<span class="gc-table-action-with-toggle">' + tglHtml + cfgBtnHtml + "</span>";
-          td.classList.add("gc-table-toggle-cell");
-          td.setAttribute("data-sort-value", (onSp ? "1" : "0") + " configure");
+        if (isTableReadOnly()) {
+          html = '<span class="muted gc-table-readonly-action">—</span>';
+          td.classList.add("gc-table-action-cell");
         } else {
-          html = cfgBtnHtml;
+          let cfgTitle = ("Configure " + String(c.label || "").trim()).trim();
+          let pt = actionButtonPreToggleByCol[c.id];
+          let btnBase = actionButtonPrimary ? "btn primary" : "btn btn--secondary";
+          let cfgBtnHtml =
+            '<button type="button" class="' +
+            btnBase +
+            ' gc-table-action-configure-btn" data-gc-action-col="' +
+            escapeHtml(c.id) +
+            '" title="' +
+            escapeHtml(cfgTitle) +
+            '">Configure</button>';
+          if (pt && typeof pt.rowKey === "string" && pt.rowKey.trim()) {
+            let rk = pt.rowKey.trim();
+            let onSp = !!row[rk];
+            let tglTitle =
+              typeof pt.toggleTitle === "string" && pt.toggleTitle.trim()
+                ? pt.toggleTitle.trim()
+                : "Toggle spoof prevention for this firewall";
+            let tglHtml = boolToggleButtonHtml(
+              onSp,
+              onSp ? "Spoof prevention on; click to turn off" : "Spoof prevention off; click to turn on",
+              tglTitle,
+              "gc-ips-spoof-table-toggle",
+            );
+            html =
+              '<span class="gc-table-action-with-toggle">' + tglHtml + cfgBtnHtml + "</span>";
+            td.classList.add("gc-table-toggle-cell");
+            td.setAttribute("data-sort-value", (onSp ? "1" : "0") + " configure");
+          } else {
+            html = cfgBtnHtml;
+          }
+          td.classList.add("gc-table-action-cell");
         }
-        td.classList.add("gc-table-action-cell");
       } else if (firewallPillNameColSet[c.id]) {
         let nm = v != null ? String(v).trim() : "";
         if (nm && typeof globalThis.gcFirewallScopePillHtml === "function") {
@@ -2585,13 +2697,15 @@ function gcCreateNetworkEntityTable(cfg) {
       }
       if (listExpand) {
         td.setAttribute("data-sort-value", listExpand.items.join(" ").toLowerCase());
-        globalThis.gcTableBindListCell(
-          td,
-          listExpand.items,
-          c.label,
-          listExpand.pillFn,
-          listExpand.listModalItemOptions || null,
-        );
+        if (!skipListCellModalBind) {
+          globalThis.gcTableBindListCell(
+            td,
+            listExpand.items,
+            c.label,
+            listExpand.pillFn,
+            listExpand.listModalItemOptions || null,
+          );
+        }
         td.classList.add("gc-hs-multi-pills");
       } else if (v != null && String(v).indexOf(HS_MULTIVALUE_SEP) !== -1) {
         td.classList.add("gc-hs-multi-pills");
@@ -2627,10 +2741,12 @@ function gcCreateNetworkEntityTable(cfg) {
         noBoolToggleColSet[c.id] ||
         valuePillColSet[c.id] ||
         (hardwarePortPills && c.id === COL_HARDWARE);
-      if ((tri !== null || emptyAccess) && !skipToggleChrome) td.classList.add("gc-table-toggle-cell");
+      if ((tri !== null || emptyAccess) && !skipToggleChrome && !isTableReadOnly()) {
+        td.classList.add("gc-table-toggle-cell");
+      }
       if (
         combineQuery &&
-        !bulkRowSelect &&
+        !isBulkRowSelect() &&
         c.id === COL_NAME &&
         (rowHasPartialScopeMembership(row) || rowHasMergedScopeConflict(row))
       ) {
@@ -2644,6 +2760,7 @@ function gcCreateNetworkEntityTable(cfg) {
         nameOuter.appendChild(nameTextWrap);
         td.appendChild(nameOuter);
       }
+      wrapGcNetEntityPillCellContent(td);
       tr.appendChild(td);
     });
     if (globalThis.gcTableFacets) {
@@ -2659,16 +2776,23 @@ function gcCreateNetworkEntityTable(cfg) {
 
   function renderFromApi(data) {
     let gen = ++tableRenderGen;
-    let labelsMap = (data && data.column_labels) || {};
+    let payload = data;
+    if (transformTablePayload) {
+      try {
+        let mapped = transformTablePayload(data);
+        if (mapped && typeof mapped === "object") payload = mapped;
+      } catch (eTf) { }
+    }
+    let labelsMap = (payload && payload.column_labels) || {};
     lastApiColumnLabels = labelsMap;
-    let cols = (data && data.columns) || [];
-    let rows = (data && data.rows) || [];
-    DEFAULT_VISIBLE_FROM_API = (data && data.columns_visible_by_default) || [];
+    let cols = (payload && payload.columns) || [];
+    let rows = (payload && payload.rows) || [];
+    DEFAULT_VISIBLE_FROM_API = (payload && payload.columns_visible_by_default) || [];
 
     COLS = cols.map(function (id) {
       return { id: id, label: colLabel(id, labelsMap) };
     });
-    if (bulkRowSelect) {
+    if (isBulkRowSelect()) {
       COLS.unshift({ id: COL_SELECT, label: "" });
     }
     colVis = loadColVis();
@@ -2701,6 +2825,13 @@ function gcCreateNetworkEntityTable(cfg) {
         htr.appendChild(th);
       });
       thead.appendChild(htr);
+      if (isTableReadOnly() && isBulkRowSelect()) {
+        let sa = document.getElementById(prefix + "-select-all");
+        if (sa) {
+          sa.disabled = true;
+          sa.title = "Read-only preview";
+        }
+      }
     }
 
     tbody.innerHTML = "";
@@ -2731,7 +2862,8 @@ function gcCreateNetworkEntityTable(cfg) {
       lazyMountInProgress = false;
       lazyMountTotalRows = 0;
       if (table) table.removeAttribute("aria-busy");
-      if (afterRenderFromApi) afterRenderFromApi(data);
+      syncTableReadOnlyClass();
+      if (afterRenderFromApi) afterRenderFromApi(payload);
       if (globalThis.gcTableSort && table) globalThis.gcTableSort.bindTable(table);
       bindIpHostSelectAllOnce();
       syncIpHostSelectAllHeader();
@@ -2782,7 +2914,8 @@ function gcCreateNetworkEntityTable(cfg) {
       applyRowFilter();
       syncQuickEntityTypeNavFromFacets();
       buildColMenuList();
-      if (afterRenderFromApi) afterRenderFromApi(data);
+      syncTableReadOnlyClass();
+      if (afterRenderFromApi) afterRenderFromApi(payload);
       if (globalThis.gcTableSort && table) globalThis.gcTableSort.bindTable(table);
       bindIpHostSelectAllOnce();
       syncIpHostSelectAllHeader();
@@ -2824,7 +2957,7 @@ function gcCreateNetworkEntityTable(cfg) {
       } catch (eLog) {}
       return;
     }
-    if (!apiUrl || typeof apiUrl !== "string") {
+    if ((!apiUrl || typeof apiUrl !== "string") && !resolveTableFetchUrl && !fetchTablePayload) {
       try {
         console.error("gcCreateNetworkEntityTable: missing apiUrl for prefix", prefix);
       } catch (eLog2) {}
@@ -2900,19 +3033,67 @@ function gcCreateNetworkEntityTable(cfg) {
     tbody.appendChild(trL);
     syncPlaceholderColspan();
 
-    let url = apiUrl + "?" + idsQueryParam + "=" + encodeURIComponent(ids.join(","));
-    if (idsQueryParam !== "configuration_ids" && effCfgs.length > 0) {
-      url += "&configuration_ids=" + encodeURIComponent(effCfgs.join(","));
+    function finishTableFetchError() {
+      renderEmptyMessage(L.loadError, prefix + "-placeholder");
+      if (afterRenderFromApi) afterRenderFromApi({});
     }
-    if (apiEntityType) {
-      url += "&entity_type=" + encodeURIComponent(apiEntityType);
+
+    if (fetchTablePayload) {
+      Promise.resolve()
+        .then(function () {
+          return fetchTablePayload({
+            firewallIds: ids,
+            configurationIds: effCfgs,
+            idsQueryParam: idsQueryParam,
+          });
+        })
+        .then(function (body) {
+          if (!body || typeof body !== "object") {
+            finishTableFetchError();
+            return;
+          }
+          renderFromApi(body);
+        })
+        .catch(function () {
+          finishTableFetchError();
+        });
+      return;
     }
-    if (combineQuery && combineQuery.param) {
-      let cbx = combineQuery.inputId ? document.getElementById(combineQuery.inputId) : null;
-      let combinedOn = !cbx || cbx.checked;
-      url += "&" + combineQuery.param + "=" + (combinedOn ? "true" : "false");
+
+    let fetchUrl = null;
+    if (resolveTableFetchUrl) {
+      try {
+        fetchUrl = resolveTableFetchUrl({
+          firewallIds: ids,
+          configurationIds: effCfgs,
+          idsQueryParam: idsQueryParam,
+        });
+      } catch (eRf) {
+        fetchUrl = null;
+      }
+      if (!fetchUrl || typeof fetchUrl !== "string") {
+        renderEmptyMessage(
+          (L && L.loadError) || "Could not build table request URL.",
+          prefix + "-placeholder",
+        );
+        if (afterRenderFromApi) afterRenderFromApi({});
+        return;
+      }
+    } else {
+      fetchUrl = apiUrl + "?" + idsQueryParam + "=" + encodeURIComponent(ids.join(","));
+      if (idsQueryParam !== "configuration_ids" && effCfgs.length > 0) {
+        fetchUrl += "&configuration_ids=" + encodeURIComponent(effCfgs.join(","));
+      }
+      if (apiEntityType) {
+        fetchUrl += "&entity_type=" + encodeURIComponent(apiEntityType);
+      }
+      if (combineQuery && combineQuery.param) {
+        let cbx = combineQuery.inputId ? document.getElementById(combineQuery.inputId) : null;
+        let combinedOn = !cbx || cbx.checked;
+        fetchUrl += "&" + combineQuery.param + "=" + (combinedOn ? "true" : "false");
+      }
     }
-    fetch(url, {
+    fetch(fetchUrl, {
       credentials: "same-origin",
       headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
     })
@@ -3119,6 +3300,11 @@ function gcCreateNetworkEntityTable(cfg) {
         return;
       }
       persistColVis(colVis);
+      if (onColVisPersist) {
+        try {
+          onColVisPersist(colVis);
+        } catch (eCv) { }
+      }
       applyColVis(colVis);
       syncPlaceholderColspan();
       applyRowFilter();
@@ -3430,5 +3616,28 @@ function gcCreateNetworkEntityTable(cfg) {
     applyRowFilter: applyRowFilter,
     getDeleteConfigEntryIdsFromSelection: getDeleteConfigEntryIdsFromSelection,
     syncIpHostSelectAllHeader: syncIpHostSelectAllHeader,
+    /**
+     * When configured, returns a plain object of table/page properties (title, columns, filters, etc.).
+     * @returns {Record<string, unknown>|null}
+     */
+    getTablePropertiesJson: function () {
+      if (!getTablePropertiesJson) return null;
+      try {
+        return getTablePropertiesJson();
+      } catch (eGt) {
+        return null;
+      }
+    },
+    /**
+     * When configured, applies properties from JSON (same shape as getTablePropertiesJson).
+     * @param {Record<string, unknown>|null|undefined} obj
+     * @param {Record<string, unknown>|undefined} opts host-specific options (e.g. preserveDesignMode)
+     */
+    setTablePropertiesJson: function (obj, opts) {
+      if (!setTablePropertiesJson || !obj || typeof obj !== "object") return;
+      try {
+        setTablePropertiesJson(obj, opts);
+      } catch (eSt) { }
+    },
   };
 }

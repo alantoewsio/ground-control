@@ -10,11 +10,18 @@
       </aside>
 {% endmacro %}
 
-{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true, secondary_btn_class="btn btn--secondary gc-net-entity-toolbar-secondary") %}
+{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true, secondary_btn_class="btn btn--secondary gc-net-entity-toolbar-secondary", primary_btn_hidden=false, secondary_btn_hidden=false, head_end_slot_id=none, table_title_element_id=none) %}
         <div class="table-wrap gc-net-if-table-wrap">
-          <div class="firewalls-page__head">
-            <h2>{{ title }}</h2>
+          {% if head_end_slot_id %}
+          <div class="firewalls-page__head firewalls-page__head--split">
+            <h2 {% if table_title_element_id %}id="{{ table_title_element_id }}"{% endif %}>{{ title }}</h2>
+            <div class="firewalls-page__head__end" id="{{ head_end_slot_id }}"></div>
           </div>
+          {% else %}
+          <div class="firewalls-page__head">
+            <h2 {% if table_title_element_id %}id="{{ table_title_element_id }}"{% endif %}>{{ title }}</h2>
+          </div>
+          {% endif %}
           <div class="toolbar">
             <div class="toolbar__sheet">
               <div class="toolbar__line toolbar__line--main">
@@ -111,12 +118,12 @@
                   </div>
                   {% endif %}
                   {% if primary_btn_id and primary_btn_label %}
-                  <button type="button" class="btn primary gc-net-entity-toolbar-primary" id="{{ primary_btn_id }}">
+                  <button type="button" class="btn primary gc-net-entity-toolbar-primary" id="{{ primary_btn_id }}"{% if primary_btn_hidden %} hidden{% endif %}>
                     {{ primary_btn_label }}
                   </button>
                   {% endif %}
                   {% if secondary_btn_id and secondary_btn_label %}
-                  <button type="button" class="{{ secondary_btn_class }}" id="{{ secondary_btn_id }}" disabled>
+                  <button type="button" class="{{ secondary_btn_class }}" id="{{ secondary_btn_id }}" disabled{% if secondary_btn_hidden %} hidden{% endif %}>
                     {{ secondary_btn_label }}
                   </button>
                   {% endif %}

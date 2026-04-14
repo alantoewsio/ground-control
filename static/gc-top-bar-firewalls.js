@@ -47,6 +47,10 @@
         });
       }
       let desc = fw.description != null ? String(fw.description).trim() : "";
+      let nm = fw.name != null ? String(fw.name).trim() : "";
+      let host = fw.host != null ? String(fw.host).trim() : "";
+      let devHost = fw.device_hostname != null ? String(fw.device_hostname).trim() : "";
+      let serial = fw.serial_number != null ? String(fw.serial_number).trim() : "";
       let urls = null;
       if (fw.urls && typeof fw.urls === "object") {
         urls = {
@@ -64,6 +68,10 @@
         description: desc || null,
         online: fw.online === true,
         urls: urls,
+        name: nm || null,
+        host: host || null,
+        device_hostname: devHost || null,
+        serial_number: serial || null,
       });
     });
     out.sort(function (a, b) {
@@ -495,6 +503,7 @@
   let trigger = document.getElementById("gc-net-fw-trigger");
   let dropdown = document.getElementById("gc-net-fw-dropdown");
   let textEl = document.getElementById("gc-net-fw-trigger-text");
+  let chipsEl = document.getElementById("gc-net-fw-trigger-chips");
   let search = document.getElementById("gc-net-fw-search");
   let optsRoot = document.getElementById("gc-net-fw-options");
   let emptyEl = document.getElementById("gc-net-fw-empty");
@@ -670,26 +679,55 @@
     let nTag = ms.querySelectorAll(".gc-net-fw-tag-cb:checked").length;
     let eff = getSelectedFirewallIds().length;
     let effCfg = getSelectedConfigurationIds().length;
-    if (nFw === 0 && nTag === 0 && nCfg === 0) {
+    let totalPick = nFw + nCfg + nTag;
+
+    if (chipsEl) chipsEl.innerHTML = "";
+    textEl.classList.remove("gc-ms-trigger-sr");
+
+    if (totalPick === 0) {
       textEl.textContent = "No scope selected";
       return;
     }
+
+    /* One explicit pick: show its label. Multiple: one-line counts only (no trigger chips). */
+    if (totalPick === 1) {
+      let cb =
+        ms.querySelector(".gc-net-fw-tag-cb:checked") ||
+        ms.querySelector(".gc-net-fw-cb--cfg:checked") ||
+        ms.querySelector(".gc-net-fw-cb--fw:checked");
+      let one = "";
+      if (cb) {
+        if (cb.classList.contains("gc-net-fw-tag-cb")) {
+          one = String(cb.value || "").trim();
+        } else if (cb.classList.contains("gc-net-fw-cb--cfg")) {
+          one =
+            String(cb.dataset.gcCfgLabel || "").trim() ||
+            ("#" + String(cb.value || "").replace(/^c:/, ""));
+        } else {
+          one =
+            String(cb.dataset.gcFwLabel || "").trim() ||
+            ("#" + String(cb.value || "").replace(/^f:/, ""));
+        }
+      }
+      textEl.textContent = one || "1 selected";
+      return;
+    }
+
     let parts = [];
     if (nTag) parts.push(nTag === 1 ? "1 tag" : nTag + " tags");
     if (nCfg) parts.push(nCfg === 1 ? "1 configuration" : nCfg + " configurations");
     if (nFw) parts.push(nFw === 1 ? "1 firewall" : nFw + " firewalls");
     let base = parts.join(" · ");
-    if (nTag > 0) {
-      textEl.textContent =
-        base +
-        " → " +
-        eff +
-        " firewall" +
-        (eff === 1 ? "" : "s") +
-        (effCfg ? " · " + effCfg + " cfg" : "");
-    } else {
-      textEl.textContent = base;
-    }
+    let summary =
+      nTag > 0
+        ? base +
+          " → " +
+          eff +
+          " firewall" +
+          (eff === 1 ? "" : "s") +
+          (effCfg ? " · " + effCfg + " cfg" : "")
+        : base;
+    textEl.textContent = summary;
   }
 
   function onMsCheckboxChange() {

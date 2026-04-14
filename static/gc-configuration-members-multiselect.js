@@ -197,6 +197,7 @@
     let trigger = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger");
     let dropdown = ms.querySelector(".gc-hs-ip-host-flyout__fw-dropdown");
     let textEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger-text");
+    let chipsEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-trigger-chips");
     let search = ms.querySelector(".gc-hs-ip-host-flyout__fw-search");
     let optsRoot = ms.querySelector(".gc-hs-ip-host-flyout__fw-ms-options");
     let emptyEl = ms.querySelector(".gc-hs-ip-host-flyout__fw-empty");
@@ -242,21 +243,66 @@
     }
 
     function syncTriggerText() {
+      let chipsFn =
+        typeof globalThis.gcRenderMultiselectTriggerChips === "function"
+          ? globalThis.gcRenderMultiselectTriggerChips
+          : null;
       if (textEl) {
         let nFw = ms.querySelectorAll(".gc-net-fw-cb:checked").length;
         let nTag = ms.querySelectorAll(".gc-net-fw-tag-cb:checked").length;
         let eff = effectiveIdsNow().length;
         if (nFw === 0 && nTag === 0) {
           textEl.textContent = "No firewalls selected";
+          textEl.classList.remove("gc-ms-trigger-sr");
+          if (chipsEl) chipsEl.innerHTML = "";
         } else {
           let parts = [];
           if (nTag) parts.push(nTag === 1 ? "1 tag" : nTag + " tags");
           if (nFw) parts.push(nFw === 1 ? "1 firewall" : nFw + " firewalls");
           let base = parts.join(" · ");
-          if (nTag > 0) {
-            textEl.textContent = base + " → " + eff + " firewall" + (eff === 1 ? "" : "s") + " in scope";
-          } else {
-            textEl.textContent = base + " selected";
+          let summary =
+            nTag > 0
+              ? base +
+                " → " +
+                eff +
+                " firewall" +
+                (eff === 1 ? "" : "s") +
+                " in scope"
+              : base + " selected";
+          textEl.textContent = summary;
+          textEl.classList.add("gc-ms-trigger-sr");
+          if (chipsEl && chipsFn) {
+            let items = [];
+            ms.querySelectorAll(".gc-net-fw-tag-cb:checked").forEach(function (cb) {
+              let tag = String(cb.value || "").trim();
+              if (!tag) return;
+              items.push({
+                label: tag,
+                removeLabel: "Remove tag " + tag,
+                onRemove: function () {
+                  cb.checked = false;
+                  onMsCheckboxChange();
+                },
+              });
+            });
+            ms.querySelectorAll(".gc-net-fw-cb:checked").forEach(function (cb) {
+              let label =
+                String(cb.dataset.gcFwLabel || "").trim() ||
+                "#" + String(cb.value || "");
+              let desc = String(cb.dataset.gcFwDesc || "").trim();
+              items.push({
+                label: label,
+                title: desc || undefined,
+                removeLabel: "Remove firewall " + label,
+                onRemove: function () {
+                  cb.checked = false;
+                  onMsCheckboxChange();
+                },
+              });
+            });
+            chipsFn(chipsEl, items);
+          } else if (textEl) {
+            textEl.classList.remove("gc-ms-trigger-sr");
           }
         }
       }

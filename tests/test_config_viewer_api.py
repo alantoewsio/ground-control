@@ -265,3 +265,94 @@ def test_configuration_config_viewer_tree_includes_zero_count_sections(authed_cl
     assert network_group["count"] == 0
     interfaces_tab = next(t for t in network_group["tabs"] if t["id"] == "interfaces")
     assert interfaces_tab["count"] == 0
+
+
+def test_api_firewalls_config_cache_distinct_entity_types_scoped(authed_client, main_session):
+    fw = Firewall(
+        name="DistinctTypesFw",
+        host="10.0.0.2",
+        port=4444,
+        username="admin",
+        verify_ssl=False,
+    )
+    main_session.add(fw)
+    main_session.flush()
+    main_session.add_all(
+        [
+            FirewallConfigEntry(
+                firewall_id=fw.id,
+                entity_type="zone",
+                external_name="A",
+                payload_json="{}",
+            ),
+            FirewallConfigEntry(
+                firewall_id=fw.id,
+                entity_type="zone",
+                external_name="B",
+                payload_json="{}",
+            ),
+            FirewallConfigEntry(
+                firewall_id=fw.id,
+                entity_type="interface",
+                external_name="eth0",
+                payload_json="{}",
+            ),
+        ]
+    )
+    main_session.commit()
+
+    r = authed_client.get(
+        f"/api/firewalls/config-cache/distinct-entity-types?firewall_ids={fw.id}"
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["entity_types"] == ["interface", "zone"]
+
+    r2 = authed_client.get("/api/firewalls/config-cache/distinct-entity-types")
+    assert r2.status_code == 200, r2.text
+    types_all = r2.json()["entity_types"]
+    assert "interface" in types_all
+    assert "zone" in types_all
+
+
+def test_api_firewalls_config_cache_table_accepts_non_hs_entity_type(authed_client, main_session):
+    """Firewalls v2 (and others) load any config-cache type via the flattened table API."""
+    fw = Firewall(
+        name="RulesFw",
+        host="10.0.0.3",
+        port=4444,
+        username="admin",
+        verify_ssl=False,
+    )
+    main_session.add(fw)
+    main_session.flush()
+    main_session.add(
+        FirewallConfigEntry(
+            firewall_id=fw.id,
+            entity_type="firewall_rule",
+            external_name="r1",
+            payload_json=json.dumps({"Name": "Allow LAN", "Status": "Enable"}),
+        )
+    )
+    main_session.commit()
+
+    r = authed_client.get(
+        "/api/firewalls/hosts-services/table",
+        params={
+            "entity_type": "firewall_rule",
+            "firewall_ids": str(fw.id),
+            "combine": "false",
+        },
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data.get("rows")
+    assert data["rows"][0].get("entity_type") == "firewall_rule"
+
+
+def test_api_firewalls_config_cache_table_rejects_bad_entity_type(authed_client):
+    r = authed_client.get(
+        "/api/firewalls/hosts-services/table",
+        params={"entity_type": "Bad-Type", "firewall_ids": "1", "combine": "false"},
+    )
+    assert r.status_code == 400

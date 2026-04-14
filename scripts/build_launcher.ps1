@@ -82,7 +82,7 @@ Write-Host "Repository: $RepoRoot"
 Write-Host "Syncing dependencies (tray + launcher-build)..."
 uv sync --group tray --group launcher-build
 
-Write-Host "Refreshing launcher icon from static/Design.png (if present)..."
+Write-Host "Refreshing static/favicon.ico and launcher icons from static/Design.png (if present)..."
 Push-Location $RepoRoot
 try {
     uv run --group tray python scripts/generate_launcher_brand_assets.py

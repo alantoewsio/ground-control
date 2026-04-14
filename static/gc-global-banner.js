@@ -403,9 +403,12 @@
     }, ROLLUP_MS);
   }
 
-  function showResult(ok, message) {
+  function showResult(ok, message, options) {
     clearTimers();
     syncResetBatch();
+    let opts = options && typeof options === "object" ? options : {};
+    let holdMs = Number(opts.holdMs);
+    if (!Number.isFinite(holdMs) || holdMs < 0) holdMs = RESULT_HOLD_MS;
     let el = root();
     if (!el) return;
     resetRollupState(el);
@@ -421,7 +424,7 @@
     if (text) text.textContent = message || (ok ? "Done." : "Something went wrong.");
     setGlobalBannerProgressBar(el, false);
     setResultCloseVisible(el, true);
-    hideTimer = setTimeout(startRollup, RESULT_HOLD_MS);
+    hideTimer = setTimeout(startRollup, holdMs);
     scheduleSyncAppFlyoutTopOffset();
   }
 

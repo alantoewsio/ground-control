@@ -35,7 +35,8 @@ ground_control_secrets.db
 .gc_backup_cache/
 .gc_backup_settings.json
 sophos-central-gui/
-Design.png
+# Ignore optional root copy only; login page ships static/Design.png
+/Design.png
 
 # Local scratch / secrets (never commit)
 _curl_cookies.txt

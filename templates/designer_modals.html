@@ -6,14 +6,14 @@
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol class="breadcrumbs__list">
     <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
-    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/content">Designer</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/navigation">Designer</a></li>
     <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Modals</li>
   </ol>
 </nav>
 {% endblock %}
 {% block page_subtitle %}
 <p class="page-header__subtitle">
-  Dialogs, flyouts, sheets, and overlay panels. More static examples live under Content.
+  Dialogs, flyouts, sheets, and overlay panels.
 </p>
 {% endblock %}
 {% block app_content_pre_main %}
@@ -41,7 +41,7 @@
 </div>
 {% endblock %}
 {% block content %}
-<main class="layout single gc-designer">
+<main class="layout single gc-designer" data-gc-designer-modals="1">
   <section class="gc-designer__section" aria-labelledby="gc-designer-modals-flyouts-h">
     <h2 id="gc-designer-modals-flyouts-h" class="gc-designer__h2">Flyouts</h2>
     <p class="gc-designer__note">
@@ -59,6 +59,9 @@
       with its <strong>Save</strong> or <strong>Cancel</strong> (not peek, backdrop, or Escape). The primary sheet still
       has no × — only its <strong>Save</strong> or <strong>Cancel</strong> closes the whole flyout (backdrop and Escape
       do not).
+      <strong>Object edit</strong> is the same shell as Edit, with a multi-firewall picker (search inside the dropdown)
+      under the title rule and an <strong>object type</strong> property for config-cache entity types (firewall and/or
+      configuration cache).
     </p>
     <div class="gc-designer__sandbox gc-designer__row">
       <div class="gc-designer__sample">
@@ -68,6 +71,89 @@
       <div class="gc-designer__sample">
         <button type="button" class="btn primary" id="gc-designer-flyout-edit-open">Edit</button>
         <span class="gc-designer__control-id" title="Reference id for this pattern">edit-flyout</span>
+      </div>
+      <div class="gc-designer__sample">
+        <button type="button" class="btn primary" id="gc-designer-flyout-object-edit-open">Object edit</button>
+        <span class="gc-designer__control-id" title="Reference id for this pattern">object-edit-flyout</span>
+      </div>
+    </div>
+    <div
+      class="gc-designer-modal-flyout-titles settings-form"
+      role="group"
+      aria-labelledby="gc-designer-modals-flyout-titles-legend"
+    >
+      <h3 id="gc-designer-modals-flyout-titles-legend" class="gc-designer-ip-fieldset__legend">
+        Flyout title properties
+      </h3>
+      <p class="muted" style="margin-top: 0">
+        Primary sheet headings prepend <strong>Add</strong> (<span class="mono">view-flyout</span>) or
+        <strong>Edit</strong> (<span class="mono">edit-flyout</span>) to your text (space-separated when non-empty).
+        Leave blank for Add or Edit only. Use <strong>Save flyout properties</strong> to persist titles, object-edit
+        title, and object type for everyone in <code class="mono">data/designer_modal_properties.json</code>.
+      </p>
+      <label class="settings-form__field">
+        <span class="settings-form__label"><span class="mono">view-flyout</span> · Title</span>
+        <input
+          type="text"
+          class="settings-form__input"
+          id="gc-designer-modals-prop-view-flyout-title"
+          maxlength="500"
+          autocomplete="off"
+          aria-describedby="gc-designer-modals-prop-view-flyout-hint"
+        />
+        <span id="gc-designer-modals-prop-view-flyout-hint" class="settings-form__hint muted"
+          >Prepends <span class="mono">Add</span> (default empty).</span
+        >
+      </label>
+      <label class="settings-form__field">
+        <span class="settings-form__label"><span class="mono">edit-flyout</span> · Title</span>
+        <input
+          type="text"
+          class="settings-form__input"
+          id="gc-designer-modals-prop-edit-flyout-title"
+          maxlength="500"
+          autocomplete="off"
+          aria-describedby="gc-designer-modals-prop-edit-flyout-hint"
+        />
+        <span id="gc-designer-modals-prop-edit-flyout-hint" class="settings-form__hint muted"
+          >Prepends <span class="mono">Edit</span> (default empty).</span
+        >
+      </label>
+      <label class="settings-form__field">
+        <span class="settings-form__label"><span class="mono">object-edit-flyout</span> · Title</span>
+        <input
+          type="text"
+          class="settings-form__input"
+          id="gc-designer-modals-prop-object-edit-flyout-title"
+          maxlength="500"
+          autocomplete="off"
+          aria-describedby="gc-designer-modals-prop-object-edit-flyout-hint"
+        />
+        <span id="gc-designer-modals-prop-object-edit-flyout-hint" class="settings-form__hint muted"
+          >Prepends <span class="mono">Edit</span> (default empty).</span
+        >
+      </label>
+      <label class="settings-form__field">
+        <span class="settings-form__label"><span class="mono">object-edit-flyout</span> · Object type</span>
+        <input
+          type="text"
+          class="settings-form__input mono"
+          id="gc-designer-modals-prop-object-edit-entity-type"
+          maxlength="128"
+          autocomplete="off"
+          list="gc-designer-object-edit-entity-type-datalist"
+          aria-describedby="gc-designer-modals-prop-object-edit-entity-type-hint"
+          placeholder="e.g. ip_host"
+        />
+        <datalist id="gc-designer-object-edit-entity-type-datalist"></datalist>
+        <span id="gc-designer-modals-prop-object-edit-entity-type-hint" class="settings-form__hint muted"
+          >Must match an <code class="mono">entity_type</code> from synced firewall or configuration config cache (see
+          <span class="mono">/api/firewalls/config-cache/distinct-entity-types</span>).</span
+        >
+      </label>
+      <div class="settings-form__actions" style="align-items: center; gap: 0.75rem; flex-wrap: wrap">
+        <button type="button" class="btn primary" id="gc-designer-modals-flyout-titles-save">Save flyout properties</button>
+        <span class="muted" id="gc-designer-modals-flyout-titles-save-status" aria-live="polite"></span>
       </div>
     </div>
   </section>
@@ -93,13 +179,47 @@
       </div>
     </div>
   </section>
+  <section class="gc-designer__section" aria-labelledby="gc-designer-modals-option-selectors-h">
+    <h2 id="gc-designer-modals-option-selectors-h" class="gc-designer__h2">Option selector</h2>
+    <p class="gc-designer__note">
+      Same segmented control as <a href="/designer/controls">Controls</a> · Option selectors (one outer border, pill-shaped
+      ends). Use <strong>Configure selector options</strong> to set labels (one per line). The <strong>control id</strong>
+      under the demo names the pattern for reuse elsewhere.
+    </p>
+    <div class="gc-designer__sandbox">
+      <div class="gc-designer__row" style="flex-direction: column; align-items: flex-start; gap: 1.25rem">
+        <button type="button" class="btn primary" id="gc-designer-modals-selector-props-open">
+          Configure selector options
+        </button>
+        <div class="gc-designer__sample gc-designer__sample--controls">
+          <span class="settings-form__label">Segments</span>
+          <div
+            id="gc-designer-modals-option-selector"
+            class="gc-option-selector"
+            role="group"
+            aria-label="Designer modals: option selector"
+            data-gc-option-selector
+            data-gc-designer-selector-items='["On","Off"]'
+          ></div>
+          <span
+            id="gc-designer-modals-selector-control-label"
+            class="gc-designer__control-id"
+            title="Reference id for this control"
+            data-gc-designer-control-id="selector"
+            >selector</span
+          >
+        </div>
+      </div>
+    </div>
+  </section>
   <section class="gc-designer__section" aria-labelledby="gc-designer-modals-banners-h">
     <h2 id="gc-designer-modals-banners-h" class="gc-designer__h2">Banners</h2>
     <p class="gc-designer__note">
       Banner state is stored in <code class="mono">sessionStorage</code> and survives refresh. A
-      <strong>consolidated</strong> row (latest message, <strong>more</strong> ⋯, and a small aggregate
-      <strong>progress bar</strong> for in-flight types) appears only when <strong>two or more</strong> banners of that
-      type are active at once. A single banner uses a simpler row without ⋯ or the aggregate bar. The popover lists each
+      <strong>consolidated</strong> row (two or more of the same type) shows a numeric <strong>pill</strong> that opens
+      the list popover; timed rows use a <strong>countdown bar</strong> for whichever activity has the longest time left,
+      while persistent and result rows keep the aggregate <strong>progress bar</strong> to the right of the pill. A
+      single banner omits the pill and extras. The popover lists each
       item with its <strong>control id</strong> (e.g. <code class="mono">timed-progress-banner</code>) and message;
       timed progress keeps × (completes oldest); <strong>Finish</strong> still completes the oldest persistent item
       (FIFO). Completed/Error rows use × to clear the whole group. The <strong>control id</strong> under each demo
@@ -166,7 +286,7 @@
         id="gc-designer-flyout-view-primary">
         <div class="gc-designer-view-flyout__resize gc-designer-view-flyout__resize--primary" aria-hidden="true"></div>
         <header class="gc-designer-modal__header">
-          <h2 id="gc-designer-flyout-view-title" class="gc-designer-modal__title">View</h2>
+          <h2 id="gc-designer-flyout-view-title" class="gc-designer-modal__title">Add</h2>
           <button type="button" class="gc-designer-modal__close" aria-label="Close">×</button>
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
@@ -251,6 +371,8 @@
     </div>
   </div>
 
+  {% include "partials/gc_designer_object_edit_flyout_modal.html" %}
+
   <div class="gc-designer-modal gc-designer-modal--dialog-center" id="gc-designer-dialog-modal" hidden>
     <button
       type="button"
@@ -288,361 +410,204 @@
       </footer>
     </div>
   </div>
+
+  <div
+    class="gc-designer-modal gc-designer-modal--flyout-right"
+    id="gc-designer-modals-selector-props-flyout"
+    data-gc-designer-modal-no-escape
+    hidden
+  >
+    <button type="button" class="gc-designer-modal__backdrop" tabindex="-1" aria-hidden="true"></button>
+    <div
+      class="gc-designer-view-flyout__stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="gc-designer-modals-selector-props-title"
+    >
+      <div
+        class="gc-designer-modal__panel gc-designer-view-flyout__panel gc-designer-view-flyout__panel--primary"
+        id="gc-designer-modals-selector-props-panel"
+      >
+        <header class="gc-designer-modal__header">
+          <h2 id="gc-designer-modals-selector-props-title" class="gc-designer-modal__title">Selector options</h2>
+        </header>
+        <div class="gc-designer-modal__divider" aria-hidden="true"></div>
+        <div class="gc-designer-modal__body">
+          <div class="settings-form__field" style="width: 100%">
+            <span class="settings-form__label" id="gc-designer-modals-selector-items-rows-l">Segment labels</span>
+            <div
+              id="gc-designer-modals-selector-items-rows"
+              class="gc-designer-selector-items-rows"
+              role="group"
+              aria-labelledby="gc-designer-modals-selector-items-rows-l"
+            ></div>
+            <button type="button" class="btn btn--secondary" id="gc-designer-modals-selector-items-add-row" style="margin-top: 10px">
+              Add value
+            </button>
+          </div>
+          <p class="settings-form__hint muted" style="margin-top: 0.75rem">
+            <strong>Save</strong> rebuilds the segment buttons and keeps the prior selection when its label still exists;
+            otherwise the first segment is active. Removing every row defaults to <strong>On</strong> and
+            <strong>Off</strong>.
+          </p>
+        </div>
+        <footer class="gc-designer-modal__footer">
+          <button type="button" class="btn btn--secondary" id="gc-designer-modals-selector-props-cancel">Cancel</button>
+          <button type="button" class="btn primary" id="gc-designer-modals-selector-props-save">Save</button>
+        </footer>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
+{% include "partials/gc_designer_controls_scripts.html" %}
+<script src="/static/gc-hosts-services-flyout.js"></script>
+<script src="/static/gc-data-controls-object-edit-layout.js"></script>
+<script src="/static/gc-designer-object-edit-catalog.js"></script>
+<script src="/static/gc-designer-stack-flyout-runtime.js"></script>
 <script>
   (function () {
-    function syncScrollLock() {
-      var anyOpen = document.querySelector(".gc-designer-modal:not([hidden])");
-      document.body.classList.toggle("gc-designer-modal-open", !!anyOpen);
+    var openModal = globalThis.gcDesignerFlyoutOpenModal;
+    var closeModal = globalThis.gcDesignerFlyoutCloseModal;
+    var bindDesignerStackFlyoutResize = globalThis.gcDesignerFlyoutBindDesignerStackFlyoutResize;
+    var applyDesignerStackFlyoutState = globalThis.gcDesignerFlyoutApplyDesignerStackFlyoutState;
+
+    var DESIGNER_MODAL_PROPS_URL = "/api/designer/modal-properties";
+
+    function designerModalFlyoutComposedTitle(prefix, suffix) {
+      var t = (suffix || "").replace(/^\s+|\s+$/g, "");
+      return t ? prefix + " " + t : prefix;
     }
 
-    function resetDesignerFlyoutScrollChurn() {
-      try {
-        document.documentElement.scrollLeft = 0;
-        document.body.scrollLeft = 0;
-        var ab = document.querySelector(".app-body");
-        if (ab) ab.scrollLeft = 0;
-        var main = document.querySelector(".app-main");
-        if (main) main.scrollLeft = 0;
-      } catch (e) {}
-    }
-
-    var designerStackFlyoutHide = { timer: null, onEnd: null, primary: null, secondary: null };
-
-    var DESIGNER_STACK_FLYOUT_MIN_W = 280;
-
-    function designerStackFlyoutIds(root) {
-      if (!root) return null;
-      if (root.id === "gc-designer-flyout-view-modal") {
-        return {
-          primaryId: "gc-designer-flyout-view-primary",
-          secondaryId: "gc-designer-flyout-view-secondary",
-          skeletonId: "gc-designer-flyout-view-primary-skeleton",
-          secondaryFocusId: "gc-designer-flyout-view-secondary-close",
-          peekDismiss: true,
-        };
+    function applyDesignerModalFlyoutTitlesFromInputs() {
+      var viewIn = document.getElementById("gc-designer-modals-prop-view-flyout-title");
+      var editIn = document.getElementById("gc-designer-modals-prop-edit-flyout-title");
+      var objEditIn = document.getElementById("gc-designer-modals-prop-object-edit-flyout-title");
+      var viewH = document.getElementById("gc-designer-flyout-view-title");
+      var editH = document.getElementById("gc-designer-flyout-edit-title");
+      var objEditH = document.getElementById("gc-designer-flyout-object-edit-title");
+      if (viewH) {
+        viewH.textContent = designerModalFlyoutComposedTitle("Add", viewIn ? viewIn.value : "");
       }
-      if (root.id === "gc-designer-flyout-edit-modal") {
-        return {
-          primaryId: "gc-designer-flyout-edit-primary",
-          secondaryId: "gc-designer-flyout-edit-secondary",
-          skeletonId: "gc-designer-flyout-edit-primary-skeleton",
-          secondaryFocusId: "gc-designer-flyout-edit-secondary-save",
-          peekDismiss: false,
-        };
+      if (editH) {
+        editH.textContent = designerModalFlyoutComposedTitle("Edit", editIn ? editIn.value : "");
       }
-      return null;
-    }
-
-    function designerStackFlyoutPrimary(root) {
-      var c = designerStackFlyoutIds(root);
-      return c ? document.getElementById(c.primaryId) : null;
-    }
-
-    function isDesignerStackFlyoutRoot(root) {
-      return designerStackFlyoutIds(root) !== null;
-    }
-
-    function resetPrimaryFlyoutWidth(root) {
-      var p = designerStackFlyoutPrimary(root);
-      if (!p) return;
-      p.style.removeProperty("width");
-      p.style.removeProperty("max-width");
-    }
-
-    function rememberPrimaryFlyoutWidthBeforeStack(root) {
-      var p = designerStackFlyoutPrimary(root);
-      if (!p) return;
-      var w = Math.round(p.getBoundingClientRect().width);
-      if (w > 0) root.dataset.gcDesignerPrimarySavedWidthPx = String(w);
-    }
-
-    function restorePrimaryFlyoutWidthIfSaved(root) {
-      var p = designerStackFlyoutPrimary(root);
-      var s = root.dataset.gcDesignerPrimarySavedWidthPx;
-      if (!p || s === undefined || s === "") return;
-      p.style.width = s + "px";
-      delete root.dataset.gcDesignerPrimarySavedWidthPx;
-    }
-
-    function clearPrimaryFlyoutSavedWidth(root) {
-      delete root.dataset.gcDesignerPrimarySavedWidthPx;
-    }
-
-    function measureDesignerFlyoutPeekPx(root) {
-      var raw = getComputedStyle(root).getPropertyValue("--gc-designer-flyout-peek").trim();
-      if (!raw) return 48;
-      if (raw.endsWith("px")) {
-        var n = parseFloat(raw);
-        return isNaN(n) ? 48 : n;
+      if (objEditH) {
+        objEditH.textContent = designerModalFlyoutComposedTitle("Edit", objEditIn ? objEditIn.value : "");
       }
-      var probe = document.createElement("div");
-      probe.style.cssText =
-        "position:absolute;left:-9999px;width:" +
-        raw +
-        ";height:0;visibility:hidden;pointer-events:none";
-      document.body.appendChild(probe);
-      var w = probe.getBoundingClientRect().width;
-      document.body.removeChild(probe);
-      return w > 0 ? w : 48;
+      syncDesignerObjectEditEntityTypeLive();
     }
 
-    function bindDesignerStackFlyoutResize(root) {
-      if (!root || root.dataset.gcDesignerStackFlyoutResizeBound === "1") return;
-      var cfg = designerStackFlyoutIds(root);
-      if (!cfg) return;
-      root.dataset.gcDesignerStackFlyoutResizeBound = "1";
-      var primary = document.getElementById(cfg.primaryId);
-      var secondary = document.getElementById(cfg.secondaryId);
-      var hPri = primary && primary.querySelector(".gc-designer-view-flyout__resize--primary");
-      var hSec = secondary && secondary.querySelector(".gc-designer-view-flyout__resize--secondary");
+    function syncDesignerObjectEditEntityTypeLive() {
+      var etIn = document.getElementById("gc-designer-modals-prop-object-edit-entity-type");
+      var live = document.getElementById("gc-designer-object-edit-entity-type-live");
+      if (!live) return;
+      var raw = etIn ? etIn.value.replace(/^\s+|\s+$/g, "") : "";
+      live.textContent = raw ? "Object type: " + raw : "Object type: —";
+    }
 
-      function overlayWidth() {
-        return root.getBoundingClientRect().width;
-      }
+    function hydrateDesignerObjectEditFirewallPicker() {
+      var mount = document.getElementById("gc-designer-object-edit-fw-mount");
+      if (!mount || typeof globalThis.gcHsHydrateFlyoutFirewallPicker !== "function") return;
+      globalThis.gcHsHydrateFlyoutFirewallPicker(mount, { row: {} });
+    }
 
-      function bindEdge(panel, handle, getMaxW, isPrimary) {
-        if (!panel || !handle) return;
-        handle.addEventListener("mousedown", function (e) {
-          if (e.button !== 0) return;
-          e.preventDefault();
-          e.stopPropagation();
-          if (isPrimary && root.classList.contains("is-view-flyout-stacked")) return;
-          var startX = e.clientX;
-          var startW = panel.getBoundingClientRect().width;
-          function onMove(e2) {
-            var cap = getMaxW();
-            var w = startW + (startX - e2.clientX);
-            w = Math.max(DESIGNER_STACK_FLYOUT_MIN_W, Math.min(cap, w));
-            panel.style.width = w + "px";
-          }
-          function onUp() {
-            document.removeEventListener("mousemove", onMove);
-            document.removeEventListener("mouseup", onUp);
-          }
-          document.addEventListener("mousemove", onMove);
-          document.addEventListener("mouseup", onUp);
-        });
-      }
+    function loadDesignerObjectEditEntityTypeDatalist() {
+      var dl = document.getElementById("gc-designer-object-edit-entity-type-datalist");
+      if (!dl) return;
+      fetch("/api/firewalls/config-cache/distinct-entity-types", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !Array.isArray(res.j.entity_types)) return;
+          dl.innerHTML = "";
+          res.j.entity_types.forEach(function (t) {
+            var s = String(t || "").trim();
+            if (!s) return;
+            var opt = document.createElement("option");
+            opt.value = s;
+            dl.appendChild(opt);
+          });
+        })
+        .catch(function () {});
+    }
 
-      bindEdge(primary, hPri, overlayWidth, true);
-      bindEdge(
-        secondary,
-        hSec,
-        function () {
-          return Math.max(DESIGNER_STACK_FLYOUT_MIN_W, overlayWidth() - measureDesignerFlyoutPeekPx(root));
+    function loadDesignerModalFlyoutTitleProps() {
+      var viewIn = document.getElementById("gc-designer-modals-prop-view-flyout-title");
+      var editIn = document.getElementById("gc-designer-modals-prop-edit-flyout-title");
+      var objEditTitleIn = document.getElementById("gc-designer-modals-prop-object-edit-flyout-title");
+      var objEditEtIn = document.getElementById("gc-designer-modals-prop-object-edit-entity-type");
+      if (!viewIn || !editIn) return;
+      fetch(DESIGNER_MODAL_PROPS_URL, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.properties) return;
+          var p = res.j.properties;
+          viewIn.value = p.view_flyout_title || "";
+          editIn.value = p.edit_flyout_title || "";
+          if (objEditTitleIn) objEditTitleIn.value = p.object_edit_flyout_title || "";
+          if (objEditEtIn) objEditEtIn.value = p.object_edit_entity_type || "";
+          applyDesignerModalFlyoutTitlesFromInputs();
+        })
+        .catch(function () {});
+    }
+
+    function saveDesignerModalFlyoutTitleProps() {
+      var viewIn = document.getElementById("gc-designer-modals-prop-view-flyout-title");
+      var editIn = document.getElementById("gc-designer-modals-prop-edit-flyout-title");
+      var objEditTitleIn = document.getElementById("gc-designer-modals-prop-object-edit-flyout-title");
+      var objEditEtIn = document.getElementById("gc-designer-modals-prop-object-edit-entity-type");
+      var statusEl = document.getElementById("gc-designer-modals-flyout-titles-save-status");
+      if (!viewIn || !editIn) return;
+      if (statusEl) statusEl.textContent = "Saving…";
+      fetch(DESIGNER_MODAL_PROPS_URL, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
         },
-        false
-      );
-    }
-
-    function getPrimaryContentHit(root) {
-      var c = designerStackFlyoutIds(root);
-      return c ? document.getElementById(c.skeletonId) : null;
-    }
-
-    function syncPrimaryContentHitState(root, interactive) {
-      var el = getPrimaryContentHit(root);
-      if (!el) return;
-      el.tabIndex = interactive ? 0 : -1;
-      if (interactive) el.removeAttribute("aria-disabled");
-      else el.setAttribute("aria-disabled", "true");
-    }
-
-    function focusPrimaryContentHitOrClose(root) {
-      var hit = getPrimaryContentHit(root);
-      requestAnimationFrame(function () {
-        if (hit && hit.tabIndex === 0) {
-          hit.focus();
-        } else if (root.id === "gc-designer-flyout-view-modal") {
-          var c = root.querySelector("#gc-designer-flyout-view-primary .gc-designer-modal__close");
-          if (c) c.focus();
-        } else if (root.id === "gc-designer-flyout-edit-modal") {
-          var fp = root.querySelector("#gc-designer-flyout-edit-primary .gc-designer-modal__footer .btn.primary");
-          if (fp) fp.focus();
-        }
-      });
-    }
-
-    function cancelDesignerStackFlyoutHide() {
-      if (designerStackFlyoutHide.timer) {
-        clearTimeout(designerStackFlyoutHide.timer);
-        designerStackFlyoutHide.timer = null;
-      }
-      if (designerStackFlyoutHide.onEnd) {
-        if (designerStackFlyoutHide.primary) {
-          designerStackFlyoutHide.primary.removeEventListener("transitionend", designerStackFlyoutHide.onEnd);
-        }
-        if (designerStackFlyoutHide.secondary) {
-          designerStackFlyoutHide.secondary.removeEventListener("transitionend", designerStackFlyoutHide.onEnd);
-        }
-      }
-      designerStackFlyoutHide.onEnd = null;
-      designerStackFlyoutHide.primary = null;
-      designerStackFlyoutHide.secondary = null;
-    }
-
-    function applyDesignerStackFlyoutState(root, stacked, opts) {
-      opts = opts || {};
-      var cfg = designerStackFlyoutIds(root);
-      if (!root || !cfg) return;
-      var secondary = document.getElementById(cfg.secondaryId);
-      var secondaryFocus = document.getElementById(cfg.secondaryFocusId);
-
-      if (stacked) {
-        cancelDesignerStackFlyoutHide();
-        root.classList.remove("is-view-flyout-collapsing", "is-view-flyout-secondary-visible");
-        rememberPrimaryFlyoutWidthBeforeStack(root);
-        resetPrimaryFlyoutWidth(root);
-        root.classList.add("is-view-flyout-stacked");
-        if (secondary) secondary.removeAttribute("hidden");
-        if (secondary) secondary.setAttribute("aria-hidden", "false");
-        syncPrimaryContentHitState(root, false);
-        void (secondary && secondary.offsetWidth);
-        requestAnimationFrame(function () {
-          if (root.hidden) return;
-          root.classList.add("is-view-flyout-secondary-visible");
-          if (!opts.skipFocus) {
-            requestAnimationFrame(function () {
-              if (secondaryFocus) secondaryFocus.focus();
-            });
+        body: JSON.stringify({
+          view_flyout_title: viewIn.value,
+          edit_flyout_title: editIn.value,
+          object_edit_flyout_title: objEditTitleIn ? objEditTitleIn.value : "",
+          object_edit_entity_type: objEditEtIn ? objEditEtIn.value : "",
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, j: j };
+          });
+        })
+        .then(function (res) {
+          if (statusEl) statusEl.textContent = res.ok ? "Saved." : "Save failed.";
+          if (res.ok && res.j && res.j.properties) {
+            var pr = res.j.properties;
+            viewIn.value = pr.view_flyout_title || "";
+            editIn.value = pr.edit_flyout_title || "";
+            if (objEditTitleIn) objEditTitleIn.value = pr.object_edit_flyout_title || "";
+            if (objEditEtIn) objEditEtIn.value = pr.object_edit_entity_type || "";
+            applyDesignerModalFlyoutTitlesFromInputs();
           }
+        })
+        .catch(function () {
+          if (statusEl) statusEl.textContent = "Save failed.";
         });
-        return;
-      }
-
-      cancelDesignerStackFlyoutHide();
-
-      if (!opts.immediate && root.classList.contains("is-view-flyout-collapsing")) {
-        return;
-      }
-
-      if (opts.immediate) {
-        root.classList.remove(
-          "is-view-flyout-stacked",
-          "is-view-flyout-collapsing",
-          "is-view-flyout-secondary-visible"
-        );
-        clearPrimaryFlyoutSavedWidth(root);
-        resetPrimaryFlyoutWidth(root);
-        if (secondary) {
-          secondary.setAttribute("hidden", "");
-          secondary.setAttribute("aria-hidden", "true");
-        }
-        syncPrimaryContentHitState(root, true);
-        resetDesignerFlyoutScrollChurn();
-        if (!opts.skipFocus) focusPrimaryContentHitOrClose(root);
-        return;
-      }
-
-      if (!root.classList.contains("is-view-flyout-stacked")) {
-        root.classList.remove("is-view-flyout-collapsing");
-        syncPrimaryContentHitState(root, true);
-        if (!opts.skipFocus) focusPrimaryContentHitOrClose(root);
-        return;
-      }
-
-      if (!secondary) {
-        root.classList.remove(
-          "is-view-flyout-stacked",
-          "is-view-flyout-collapsing",
-          "is-view-flyout-secondary-visible"
-        );
-        restorePrimaryFlyoutWidthIfSaved(root);
-        syncPrimaryContentHitState(root, true);
-        if (!opts.skipFocus) focusPrimaryContentHitOrClose(root);
-        return;
-      }
-
-      syncPrimaryContentHitState(root, false);
-
-      var primary = designerStackFlyoutPrimary(root);
-      if (!primary) {
-        root.classList.remove(
-          "is-view-flyout-stacked",
-          "is-view-flyout-collapsing",
-          "is-view-flyout-secondary-visible"
-        );
-        secondary.setAttribute("hidden", "");
-        syncPrimaryContentHitState(root, true);
-        restorePrimaryFlyoutWidthIfSaved(root);
-        return;
-      }
-
-      var finished = false;
-      function finishHide() {
-        if (finished) return;
-        if (!root.classList.contains("is-view-flyout-collapsing")) return;
-        finished = true;
-        cancelDesignerStackFlyoutHide();
-        secondary.setAttribute("hidden", "");
-        secondary.setAttribute("aria-hidden", "true");
-        root.classList.remove(
-          "is-view-flyout-stacked",
-          "is-view-flyout-collapsing",
-          "is-view-flyout-secondary-visible"
-        );
-        restorePrimaryFlyoutWidthIfSaved(root);
-        syncPrimaryContentHitState(root, true);
-        resetDesignerFlyoutScrollChurn();
-        requestAnimationFrame(function () {
-          resetDesignerFlyoutScrollChurn();
-        });
-        if (!opts.skipFocus) focusPrimaryContentHitOrClose(root);
-      }
-
-      function onTransitionEnd(e) {
-        if (e.target !== primary) return;
-        if (e.propertyName !== "transform") return;
-        finishHide();
-      }
-
-      root.classList.add("is-view-flyout-collapsing");
-      designerStackFlyoutHide.primary = primary;
-      designerStackFlyoutHide.secondary = null;
-      designerStackFlyoutHide.onEnd = onTransitionEnd;
-      primary.addEventListener("transitionend", onTransitionEnd);
-      designerStackFlyoutHide.timer = setTimeout(finishHide, 500);
-    }
-
-    function openModal(root) {
-      if (!root) return;
-      document.querySelectorAll(".gc-designer-modal:not([hidden])").forEach(function (other) {
-        if (other !== root) other.hidden = true;
-      });
-      root.hidden = false;
-      syncScrollLock();
-      resetDesignerFlyoutScrollChurn();
-      if (isDesignerStackFlyoutRoot(root)) {
-        applyDesignerStackFlyoutState(root, false, { skipFocus: true, immediate: true });
-      }
-      if (root.id === "gc-designer-dialog-modal") {
-        return;
-      }
-      var closeBtn =
-        root.id === "gc-designer-flyout-view-modal"
-          ? root.querySelector("#gc-designer-flyout-view-primary .gc-designer-modal__close")
-          : root.id === "gc-designer-flyout-edit-modal"
-            ? root.querySelector("#gc-designer-flyout-edit-primary .gc-designer-modal__footer .btn.primary")
-            : root.querySelector(".gc-designer-modal__close");
-      if (closeBtn) {
-        closeBtn.focus();
-      } else {
-        var footerPrimary = root.querySelector(".gc-designer-modal__footer .btn.primary");
-        if (footerPrimary) footerPrimary.focus();
-      }
-    }
-
-    function closeModal(root) {
-      if (!root || root.hidden) return;
-      if (isDesignerStackFlyoutRoot(root)) {
-        applyDesignerStackFlyoutState(root, false, { skipFocus: true, immediate: true });
-      }
-      root.hidden = true;
-      syncScrollLock();
-      resetDesignerFlyoutScrollChurn();
     }
 
     (function wireDesignerCenterDialogs() {
@@ -740,6 +705,7 @@
       bindDesignerStackFlyoutResize(root);
 
       openBtn.addEventListener("click", function () {
+        applyDesignerModalFlyoutTitlesFromInputs();
         openModal(root);
       });
 
@@ -803,6 +769,7 @@
       bindDesignerStackFlyoutResize(root);
 
       openBtn.addEventListener("click", function () {
+        applyDesignerModalFlyoutTitlesFromInputs();
         openModal(root);
       });
       if (saveBtn) {
@@ -840,18 +807,65 @@
       if (secCancel) secCancel.addEventListener("click", collapseSecondary);
     })();
 
+    (function wireObjectEditFlyoutOpenFromModalsProps() {
+      var root = document.getElementById("gc-designer-flyout-object-edit-modal");
+      var openBtn = document.getElementById("gc-designer-flyout-object-edit-open");
+      if (!root || !openBtn) return;
+      openBtn.addEventListener("click", function () {
+        applyDesignerModalFlyoutTitlesFromInputs();
+        hydrateDesignerObjectEditFirewallPicker();
+        if (typeof globalThis.gcDesignerHydrateObjectEditCatalogFields === "function") {
+          globalThis.gcDesignerHydrateObjectEditCatalogFields();
+        }
+        openModal(root);
+      });
+    })();
+
     (function wireDesignerDemoBanner() {
       var HOST_ID = "gc-designer-demo-banner-host";
       var STORAGE_KEY = "gcDesignerDemoBanners";
       var DURATION_MS = 20000;
       var POPOVER_MAX_ROWS = 10;
       var POPOVER_ROW_PX = 44;
+      var timedCountdownIntervalId = null;
 
       var host = document.getElementById(HOST_ID);
       var popover = document.getElementById("gc-designer-banner-more-popover");
       var popoverList = document.getElementById("gc-designer-banner-more-popover-list");
       var popBackdrop = document.getElementById("gc-designer-banner-more-backdrop");
       if (!host) return;
+
+      function wireBannerPopoverListActions() {
+        if (!popoverList || popoverList.dataset.gcDesignerPopoverActionsWired) return;
+        popoverList.dataset.gcDesignerPopoverActionsWired = "1";
+        popoverList.addEventListener("click", function (e) {
+          var btn = e.target.closest("[data-gc-dismiss-timed]");
+          if (btn) {
+            e.preventDefault();
+            removeTimedActivityById(Number(btn.getAttribute("data-gc-dismiss-timed")));
+            return;
+          }
+          btn = e.target.closest("[data-gc-dismiss-persistent]");
+          if (btn) {
+            e.preventDefault();
+            removePersistentItemById(String(btn.getAttribute("data-gc-dismiss-persistent")));
+            return;
+          }
+          btn = e.target.closest("[data-gc-dismiss-completed]");
+          if (btn) {
+            e.preventDefault();
+            removeCompletedItem(String(btn.getAttribute("data-gc-dismiss-completed")));
+            return;
+          }
+          btn = e.target.closest("[data-gc-dismiss-error]");
+          if (btn) {
+            e.preventDefault();
+            removeErrorItem(String(btn.getAttribute("data-gc-dismiss-error")));
+            return;
+          }
+        });
+      }
+      wireBannerPopoverListActions();
 
       var openPopoverBucket = null;
       var openPopoverAnchor = null;
@@ -910,7 +924,12 @@
               completed: state.timed.completed,
               nextId: state.timed.nextId,
               active: state.timed.active.map(function (a) {
-                return { id: a.id, message: a.message, endsAt: a.endsAt };
+                return {
+                  id: a.id,
+                  message: a.message,
+                  endsAt: a.endsAt,
+                  startedAt: a.startedAt != null ? a.startedAt : a.endsAt - DURATION_MS,
+                };
               }),
             },
             persistent: {
@@ -978,11 +997,19 @@
         return state.error.items;
       }
 
+      function escapeDesignerBannerText(text) {
+        var s = String(text == null ? "" : text);
+        var d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
       function closeBannerMorePopover() {
         openPopoverBucket = null;
         openPopoverAnchor = null;
         if (popover) popover.hidden = true;
         if (popBackdrop) popBackdrop.hidden = true;
+        syncDesignerBannerTicker();
       }
 
       function positionBannerMorePopover() {
@@ -1002,67 +1029,230 @@
         var items = bucketItems(bucket);
         var typeId = BUCKET_CONTROL_ID[bucket] || bucket;
         popoverList.innerHTML = "";
-        items.forEach(function (it) {
-          var li = document.createElement("li");
-          li.className = "gc-designer-banner-more-popover__item";
-          var typeEl = document.createElement("span");
-          typeEl.className = "gc-designer-banner-more-popover__type mono";
-          typeEl.textContent = typeId;
-          var msgEl = document.createElement("span");
-          msgEl.className = "gc-designer-banner-more-popover__msg";
-          msgEl.textContent = it.message || "";
-          li.appendChild(typeEl);
-          li.appendChild(msgEl);
-          popoverList.appendChild(li);
-        });
+        popover.classList.remove(
+          "gc-designer-banner-more-popover--bucket-timed",
+          "gc-designer-banner-more-popover--bucket-persistent",
+          "gc-designer-banner-more-popover--bucket-completed",
+          "gc-designer-banner-more-popover--bucket-error"
+        );
+        popover.classList.add("gc-designer-banner-more-popover--bucket-" + bucket);
+
+        function buildBannerRowHtml(iconHtml, msg, dismissAttr, dismissVal, includeTimer) {
+          var timerBlock = includeTimer
+            ? '<div class="gc-designer-demo-banner__countdown gc-designer-demo-banner__countdown--js" role="timer" aria-live="off"><div class="gc-designer-demo-banner__countdown-fill gc-designer-demo-banner__countdown-fill--js" aria-hidden="true"></div></div>'
+            : '<div class="gc-designer-banner-more-popover__timer-slot" aria-hidden="true"></div>';
+          var escVal = String(dismissVal).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+          return (
+            '<div class="gc-designer-banner-more-popover__banner-row">' +
+            '<span class="gc-designer-demo-banner__icon">' +
+            iconHtml +
+            "</span>" +
+            '<div class="gc-designer-banner-more-popover__center">' +
+            '<span class="gc-designer-banner-more-popover__type mono">' +
+            escapeDesignerBannerText(typeId) +
+            "</span>" +
+            '<p class="gc-designer-banner-more-popover__msg">' +
+            escapeDesignerBannerText(msg) +
+            "</p></div>" +
+            timerBlock +
+            '<button type="button" class="gc-designer-banner-more-popover__close gc-designer-demo-banner__close" ' +
+            dismissAttr +
+            '="' +
+            escVal +
+            '" aria-label="Dismiss">&times;</button>' +
+            "</div>"
+          );
+        }
+
+        var li;
+        if (bucket === "timed") {
+          items.forEach(function (it) {
+            li = document.createElement("li");
+            li.className =
+              "gc-designer-banner-more-popover__item gc-designer-banner-more-popover__item--banner gc-designer-banner-more-popover__item--progress";
+            li.setAttribute("data-gc-timed-id", String(it.id));
+            li.innerHTML = buildBannerRowHtml(ICON_PROGRESS, it.message || "", "data-gc-dismiss-timed", it.id, true);
+            popoverList.appendChild(li);
+          });
+        } else if (bucket === "persistent") {
+          items.forEach(function (it) {
+            li = document.createElement("li");
+            li.className =
+              "gc-designer-banner-more-popover__item gc-designer-banner-more-popover__item--banner gc-designer-banner-more-popover__item--progress gc-designer-banner-more-popover__item--persistent";
+            li.innerHTML = buildBannerRowHtml(
+              ICON_PROGRESS,
+              it.message || "",
+              "data-gc-dismiss-persistent",
+              it.id,
+              false
+            );
+            popoverList.appendChild(li);
+          });
+        } else if (bucket === "completed") {
+          items.forEach(function (it) {
+            li = document.createElement("li");
+            li.className =
+              "gc-designer-banner-more-popover__item gc-designer-banner-more-popover__item--banner gc-designer-banner-more-popover__item--completed";
+            li.setAttribute("data-gc-completed-row-id", String(it.id));
+            li.innerHTML = buildBannerRowHtml(ICON_DONE, it.message || "", "data-gc-dismiss-completed", it.id, true);
+            popoverList.appendChild(li);
+          });
+        } else {
+          items.forEach(function (it) {
+            li = document.createElement("li");
+            li.className =
+              "gc-designer-banner-more-popover__item gc-designer-banner-more-popover__item--banner gc-designer-banner-more-popover__item--error";
+            li.setAttribute("data-gc-error-row-id", String(it.id));
+            li.innerHTML = buildBannerRowHtml(ICON_ERR, it.message || "", "data-gc-dismiss-error", it.id, true);
+            popoverList.appendChild(li);
+          });
+        }
+
         if (popBackdrop) popBackdrop.hidden = false;
         popover.hidden = false;
         positionBannerMorePopover();
-        var moreBtn = anchorEl.querySelector(".gc-designer-banner-more");
-        if (moreBtn) moreBtn.focus();
+        tickDesignerBannerCountdowns();
+        syncDesignerBannerTicker();
+        var pillBtn = anchorEl.querySelector(".gc-designer-banner-consolidate-pill");
+        if (pillBtn && !pillBtn.hidden) pillBtn.focus();
       }
 
-      function setBannerRowConsolidatedUI(rowEl, consolidated) {
+      function setBannerRowConsolidatedUI(rowEl, consolidated, options) {
+        options = options || {};
         if (!rowEl) return;
         if (!consolidated && openPopoverAnchor === rowEl) {
           closeBannerMorePopover();
         }
         rowEl.classList.toggle("gc-designer-demo-banner--consolidated", !!consolidated);
         rowEl.classList.toggle("gc-designer-demo-banner--single", !consolidated);
-        var more = rowEl.querySelector(".gc-designer-banner-more");
-        var agg = rowEl.querySelector(".gc-designer-demo-banner__aggregate-wrap");
-        if (more) {
-          more.hidden = !consolidated;
-          if (consolidated) more.removeAttribute("aria-hidden");
-          else more.setAttribute("aria-hidden", "true");
-        }
-        if (agg) {
-          agg.hidden = !consolidated;
-          if (consolidated) agg.removeAttribute("aria-hidden");
-          else agg.setAttribute("aria-hidden", "true");
+        var meta = rowEl.querySelector(".gc-designer-demo-banner__meta-tools");
+        if (meta) {
+          meta.hidden = options.showMetaAlways ? false : !consolidated;
         }
       }
 
-      function wireMoreAndRow(bucket, rowEl) {
-        var more = rowEl.querySelector(".gc-designer-banner-more");
-        if (more) {
-          more.addEventListener("click", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (openPopoverBucket === bucket && !popover.hidden) {
-              closeBannerMorePopover();
-            } else {
-              openBannerMorePopover(bucket, rowEl);
-            }
-          });
+      function wireConsolidatePill(bucket, rowEl) {
+        var pill = rowEl.querySelector(".gc-designer-banner-consolidate-pill");
+        if (!pill) return;
+        pill.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (openPopoverBucket === bucket && !popover.hidden) {
+            closeBannerMorePopover();
+          } else {
+            openBannerMorePopover(bucket, rowEl);
+          }
+        });
+      }
+
+      function stopDesignerBannerTicker() {
+        if (timedCountdownIntervalId) {
+          clearInterval(timedCountdownIntervalId);
+          timedCountdownIntervalId = null;
+        }
+      }
+
+      function pickLongestTimedActive() {
+        var arr = state.timed.active;
+        if (!arr.length) return null;
+        if (arr.length === 1) return arr[0];
+        var winner = arr[0];
+        for (var i = 1; i < arr.length; i++) {
+          if (arr[i].endsAt >= winner.endsAt) winner = arr[i];
+        }
+        return winner;
+      }
+
+      function updateJsCountdownFill(fillEl, item, now, durationFallbackMs) {
+        if (!fillEl || !item) return;
+        var endsAt = item.endsAt;
+        var started =
+          item.startedAt != null ? item.startedAt : endsAt - (durationFallbackMs || DURATION_MS);
+        var total = Math.max(1, endsAt - started);
+        var elapsed = Math.min(total, Math.max(0, now - started));
+        fillEl.style.width = (elapsed / total) * 100 + "%";
+      }
+
+      function tickDesignerBannerCountdowns() {
+        var now = Date.now();
+        var rowEl = state.timed.rowEl;
+        if (rowEl && state.timed.active.length > 0) {
+          var rowPick = pickLongestTimedActive();
+          var rowFill = rowEl.querySelector(".gc-designer-demo-banner__countdown-fill--js");
+          updateJsCountdownFill(rowFill, rowPick, now, DURATION_MS);
+          var timerEl = rowEl.querySelector(".gc-designer-demo-banner__countdown--js");
+          if (timerEl && rowPick) {
+            var maxEnd = rowPick.endsAt;
+            var started =
+              rowPick.startedAt != null ? rowPick.startedAt : maxEnd - DURATION_MS;
+            var total = Math.max(1, maxEnd - started);
+            var elapsed = Math.min(total, Math.max(0, now - started));
+            var pct = (elapsed / total) * 100;
+            timerEl.setAttribute("aria-valuenow", String(Math.round(pct)));
+            timerEl.setAttribute("aria-valuemin", "0");
+            timerEl.setAttribute("aria-valuemax", "100");
+            var secLeft = Math.max(0, Math.ceil((maxEnd - now) / 1000));
+            timerEl.setAttribute("aria-label", "Time remaining: about " + secLeft + " seconds");
+          }
+        }
+        if (!popover || popover.hidden || !popoverList) return;
+        var t;
+        if (openPopoverBucket === "timed") {
+          for (t = 0; t < state.timed.active.length; t++) {
+            var ta = state.timed.active[t];
+            var liT = popoverList.querySelector('[data-gc-timed-id="' + ta.id + '"]');
+            if (!liT) continue;
+            var pf = liT.querySelector(".gc-designer-demo-banner__countdown-fill--js");
+            updateJsCountdownFill(pf, ta, now, DURATION_MS);
+          }
+        } else if (openPopoverBucket === "completed") {
+          for (t = 0; t < state.completed.items.length; t++) {
+            var c = state.completed.items[t];
+            var liC = popoverList.querySelector('[data-gc-completed-row-id="' + c.id + '"]');
+            if (!liC) continue;
+            var cf = liC.querySelector(".gc-designer-demo-banner__countdown-fill--js");
+            var cStarted = c.endsAt - DURATION_MS;
+            updateJsCountdownFill(cf, { endsAt: c.endsAt, startedAt: cStarted }, now, DURATION_MS);
+          }
+        } else if (openPopoverBucket === "error") {
+          for (t = 0; t < state.error.items.length; t++) {
+            var x = state.error.items[t];
+            var liX = popoverList.querySelector('[data-gc-error-row-id="' + x.id + '"]');
+            if (!liX) continue;
+            var xf = liX.querySelector(".gc-designer-demo-banner__countdown-fill--js");
+            var xStarted = x.endsAt - DURATION_MS;
+            updateJsCountdownFill(xf, { endsAt: x.endsAt, startedAt: xStarted }, now, DURATION_MS);
+          }
+        }
+      }
+
+      function designerBannerTickerNeeded() {
+        if (state.timed.active.length > 0) return true;
+        if (popover && !popover.hidden && openPopoverBucket === "completed") return true;
+        if (popover && !popover.hidden && openPopoverBucket === "error") return true;
+        return false;
+      }
+
+      function syncDesignerBannerTicker() {
+        if (!designerBannerTickerNeeded()) {
+          stopDesignerBannerTicker();
+          return;
+        }
+        tickDesignerBannerCountdowns();
+        if (!timedCountdownIntervalId) {
+          timedCountdownIntervalId = setInterval(tickDesignerBannerCountdowns, 250);
         }
       }
 
       function removeRow(bucketKey) {
+        if (bucketKey === "timed") {
+          stopDesignerBannerTicker();
+        }
         var row = state[bucketKey].rowEl;
         if (row && row.parentNode) row.parentNode.removeChild(row);
         state[bucketKey].rowEl = null;
         if (openPopoverAnchor === row) closeBannerMorePopover();
+        syncDesignerBannerTicker();
       }
 
       function ensureTimedRow() {
@@ -1079,11 +1269,12 @@
           ICON_PROGRESS +
           "</span>" +
           '<p class="gc-designer-demo-banner__message gc-designer-banner-primary-line"></p>' +
-          '<button type="button" class="gc-designer-banner-more" aria-label="Show all in-progress items">⋯</button>' +
-          '<div class="gc-designer-demo-banner__aggregate-wrap">' +
-          '<div class="gc-designer-demo-banner__aggregate" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-label="Activities completed in this batch">' +
-          '<div class="gc-designer-demo-banner__aggregate-track" aria-hidden="true">' +
-          '<div class="gc-designer-demo-banner__aggregate-fill"></div></div></div></div>' +
+          '<div class="gc-designer-demo-banner__meta-tools" hidden>' +
+          '<button type="button" class="gc-designer-banner-consolidate-pill" aria-label=""></button>' +
+          '<div class="gc-designer-demo-banner__timed-countdown-host">' +
+          '<div class="gc-designer-demo-banner__countdown gc-designer-demo-banner__countdown--js" role="timer" aria-live="off">' +
+          '<div class="gc-designer-demo-banner__countdown-fill gc-designer-demo-banner__countdown-fill--js" aria-hidden="true"></div>' +
+          "</div></div></div>" +
           '<button type="button" class="gc-designer-demo-banner__close" aria-label="Complete oldest activity">&times;</button>' +
           "</div>";
         el.querySelector(".gc-designer-demo-banner__close").addEventListener("click", function (e) {
@@ -1092,7 +1283,7 @@
         });
         state.timed.rowEl = el;
         host.appendChild(el);
-        wireMoreAndRow("timed", el);
+        wireConsolidatePill("timed", el);
       }
 
       function refreshTimedRow() {
@@ -1104,26 +1295,24 @@
         }
         ensureTimedRow();
         var el = state.timed.rowEl;
-        var maxT = state.timed.maxTotal;
-        var done = state.timed.completed;
         var consolidated = state.timed.active.length >= 2;
-        setBannerRowConsolidatedUI(el, consolidated);
+        setBannerRowConsolidatedUI(el, consolidated, { showMetaAlways: true });
         var line = el.querySelector(".gc-designer-banner-primary-line");
         if (line) line.textContent = latestMessage("timed");
-        var fill = el.querySelector(".gc-designer-demo-banner__aggregate-fill");
-        var bar = el.querySelector(".gc-designer-demo-banner__aggregate");
-        if (fill && maxT > 0) {
-          var pct = Math.min(100, Math.max(0, (done / maxT) * 100));
-          fill.style.width = pct + "%";
-        } else if (fill) fill.style.width = "0%";
-        if (bar) {
-          bar.setAttribute("aria-valuemax", String(Math.max(0, maxT)));
-          bar.setAttribute("aria-valuenow", String(Math.min(maxT, done)));
-          bar.setAttribute(
-            "aria-label",
-            "Activities completed in this batch: " + done + " of " + maxT
-          );
+        var nTimed = state.timed.active.length;
+        var pillT = el.querySelector(".gc-designer-banner-consolidate-pill");
+        if (pillT) {
+          pillT.hidden = !consolidated;
+          if (consolidated) {
+            pillT.textContent = String(nTimed);
+            pillT.setAttribute("aria-label", "Show all " + nTimed + " in-progress items");
+          } else {
+            pillT.textContent = "";
+            pillT.removeAttribute("aria-label");
+          }
         }
+        tickDesignerBannerCountdowns();
+        syncDesignerBannerTicker();
         reorderBannerRows();
         if (openPopoverBucket === "timed" && openPopoverAnchor === el) {
           openBannerMorePopover("timed", el);
@@ -1163,7 +1352,14 @@
         var timer = setTimeout(function () {
           onTimedProgressActivityEnded(id);
         }, DURATION_MS);
-        state.timed.active.push({ id: id, message: message, endsAt: endsAt, timer: timer });
+        var startedAt = Date.now();
+        state.timed.active.push({
+          id: id,
+          message: message,
+          endsAt: endsAt,
+          startedAt: startedAt,
+          timer: timer,
+        });
         host.hidden = false;
         refreshTimedRow();
         syncFlyoutTopOffset();
@@ -1186,6 +1382,49 @@
         persist();
       }
 
+      function removeTimedActivityById(id) {
+        var idx = -1;
+        for (var i = 0; i < state.timed.active.length; i++) {
+          if (state.timed.active[i].id === id) {
+            idx = i;
+            break;
+          }
+        }
+        if (idx === -1) return;
+        var t = state.timed.active[idx];
+        clearTimeout(t.timer);
+        state.timed.active.splice(idx, 1);
+        state.timed.completed++;
+        if (!state.timed.active.length) {
+          state.timed.maxTotal = 0;
+          state.timed.completed = 0;
+          state.timed.nextId = 0;
+          removeRow("timed");
+          syncHostHidden();
+        } else {
+          refreshTimedRow();
+        }
+        persist();
+      }
+
+      function removePersistentItemById(pid) {
+        var ix = -1;
+        for (var i = 0; i < state.persistent.items.length; i++) {
+          if (state.persistent.items[i].id === pid) {
+            ix = i;
+            break;
+          }
+        }
+        if (ix === -1) return;
+        state.persistent.items.splice(ix, 1);
+        if (state.persistent.items.length < 2) {
+          state.persistent.consolidatedDone = 0;
+        }
+        refreshPersistentRow();
+        syncFlyoutTopOffset();
+        persist();
+      }
+
       function ensurePersistentRow() {
         if (state.persistent.rowEl) return;
         var el = document.createElement("div");
@@ -1200,15 +1439,16 @@
           ICON_PROGRESS +
           "</span>" +
           '<p class="gc-designer-demo-banner__message gc-designer-banner-primary-line"></p>' +
-          '<button type="button" class="gc-designer-banner-more" aria-label="Show all persistent items">⋯</button>' +
+          '<div class="gc-designer-demo-banner__meta-tools" hidden>' +
+          '<button type="button" class="gc-designer-banner-consolidate-pill" aria-label=""></button>' +
           '<div class="gc-designer-demo-banner__aggregate-wrap">' +
           '<div class="gc-designer-demo-banner__aggregate" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-label="Persistent items finished in this batch">' +
           '<div class="gc-designer-demo-banner__aggregate-track" aria-hidden="true">' +
           '<div class="gc-designer-demo-banner__aggregate-fill"></div></div></div></div>' +
-          "</div>";
+          "</div></div>";
         state.persistent.rowEl = el;
         host.appendChild(el);
-        wireMoreAndRow("persistent", el);
+        wireConsolidatePill("persistent", el);
       }
 
       function refreshPersistentRow() {
@@ -1241,6 +1481,17 @@
             "aria-label",
             "Persistent items finished in this batch: " + doneP + " of " + maxP
           );
+        }
+        var pillP = el.querySelector(".gc-designer-banner-consolidate-pill");
+        if (pillP) {
+          pillP.hidden = !consolidated;
+          if (consolidated) {
+            pillP.textContent = String(n);
+            pillP.setAttribute("aria-label", "Show all " + n + " persistent items");
+          } else {
+            pillP.textContent = "";
+            pillP.removeAttribute("aria-label");
+          }
         }
         reorderBannerRows();
         if (openPopoverBucket === "persistent" && openPopoverAnchor === el) {
@@ -1286,11 +1537,13 @@
           ICON_DONE +
           "</span>" +
           '<p class="gc-designer-demo-banner__message gc-designer-banner-primary-line"></p>' +
-          '<button type="button" class="gc-designer-banner-more" aria-label="Show all completed messages">⋯</button>' +
+          '<div class="gc-designer-demo-banner__meta-tools" hidden>' +
+          '<button type="button" class="gc-designer-banner-consolidate-pill" aria-label=""></button>' +
           '<div class="gc-designer-demo-banner__aggregate-wrap">' +
           '<div class="gc-designer-demo-banner__aggregate" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-label="Completed notifications cleared in this batch">' +
           '<div class="gc-designer-demo-banner__aggregate-track" aria-hidden="true">' +
           '<div class="gc-designer-demo-banner__aggregate-fill"></div></div></div></div>' +
+          "</div>" +
           '<button type="button" class="gc-designer-demo-banner__close" aria-label="Dismiss all completed">&times;</button>' +
           "</div>";
         el.querySelector(".gc-designer-demo-banner__close").addEventListener("click", function (e) {
@@ -1299,7 +1552,7 @@
         });
         state.completed.rowEl = el;
         host.appendChild(el);
-        wireMoreAndRow("completed", el);
+        wireConsolidatePill("completed", el);
       }
 
       function refreshCompletedRow() {
@@ -1330,6 +1583,17 @@
             "aria-label",
             "Completed notifications cleared in this batch: " + clearedC + " of " + maxC
           );
+        }
+        var pillC = el.querySelector(".gc-designer-banner-consolidate-pill");
+        if (pillC) {
+          pillC.hidden = !consolidatedC;
+          if (consolidatedC) {
+            pillC.textContent = String(nc);
+            pillC.setAttribute("aria-label", "Show all " + nc + " completed messages");
+          } else {
+            pillC.textContent = "";
+            pillC.removeAttribute("aria-label");
+          }
         }
         reorderBannerRows();
         if (openPopoverBucket === "completed" && openPopoverAnchor === el) {
@@ -1379,11 +1643,13 @@
           ICON_ERR +
           "</span>" +
           '<p class="gc-designer-demo-banner__message gc-designer-banner-primary-line"></p>' +
-          '<button type="button" class="gc-designer-banner-more" aria-label="Show all error messages">⋯</button>' +
+          '<div class="gc-designer-demo-banner__meta-tools" hidden>' +
+          '<button type="button" class="gc-designer-banner-consolidate-pill" aria-label=""></button>' +
           '<div class="gc-designer-demo-banner__aggregate-wrap">' +
           '<div class="gc-designer-demo-banner__aggregate" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-label="Error notifications cleared in this batch">' +
           '<div class="gc-designer-demo-banner__aggregate-track" aria-hidden="true">' +
           '<div class="gc-designer-demo-banner__aggregate-fill"></div></div></div></div>' +
+          "</div>" +
           '<button type="button" class="gc-designer-demo-banner__close" aria-label="Dismiss all errors">&times;</button>' +
           "</div>";
         el.querySelector(".gc-designer-demo-banner__close").addEventListener("click", function (e) {
@@ -1392,7 +1658,7 @@
         });
         state.error.rowEl = el;
         host.appendChild(el);
-        wireMoreAndRow("error", el);
+        wireConsolidatePill("error", el);
       }
 
       function refreshErrorRow() {
@@ -1423,6 +1689,17 @@
             "aria-label",
             "Error notifications cleared in this batch: " + clearedE + " of " + maxE
           );
+        }
+        var pillE = el.querySelector(".gc-designer-banner-consolidate-pill");
+        if (pillE) {
+          pillE.hidden = !consolidatedE;
+          if (consolidatedE) {
+            pillE.textContent = String(ne);
+            pillE.setAttribute("aria-label", "Show all " + ne + " error messages");
+          } else {
+            pillE.textContent = "";
+            pillE.removeAttribute("aria-label");
+          }
         }
         reorderBannerRows();
         if (openPopoverBucket === "error" && openPopoverAnchor === el) {
@@ -1529,7 +1806,14 @@
             var timer = setTimeout(function () {
               onTimedProgressActivityEnded(id);
             }, Math.max(0, endsAt - now));
-            state.timed.active.push({ id: id, message: message, endsAt: endsAt, timer: timer });
+            var st = rawA.startedAt != null ? rawA.startedAt : endsAt - DURATION_MS;
+            state.timed.active.push({
+              id: id,
+              message: message,
+              endsAt: endsAt,
+              startedAt: st,
+              timer: timer,
+            });
           });
           if (!state.timed.active.length) {
             state.timed.maxTotal = 0;
@@ -1644,6 +1928,384 @@
         } catch (eRo) {}
       }
     })();
+
+    var modalFlyoutTitlesSave = document.getElementById("gc-designer-modals-flyout-titles-save");
+    if (modalFlyoutTitlesSave) {
+      modalFlyoutTitlesSave.addEventListener("click", saveDesignerModalFlyoutTitleProps);
+    }
+    var modalViewTitleIn = document.getElementById("gc-designer-modals-prop-view-flyout-title");
+    var modalEditTitleIn = document.getElementById("gc-designer-modals-prop-edit-flyout-title");
+    if (modalViewTitleIn) {
+      modalViewTitleIn.addEventListener("input", applyDesignerModalFlyoutTitlesFromInputs);
+    }
+    if (modalEditTitleIn) {
+      modalEditTitleIn.addEventListener("input", applyDesignerModalFlyoutTitlesFromInputs);
+    }
+    var modalObjEditTitleIn = document.getElementById("gc-designer-modals-prop-object-edit-flyout-title");
+    if (modalObjEditTitleIn) {
+      modalObjEditTitleIn.addEventListener("input", applyDesignerModalFlyoutTitlesFromInputs);
+    }
+    var modalObjEditEtIn = document.getElementById("gc-designer-modals-prop-object-edit-entity-type");
+    if (modalObjEditEtIn) {
+      modalObjEditEtIn.addEventListener("input", syncDesignerObjectEditEntityTypeLive);
+    }
+    applyDesignerModalFlyoutTitlesFromInputs();
+    loadDesignerObjectEditEntityTypeDatalist();
+    loadDesignerModalFlyoutTitleProps();
+
+    function designerModalsParseJsonArg(raw) {
+      if (raw == null || raw === "") return {};
+      if (typeof raw === "object") return raw;
+      try {
+        return JSON.parse(String(raw));
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function designerModalsOptionSelectorGroupFromLabelEl(el) {
+      if (!el) return null;
+      var prev = el.previousElementSibling;
+      if (prev && prev.matches && prev.matches("[data-gc-option-selector]")) return prev;
+      var sample = el.closest(".gc-designer__sample");
+      if (sample) {
+        var g = sample.querySelector("[data-gc-option-selector]");
+        if (g) return g;
+      }
+      return null;
+    }
+
+    function designerModalsParseSelectorItemsAttr(grp) {
+      if (window.gcOptionSelectorParseItemsAttr) return window.gcOptionSelectorParseItemsAttr(grp);
+      if (!grp) return null;
+      var raw = grp.getAttribute("data-gc-designer-selector-items");
+      if (!raw) return null;
+      try {
+        var j = JSON.parse(raw);
+        return Array.isArray(j) ? j.map(function (x) { return String(x); }) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function designerModalsOptionSelectorRebuild(grp, items, opts) {
+      if (window.gcOptionSelectorRebuild) {
+        window.gcOptionSelectorRebuild(grp, items, opts);
+        return;
+      }
+      opts = opts || {};
+      var prevLabel = opts.preserveSelectedLabel;
+      if (prevLabel == null && grp) {
+        var cur = grp.querySelector(".gc-option-selector__btn.primary");
+        if (cur) prevLabel = cur.textContent.trim();
+      }
+      var labels = (Array.isArray(items) ? items : [])
+        .map(function (x) {
+          return String(x).trim();
+        })
+        .filter(function (s) {
+          return s !== "";
+        });
+      if (!labels.length) labels = ["On", "Off"];
+      grp.setAttribute("data-gc-designer-selector-items", JSON.stringify(labels));
+      grp.innerHTML = "";
+      labels.forEach(function (label) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn gc-option-selector__btn";
+        btn.setAttribute("aria-pressed", "false");
+        btn.textContent = label;
+        grp.appendChild(btn);
+      });
+      var btns = grp.querySelectorAll(".gc-option-selector__btn");
+      var picked = false;
+      if (prevLabel) {
+        for (var i = 0; i < btns.length; i++) {
+          if (btns[i].textContent.trim() === prevLabel) {
+            btns[i].classList.add("primary");
+            btns[i].setAttribute("aria-pressed", "true");
+            picked = true;
+            break;
+          }
+        }
+      }
+      if (!picked && btns[0]) {
+        btns[0].classList.add("primary");
+        btns[0].setAttribute("aria-pressed", "true");
+      }
+    }
+
+    function designerModalsSelectorItemsAsText(grp) {
+      if (window.gcOptionSelectorItemsAsText) return window.gcOptionSelectorItemsAsText(grp);
+      var fromAttr = designerModalsParseSelectorItemsAttr(grp);
+      if (fromAttr && fromAttr.length) return fromAttr.join("\n");
+      var lines = [];
+      if (grp) {
+        grp.querySelectorAll(".gc-option-selector__btn").forEach(function (b) {
+          lines.push(b.textContent.trim());
+        });
+      }
+      return lines.join("\n");
+    }
+
+    function designerModalsSelectorApplyText(grp, text) {
+      var lines = String(text || "")
+        .split(/\r?\n/)
+        .map(function (s) {
+          return s.trim();
+        })
+        .filter(function (s) {
+          return s !== "";
+        });
+      designerModalsOptionSelectorRebuild(grp, lines, {});
+    }
+
+    function designerModalsSelectorRowsClear(container) {
+      if (!container) return;
+      container.innerHTML = "";
+    }
+
+    function designerModalsSelectorRowsAppend(container, value) {
+      if (!container) return;
+      var row = document.createElement("div");
+      row.className = "gc-designer-selector-items-row gc-designer__row";
+      row.setAttribute(
+        "style",
+        "display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;width:100%"
+      );
+      var inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "settings-form__input";
+      inp.style.flex = "1";
+      inp.style.minWidth = "8rem";
+      inp.value = value == null ? "" : String(value);
+      inp.setAttribute("aria-label", "Segment label");
+      inp.autocomplete = "off";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn--secondary gc-designer-selector-items-remove-row";
+      btn.textContent = "Remove";
+      row.appendChild(inp);
+      row.appendChild(btn);
+      container.appendChild(row);
+    }
+
+    function designerModalsSelectorRowsFromGroup(container, grp) {
+      if (!container || !grp) return;
+      var text = designerModalsSelectorItemsAsText(grp);
+      var parts = String(text || "")
+        .split(/\r?\n/)
+        .map(function (s) {
+          return s.trim();
+        })
+        .filter(function (s) {
+          return s !== "";
+        });
+      designerModalsSelectorRowsClear(container);
+      if (!parts.length) {
+        designerModalsSelectorRowsAppend(container, "On");
+        designerModalsSelectorRowsAppend(container, "Off");
+      } else {
+        parts.forEach(function (p) {
+          designerModalsSelectorRowsAppend(container, p);
+        });
+      }
+    }
+
+    function designerModalsSelectorRowsReadText(container) {
+      if (!container) return "";
+      var lines = [];
+      container.querySelectorAll(".gc-designer-selector-items-row input[type='text']").forEach(function (inp) {
+        var s = String(inp.value || "").trim();
+        if (s !== "") lines.push(s);
+      });
+      return lines.join("\n");
+    }
+
+    function designerModalsSelectorRowsSnapshot(container) {
+      if (!container) return [];
+      return Array.prototype.map.call(
+        container.querySelectorAll(".gc-designer-selector-items-row input[type='text']"),
+        function (inp) {
+          return String(inp.value || "");
+        }
+      );
+    }
+
+    function designerModalsSelectorRowsRestore(container, snap) {
+      if (!container) return;
+      designerModalsSelectorRowsClear(container);
+      if (snap && snap.length) {
+        snap.forEach(function (v) {
+          designerModalsSelectorRowsAppend(container, v);
+        });
+      } else {
+        designerModalsSelectorRowsAppend(container, "On");
+        designerModalsSelectorRowsAppend(container, "Off");
+      }
+    }
+
+    function designerModalsEnsureSelectorRowsDelegation(container) {
+      if (!container || container.getAttribute("data-gc-selector-rows-delegation") === "1") return;
+      container.setAttribute("data-gc-selector-rows-delegation", "1");
+      container.addEventListener("click", function (e) {
+        var rm = e.target.closest(".gc-designer-selector-items-remove-row");
+        if (!rm || !container.contains(rm)) return;
+        var row = rm.closest(".gc-designer-selector-items-row");
+        if (!row) return;
+        row.remove();
+        if (!container.querySelector(".gc-designer-selector-items-row")) {
+          designerModalsSelectorRowsAppend(container, "");
+        }
+      });
+    }
+
+    (function wireModalsSelectorPropsFlyout() {
+      var root = document.getElementById("gc-designer-modals-selector-props-flyout");
+      var grp = document.getElementById("gc-designer-modals-option-selector");
+      var rowsEl = document.getElementById("gc-designer-modals-selector-items-rows");
+      var addRowBtn = document.getElementById("gc-designer-modals-selector-items-add-row");
+      if (!root || !grp || !rowsEl) return;
+      var snapshot = null;
+
+      function openFlyout() {
+        designerModalsEnsureSelectorRowsDelegation(rowsEl);
+        designerModalsSelectorRowsFromGroup(rowsEl, grp);
+        snapshot = designerModalsSelectorRowsSnapshot(rowsEl);
+        openModal(root);
+        var firstInp = rowsEl.querySelector("input[type='text']");
+        if (firstInp) firstInp.focus();
+      }
+
+      function closeFlyout() {
+        closeModal(root);
+        var openBtn = document.getElementById("gc-designer-modals-selector-props-open");
+        if (openBtn) openBtn.focus();
+      }
+
+      document.addEventListener("click", function (ev) {
+        var opener = ev.target.closest && ev.target.closest("#gc-designer-modals-selector-props-open");
+        if (!opener) return;
+        ev.preventDefault();
+        openFlyout();
+      });
+
+      if (addRowBtn) {
+        addRowBtn.addEventListener("click", function () {
+          designerModalsEnsureSelectorRowsDelegation(rowsEl);
+          designerModalsSelectorRowsAppend(rowsEl, "");
+          var inputs = rowsEl.querySelectorAll("input[type='text']");
+          var last = inputs[inputs.length - 1];
+          if (last) last.focus();
+        });
+      }
+
+      document.addEventListener(
+        "click",
+        function (ev) {
+          var saveHit = ev.target.closest && ev.target.closest("#gc-designer-modals-selector-props-save");
+          var cancelHit = ev.target.closest && ev.target.closest("#gc-designer-modals-selector-props-cancel");
+          if (!saveHit && !cancelHit) return;
+          ev.preventDefault();
+          if (saveHit) {
+            try {
+              designerModalsSelectorApplyText(grp, designerModalsSelectorRowsReadText(rowsEl));
+              snapshot = null;
+            } finally {
+              closeFlyout();
+            }
+          } else {
+            try {
+              designerModalsSelectorRowsRestore(rowsEl, snapshot);
+              snapshot = null;
+            } finally {
+              closeFlyout();
+            }
+          }
+        },
+        true
+      );
+    })();
+
+    function designerModalsGetPropsForControl(controlId, el) {
+      var out = { controlId: controlId };
+      if (controlId !== "selector") return out;
+      var grp = designerModalsOptionSelectorGroupFromLabelEl(el);
+      var itemsParsed = grp ? designerModalsParseSelectorItemsAttr(grp) : null;
+      out.items = itemsParsed ? itemsParsed.slice() : [];
+      out.options = [];
+      if (grp) {
+        var selNative = grp.querySelector("select.gc-option-selector__native");
+        if (selNative) {
+          Array.prototype.forEach.call(selNative.options, function (opt) {
+            out.options.push({ label: opt.textContent.trim(), selected: opt.selected });
+          });
+        } else {
+          grp.querySelectorAll(".gc-option-selector__btn").forEach(function (b) {
+            out.options.push({ label: b.textContent.trim(), selected: b.getAttribute("aria-pressed") === "true" });
+          });
+        }
+      }
+      if (!out.items.length && grp) {
+        out.items = out.options.map(function (o) {
+          return o.label;
+        });
+      }
+      var sel = out.options.filter(function (o) {
+        return o.selected;
+      });
+      out.selectedLabel = sel.length ? sel[0].label : "";
+      return out;
+    }
+
+    function designerModalsSetPropsForControl(controlId, el, raw) {
+      var j = designerModalsParseJsonArg(raw);
+      if (controlId !== "selector") return false;
+      var grp = designerModalsOptionSelectorGroupFromLabelEl(el);
+      if (!grp) return false;
+      var wantLabel =
+        j.selectedLabel != null
+          ? String(j.selectedLabel).trim()
+          : j.label != null
+            ? String(j.label).trim()
+            : "";
+      var idx = j.selectedIndex != null ? parseInt(j.selectedIndex, 10) : NaN;
+      if (Array.isArray(j.items)) {
+        designerModalsOptionSelectorRebuild(grp, j.items, {});
+        if (window.gcOptionSelectorSetSelection) {
+          window.gcOptionSelectorSetSelection(grp, wantLabel, idx);
+        }
+        return true;
+      }
+      if (window.gcOptionSelectorSetSelection) {
+        window.gcOptionSelectorSetSelection(grp, wantLabel, idx);
+        return true;
+      }
+      return false;
+    }
+
+    document.querySelectorAll("[data-gc-designer-control-id]").forEach(function (el) {
+      el.gcGetProperties = function () {
+        var cid = el.getAttribute("data-gc-designer-control-id") || "";
+        return designerModalsGetPropsForControl(cid, el);
+      };
+      el.gcSetProperties = function (json) {
+        var cid = el.getAttribute("data-gc-designer-control-id") || "";
+        return designerModalsSetPropsForControl(cid, el, json);
+      };
+    });
+
+    var ctlModalsSelector = document.getElementById("gc-designer-modals-selector-control-label");
+    if (ctlModalsSelector) {
+      ctlModalsSelector.gcOpenSelectorPropertiesFlyout = function () {
+        var b = document.getElementById("gc-designer-modals-selector-props-open");
+        if (b) b.click();
+      };
+    }
+    window.gcOpenDesignerModalsSelectorPropertiesFlyout = function () {
+      var b = document.getElementById("gc-designer-modals-selector-props-open");
+      if (b) b.click();
+    };
 
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;

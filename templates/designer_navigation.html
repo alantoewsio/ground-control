@@ -1,0 +1,133 @@
+{% extends "designer_base.html" %}
+{% set designer_subnav_active = "navigation" %}
+{% block title %}Navigation · Designer · Ground Control{% endblock %}
+{% block page_title %}Navigation{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/navigation">Designer</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Navigation</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Map each <strong>cached entity type</strong> to a display name and navigation targets (section, page, tab). Values are
+  stored in <code class="mono">data/designer_entity_type_navigation.json</code>.
+</p>
+{% endblock %}
+{% block content %}
+<main class="layout single gc-designer" data-gc-designer-navigation="1">
+  <section class="gc-designer__section" aria-labelledby="gc-designer-object-nav-h">
+    <h2 id="gc-designer-object-nav-h" class="gc-designer__h2">Object Navigation</h2>
+    <p class="gc-designer__note">
+      One row per distinct <code class="mono">entity_type</code> from the config cache. Only the entity type column is
+      read-only. <strong>Nav section</strong>, <strong>Nav page</strong>, and <strong>Tab</strong> are comboboxes: type to filter or pick from
+      suggestions. Nav page suggestions only include values from rows that share the same nav section (case-insensitive).
+      Tab suggestions only include values from rows that share the same nav section and nav page (case-insensitive).
+      Rows sort by saved <strong>facet order</strong> (section, then page, then tab), then
+      <strong>nav order</strong> (numeric first; blank sorts after numbers). Use the <strong>grip next to section, page, or tab</strong>
+      to open a short list of unique values for that scope; drag there to reorder that facet, then <strong>Apply order</strong>.
+      Use the left <strong>row drag handle</strong> to reorder entity types within the same section, page, and tab; nav order updates automatically.
+      While row-dragging, other rows are dimmed. Column headers do not sort the table.
+    </p>
+    <div class="gc-designer-data-controls__catalog-toolbar">
+      <button type="button" class="button button--primary" id="gc-designer-entity-nav-save">
+        Save navigation metadata
+      </button>
+      <p class="gc-designer-data-controls__save-status muted" id="gc-designer-entity-nav-save-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="gc-designer-data-controls__table-wrap">
+      <table
+        class="data-table data-table--dense gc-designer-data-controls__table gc-designer-entity-nav__table"
+        aria-label="Object navigation by cached entity type"
+      >
+        <thead>
+          <tr>
+            <th scope="col" class="gc-designer-entity-nav__th-drag" data-gc-no-sort>
+              <span class="gc-sr-only">Reorder</span>
+            </th>
+            <th scope="col" data-gc-no-sort>Entity type</th>
+            <th scope="col" data-gc-no-sort>Type</th>
+            <th scope="col" data-gc-no-sort>Display name</th>
+            <th scope="col" data-gc-no-sort>Nav section</th>
+            <th scope="col" data-gc-no-sort>Nav page</th>
+            <th scope="col" data-gc-no-sort>Tab</th>
+            <th scope="col" data-gc-no-sort>Nav order</th>
+          </tr>
+        </thead>
+        <tbody id="gc-designer-entity-nav-tbody">
+          <tr>
+            <td colspan="8" class="muted">Loading…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div
+      id="gc-designer-entity-nav-facet-overlay"
+      class="gc-designer-entity-nav-facet-overlay"
+      hidden
+      aria-hidden="true"
+    >
+      <div class="gc-designer-entity-nav-facet-overlay__backdrop" aria-hidden="true"></div>
+      <div
+        class="gc-designer-entity-nav-facet-overlay__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gc-designer-entity-nav-facet-title"
+      >
+        <h3 id="gc-designer-entity-nav-facet-title" class="gc-designer-entity-nav-facet-overlay__title"></h3>
+        <p id="gc-designer-entity-nav-facet-hint" class="gc-designer-entity-nav-facet-overlay__hint muted"></p>
+        <ol id="gc-designer-entity-nav-facet-list" class="gc-designer-entity-nav-facet-overlay__list"></ol>
+        <div class="gc-designer-entity-nav-facet-overlay__actions">
+          <button type="button" class="button button--primary" id="gc-designer-entity-nav-facet-done">Apply order</button>
+          <button type="button" class="button" id="gc-designer-entity-nav-facet-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="gc-designer__section" aria-labelledby="gc-designer-entity-nav-object-sel-h">
+    <h2 id="gc-designer-entity-nav-object-sel-h" class="gc-designer__h2">Object selector</h2>
+    <p class="gc-designer__note">
+      Two reference controls for cached entity types (same option data, independent selection state). Use
+      <code class="mono">data-gc-designer-object-selector="object-selector"</code> or
+      <code class="mono">…="object-selector-list"</code> to mount them elsewhere; query with
+      <code class="mono">window.gcQueryDesignerObjectSelector("object-selector")</code> or
+      <code class="mono">gcQueryDesignerObjectSelectorAll(...)</code> for every instance.
+      The list is <strong>multi-select</strong> with a checkbox on each row. Groups mirror <strong>nav section</strong> ·
+      <strong>nav page</strong>; labels use <strong>display name</strong> when set; values are
+      <code class="mono">entity_type</code>. Updates after you <strong>save</strong> (or on load).
+    </p>
+    <div
+      class="gc-designer-entity-nav-object-sel settings-form"
+      id="gc-designer-entity-nav-object-sel"
+      aria-label="Entity types by navigation"
+    >
+      <label class="settings-form__field gc-designer-entity-nav-object-sel__field" for="gc-designer-entity-nav-object-selector">
+        <span class="settings-form__label" id="gc-designer-entity-nav-object-sel-l">Object selector</span>
+        <select
+          class="settings-form__input mono gc-designer-entity-nav-object-sel__select"
+          id="gc-designer-entity-nav-object-selector"
+          data-gc-designer-object-selector="object-selector"
+          aria-labelledby="gc-designer-entity-nav-object-sel-l"
+        >
+          <option value="">Select an object…</option>
+        </select>
+      </label>
+      <fieldset class="settings-form__field gc-designer-entity-nav-object-sel__field gc-designer-entity-nav-object-sel__fieldset">
+        <legend class="settings-form__label" id="gc-designer-entity-nav-object-selector-list-l">Object selector list</legend>
+        <div
+          id="gc-designer-entity-nav-object-selector-list"
+          class="gc-designer-object-selector-list settings-form__input"
+          data-gc-designer-object-selector="object-selector-list"
+        ></div>
+      </fieldset>
+    </div>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-designer-data-controls-entity-nav.js"></script>
+{% endblock %}

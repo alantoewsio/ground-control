@@ -242,23 +242,15 @@ def _migrate_legacy_crypto_files_to_persist() -> None:
         if src.is_file():
             shutil.copy2(src, dest)
 
-# Sign-out after this many minutes without API activity from the browser (0 = idle disabled).
+# Default sign-out delay without browser/API activity (0 = idle disabled). Overridden by saved
+# Security settings unless ``GROUND_CONTROL_SESSION_IDLE_MINUTES`` is set.
 DEFAULT_SESSION_IDLE_MINUTES = 60
 
 
 def session_idle_timeout_minutes() -> int:
-    import os
+    from app import security_settings
 
-    raw = (os.environ.get("GROUND_CONTROL_SESSION_IDLE_MINUTES") or "").strip()
-    if not raw:
-        return DEFAULT_SESSION_IDLE_MINUTES
-    try:
-        v = int(raw)
-    except ValueError:
-        return DEFAULT_SESSION_IDLE_MINUTES
-    if v < 0:
-        return DEFAULT_SESSION_IDLE_MINUTES
-    return min(v, 525600)
+    return security_settings.effective_session_idle_timeout_minutes()
 
 
 def under_pytest() -> bool:
