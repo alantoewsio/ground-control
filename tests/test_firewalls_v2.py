@@ -46,9 +46,14 @@ def test_firewalls_v2_object_page_ok(designer_client) -> None:
     assert b'id="gc-fw-v2-obj-opt-add-btn"' in r.content
     assert b'id="gc-fw-v2-obj-opt-delete-btn"' in r.content
     assert b"gc-designer-flyout-object-edit-modal" in r.content
+    assert b"id=\"gc-fw-v2-obj-add-type-modal\"" in r.content
     assert b"gc-designer-stack-flyout-runtime.js" in r.content
+    assert b"GC_ENTITY_TYPE_NAV_ICONS" in r.content
     assert b"gc-designer-object-edit-catalog.js" in r.content
     assert b"gc-data-controls-object-edit-layout.js" in r.content
+    assert b"GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK" in r.content
+    assert b"gcHsEnqueueDeletesBatchUrl" in r.content
+    assert b"gc-designer-object-edit-delete-wrap" in r.content
 
 
 def test_api_firewalls_config_ui_entity_payload_fields_ok(authed_client) -> None:
@@ -64,7 +69,17 @@ def test_api_firewalls_config_ui_data_controls_layout_ok(authed_client) -> None:
     assert r.status_code == 200, r.text
     body = r.json()
     assert body.get("ok") is True
-    assert isinstance(body.get("layout"), dict)
+    layout = body.get("layout")
+    assert isinstance(layout, dict)
+    assert isinstance(layout.get("layout_locked"), bool)
+
+
+def test_api_firewalls_config_ui_data_controls_layout_locks_ok(authed_client) -> None:
+    r = authed_client.get("/api/firewalls/config-ui/data-controls-layout-locks")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body.get("ok") is True
+    assert isinstance(body.get("locks"), dict)
 
 
 def test_api_firewalls_config_ui_requires_auth(client) -> None:
@@ -145,3 +160,92 @@ def test_build_firewalls_v2_object_nav_tree_has_sections() -> None:
     assert len(tree) >= 1
     sec = tree[0]
     assert "label" in sec and "slug" in sec and "pages" in sec
+
+
+def test_firewalls_v2_sidebar_uses_saved_page_icon(
+    designer_client, tmp_path, monkeypatch
+) -> None:
+    from app import designer_entity_type_navigation as mod
+    from app.designer_entity_type_navigation import save_navigation_entries
+
+    monkeypatch.setattr(
+        mod, "properties_file_path", lambda: tmp_path / "designer_entity_type_navigation.json"
+    )
+    save_navigation_entries(
+        {
+            "entries": {
+                "zone": {
+                    "kind": "Objects",
+                    "display_name": "Zone",
+                    "nav_section": "Protect",
+                    "nav_order": "1",
+                    "nav_page": "Firewall",
+                    "tab": "Rules",
+                }
+            },
+            "page_icons": {
+                "protect|firewall": {
+                    "nav_section": "Protect",
+                    "nav_page": "Firewall",
+                    "icon": "shield",
+                }
+            },
+        }
+    )
+
+    r = designer_client.get("/firewalls-v2/o/protect/firewall", follow_redirects=False)
+    assert r.status_code == 200
+    assert b"gc-material-symbol--sidebar" in r.content
+    assert b">shield<" in r.content
+
+
+def test_firewalls_v2_sidebar_hides_marked_page(
+    designer_client, tmp_path, monkeypatch
+) -> None:
+    from app import designer_entity_type_navigation as mod
+    from app.designer_entity_type_navigation import save_navigation_entries
+
+    monkeypatch.setattr(
+        mod, "properties_file_path", lambda: tmp_path / "designer_entity_type_navigation.json"
+    )
+    save_navigation_entries(
+        {
+            "entries": {
+                "zone": {
+                    "kind": "Objects",
+                    "display_name": "Zone",
+                    "nav_section": "Protect",
+                    "nav_order": "1",
+                    "nav_page": "Firewall",
+                    "tab": "Rules",
+                },
+                "address": {
+                    "kind": "Objects",
+                    "display_name": "Address",
+                    "nav_section": "Protect",
+                    "nav_order": "2",
+                    "nav_page": "Address",
+                    "tab": "Objects",
+                },
+            },
+            "page_icons": {
+                "protect|firewall": {
+                    "nav_section": "Protect",
+                    "nav_page": "Firewall",
+                    "icon": "shield",
+                    "hidden": True,
+                },
+                "protect|address": {
+                    "nav_section": "Protect",
+                    "nav_page": "Address",
+                    "icon": "dns",
+                    "hidden": False,
+                },
+            },
+        }
+    )
+
+    r = designer_client.get("/firewalls-v2", follow_redirects=False)
+    assert r.status_code == 200
+    assert b"/firewalls-v2/o/protect/firewall" not in r.content
+    assert b"/firewalls-v2/o/protect/address" in r.content

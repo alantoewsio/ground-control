@@ -1,0 +1,516 @@
+{
+  "version": 1,
+  "entries": {
+    "firewall_rule": {
+      "kind": "Objects",
+      "display_name": "Firewall rule",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Firewall",
+      "tab": "Firewall Rules",
+      "nav_icon": "rule"
+    },
+    "rule_group": {
+      "kind": "Objects",
+      "display_name": "Firewall rule group",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Firewall",
+      "tab": "Firewall Rules",
+      "nav_icon": "snippet_folder"
+    },
+    "ips_switch": {
+      "kind": "Settings",
+      "display_name": "IPS switch",
+      "nav_section": "PROTECT",
+      "nav_order": "1",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Configure",
+      "nav_icon": "power_settings_new"
+    },
+    "dos_settings": {
+      "kind": "Settings",
+      "display_name": "DoS Settings",
+      "nav_section": "PROTECT",
+      "nav_order": "2",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Configure",
+      "nav_icon": "filter_alt"
+    },
+    "spoof_prevention": {
+      "kind": "Settings",
+      "display_name": "Spoof prevention",
+      "nav_section": "PROTECT",
+      "nav_order": "3",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Configure",
+      "nav_icon": "fingerprint"
+    },
+    "ips_full_signature_pack": {
+      "kind": "Settings",
+      "display_name": "Full signature pack",
+      "nav_section": "PROTECT",
+      "nav_order": "4",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Configure",
+      "nav_icon": "fingerprint"
+    },
+    "ips_custom_signature": {
+      "kind": "Objects",
+      "display_name": "Custom signature",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Custom signatures",
+      "nav_icon": "fingerprint"
+    },
+    "ips_policy": {
+      "kind": "Objects",
+      "display_name": "IPS policy",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Policies",
+      "nav_icon": "policy"
+    },
+    "trusted_mac": {
+      "kind": "Objects",
+      "display_name": "Trusted MAC",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Intrusion Prevention",
+      "tab": "Trusted MAC",
+      "nav_icon": "badge"
+    },
+    "webfilterpolicy": {
+      "kind": "Objects",
+      "display_name": "Web filter policy",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Web",
+      "tab": "Policies",
+      "nav_icon": "safety_check"
+    },
+    "url_group": {
+      "kind": "Objects",
+      "display_name": "URL Group",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Web",
+      "tab": "URL Groups",
+      "nav_icon": "dataset_linked"
+    },
+    "useractivity": {
+      "kind": "Objects",
+      "display_name": "User Activity",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Web",
+      "tab": "User Activity Policies",
+      "nav_icon": "manage_accounts"
+    },
+    "user_group": {
+      "kind": "Objects",
+      "display_name": "User group",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Authentication",
+      "tab": "User Groups",
+      "nav_icon": "group"
+    },
+    "user": {
+      "kind": "Objects",
+      "display_name": "User",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Authentication",
+      "tab": "Users",
+      "nav_icon": "account_circle"
+    },
+    "admin_authen": {
+      "kind": "Objects",
+      "display_name": "Admin authentication",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Authentication",
+      "tab": "WebAdmin",
+      "nav_icon": "key"
+    },
+    "dns_forwarders": {
+      "kind": "Objects",
+      "display_name": "DNS forwarder",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "DNS",
+      "nav_icon": "dns"
+    },
+    "alias": {
+      "kind": "Objects",
+      "display_name": "Additional address",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "Interfaces",
+      "nav_icon": "settings_ethernet"
+    },
+    "bridge_pair": {
+      "kind": "Objects",
+      "display_name": "Bridge ports",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "Interfaces",
+      "nav_icon": "settings_ethernet"
+    },
+    "interface": {
+      "kind": "Objects",
+      "display_name": "Interface",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "Interfaces",
+      "nav_icon": "settings_ethernet"
+    },
+    "lag": {
+      "kind": "Objects",
+      "display_name": "LAG port",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "Interfaces",
+      "nav_icon": "settings_ethernet"
+    },
+    "vlan": {
+      "kind": "Objects",
+      "display_name": "VLAN Interface",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "Interfaces",
+      "nav_icon": "settings_ethernet"
+    },
+    "zone": {
+      "kind": "Objects",
+      "display_name": "Zone",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "Zones",
+      "nav_icon": "sell"
+    },
+    "dhcp_server": {
+      "kind": "Objects",
+      "display_name": "DHCP Server",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "DHCP Servers",
+      "nav_icon": "storage"
+    },
+    "vpn_profile": {
+      "kind": "Objects",
+      "display_name": "IPsec profile",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "VPN",
+      "tab": "IPsec Profiles",
+      "nav_icon": "shield_lock"
+    },
+    "syslog_server": {
+      "kind": "Objects",
+      "display_name": "Syslog Server",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "System Services",
+      "tab": "Syslog Servers",
+      "nav_icon": "list_alt"
+    },
+    "ha_configure": {
+      "kind": "Objects",
+      "display_name": "HA Configuration",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "System Services",
+      "tab": "HA",
+      "nav_icon": "tune"
+    },
+    "acl_rule": {
+      "kind": "Objects",
+      "display_name": "Access Control Rule",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Administration",
+      "tab": "ACL Rules",
+      "nav_icon": "rule"
+    },
+    "admin_settings": {
+      "kind": "Settings",
+      "display_name": "Admin settings",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Administration",
+      "tab": "Settings",
+      "nav_icon": "settings"
+    },
+    "ip_host": {
+      "kind": "Objects",
+      "display_name": "IP host",
+      "nav_section": "SYSTEM",
+      "nav_order": "1",
+      "nav_page": "Hosts and Services",
+      "tab": "Hosts",
+      "nav_icon": "laptop"
+    },
+    "ip_hostgroup": {
+      "kind": "Objects",
+      "display_name": "IP host group",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "Host Groups",
+      "nav_icon": "grid_view"
+    },
+    "fqdn_host": {
+      "kind": "Objects",
+      "display_name": "FQDN host",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "FQDN Hosts",
+      "nav_icon": "language"
+    },
+    "fqdn_hostgroup": {
+      "kind": "Objects",
+      "display_name": "FQDN host group",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "FQDN Host Groups",
+      "nav_icon": "grid_view"
+    },
+    "country_group": {
+      "kind": "Objects",
+      "display_name": "Country group",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "Country Groups",
+      "nav_icon": "public"
+    },
+    "service": {
+      "kind": "Objects",
+      "display_name": "Service",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "Services",
+      "nav_icon": "swap_horiz"
+    },
+    "service_group": {
+      "kind": "Objects",
+      "display_name": "Service group",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "Service Groups",
+      "nav_icon": "grid_view"
+    },
+    "mac_host": {
+      "kind": "Objects",
+      "display_name": "MAC host",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Hosts and Services",
+      "tab": "MAC Hosts & Groups",
+      "nav_icon": "device_unknown"
+    },
+    "access_time_policy": {
+      "kind": "Objects",
+      "display_name": "Access time policy",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Profiles",
+      "tab": "Access Time Policies",
+      "nav_icon": "alarm"
+    },
+    "data_transfer_policy": {
+      "kind": "Objects",
+      "display_name": "Data transfer policy",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Profiles",
+      "tab": "Data Transfer Policies",
+      "nav_icon": "shield_moon"
+    },
+    "decryption_profile": {
+      "kind": "Objects",
+      "display_name": "Decryption profile",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Profiles",
+      "tab": "Decryption profiles",
+      "nav_icon": "lock_open"
+    },
+    "admin_profile": {
+      "kind": "Objects",
+      "display_name": "RBAC profile",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Profiles",
+      "tab": "RBAC",
+      "nav_icon": "manage_accounts"
+    },
+    "schedule": {
+      "kind": "Objects",
+      "display_name": "Schedule",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Profiles",
+      "tab": "Schedules",
+      "nav_icon": "calendar_month"
+    },
+    "surfing_quota_policy": {
+      "kind": "Objects",
+      "display_name": "Surfing quota policy",
+      "nav_section": "SYSTEM",
+      "nav_order": "",
+      "nav_page": "Profiles",
+      "tab": "Surfing Quota Policies",
+      "nav_icon": "travel_explore"
+    }
+  },
+  "facet_orders": {
+    "sections": [
+      "PROTECT",
+      "CONFIGURE",
+      "SYSTEM"
+    ],
+    "pagesBySection": {
+      "protect": [
+        "Firewall",
+        "Intrusion Prevention",
+        "Web"
+      ],
+      "configure": [
+        "Authentication",
+        "Network",
+        "VPN",
+        "System Services"
+      ],
+      "system": [
+        "Administration",
+        "Hosts and Services",
+        "Profiles"
+      ]
+    },
+    "tabsBySectionPage": {
+      "protect|firewall": [
+        "Firewall Rules"
+      ],
+      "protect|intrusion prevention": [
+        "Configure",
+        "Custom signatures",
+        "Policies",
+        "Trusted MAC"
+      ],
+      "protect|web": [
+        "Policies",
+        "URL Groups",
+        "User Activity Policies"
+      ],
+      "configure|authentication": [
+        "User Groups",
+        "Users",
+        "WebAdmin"
+      ],
+      "configure|network": [
+        "DNS",
+        "Interfaces",
+        "Zones",
+        "DHCP Servers"
+      ],
+      "configure|vpn": [
+        "IPsec Profiles"
+      ],
+      "configure|system services": [
+        "Syslog Servers",
+        "HA"
+      ],
+      "system|administration": [
+        "ACL Rules",
+        "Settings"
+      ],
+      "system|hosts and services": [
+        "Hosts",
+        "Host Groups",
+        "FQDN Hosts",
+        "FQDN Host Groups",
+        "Country Groups",
+        "Services",
+        "Service Groups",
+        "MAC Hosts & Groups"
+      ],
+      "system|profiles": [
+        "Access Time Policies",
+        "Data Transfer Policies",
+        "Decryption profiles",
+        "RBAC",
+        "Schedules",
+        "Surfing Quota Policies"
+      ]
+    }
+  },
+  "page_icons": {
+    "protect|firewall": {
+      "nav_section": "PROTECT",
+      "nav_page": "Firewall",
+      "icon": "security"
+    },
+    "protect|intrusion prevention": {
+      "nav_section": "PROTECT",
+      "nav_page": "Intrusion Prevention",
+      "icon": "fingerprint"
+    },
+    "protect|web": {
+      "nav_section": "PROTECT",
+      "nav_page": "Web",
+      "icon": "public"
+    },
+    "configure|authentication": {
+      "nav_section": "CONFIGURE",
+      "nav_page": "Authentication",
+      "icon": "supervisor_account"
+    },
+    "configure|network": {
+      "nav_section": "CONFIGURE",
+      "nav_page": "Network",
+      "icon": "lan"
+    },
+    "configure|vpn": {
+      "nav_section": "CONFIGURE",
+      "nav_page": "VPN",
+      "icon": "shield_lock"
+    },
+    "configure|system services": {
+      "nav_section": "CONFIGURE",
+      "nav_page": "System Services",
+      "icon": "fact_check"
+    },
+    "system|administration": {
+      "nav_section": "SYSTEM",
+      "nav_page": "Administration",
+      "icon": "admin_panel_settings"
+    },
+    "system|hosts and services": {
+      "nav_section": "SYSTEM",
+      "nav_page": "Hosts and Services",
+      "icon": "desktop_windows"
+    },
+    "system|profiles": {
+      "nav_section": "SYSTEM",
+      "nav_page": "Profiles",
+      "icon": "health_and_safety"
+    }
+  }
+}

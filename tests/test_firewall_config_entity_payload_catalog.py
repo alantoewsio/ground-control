@@ -67,6 +67,13 @@ def test_apply_inferred_data_entry_types_treats_blank_as_unset(main_session) -> 
             ),
             FirewallConfigEntityPayloadField(
                 entity_type=et,
+                property_name="Members",
+                json_value_kind="array",
+                data_entry_type="",
+                data_entry_properties=None,
+            ),
+            FirewallConfigEntityPayloadField(
+                entity_type=et,
                 property_name="Kept",
                 json_value_kind="string",
                 data_entry_type="selector",
@@ -76,17 +83,20 @@ def test_apply_inferred_data_entry_types_treats_blank_as_unset(main_session) -> 
     main_session.commit()
     n = apply_inferred_data_entry_types_where_unset(main_session)
     main_session.commit()
-    assert n >= 3
+    assert n >= 4
     rows = (
         main_session.query(FirewallConfigEntityPayloadField)
         .filter(FirewallConfigEntityPayloadField.entity_type == et)
         .all()
     )
-    by_p = {r.property_name: r.data_entry_type for r in rows}
-    assert by_p["Name"] == "text-single"
-    assert by_p["Description"] == "text-multiline"
-    assert by_p["@transactionid"] == "Hidden"
-    assert by_p["Kept"] == "selector"
+    by_p = {r.property_name: r for r in rows}
+    assert by_p["Name"].data_entry_type == "text-single"
+    assert by_p["Description"].data_entry_type == "text-multiline"
+    assert by_p["@transactionid"].data_entry_type == "Hidden"
+    assert by_p["Members"].data_entry_type == "member-lookup"
+    assert by_p["Members"].data_entry_properties is not None
+    assert json.loads(by_p["Members"].data_entry_properties).get("multi") is True
+    assert by_p["Kept"].data_entry_type == "selector"
 
 
 def test_json_value_kind_primitives() -> None:
@@ -201,6 +211,9 @@ def test_sync_entity_type_updates_payload_field_catalog(main_session) -> None:
     )
     assert cat is not None
     assert cat.json_value_kind == "array"
+    assert cat.data_entry_type == "member-lookup"
+    assert cat.data_entry_properties is not None
+    assert json.loads(cat.data_entry_properties).get("multi") is True
 
     row = (
         db.query(FirewallConfigEntry)

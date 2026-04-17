@@ -13,19 +13,7 @@ fw_v2_section.label }} · Firewalls v2 · Ground Control{% endblock %}
   </ol>
 </nav>
 {% endblock %}
-{% block page_subtitle %}
-<p class="page-header__subtitle">
-  {% if fw_v2_nav_tabbed %}
-  Object types and settings follow the <strong>tab</strong> labels from
-  <span class="mono">designer_entity_type_navigation.json</span> for this page. Table layout can be saved per tab when
-  design mode is on.
-  {% else %}
-  Unified data table for every <strong>Objects</strong> entity type mapped to this page in
-  <span class="mono">designer_entity_type_navigation.json</span>. Table layout and column settings can be saved per path
-  when design mode is on.
-  {% endif %}
-</p>
-{% endblock %}
+{% block page_subtitle %}{% endblock %}
 {% block content %}
 <main class="layout single gc-fw-v2-object-layout">
   <section class="firewalls-page">
@@ -89,17 +77,16 @@ fw_v2_section.label }} · Firewalls v2 · Ground Control{% endblock %}
 </script>
 {% if fw_v2_show_object_table %}
 <script>
+  window.GC_ENTITY_TYPE_NAV_ICONS = {{ fw_v2_entity_type_nav_icons | tojson }};
   window.GC_FW_V2_TABLE_INSTANCE_ID = {{ fw_v2_table_instance_id | tojson }};
   window.GC_FW_V2_LOCK_ENTITY_TYPES = {{ fw_v2_locked_entity_types | tojson }};
   window.GC_FW_V2_NAV_TABBED = {{ fw_v2_nav_tabbed | tojson }};
+  window.GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK = {{ fw_v2_can_edit_data_controls_layout_lock | tojson }};
+  window.gcHsEnqueueUpdatesBatchUrl = {{ url_api_task_queue_enqueue_hs_updates_batch | tojson }};
+  window.gcHsEnqueueCreatesBatchUrl = {{ url_api_task_queue_enqueue_hs_creates_batch | tojson }};
+  window.gcHsEnqueueDeletesBatchUrl = {{ url_api_task_queue_enqueue_hs_deletes_batch | tojson }};
 </script>
-<script src="/static/gc-network-entity.js?v={{ _gc_ver }}"></script>
-<script src="/static/gc-hosts-services-flyout.js?v={{ _gc_ver }}"></script>
-<script src="/static/gc-option-selector.js?v={{ _gc_ver }}"></script>
-<script src="/static/gc-designer-object-edit-dd-runtime.js?v={{ _gc_ver }}"></script>
-<script src="/static/gc-data-controls-object-edit-layout.js?v={{ _gc_ver }}"></script>
-<script src="/static/gc-designer-object-edit-catalog.js?v={{ _gc_ver }}"></script>
-<script src="/static/gc-designer-stack-flyout-runtime.js?v={{ _gc_ver }}"></script>
+{% include "partials/gc_object_edit_flyout_scripts.html" %}
 <script src="/static/gc-fw-v2-object-data-table.js?v={{ _gc_ver }}"></script>
 {% endif %}
 {% endblock %}

@@ -379,10 +379,130 @@
     if (isDesignerStackFlyoutRoot(root)) {
       applyDesignerStackFlyoutState(root, false, { skipFocus: true, immediate: true });
     }
+    if (root.id === "gc-designer-flyout-object-edit-modal") {
+      globalThis.__gcObjectEditFlyoutEditInitialFwIds = null;
+      globalThis.__gcObjectEditFlyoutObjectName = null;
+      if (typeof globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome === "function") {
+        globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome();
+      }
+    }
     root.hidden = true;
     syncScrollLock();
     resetDesignerFlyoutScrollChurn();
   }
+
+  function gcDesignerFwV2ObjectEditPage() {
+    return (
+      !!document.querySelector("[data-gc-fw-v2-object-table]") ||
+      !!document.querySelector("main.gc-fw-v2-object-layout")
+    );
+  }
+
+  function firewallDisplayLabelFromNav(fid) {
+    var idStr = String(fid);
+    var nav = Array.isArray(globalThis.gcNavFirewallsJson) ? globalThis.gcNavFirewallsJson : [];
+    for (var i = 0; i < nav.length; i++) {
+      var fw = nav[i];
+      if (!fw || fw.id == null) continue;
+      if (String(fw.id) !== idStr) continue;
+      var lbl = String(fw.label != null ? fw.label : "").trim();
+      if (lbl) return lbl;
+      var nm = String(fw.name != null ? fw.name : "").trim();
+      if (nm) return nm;
+      var ho = String(fw.host != null ? fw.host : "").trim();
+      if (ho) return ho;
+      return idStr;
+    }
+    return "Firewall " + idStr;
+  }
+
+  function collectObjectEditFlyoutFirewallIdsFromMount() {
+    var mount = document.getElementById("gc-designer-object-edit-fw-mount");
+    if (!mount) return [];
+    var ms = mount.querySelector("[data-gc-fw-ms]");
+    if (!ms) return [];
+    var out = [];
+    ms.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      if (!cb.checked) return;
+      if (!cb.hasAttribute("data-gc-fw-id")) return;
+      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      if (!isNaN(n) && n > 0) out.push(n);
+    });
+    return out;
+  }
+
+  globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome = function () {
+    var wrap = document.getElementById("gc-designer-object-edit-delete-wrap");
+    var chipsEl = document.getElementById("gc-designer-object-edit-delete-chips");
+    var hint = document.getElementById("gc-designer-object-edit-delete-save-hint");
+    var labelEl = document.getElementById("gc-designer-object-edit-delete-label");
+    if (!wrap || !chipsEl || !hint) return;
+    if (!gcDesignerFwV2ObjectEditPage()) {
+      wrap.hidden = true;
+      hint.hidden = true;
+      hint.textContent = "";
+      chipsEl.innerHTML = "";
+      if (labelEl) labelEl.textContent = "Delete from";
+      chipsEl.setAttribute("aria-label", "Firewalls this object will be removed from");
+      return;
+    }
+    var initial = globalThis.__gcObjectEditFlyoutEditInitialFwIds;
+    if (!Array.isArray(initial) || !initial.length) {
+      wrap.hidden = true;
+      hint.hidden = true;
+      hint.textContent = "";
+      chipsEl.innerHTML = "";
+      if (labelEl) labelEl.textContent = "Delete from";
+      chipsEl.setAttribute("aria-label", "Firewalls this object will be removed from");
+      return;
+    }
+    var cur = collectObjectEditFlyoutFirewallIdsFromMount();
+    var curSet = {};
+    cur.forEach(function (id) {
+      curSet[id] = true;
+    });
+    var deleted = [];
+    initial.forEach(function (raw) {
+      var n = parseInt(String(raw), 10);
+      if (isNaN(n) || n <= 0) return;
+      if (!curSet[n]) deleted.push(n);
+    });
+    if (!deleted.length) {
+      wrap.hidden = true;
+      hint.hidden = true;
+      hint.textContent = "";
+      chipsEl.innerHTML = "";
+      if (labelEl) labelEl.textContent = "Delete from";
+      chipsEl.setAttribute("aria-label", "Firewalls this object will be removed from");
+      return;
+    }
+    var objNm = globalThis.__gcObjectEditFlyoutObjectName;
+    var dispNm =
+      typeof objNm === "string" && objNm.trim() ? objNm.trim() : "object";
+    if (labelEl) {
+      labelEl.textContent = "Delete " + dispNm + " from";
+    }
+    wrap.hidden = false;
+    chipsEl.innerHTML = "";
+    chipsEl.setAttribute(
+      "aria-label",
+      "Firewalls to remove " + dispNm + " from",
+    );
+    deleted.forEach(function (fid) {
+      var span = document.createElement("span");
+      span.className = "gc-ms-trigger-chip gc-designer-object-edit-delete-chip";
+      var t = document.createElement("span");
+      t.className = "gc-ms-trigger-chip__text mono";
+      t.textContent = firewallDisplayLabelFromNav(fid);
+      t.title = "Firewall id " + fid;
+      span.appendChild(t);
+      chipsEl.appendChild(span);
+    });
+    hint.hidden = false;
+    var x = deleted.length;
+    hint.textContent =
+      "will be deleted from " + x + " firewall" + (x === 1 ? "" : "s") + ".";
+  };
 
   (function wireObjectEditFlyoutCore() {
     var root = document.getElementById("gc-designer-flyout-object-edit-modal");
@@ -398,6 +518,22 @@
 
     bindDesignerStackFlyoutResize(root);
 
+    var fwMount = document.getElementById("gc-designer-object-edit-fw-mount");
+    if (fwMount && fwMount.dataset.gcObjEditFwDeleteSyncWired !== "1") {
+      fwMount.dataset.gcObjEditFwDeleteSyncWired = "1";
+      fwMount.addEventListener(
+        "change",
+        function (ev) {
+          var t = ev.target;
+          if (!t || !t.matches || !t.matches('input[type="checkbox"][data-gc-fw-id]')) return;
+          if (typeof globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome === "function") {
+            globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome();
+          }
+        },
+        true,
+      );
+    }
+
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         var payload =
@@ -405,15 +541,23 @@
             ? globalThis.gcDesignerObjectEditFlyoutCollectSave()
             : null;
         try {
-          document.dispatchEvent(
-            new CustomEvent("gc-object-edit-flyout-save", { detail: payload }),
-          );
-        } catch (eSave) {}
-        closeModal(root);
+          var ev = new CustomEvent("gc-object-edit-flyout-save", {
+            detail: payload,
+            cancelable: true,
+          });
+          if (document.dispatchEvent(ev)) closeModal(root);
+        } catch (eSave) {
+          closeModal(root);
+        }
       });
     }
     if (cancelBtn) {
       cancelBtn.addEventListener("click", function () {
+        globalThis.__gcObjectEditFlyoutEditInitialFwIds = null;
+        globalThis.__gcObjectEditFlyoutObjectName = null;
+        if (typeof globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome === "function") {
+          globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome();
+        }
         closeModal(root);
       });
     }
@@ -473,16 +617,60 @@
     if (!root) return;
     var mount = document.getElementById("gc-designer-object-edit-fw-mount");
     var et = String(opts.entityType || "").trim();
+    var modeRaw = String(opts.mode || "edit").trim().toLowerCase();
+    var isAdd = modeRaw === "add";
     var titleEl = document.getElementById("gc-designer-flyout-object-edit-title");
     if (titleEl) {
-      var rl = String(opts.rowLabel || "").trim();
-      titleEl.textContent = rl ? "Edit " + rl : "Edit";
+      if (isAdd) {
+        var etDisp = et ? et.replace(/_/g, " ") : "";
+        titleEl.textContent = etDisp ? "Add · " + etDisp : "Add";
+      } else {
+        var rl = String(opts.rowLabel || "").trim();
+        titleEl.textContent = rl ? "Edit " + rl : "Edit";
+      }
     }
-    var row = opts.row && typeof opts.row === "object" ? opts.row : {};
+    if (isAdd) {
+      var etDispName = et ? et.replace(/_/g, " ") : "";
+      globalThis.__gcObjectEditFlyoutObjectName = etDispName ? etDispName : "object";
+    } else {
+      var rlName = String(opts.rowLabel || "").trim();
+      globalThis.__gcObjectEditFlyoutObjectName = rlName ? rlName : "object";
+    }
+    var row =
+      isAdd
+        ? { cells: {}, flat: {} }
+        : opts.row && typeof opts.row === "object"
+          ? opts.row
+          : {};
+    var ids = collectFirewallIdsFromPreviewRow(row);
+    if (isAdd && (!ids || !ids.length)) {
+      ids = [];
+      if (typeof globalThis.gcHsTopBarFirewallIds === "function") {
+        var ord = globalThis.gcHsTopBarFirewallIds();
+        if (Array.isArray(ord)) {
+          ord.forEach(function (x) {
+            var n = parseInt(String(x), 10);
+            if (!isNaN(n) && n > 0) ids.push(n);
+          });
+        }
+      } else if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+        var raw = globalThis.gcGetSelectedFirewallIds();
+        if (Array.isArray(raw)) {
+          raw.forEach(function (x) {
+            var n2 = parseInt(String(x), 10);
+            if (!isNaN(n2) && n2 > 0) ids.push(n2);
+          });
+        }
+      }
+    }
+    if (isAdd) {
+      globalThis.__gcObjectEditFlyoutEditInitialFwIds = null;
+    } else {
+      globalThis.__gcObjectEditFlyoutEditInitialFwIds = ids.length ? ids.slice() : [];
+    }
     if (mount) {
       var ms = mount.querySelector("[data-gc-fw-ms]");
       if (ms) {
-        var ids = collectFirewallIdsFromPreviewRow(row);
         if (ids.length) {
           ms.dataset.fwInitialSelected = JSON.stringify(ids);
           ms.dataset.fwAssignedIds = JSON.stringify(ids);
@@ -500,9 +688,17 @@
         cells: row.cells && typeof row.cells === "object" ? row.cells : null,
         flat: row.flat && typeof row.flat === "object" ? row.flat : null,
         row: row,
+        mode: isAdd ? "add" : "edit",
       });
     }
     openModal(root);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (typeof globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome === "function") {
+          globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome();
+        }
+      });
+    });
   };
 
   globalThis.gcDesignerFlyoutSyncScrollLock = syncScrollLock;

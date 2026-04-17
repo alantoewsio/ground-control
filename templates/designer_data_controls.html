@@ -21,56 +21,52 @@
 {% block content %}
 <script type="application/json" id="gc-designer-data-controls-entry-types">{{ designer_catalog_data_entry_types | tojson }}</script>
 <main class="layout single gc-designer gc-designer-data-controls-page" data-gc-designer-data-controls="1">
-  <section class="gc-designer__section gc-designer-data-controls__type-rail" aria-labelledby="gc-designer-data-controls-h">
-    <h2 id="gc-designer-data-controls-h" class="gc-designer__h2">Cached object type</h2>
-    <p class="gc-designer__note">
-      Choose a type to load its catalogued payload properties. If the list is empty, run a config sync so fields can be
-      discovered.
-    </p>
-    <div class="gc-designer-data-controls__toolbar settings-form">
-      <label
-        class="settings-form__field gc-designer-data-controls__type-field gc-designer-entity-nav-object-sel__field"
-      >
-        <span class="settings-form__label" id="gc-designer-data-controls-type-l">Select type</span>
-        <select
-          class="settings-form__input mono gc-designer-entity-nav-object-sel__select"
-          id="gc-designer-data-controls-type"
-          data-gc-designer-object-selector="data-controls-entity-type"
-          aria-labelledby="gc-designer-data-controls-type-l"
-        >
-          <option value="">Loading…</option>
-        </select>
-      </label>
-      <p class="gc-designer-data-controls__status muted" id="gc-designer-data-controls-status" role="status" aria-live="polite"></p>
-    </div>
-  </section>
   <div class="gc-designer-data-controls__main-col">
-  <section class="gc-designer__section gc-designer-data-controls__tabs-wrap" aria-label="Data controls editor tabs">
-    <div class="gc-tabs gc-designer-data-controls__tabs" role="tablist" aria-label="Data controls tabs">
-      <button
-        type="button"
-        class="gc-tabs__tab is-active"
-        id="gc-designer-data-controls-tab-catalog"
-        role="tab"
-        aria-selected="true"
-        aria-controls="gc-designer-data-controls-panel-catalog"
-        data-gc-dc-tab="catalog"
-      >
-        Field catalog
-      </button>
-      <button
-        type="button"
-        class="gc-tabs__tab"
-        id="gc-designer-data-controls-tab-layout"
-        role="tab"
-        aria-selected="false"
-        aria-controls="gc-designer-data-controls-panel-layout"
-        data-gc-dc-tab="layout"
-      >
-        Layout
-      </button>
-    </div>
-  </section>
+  <section class="gc-designer__section gc-designer-data-controls__workspace" aria-label="Data controls editor">
+    <p class="gc-designer__note gc-designer-data-controls__lead-note">
+      Choose a cached object type to load catalog fields and layout plans. If the list is empty, run a config sync so
+      fields can be discovered.
+    </p>
+    <div class="gc-designer-data-controls__editor-shell">
+      <aside class="gc-designer-data-controls__object-list-col" aria-label="Object type">
+        <span class="settings-form__label" id="gc-designer-data-controls-type-l">Object type</span>
+        <div
+          id="gc-designer-data-controls-type"
+          class="gc-designer-object-selector-list gc-designer-object-selector-list--single-select gc-designer-data-controls__object-selector"
+          data-gc-designer-object-selector="object-selector-list-single"
+          role="radiogroup"
+          aria-labelledby="gc-designer-data-controls-type-l"
+        ></div>
+      </aside>
+      <div class="gc-designer-data-controls__editor-main-col">
+        <div class="gc-designer-data-controls__tabs-wrap">
+          <div class="gc-tabs gc-designer-data-controls__tabs" role="tablist" aria-label="Data controls tabs">
+            <button
+              type="button"
+              class="gc-tabs__tab is-active"
+              id="gc-designer-data-controls-tab-catalog"
+              role="tab"
+              aria-selected="true"
+              aria-controls="gc-designer-data-controls-panel-catalog"
+              data-gc-dc-tab="catalog"
+            >
+              Field catalog
+            </button>
+            <button
+              type="button"
+              class="gc-tabs__tab"
+              id="gc-designer-data-controls-tab-layout"
+              role="tab"
+              aria-selected="false"
+              aria-controls="gc-designer-data-controls-panel-layout"
+              data-gc-dc-tab="layout"
+            >
+              Layout plans
+            </button>
+          </div>
+          <p class="gc-designer-data-controls__status muted" id="gc-designer-data-controls-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="gc-designer-data-controls__panels-col">
   <section
     class="gc-designer__section"
     id="gc-designer-data-controls-panel-catalog"
@@ -107,6 +103,35 @@
         Save changes
       </button>
       <p class="gc-designer-data-controls__save-status muted" id="gc-designer-data-controls-save-status" role="status" aria-live="polite"></p>
+    </div>
+    <div
+      class="gc-designer-data-controls__layout-persist-toolbar settings-form"
+      role="group"
+      aria-label="Layout wiring and display cards"
+    >
+      <button
+        type="button"
+        class="button button--primary gc-dc-layout-persist-btn gc-dc-layout-save"
+        id="gc-designer-data-controls-layout-save-catalog"
+        disabled
+      >
+        Save layout
+      </button>
+      <button
+        type="button"
+        class="button button--secondary gc-dc-layout-persist-btn gc-dc-layout-reload"
+        id="gc-designer-data-controls-layout-reload-catalog"
+        disabled
+      >
+        Reload saved layout
+      </button>
+      <span
+        class="muted gc-designer-data-controls__layout-dirty-badge"
+        id="gc-designer-data-controls-layout-dirty-catalog"
+        hidden
+      >
+        Unsaved layout changes
+      </span>
     </div>
     <div class="gc-designer-data-controls__table-wrap">
       <table class="data-table data-table--dense gc-designer-data-controls__table" aria-label="Fields for selected type">
@@ -149,43 +174,63 @@
     aria-hidden="true"
     hidden
   >
-    <h2 class="gc-designer__h2">Layout</h2>
+    <h2 class="gc-designer__h2">Layout plans</h2>
     <p class="gc-designer__note">
       Drag from output dots to input dots to define data wiring and visibility logic. Select a connector and press
-      <code class="mono">Delete</code> to remove it. Layout changes autosave per object type.
+      <code class="mono">Delete</code> to remove it. In Display cards, use the left grip to reorder control cards
+      vertically; other cards shift to make room. Use <strong>Save layout</strong> to persist wiring, card order, logic
+      blocks, and Add only settings. Turn on <strong>Layout locked</strong> to block further edits until you unlock (also
+      shown on Data entry object pickers). The page warns you if you leave with unsaved layout changes.
     </p>
-    <div class="gc-designer-data-controls__layout-toolbar">
-      <button type="button" class="button button--secondary" id="gc-designer-data-controls-layout-reset">
-        Reset layout to defaults
+    <div
+      class="gc-designer-data-controls__layout-toolbar gc-designer-data-controls__layout-toolbar--main"
+      role="group"
+      aria-label="Layout controls"
+    >
+      <span id="gc-designer-data-controls-generate-h-layout" class="gc-designer-data-controls__layout-inline-label"
+        >Generate from cache</span
+      >
+      <label class="gc-designer-data-controls__check">
+        <input type="checkbox" id="gc-designer-data-controls-gen-fw-layout" checked />
+        <span>Firewall</span>
+      </label>
+      <label class="gc-designer-data-controls__check">
+        <input type="checkbox" id="gc-designer-data-controls-gen-cfg-layout" checked />
+        <span>Configuration</span>
+      </label>
+      <button type="button" class="button button--secondary" id="gc-designer-data-controls-generate-layout">
+        Update fields
+      </button>
+      <span
+        class="gc-designer-data-controls__generate-status muted"
+        id="gc-designer-data-controls-generate-status-layout"
+        role="status"
+        aria-live="polite"
+      ></span>
+      <button
+        type="button"
+        class="button button--primary gc-dc-layout-persist-btn gc-dc-layout-save"
+        id="gc-designer-data-controls-layout-save-panel"
+        disabled
+      >
+        Save Layout
       </button>
       <button
         type="button"
-        class="button button--secondary"
-        id="gc-designer-data-controls-layout-add-and"
+        class="button button--secondary gc-dc-layout-persist-btn gc-dc-layout-reload"
+        id="gc-designer-data-controls-layout-reload-panel"
+        disabled
       >
-        Add AND block
+        Reload
       </button>
-      <button
-        type="button"
-        class="button button--secondary"
-        id="gc-designer-data-controls-layout-add-or"
+      <span
+        class="muted gc-designer-data-controls__layout-dirty-badge"
+        id="gc-designer-data-controls-layout-dirty-panel"
+        hidden
       >
-        Add OR block
-      </button>
-      <button
-        type="button"
-        class="button button--secondary"
-        id="gc-designer-data-controls-layout-add-not"
-      >
-        Add NOT block
-      </button>
-      <button
-        type="button"
-        class="button button--secondary"
-        id="gc-designer-data-controls-layout-add-if-value"
-      >
-        Add Value block
-      </button>
+        Unsaved layout changes
+      </span>
+      <button type="button" class="button button--secondary" id="gc-designer-data-controls-layout-reset">Reset</button>
       <div class="gc-designer-data-controls__layout-test-picker" id="gc-designer-data-controls-layout-test-picker">
         <button
           type="button"
@@ -216,11 +261,41 @@
       <button
         type="button"
         class="button button--secondary"
-        id="gc-designer-data-controls-layout-test-btn"
+        id="gc-designer-data-controls-layout-trace-btn"
         disabled
       >
-        Test connections
+        Trace
       </button>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-show-edit-btn"
+        disabled
+      >
+        Show Edit
+      </button>
+      <button
+        type="button"
+        class="button button--secondary"
+        id="gc-designer-data-controls-layout-show-add-btn"
+      >
+        Show Add
+      </button>
+      <label
+        class="gc-toolbar-combine gc-dc-layout-locked-toggle gc-dc-layout-locked-toggle--toolbar"
+        title="When on, wiring and layout structure cannot be changed until this is turned off (stored with this object type)."
+      >
+        <span class="gc-toolbar-combine__text">Locked</span>
+        <input
+          type="checkbox"
+          class="gc-toolbar-combine__input"
+          id="gc-designer-data-controls-layout-locked"
+          disabled
+        />
+        <span class="gc-toolbar-combine__track" aria-hidden="true"
+          ><span class="gc-toolbar-combine__thumb"></span
+        ></span>
+      </label>
     </div>
     <p class="gc-designer-data-controls__layout-status muted" id="gc-designer-data-controls-layout-status" role="status" aria-live="polite"></p>
     <div class="gc-designer-data-controls-layout" id="gc-designer-data-controls-layout-root">
@@ -229,18 +304,82 @@
         id="gc-designer-data-controls-layout-edges"
         aria-hidden="true"
       ></svg>
-      <div class="gc-designer-data-controls-layout__canvas-wrap">
-        <div class="gc-designer-data-controls-layout__canvas" id="gc-designer-data-controls-layout-canvas">
-          <div
-            class="gc-designer-data-controls-layout__nodes"
-            id="gc-designer-data-controls-layout-nodes"
-            aria-label="Layout field canvas"
-          ></div>
+      <div class="gc-designer-data-controls-layout__data-field-panel" aria-label="Data field cards">
+        <header class="gc-designer-data-controls-layout__panel-head">
+          <h3 class="gc-designer-data-controls-layout__panel-title">Data field cards</h3>
+          <p class="muted gc-designer-data-controls-layout__panel-note">
+            Field catalog rows appear here; set a data entry type in Field catalog to add wiring handles.
+          </p>
+        </header>
+        <div class="gc-designer-data-controls-layout__canvas-wrap">
+          <div class="gc-designer-data-controls-layout__canvas" id="gc-designer-data-controls-layout-canvas">
+            <div
+              class="gc-designer-data-controls-layout__nodes"
+              id="gc-designer-data-controls-layout-nodes"
+              aria-label="Layout field canvas"
+            ></div>
+          </div>
         </div>
       </div>
-      <aside class="gc-designer-data-controls-layout__panel" aria-label="Object edit controls">
+      <aside class="gc-designer-data-controls-layout__panel gc-designer-data-controls-layout__logic-panel" aria-label="Logic">
         <header class="gc-designer-data-controls-layout__panel-head">
-          <h3 class="gc-designer-data-controls-layout__panel-title">Object edit pane</h3>
+          <h3 class="gc-designer-data-controls-layout__panel-title">Logic</h3>
+          <div class="gc-designer-data-controls-layout__logic-toolbox" aria-label="Logic toolbox">
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-and"
+              title="Add AND block"
+              aria-label="Add AND block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">join_inner</span>
+            </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-or"
+              title="Add OR block"
+              aria-label="Add OR block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">call_split</span>
+            </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-not"
+              title="Add NOT block"
+              aria-label="Add NOT block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">block</span>
+            </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-if-value"
+              title="Add Value block"
+              aria-label="Add Value block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">rule</span>
+            </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-csv-array"
+              title="Add CSV ↔ Array block"
+              aria-label="Add CSV to Array block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">data_array</span>
+            </button>
+          </div>
+        </header>
+        <div
+          class="settings-form gc-designer-data-controls-layout__logic"
+          id="gc-designer-data-controls-layout-logic"
+        ></div>
+      </aside>
+      <aside class="gc-designer-data-controls-layout__panel" aria-label="Display cards">
+        <header class="gc-designer-data-controls-layout__panel-head">
+          <h3 class="gc-designer-data-controls-layout__panel-title">Display cards</h3>
           <p class="muted gc-designer-data-controls-layout__panel-note">
             Controls selected in Field catalog appear here.
           </p>
@@ -250,6 +389,10 @@
           id="gc-designer-data-controls-layout-controls"
         ></div>
       </aside>
+    </div>
+  </section>
+        </div>
+      </div>
     </div>
   </section>
   </div>
@@ -309,13 +452,33 @@
   var genFw = document.getElementById("gc-designer-data-controls-gen-fw");
   var genCfg = document.getElementById("gc-designer-data-controls-gen-cfg");
   var genStatusEl = document.getElementById("gc-designer-data-controls-generate-status");
+  var genBtnLayout = document.getElementById("gc-designer-data-controls-generate-layout");
+  var genFwLayout = document.getElementById("gc-designer-data-controls-gen-fw-layout");
+  var genCfgLayout = document.getElementById("gc-designer-data-controls-gen-cfg-layout");
+  var genStatusLayoutEl = document.getElementById("gc-designer-data-controls-generate-status-layout");
   var saveBtn = document.getElementById("gc-designer-data-controls-save");
   var saveStatusEl = document.getElementById("gc-designer-data-controls-save-status");
   var rowInitials = {};
   var allCachedEntityTypes = [];
+  var layoutLockFlagsByEntityType = {};
+  var layoutLockFetchPromise = null;
   var STORAGE_KEY_TAB = "gc.designer.dataControls.activeTab";
   var STORAGE_KEY_ENTITY = "gc.designer.dataControls.entityType";
   var appliedSavedEntityType = false;
+
+  function getEntityTypeControlValue() {
+    if (!typeSel) return "";
+    var r = typeSel.querySelector(".gc-designer-object-selector-list__radio:checked");
+    return r ? String(r.value || "").trim() : "";
+  }
+
+  function setEntityTypeControlValue(et) {
+    var v = trimStr(et);
+    if (!typeSel) return;
+    typeSel.querySelectorAll(".gc-designer-object-selector-list__radio").forEach(function (rad) {
+      rad.checked = !!v && trimStr(rad.value) === v;
+    });
+  }
 
   function readStoredUiValue(key) {
     try {
@@ -331,6 +494,54 @@
       if (!v) localStorage.removeItem(key);
       else localStorage.setItem(key, v);
     } catch (e) {}
+  }
+
+  function loadLayoutLockFlags() {
+    if (layoutLockFetchPromise) return layoutLockFetchPromise;
+    layoutLockFetchPromise = fetch("/api/firewalls/config-ui/data-controls-layout-locks", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok && j && j.ok, locks: j && j.locks };
+        });
+      })
+      .then(function (res) {
+        layoutLockFetchPromise = null;
+        layoutLockFlagsByEntityType =
+          res.ok && res.locks && typeof res.locks === "object" ? res.locks : {};
+        return layoutLockFlagsByEntityType;
+      })
+      .catch(function () {
+        layoutLockFetchPromise = null;
+        layoutLockFlagsByEntityType = {};
+        return layoutLockFlagsByEntityType;
+      });
+    return layoutLockFetchPromise;
+  }
+
+  function applyLayoutLockIconsToObjectTypeSelector() {
+    if (!typeSel) return;
+    typeSel
+      .querySelectorAll(".gc-designer-object-selector-list__row")
+      .forEach(function (row) {
+        var inp = row.querySelector(".gc-designer-object-selector-list__radio");
+        var lab = row.querySelector(".gc-designer-object-selector-list__label");
+        if (!inp || !lab) return;
+        var et = trimStr(inp.value);
+        var locked = !!(et && layoutLockFlagsByEntityType[et]);
+        lab.classList.toggle(
+          "gc-designer-object-selector-list__label--layout-locked",
+          locked,
+        );
+      });
+  }
+
+  function refreshObjectTypeSelectorLayoutLockIcons() {
+    loadLayoutLockFlags().then(function () {
+      applyLayoutLockIconsToObjectTypeSelector();
+    });
   }
 
   function wireTabPersistence() {
@@ -502,9 +713,21 @@
     if (statusEl) statusEl.textContent = msg || "";
   }
 
-  function setGenStatus(msg) {
-    if (genStatusEl) genStatusEl.textContent = msg || "";
+  function mirrorGenCheckboxPair(a, b) {
+    if (!a || !b) return;
+    a.addEventListener("change", function () {
+      b.checked = a.checked;
+    });
+    b.addEventListener("change", function () {
+      a.checked = b.checked;
+    });
   }
+
+  function wireGenCacheCheckboxMirror() {
+    mirrorGenCheckboxPair(genFw, genFwLayout);
+    mirrorGenCheckboxPair(genCfg, genCfgLayout);
+  }
+  wireGenCacheCheckboxMirror();
 
   function captureInitial(f) {
     return {
@@ -590,7 +813,7 @@
 
   function refreshSaveAvailability() {
     if (!saveBtn || !tbody) return;
-    var type = typeSel ? String(typeSel.value || "").trim() : "";
+    var type = getEntityTypeControlValue();
     var any = false;
     if (type) {
       tbody.querySelectorAll("tr[data-field-id]").forEach(function (tr) {
@@ -624,10 +847,12 @@
       out.push({
         id: String(tr.getAttribute("data-field-id") || ""),
         property_name: String(tr.getAttribute("data-property-name") || "").trim(),
+        json_value_kind: String(tr.getAttribute("data-json-value-kind") || "").trim(),
         data_entry_type: String(cur.data_entry_type || "").trim(),
         data_entry_properties: String(cur.data_entry_properties || ""),
         allowed_options: parseEditorJsonArray(cur.allowed_options),
         show_as: String(cur.show_as || "").trim(),
+        display_order: String(cur.display_order || "").trim(),
         help_text: String(cur.help_text || ""),
       });
     });
@@ -635,7 +860,7 @@
   }
 
   function emitCatalogChanged() {
-    var entityType = typeSel ? String(typeSel.value || "").trim() : "";
+    var entityType = getEntityTypeControlValue();
     var fields = readCatalogRowsForLayout();
     window.__gcDesignerDataControlsCatalogState = {
       entity_type: entityType,
@@ -743,6 +968,10 @@
       tr.setAttribute(
         "data-entry-properties",
         f.data_entry_properties == null ? "" : String(f.data_entry_properties),
+      );
+      tr.setAttribute(
+        "data-json-value-kind",
+        f.json_value_kind == null ? "" : String(f.json_value_kind),
       );
 
       var tdDrag = document.createElement("td");
@@ -927,8 +1156,8 @@
   function syncAllCachedEntityTypesFromTypeSelect() {
     allCachedEntityTypes = [];
     if (!typeSel) return;
-    typeSel.querySelectorAll("option").forEach(function (o) {
-      var v = trimStr(o.value);
+    typeSel.querySelectorAll(".gc-designer-object-selector-list__radio").forEach(function (inp) {
+      var v = trimStr(inp.value);
       if (v) allCachedEntityTypes.push(v);
     });
     allCachedEntityTypes.sort(function (a, b) {
@@ -938,30 +1167,30 @@
 
   function loadEntityTypes() {
     if (!typeSel) return;
-    typeSel.innerHTML = '<option value="">Loading…</option>';
-    typeSel.disabled = false;
-    if (typeof globalThis.gcDesignerHydrateObjectSelectorDropdown !== "function") {
+    typeSel.innerHTML = '<p class="muted gc-designer-object-selector-list__empty">Loading…</p>';
+    typeSel.classList.remove("is-disabled");
+    if (typeof globalThis.gcDesignerHydrateObjectSelectorListSingle !== "function") {
       typeSel.innerHTML = "";
-      var optBad = document.createElement("option");
-      optBad.value = "";
-      optBad.textContent = "Object selector script unavailable";
-      optBad.disabled = true;
-      typeSel.appendChild(optBad);
-      typeSel.disabled = true;
+      typeSel.classList.add("is-disabled");
+      var emptyBad = document.createElement("p");
+      emptyBad.className = "muted gc-designer-object-selector-list__empty";
+      emptyBad.textContent = "Object selector script unavailable";
+      typeSel.appendChild(emptyBad);
       return;
     }
-    globalThis.gcDesignerHydrateObjectSelectorDropdown(typeSel, function () {
+    globalThis.gcDesignerHydrateObjectSelectorListSingle(typeSel, function () {
       syncAllCachedEntityTypesFromTypeSelect();
+      refreshObjectTypeSelectorLayoutLockIcons();
       if (appliedSavedEntityType) return;
       appliedSavedEntityType = true;
       var saved = readStoredUiValue(STORAGE_KEY_ENTITY);
       if (!saved) return;
       var has = false;
-      typeSel.querySelectorAll("option").forEach(function (o) {
-        if (String(o.value || "").trim() === saved) has = true;
+      typeSel.querySelectorAll(".gc-designer-object-selector-list__radio").forEach(function (inp) {
+        if (String(inp.value || "").trim() === saved) has = true;
       });
       if (!has) return;
-      typeSel.value = saved;
+      setEntityTypeControlValue(saved);
       typeSel.dispatchEvent(new Event("change", { bubbles: true }));
     });
   }
@@ -1059,8 +1288,19 @@
     return { value: out.length ? out : null };
   }
 
+  function parseDataEntryPropertiesObject(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return {};
+    try {
+      var j = JSON.parse(s);
+      return j && typeof j === "object" && !Array.isArray(j) ? j : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   function saveCatalogChanges() {
-    var et = typeSel ? String(typeSel.value || "").trim() : "";
+    var et = getEntityTypeControlValue();
     if (!et || !tbody || !saveBtn || saveBtn.disabled) return;
     var updates = [];
     var parseErr = null;
@@ -1137,9 +1377,314 @@
       });
   }
 
+  globalThis.gcDesignerDataControlsSetFieldShowAs = function (fieldId, nextVal) {
+    return new Promise(function (resolve) {
+      var et = getEntityTypeControlValue();
+      var fid = parseInt(String(fieldId || ""), 10);
+      if (!et || !fid || !tbody) {
+        resolve(false);
+        return;
+      }
+      var tr = tbody.querySelector('tr[data-field-id="' + String(fid) + '"]');
+      if (!tr) {
+        resolve(false);
+        return;
+      }
+      var showIn = tr.querySelector(".gc-designer-data-controls__input-show-as");
+      if (!showIn) {
+        resolve(false);
+        return;
+      }
+      showIn.value = String(nextVal != null ? nextVal : "");
+      refreshRowDirtyUi(tr);
+      refreshSaveAvailability();
+      setSaveStatus("Saving…");
+      var norm = String(nextVal != null ? nextVal : "").trim();
+      var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+      fetch(url, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({
+          updates: [
+            {
+              id: fid,
+              show_as: norm ? norm : null,
+            },
+          ],
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var det = res.j && res.j.detail;
+            setSaveStatus(
+              typeof det === "string"
+                ? det
+                : "Save failed (" + (res.status || "?") + ").",
+            );
+            resolve(false);
+            return;
+          }
+          setSaveStatus("Saved.");
+          loadFields(et);
+          resolve(true);
+        })
+        .catch(function () {
+          setSaveStatus("Save request failed.");
+          resolve(false);
+        });
+    });
+  };
+
+  globalThis.gcDesignerDataControlsSetFieldAllowedOptions = function (fieldId, rawText) {
+    return new Promise(function (resolve) {
+      var et = getEntityTypeControlValue();
+      var fid = parseInt(String(fieldId || ""), 10);
+      if (!et || !fid || !tbody) {
+        resolve(false);
+        return;
+      }
+      var tr = tbody.querySelector('tr[data-field-id="' + String(fid) + '"]');
+      if (!tr) {
+        resolve(false);
+        return;
+      }
+      var ao = parseAllowedOptionsForSave(rawText);
+      if (ao.err) {
+        setSaveStatus(ao.err);
+        resolve(false);
+        return;
+      }
+      var taAo = tr.querySelector(".gc-designer-data-controls__input-allowed-options");
+      if (taAo) {
+        taAo.value =
+          ao.value && ao.value.length
+            ? JSON.stringify(ao.value)
+            : "";
+      }
+      refreshRowDirtyUi(tr);
+      refreshSaveAvailability();
+      setSaveStatus("Saving…");
+      var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+      fetch(url, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({
+          updates: [
+            {
+              id: fid,
+              allowed_options: ao.value,
+            },
+          ],
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var det = res.j && res.j.detail;
+            setSaveStatus(
+              typeof det === "string"
+                ? det
+                : "Save failed (" + (res.status || "?") + ").",
+            );
+            resolve(false);
+            return;
+          }
+          setSaveStatus("Saved.");
+          loadFields(et);
+          resolve(true);
+        })
+        .catch(function () {
+          setSaveStatus("Save request failed.");
+          resolve(false);
+        });
+    });
+  };
+
+  globalThis.gcDesignerDataControlsSetFieldMemberLookupMulti = function (fieldId, enabled) {
+    return new Promise(function (resolve) {
+      var et = getEntityTypeControlValue();
+      var fid = parseInt(String(fieldId || ""), 10);
+      if (!et || !fid || !tbody) {
+        resolve(false);
+        return;
+      }
+      var tr = tbody.querySelector('tr[data-field-id="' + String(fid) + '"]');
+      if (!tr) {
+        resolve(false);
+        return;
+      }
+      var detSel = tr.querySelector(".gc-designer-data-controls__select-det");
+      if (!detSel || String(detSel.value || "").trim().toLowerCase() !== "member-lookup") {
+        resolve(false);
+        return;
+      }
+      var propsIn = tr.querySelector(".gc-designer-data-controls__input-props");
+      if (!propsIn) {
+        resolve(false);
+        return;
+      }
+      var nextOn = !!enabled;
+      var props = parseDataEntryPropertiesObject(propsIn.value);
+      props.multi = nextOn;
+      if (!props.source || typeof props.source !== "object" || Array.isArray(props.source)) {
+        props.source = {};
+      }
+      props.source.multi = nextOn;
+      var nextText = JSON.stringify(props);
+      propsIn.value = nextText;
+      refreshRowDirtyUi(tr);
+      refreshSaveAvailability();
+      setSaveStatus("Saving…");
+      var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+      fetch(url, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({
+          updates: [
+            {
+              id: fid,
+              data_entry_properties: nextText,
+            },
+          ],
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var det = res.j && res.j.detail;
+            setSaveStatus(
+              typeof det === "string"
+                ? det
+                : "Save failed (" + (res.status || "?") + ").",
+            );
+            resolve(false);
+            return;
+          }
+          setSaveStatus("Saved.");
+          loadFields(et);
+          resolve(true);
+        })
+        .catch(function () {
+          setSaveStatus("Save request failed.");
+          resolve(false);
+        });
+    });
+  };
+
+  globalThis.gcDesignerDataControlsApplyDisplayOrdersFromPanel = function (orderedFieldIds) {
+    return new Promise(function (resolve) {
+      var et = getEntityTypeControlValue();
+      if (!et || !tbody) {
+        resolve(false);
+        return;
+      }
+      var panelIds = (orderedFieldIds || []).map(function (x) {
+        return String(x != null ? x : "").trim();
+      }).filter(Boolean);
+      var seen = Object.create(null);
+      var merged = [];
+      panelIds.forEach(function (id) {
+        if (seen[id]) return;
+        seen[id] = true;
+        merged.push(id);
+      });
+      tbody.querySelectorAll("tr[data-field-id]").forEach(function (tr) {
+        var id = String(tr.getAttribute("data-field-id") || "").trim();
+        if (!id || seen[id]) return;
+        merged.push(id);
+        seen[id] = true;
+      });
+      merged.forEach(function (fid, idx) {
+        var tr = tbody.querySelector('tr[data-field-id="' + fid + '"]');
+        if (!tr) return;
+        var ordIn = tr.querySelector(".gc-designer-data-controls__input-order");
+        if (ordIn) ordIn.value = String(idx + 1);
+        refreshRowDirtyUi(tr);
+      });
+      refreshSaveAvailability();
+      emitCatalogChanged();
+      var updates = merged
+        .map(function (fid, idx) {
+          var idNum = parseInt(fid, 10);
+          if (!idNum) return null;
+          return { id: idNum, display_order: idx + 1 };
+        })
+        .filter(Boolean);
+      if (!updates.length) {
+        resolve(true);
+        return;
+      }
+      setSaveStatus("Saving display order…");
+      var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+      fetch(url, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({ updates: updates }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var det = res.j && res.j.detail;
+            setSaveStatus(
+              typeof det === "string"
+                ? det
+                : "Save failed (" + (res.status || "?") + ").",
+            );
+            resolve(false);
+            return;
+          }
+          var n = res.j.updated != null ? res.j.updated : updates.length;
+          setSaveStatus("Saved display order (" + n + " row(s)).");
+          loadFields(et);
+          resolve(true);
+        })
+        .catch(function () {
+          setSaveStatus("Save request failed.");
+          resolve(false);
+        });
+    });
+  };
+
   globalThis.gcDesignerDataControlsSetFieldDataEntryType = function (fieldId, nextVal) {
     return new Promise(function (resolve) {
-      var et = typeSel ? String(typeSel.value || "").trim() : "";
+      var et = getEntityTypeControlValue();
       var fid = parseInt(String(fieldId || ""), 10);
       if (!et || !fid || !tbody) {
         resolve(false);
@@ -1220,25 +1765,61 @@
     saveBtn.addEventListener("click", saveCatalogChanges);
   }
 
+  function revertTypeSelectTo(entityType) {
+    if (!typeSel) return;
+    setEntityTypeControlValue(entityType);
+  }
+
   if (typeSel) {
     typeSel.addEventListener("change", function () {
-      var cur = String(typeSel.value || "").trim();
+      var cur = getEntityTypeControlValue();
+      var prev =
+        typeof globalThis.gcDesignerDcLayoutGetEntityType === "function"
+          ? String(globalThis.gcDesignerDcLayoutGetEntityType() || "").trim()
+          : "";
+      if (
+        prev &&
+        cur !== prev &&
+        typeof globalThis.gcDesignerDcLayoutIsDirty === "function" &&
+        globalThis.gcDesignerDcLayoutIsDirty()
+      ) {
+        var ok = globalThis.confirm(
+          "You have unsaved layout changes for " +
+            prev +
+            ". Switch object types anyway? Those changes will be lost unless you save the layout first.",
+        );
+        if (!ok) {
+          revertTypeSelectTo(prev);
+          return;
+        }
+      }
       writeStoredUiValue(STORAGE_KEY_ENTITY, cur);
       loadFields(cur);
       emitCatalogChanged();
     });
   }
 
-  function runGenerateMissing() {
-    if (!genBtn) return;
-    var incFw = genFw ? !!genFw.checked : true;
-    var incCfg = genCfg ? !!genCfg.checked : true;
+  function runGenerateMissing(fromLayout) {
+    var btn = fromLayout ? genBtnLayout : genBtn;
+    if (!btn) return;
+    var fw = fromLayout ? genFwLayout : genFw;
+    var cfg = fromLayout ? genCfgLayout : genCfg;
+    var statEl = fromLayout ? genStatusLayoutEl : genStatusEl;
+    function setSourceGenStatus(msg) {
+      if (statEl) statEl.textContent = msg || "";
+    }
+    function setBothGenDisabled(dis) {
+      if (genBtn) genBtn.disabled = dis;
+      if (genBtnLayout) genBtnLayout.disabled = dis;
+    }
+    var incFw = fw ? !!fw.checked : true;
+    var incCfg = cfg ? !!cfg.checked : true;
     if (!incFw && !incCfg) {
-      setGenStatus("Select at least one cache source.");
+      setSourceGenStatus("Select at least one cache source.");
       return;
     }
-    genBtn.disabled = true;
-    setGenStatus("Scanning cache…");
+    setBothGenDisabled(true);
+    setSourceGenStatus("Scanning cache…");
     fetch("/api/designer/entity-payload-fields/generate-missing", {
       method: "POST",
       credentials: "same-origin",
@@ -1258,10 +1839,10 @@
         });
       })
       .then(function (res) {
-        genBtn.disabled = false;
+        setBothGenDisabled(false);
         if (!res.ok || !res.j) {
           var det = res.j && res.j.detail;
-          setGenStatus(
+          setSourceGenStatus(
             typeof det === "string"
               ? det
               : "Request failed (" + (res.status || "?") + ")."
@@ -1269,14 +1850,14 @@
           return;
         }
         if (!res.j.ok) {
-          setGenStatus("Could not complete generate.");
+          setSourceGenStatus("Could not complete generate.");
           return;
         }
         var scanned = res.j.entries_scanned != null ? res.j.entries_scanned : "—";
         var ins = res.j.rows_inserted != null ? res.j.rows_inserted : "—";
         var inf =
           res.j.data_entry_types_inferred != null ? res.j.data_entry_types_inferred : "—";
-        setGenStatus(
+        setSourceGenStatus(
           "Scanned " +
             scanned +
             " cache row(s); inserted " +
@@ -1285,17 +1866,24 @@
             inf +
             " existing row(s)."
         );
-        var cur = typeSel ? String(typeSel.value || "").trim() : "";
+        var cur = getEntityTypeControlValue();
         if (cur) loadFields(cur);
       })
       .catch(function () {
-        genBtn.disabled = false;
-        setGenStatus("Request failed.");
+        setBothGenDisabled(false);
+        setSourceGenStatus("Request failed.");
       });
   }
 
   if (genBtn) {
-    genBtn.addEventListener("click", runGenerateMissing);
+    genBtn.addEventListener("click", function () {
+      runGenerateMissing(false);
+    });
+  }
+  if (genBtnLayout) {
+    genBtnLayout.addEventListener("click", function () {
+      runGenerateMissing(true);
+    });
   }
 
   function wireTestModalClose() {
@@ -1328,8 +1916,15 @@
   {% include "partials/gc_designer_controls_main_demo.html" %}
 </div>
 {% include "partials/gc_designer_controls_flyouts_overlay.html" %}
+{# Object-edit modal is already inside gc_designer_controls_flyouts_overlay.html — do not include twice #}
 {% endblock %}
 
 {% block scripts %}
+<script>
+  window.GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK = true;
+</script>
 {% include "partials/gc_designer_controls_scripts.html" %}
+{% set object_edit_bundle_include_option_selector = false %}
+{% include "partials/gc_object_edit_flyout_scripts.html" %}
+{% set object_edit_bundle_include_option_selector = true %}
 {% endblock %}

@@ -395,6 +395,37 @@
     };
   }
 
+  function writeOptsToInput(el, opts) {
+    if (!el || !opts || typeof opts !== "object") return;
+    var strKeys = [
+      ["withinCidr", "data-gc-ip-within-cidr"],
+      ["rangeLo", "data-gc-ip-range-lo"],
+      ["rangeHi", "data-gc-ip-range-hi"],
+      ["prefix", "data-gc-ip-prefix"],
+      ["cidrPrefixMin", "data-gc-ip-cidr-prefix-min"],
+      ["cidrPrefixMax", "data-gc-ip-cidr-prefix-max"],
+      ["storedPrefix", "data-gc-ip-prefix-length"],
+    ];
+    strKeys.forEach(function (pair) {
+      var k = pair[0];
+      var attr = pair[1];
+      var v = opts[k];
+      if (v != null && String(v).trim() !== "") el.setAttribute(attr, String(v).trim());
+      else el.removeAttribute(attr);
+    });
+    var boolKeys = [
+      ["requireNetwork", "data-gc-ip-require-network"],
+      ["requireValueCidr", "data-gc-ip-require-value-cidr"],
+      ["autocorrect", "data-gc-ip-autocorrect"],
+    ];
+    boolKeys.forEach(function (pair) {
+      var k = pair[0];
+      var attr = pair[1];
+      if (opts[k] === true) el.setAttribute(attr, "true");
+      else el.removeAttribute(attr);
+    });
+  }
+
   function hasAppliedIpConstraints(el) {
     if (!el || !el.attributes) return false;
     for (var i = 0; i < el.attributes.length; i++) {
@@ -484,12 +515,18 @@
       }
     }
     if (opts.requireNetwork) {
-      var pfx = parseInt(opts.prefix, 10);
-      if (!Number.isFinite(pfx) || pfx < 0 || pfx > 32) {
+      var pfxNet = parseInt(opts.prefix, 10);
+      if (userPfx !== null && Number.isFinite(userPfx)) {
+        pfxNet = userPfx;
+      } else if (opts.storedPrefix) {
+        var spNet = parseInt(opts.storedPrefix, 10);
+        if (Number.isFinite(spNet)) pfxNet = spNet;
+      }
+      if (!Number.isFinite(pfxNet) || pfxNet < 0 || pfxNet > 32) {
         return { ok: false, msg: "Set data-gc-ip-prefix (0–32) for IPv4 network-address check." };
       }
-      if (!isIpv4NetworkAddress(host, pfx)) {
-        return { ok: false, msg: "IPv4 must be the network address for /" + pfx + " (host bits must be 0)." };
+      if (!isIpv4NetworkAddress(host, pfxNet)) {
+        return { ok: false, msg: "IPv4 must be the network address for /" + pfxNet + " (host bits must be 0)." };
       }
     }
     if (opts.requireValueCidr) {
@@ -571,12 +608,18 @@
       };
     }
     if (opts.requireNetwork) {
-      var pfx6 = parseInt(opts.prefix, 10);
-      if (!Number.isFinite(pfx6) || pfx6 < 0 || pfx6 > 128) {
+      var pfx6Net = parseInt(opts.prefix, 10);
+      if (userPfx6 !== null && Number.isFinite(userPfx6)) {
+        pfx6Net = userPfx6;
+      } else if (opts.storedPrefix) {
+        var sp6 = parseInt(opts.storedPrefix, 10);
+        if (Number.isFinite(sp6)) pfx6Net = sp6;
+      }
+      if (!Number.isFinite(pfx6Net) || pfx6Net < 0 || pfx6Net > 128) {
         return { ok: false, msg: "Set data-gc-ip-prefix (0–128) for IPv6 network-address check." };
       }
-      if (!isIpv6NetworkAddress(host, pfx6)) {
-        return { ok: false, msg: "IPv6 must be the network address for /" + pfx6 + " (host bits must be 0)." };
+      if (!isIpv6NetworkAddress(host, pfx6Net)) {
+        return { ok: false, msg: "IPv6 must be the network address for /" + pfx6Net + " (host bits must be 0)." };
       }
     }
     if (opts.requireValueCidr) {
@@ -1692,6 +1735,85 @@
     });
   }
 
+  function normalizeIpConstraintWireToInternal(raw) {
+    var s = String(raw == null ? "" : raw).replace(/^\s+|\s+$/g, "");
+    if (!s) return "none";
+    var x = s.toLowerCase();
+    if (x === "ip") return "none";
+    if (x === "assignment") return "cidr-subnet";
+    if (x === "iprange") return "ip-range";
+    if (x === "interface address") return "value-cidr";
+    if (x === "network") return "network-only";
+    if (
+      x === "none" ||
+      x === "cidr-subnet" ||
+      x === "ip-range" ||
+      x === "network-only" ||
+      x === "value-cidr"
+    ) {
+      return x;
+    }
+    return "none";
+  }
+
+  function clearCatalogIpWireConstraintAttrs(inp) {
+    if (!inp) return;
+    [
+      "data-gc-ip-within-cidr",
+      "data-gc-ip-range-lo",
+      "data-gc-ip-range-hi",
+      "data-gc-ip-require-network",
+      "data-gc-ip-require-value-cidr",
+      "data-gc-ip-cidr-prefix-min",
+      "data-gc-ip-cidr-prefix-max",
+      "data-gc-ip-prefix",
+    ].forEach(function (a) {
+      inp.removeAttribute(a);
+    });
+  }
+
+  function applyCatalogIpAutocorrect(row, acOn) {
+    if (!row || !row.querySelectorAll) return false;
+    var list = row.querySelectorAll("input.gc-ip-field__input");
+    if (!list || !list.length) return false;
+    for (var ia = 0; ia < list.length; ia++) {
+      var inpAc = list[ia];
+      if (acOn) inpAc.setAttribute("data-gc-ip-autocorrect", "true");
+      else inpAc.removeAttribute("data-gc-ip-autocorrect");
+    }
+    var ipBx = (window.__gcDesignerControlsBridge || {}).ip;
+    if (ipBx && ipBx.refreshHints) ipBx.refreshHints();
+    return true;
+  }
+
+  function applyCatalogIpWireConstraints(row, constraintRaw, poolRaw) {
+    var inp = row && row.querySelector && row.querySelector("input.gc-ip-field__input");
+    if (!inp) return false;
+    var ipB = (window.__gcDesignerControlsBridge || {}).ip;
+    if (!ipB) return false;
+    var rawTrim = String(constraintRaw == null ? "" : constraintRaw).replace(/^\s+|\s+$/g, "");
+    var mode = normalizeIpConstraintWireToInternal(constraintRaw);
+    var pool = String(poolRaw == null ? "" : poolRaw).replace(/^\s+|\s+$/g, "");
+    if (!rawTrim && pool) mode = "cidr-subnet";
+    clearCatalogIpWireConstraintAttrs(inp);
+    if (mode === "cidr-subnet") {
+      if (pool) inp.setAttribute("data-gc-ip-within-cidr", pool);
+    } else if (mode === "network-only") {
+      inp.setAttribute("data-gc-ip-require-network", "true");
+    } else if (mode === "value-cidr") {
+      inp.setAttribute("data-gc-ip-require-value-cidr", "true");
+    }
+    if (ipB.refreshHints) ipB.refreshHints();
+    try {
+      inp.dispatchEvent(new Event("blur"));
+    } catch (eB) {}
+    return true;
+  }
+
+  window.gcDesignerNormalizeIpConstraintWireValue = normalizeIpConstraintWireToInternal;
+  window.gcDesignerApplyCatalogIpWireConstraints = applyCatalogIpWireConstraints;
+  window.gcDesignerApplyCatalogIpAutocorrect = applyCatalogIpAutocorrect;
+
   window.__gcDesignerControlsBridge = window.__gcDesignerControlsBridge || {};
   window.__gcDesignerControlsBridge.ip = {
     readAllGcIpAttrs: readAllGcIpAttrs,
@@ -1717,6 +1839,7 @@
     refreshHints: refreshDesignerIpHints,
     hasAppliedIpConstraints: hasAppliedIpConstraints,
     readOptsFromInput: readOptsFromInput,
+    writeOptsToInput: writeOptsToInput,
     wireCatalogIpInput: function (input, errEl, okEl, previewEl, maskPillEl, family) {
       wireIpField(input, errEl, okEl, previewEl, maskPillEl, family, function () {
         return readOptsFromInput(input);
@@ -2501,6 +2624,10 @@
     }
     if (!types.length && fs) {
       types = readCheckedValues(fs, "[data-gc-ml-entity-type]");
+    }
+    var layoutEt = String(root.getAttribute("data-gc-ml-layout-source-type") || "").trim();
+    if (layoutEt && /^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(layoutEt)) {
+      types = [layoutEt];
     }
     var cols = fs ? readCheckedValues(fs, "[data-gc-ml-list-col]") : [];
     if (!cols.length) cols = ["__firewall", "entity_type"];
@@ -4189,6 +4316,72 @@
     return out;
   }
 
+  function catalogIpAddressRootFromEl(el) {
+    if (!el || !el.querySelector) return null;
+    if (el.getAttribute && el.getAttribute("data-gc-obj-edit-ip-address") === "1") return el;
+    if (el.classList && el.classList.contains("gc-designer-object-edit-catalog-row")) {
+      return el.querySelector('[data-gc-obj-edit-ip-address="1"]');
+    }
+    return null;
+  }
+
+  function setCatalogIpAddressPropsFromJson(root, j, B) {
+    var ipB = B.ip;
+    var famSel = root.querySelector("select.gc-obj-edit-ip-address__family");
+    var v4w = root.querySelector(".gc-obj-edit-ip-address-fields-v4");
+    var v6w = root.querySelector(".gc-obj-edit-ip-address-fields-v6");
+    var v4i = root.querySelector('[data-gc-obj-edit-ip-panel="ipv4"] input.gc-ip-field__input');
+    var v6i = root.querySelector('[data-gc-obj-edit-ip-panel="ipv6"] input.gc-ip-field__input');
+    if (!v4i || !v6i) return false;
+    if (j.IPFamily != null) {
+      var want6 = String(j.IPFamily).toLowerCase().indexOf("6") >= 0;
+      if (famSel) {
+        famSel.value = want6 ? "IPv6" : "IPv4";
+        try {
+          famSel.dispatchEvent(new Event("change", { bubbles: true }));
+        } catch (eC) {}
+      } else {
+        if (v4w) v4w.hidden = want6;
+        if (v6w) v6w.hidden = !want6;
+      }
+    }
+    var famIs6 = famSel ? famSel.value === "IPv6" : !!(v6w && !v6w.hidden);
+    var inpA = famIs6 ? v6i : v4i;
+    if (j.usesAppliedIpConstraints === false && ipB && ipB.clearAllGcIpAttrs) {
+      ipB.clearAllGcIpAttrs(v4i);
+      ipB.clearAllGcIpAttrs(v6i);
+    }
+    if (j.clearAppliedIpAttributes && ipB && ipB.clearAllGcIpAttrs) {
+      ipB.clearAllGcIpAttrs(v4i);
+      ipB.clearAllGcIpAttrs(v6i);
+    } else if (j.appliedIpAttributes && ipB && ipB.writeAllGcIpAttrs) {
+      ipB.writeAllGcIpAttrs(v4i, j.appliedIpAttributes);
+      ipB.writeAllGcIpAttrs(v6i, j.appliedIpAttributes);
+    }
+    if (
+      j.effectiveConstraintOptions != null &&
+      typeof j.effectiveConstraintOptions === "object" &&
+      ipB &&
+      ipB.writeOptsToInput
+    ) {
+      ipB.writeOptsToInput(v4i, j.effectiveConstraintOptions);
+      ipB.writeOptsToInput(v6i, j.effectiveConstraintOptions);
+    }
+    if (j.autocorrect === false || j.autocorrect === "false" || j.autocorrect === "0") {
+      v4i.removeAttribute("data-gc-ip-autocorrect");
+      v6i.removeAttribute("data-gc-ip-autocorrect");
+    } else if (j.autocorrect === true || j.autocorrect === "true" || j.autocorrect === "1") {
+      v4i.setAttribute("data-gc-ip-autocorrect", "true");
+      v6i.setAttribute("data-gc-ip-autocorrect", "true");
+    }
+    if (j.value != null) inpA.value = String(j.value);
+    if (ipB && ipB.refreshHints) ipB.refreshHints();
+    try {
+      inpA.dispatchEvent(new Event("blur"));
+    } catch (eB) {}
+    return true;
+  }
+
   function setPropsForControl(controlId, el, raw) {
     var j = parseJsonArg(raw);
     var B = window.__gcDesignerControlsBridge || {};
@@ -4213,6 +4406,10 @@
     }
 
     if (controlId === "ip-address") {
+      var catIpRoot = catalogIpAddressRootFromEl(el);
+      if (catIpRoot) {
+        return setCatalogIpAddressPropsFromJson(catIpRoot, j, B);
+      }
       var ipA = B.ip;
       if (!ipA) return false;
       if (j.IPFamily != null && ipA.setIpFamily) ipA.setIpFamily(j.IPFamily);
@@ -4220,8 +4417,16 @@
       var famA = ipA.getIpFamily ? ipA.getIpFamily() : "IPv4";
       var inpA = famA === "IPv6" ? ipA.getIpv6Input() : ipA.getIpv4Input();
       if (!inpA) return false;
+      if (j.usesAppliedIpConstraints === false) ipA.clearAllGcIpAttrs(inpA);
       if (j.clearAppliedIpAttributes) ipA.clearAllGcIpAttrs(inpA);
       else if (j.appliedIpAttributes) ipA.writeAllGcIpAttrs(inpA, j.appliedIpAttributes);
+      if (
+        j.effectiveConstraintOptions != null &&
+        typeof j.effectiveConstraintOptions === "object" &&
+        ipA.writeOptsToInput
+      ) {
+        ipA.writeOptsToInput(inpA, j.effectiveConstraintOptions);
+      }
       if (j.value != null) inpA.value = String(j.value);
       ipA.refreshHints();
       inpA.dispatchEvent(new Event("blur"));
@@ -4251,8 +4456,16 @@
       if (!ip2) return false;
       var inp = controlId === "ip-ipv4" ? ip2.getIpv4Input() : ip2.getIpv6Input();
       if (!inp) return false;
+      if (j.usesAppliedIpConstraints === false) ip2.clearAllGcIpAttrs(inp);
       if (j.clearAppliedIpAttributes) ip2.clearAllGcIpAttrs(inp);
       else if (j.appliedIpAttributes) ip2.writeAllGcIpAttrs(inp, j.appliedIpAttributes);
+      if (
+        j.effectiveConstraintOptions != null &&
+        typeof j.effectiveConstraintOptions === "object" &&
+        ip2.writeOptsToInput
+      ) {
+        ip2.writeOptsToInput(inp, j.effectiveConstraintOptions);
+      }
       if (j.value != null) inp.value = String(j.value);
       ip2.refreshHints();
       inp.dispatchEvent(new Event("blur"));

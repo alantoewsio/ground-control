@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -75,6 +76,51 @@ def row_data_entry_type_is_unset(row: FirewallConfigEntityPayloadField) -> bool:
     return not str(v).strip()
 
 
+def row_data_entry_properties_is_unset(row: FirewallConfigEntityPayloadField) -> bool:
+    """True when ``data_entry_properties`` is NULL, empty, or whitespace-only."""
+    v = row.data_entry_properties
+    if v is None:
+        return True
+    return not str(v).strip()
+
+
+def _member_lookup_multi_data_entry_properties_json() -> str:
+    """
+    Canonical member-lookup props for array defaults.
+
+    Keep ``multi`` mirrored at root and ``source.multi`` for runtime compatibility.
+    """
+    return json.dumps(
+        {
+            "multi": True,
+            "source": {
+                "multi": True,
+            },
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def infer_default_catalog_settings_for_field(
+    property_name: str, json_kind: str
+) -> tuple[str | None, str | None]:
+    """
+    Infer default catalog settings for new/blank rows.
+
+    Rules:
+    - ``array`` -> ``member-lookup`` with multi-select enabled
+    - ``object`` -> no control (``None`` data entry type)
+    - other kinds -> name-based fallback inference
+    """
+    kind = str(json_kind or "").strip().lower()
+    if kind == "array":
+        return "member-lookup", _member_lookup_multi_data_entry_properties_json()
+    if kind == "object":
+        return None, None
+    return infer_default_data_entry_type_for_property(property_name), None
+
+
 def apply_inferred_data_entry_types_where_unset(db: Session) -> int:
     """
     Set ``data_entry_type`` from :func:`infer_default_data_entry_type_for_property` where the
@@ -94,9 +140,13 @@ def apply_inferred_data_entry_types_where_unset(db: Session) -> int:
         .all()
     )
     for row in rows:
-        inferred = infer_default_data_entry_type_for_property(row.property_name)
+        inferred, inferred_props = infer_default_catalog_settings_for_field(
+            row.property_name, row.json_value_kind
+        )
         if inferred:
             row.data_entry_type = inferred
+            if inferred_props is not None and row_data_entry_properties_is_unset(row):
+                row.data_entry_properties = inferred_props
             n += 1
     return n
 
@@ -118,7 +168,7 @@ def record_entity_payload_field_rows(
         if not prop:
             continue
         kind = json_value_kind(val)
-        inferred_det = infer_default_data_entry_type_for_property(prop)
+        inferred_det, inferred_props = infer_default_catalog_settings_for_field(prop, kind)
         row = (
             db.query(FirewallConfigEntityPayloadField)
             .filter(
@@ -136,7 +186,7 @@ def record_entity_payload_field_rows(
                     json_value_kind=kind,
                     dependent_on=None,
                     data_entry_type=inferred_det,
-                    data_entry_properties=None,
+                    data_entry_properties=inferred_props,
                     show_as=None,
                     display_order=ord_seq,
                 )
@@ -147,4 +197,6 @@ def record_entity_payload_field_rows(
             row.updated_at = _utc_now()
         if row_data_entry_type_is_unset(row) and inferred_det is not None:
             row.data_entry_type = inferred_det
+            if inferred_props is not None and row_data_entry_properties_is_unset(row):
+                row.data_entry_properties = inferred_props
             row.updated_at = _utc_now()

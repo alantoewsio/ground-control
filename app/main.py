@@ -170,6 +170,7 @@ from app.dashboard_metrics import (
 from app.database import SessionLocal, get_db, init_db
 from app.designer_entity_type_navigation import (
     build_firewalls_v2_object_nav_tree,
+    entity_type_nav_icons_map,
     get_navigation_entries,
     list_object_entity_types_for_nav_page,
     list_object_entity_types_for_nav_tab,
@@ -185,8 +186,11 @@ from app.designer_named_controls import (
     designer_named_control_ids_sorted,
 )
 from app.designer_data_controls_layout import (
+    LayoutMapLockedError,
     get_layout_for_entity_type,
+    get_layout_lock_flags,
     save_layout_for_entity_type,
+    set_layout_map_locked,
 )
 from app.designer_table_properties import (
     INSTANCE_ID_RE,
@@ -2516,6 +2520,10 @@ def _designer_template_context(
         **template_nav_firewall_context(request, sdb, db),
         "top_nav_active": "designer",
         "designer_subnav_active": designer_subnav_active,
+        # Needed by gc_object_edit_flyout_scripts.html so the member-lookup dropdown
+        # inside the shared object-edit flyout renders the same Material-Symbol per
+        # object-type icons on Designer pages that it renders on Firewalls v2 pages.
+        "entity_type_nav_icons": entity_type_nav_icons_map(),
     }
 
 
@@ -2764,6 +2772,10 @@ class _DesignerDataControlsLayoutBody(BaseModel):
     layout: dict[str, Any] = Field(default_factory=dict)
 
 
+class _DesignerDataControlsLayoutLockedBody(BaseModel):
+    layout_locked: bool = False
+
+
 def _normalize_catalog_editor_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -2891,6 +2903,17 @@ def api_firewalls_config_ui_data_controls_layout(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     et = str(entity_type or "").strip()
     return {"ok": True, "entity_type": et, "layout": layout}
+
+
+@app.get(
+    "/api/firewalls/config-ui/data-controls-layout-locks",
+    name="api_firewalls_config_ui_data_controls_layout_locks",
+)
+def api_firewalls_config_ui_data_controls_layout_locks(
+    _: Annotated[str, Depends(current_user_id_dep)],
+):
+    """Layout-map lock flags for all object types (object-edit dropdowns)."""
+    return {"ok": True, "locks": get_layout_lock_flags()}
 
 
 class _DesignerCachedObjectNamesBody(BaseModel):
@@ -3115,9 +3138,28 @@ def api_designer_data_controls_layout_put(
 ):
     try:
         saved = save_layout_for_entity_type(entity_type, body.layout)
+    except LayoutMapLockedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, "entity_type": entity_type, "layout": saved}
+
+
+@app.patch(
+    "/api/designer/data-controls-layout/{entity_type}/layout-locked",
+    name="api_designer_data_controls_layout_patch_locked",
+)
+def api_designer_data_controls_layout_patch_locked(
+    entity_type: str,
+    _: Annotated[str, Depends(designer_user_id_dep)],
+    body: _DesignerDataControlsLayoutLockedBody,
+):
+    try:
+        saved = set_layout_map_locked(entity_type, body.layout_locked)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    et = str(entity_type or "").strip()
+    return {"ok": True, "entity_type": et, "layout": saved}
 
 
 @app.get(
@@ -3640,8 +3682,13 @@ def _firewalls_v2_shell_context(
     active_section_slug: str = "",
     active_page_slug: str = "",
 ) -> dict[str, Any]:
+    nav_icons = entity_type_nav_icons_map()
     return {
         "fw_v2_nav_tree": build_firewalls_v2_object_nav_tree(),
+        "fw_v2_entity_type_nav_icons": nav_icons,
+        # Shared key consumed by gc_object_edit_flyout_scripts.html so Firewalls v2
+        # and Designer both hydrate GC_ENTITY_TYPE_NAV_ICONS from the same source.
+        "entity_type_nav_icons": nav_icons,
         "fw_v2_route": route,
         "fw_v2_active_section_slug": active_section_slug,
         "fw_v2_active_page_slug": active_page_slug,
@@ -3832,6 +3879,14 @@ def firewalls_v2_object_page(
     if not INSTANCE_ID_RE.match(table_instance_id):
         raise HTTPException(status_code=400, detail="Invalid navigation path for table id")
     show_object_table = (not nav_tabbed) or (len(locked_types) > 0)
+    ac_fw_v2 = auth_client_state(request, sdb)
+    u_fw_v2 = ac_fw_v2.get("user") or {}
+    role_fw_v2_cf = str(u_fw_v2.get("role") or "").strip().casefold()
+    can_edit_dc_layout_lock = role_fw_v2_cf in {
+        "designer",
+        "superadmin",
+        "super admin",
+    }
     firewalls = db.query(Firewall).order_by(Firewall.id.desc()).all()
     nav_fw_sorted = sorted(
         firewalls,
@@ -3868,7 +3923,17 @@ def firewalls_v2_object_page(
             "fw_v2_show_object_table": show_object_table,
             "fw_v2_locked_entity_types": locked_types,
             "fw_v2_table_instance_id": table_instance_id,
+            "fw_v2_can_edit_data_controls_layout_lock": can_edit_dc_layout_lock,
             "hosts_services_entity_types": sorted(HOSTS_SERVICES_ENTITY_TYPES),
+            "url_api_task_queue_enqueue_hs_updates_batch": str(
+                request.url_for("api_task_queue_enqueue_hs_updates_batch")
+            ),
+            "url_api_task_queue_enqueue_hs_creates_batch": str(
+                request.url_for("api_task_queue_enqueue_hs_creates_batch")
+            ),
+            "url_api_task_queue_enqueue_hs_deletes_batch": str(
+                request.url_for("api_task_queue_enqueue_hs_deletes_batch")
+            ),
         },
     )
 

@@ -19,6 +19,38 @@
 {% endblock %}
 {% block content %}
 <main class="layout single gc-designer" data-gc-designer-navigation="1">
+  <section class="gc-designer__section" aria-labelledby="gc-designer-page-nav-icons-h">
+    <h2 id="gc-designer-page-nav-icons-h" class="gc-designer__h2">Firewalls v2 page icons</h2>
+    <p class="gc-designer__note">
+      One row per unique <strong>Nav section</strong> + <strong>Nav page</strong> pair in Object Navigation. Pick a Material icon
+      to show for that page in the Firewalls v2 left nav.
+    </p>
+    <div class="gc-designer-data-controls__catalog-toolbar">
+      <button type="button" class="button button--primary" id="gc-designer-entity-nav-page-icons-save">
+        Save settings
+      </button>
+    </div>
+    <div class="gc-designer-data-controls__table-wrap">
+      <table
+        class="data-table data-table--dense gc-designer-data-controls__table gc-designer-entity-nav__table gc-designer-entity-nav__page-icons-table"
+        aria-label="Firewalls v2 page icons by nav section and nav page"
+      >
+        <thead>
+          <tr>
+            <th scope="col" data-gc-no-sort>Nav section</th>
+            <th scope="col" data-gc-no-sort>Nav page</th>
+            <th scope="col" data-gc-no-sort>Icon</th>
+            <th scope="col" data-gc-no-sort>Hidden</th>
+          </tr>
+        </thead>
+        <tbody id="gc-designer-entity-nav-page-icons-tbody">
+          <tr>
+            <td colspan="4" class="muted">Loading…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
   <section class="gc-designer__section" aria-labelledby="gc-designer-object-nav-h">
     <h2 id="gc-designer-object-nav-h" class="gc-designer__h2">Object Navigation</h2>
     <p class="gc-designer__note">
@@ -49,6 +81,7 @@
               <span class="gc-sr-only">Reorder</span>
             </th>
             <th scope="col" data-gc-no-sort>Entity type</th>
+            <th scope="col" data-gc-no-sort>Icon</th>
             <th scope="col" data-gc-no-sort>Type</th>
             <th scope="col" data-gc-no-sort>Display name</th>
             <th scope="col" data-gc-no-sort>Nav section</th>
@@ -59,7 +92,7 @@
         </thead>
         <tbody id="gc-designer-entity-nav-tbody">
           <tr>
-            <td colspan="8" class="muted">Loading…</td>
+            <td colspan="9" class="muted">Loading…</td>
           </tr>
         </tbody>
       </table>
@@ -87,6 +120,37 @@
       </div>
     </div>
   </section>
+  <div
+    id="gc-designer-entity-nav-icon-overlay"
+    class="gc-designer-entity-nav-icon-overlay"
+    hidden
+    aria-hidden="true"
+  >
+    <div class="gc-designer-entity-nav-icon-overlay__backdrop" aria-hidden="true"></div>
+    <div
+      class="gc-designer-entity-nav-icon-overlay__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="gc-designer-entity-nav-icon-title"
+    >
+      <h3 id="gc-designer-entity-nav-icon-title" class="gc-designer-entity-nav-icon-overlay__title">Select icon</h3>
+      <label class="settings-form__field gc-designer-entity-nav-icon-overlay__search-wrap" for="gc-designer-entity-nav-icon-search">
+        <span class="settings-form__label">Search material icons</span>
+        <input
+          id="gc-designer-entity-nav-icon-search"
+          type="text"
+          class="settings-form__input mono gc-designer-entity-nav-icon-overlay__search"
+          placeholder="Type icon name…"
+          autocomplete="off"
+        />
+      </label>
+      <div id="gc-designer-entity-nav-icon-grid" class="gc-designer-entity-nav-icon-overlay__grid" aria-label="Available icons"></div>
+      <div class="gc-designer-entity-nav-icon-overlay__actions">
+        <button type="button" class="button" id="gc-designer-entity-nav-icon-clear">Clear icon</button>
+        <button type="button" class="button" id="gc-designer-entity-nav-icon-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
   <section class="gc-designer__section" aria-labelledby="gc-designer-entity-nav-object-sel-h">
     <h2 id="gc-designer-entity-nav-object-sel-h" class="gc-designer__h2">Object selector</h2>
     <p class="gc-designer__note">

@@ -987,6 +987,12 @@
           globalThis.gcHsOnFlyoutFirewallSelectionChange(fieldsRoot);
         } catch (eFwHook) {}
       }
+      /* Chip remove sets .checked without a native change event — keep object-edit delete UI in sync. */
+      if (typeof globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome === "function") {
+        try {
+          globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome();
+        } catch (eObjEditDel) {}
+      }
     }
 
     function renderFwOptions(items) {
@@ -1139,6 +1145,23 @@
     }
     renderFwOptions(navItems);
     runFwFilter();
+    setOpen(false);
+
+    var objEditModal = root && root.closest ? root.closest("#gc-designer-flyout-object-edit-modal") : null;
+    if (objEditModal && objEditModal.getAttribute("data-gc-obj-edit-fw-outside-close") !== "1") {
+      objEditModal.setAttribute("data-gc-obj-edit-fw-outside-close", "1");
+      objEditModal.addEventListener("click", function (e) {
+        if (objEditModal.hidden) return;
+        var t = e.target;
+        if (t && t.closest && (t.closest("[data-gc-fw-ms]") || t.closest("[data-gc-cfg-ms]"))) return;
+        objEditModal.querySelectorAll(".gc-hs-ip-host-flyout__fw-dropdown").forEach(function (d) {
+          d.hidden = true;
+        });
+        objEditModal.querySelectorAll(".gc-hs-ip-host-flyout__fw-trigger").forEach(function (trg) {
+          trg.setAttribute("aria-expanded", "false");
+        });
+      });
+    }
   }
 
   function hydrateIpHostHostGroupMs(root, row) {
@@ -2377,5 +2400,7 @@
   globalThis.gcHsFlyoutOpenAddIpHost = openFlyoutAddIpHost;
   globalThis.gcHsFlyoutOpenAddForEntity = openFlyoutAddHsEntity;
   globalThis.gcHsHydrateFlyoutFirewallPicker = hydrateIpHostFirewallMs;
+  /** Same ordered ids as the flyout firewall dropdown uses under `data-fw-inventory-scope="global-selected"`. */
+  globalThis.gcHsTopBarFirewallIds = topBarSelectedFirewallIdsOrdered;
   globalThis.gcHsDispatchAfterDeleteBatch = gcHsNotifySaveSuccess;
 })();

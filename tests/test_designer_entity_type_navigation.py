@@ -5,12 +5,48 @@ import json
 import pytest
 
 from app.designer_entity_type_navigation import (
+    build_firewalls_v2_object_nav_tree,
+    entity_type_nav_icons_map,
     get_navigation_entries,
     list_object_entity_types_for_nav_page,
     list_object_entity_types_for_nav_tab,
     list_settings_entities_for_nav_tab,
     save_navigation_entries,
 )
+
+
+def test_entity_type_nav_icons_map(tmp_path, monkeypatch) -> None:
+    from app import designer_entity_type_navigation as mod
+
+    monkeypatch.setattr(mod, "properties_file_path", lambda: tmp_path / "nav.json")
+    p = tmp_path / "nav.json"
+    p.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "entries": {
+                    "zone": {
+                        "display_name": "Z",
+                        "nav_section": "s",
+                        "nav_page": "p",
+                        "tab": "t",
+                        "nav_icon": "shield",
+                    },
+                    "bare": {
+                        "display_name": "B",
+                        "nav_section": "s",
+                        "nav_page": "p",
+                        "tab": "t2",
+                        "nav_icon": "",
+                    },
+                },
+            },
+        ),
+        encoding="utf-8",
+    )
+    m = entity_type_nav_icons_map()
+    assert m.get("zone") == "shield"
+    assert "bare" not in m
 
 
 def test_get_navigation_entries_filters_invalid_keys(tmp_path, monkeypatch) -> None:
@@ -194,6 +230,7 @@ def test_api_designer_entity_type_navigation_get_put(designer_client, tmp_path, 
     assert j["facet_orders"].get("sections") == []
     assert j["facet_orders"].get("pagesBySection") == {}
     assert j["facet_orders"].get("tabsBySectionPage") == {}
+    assert j.get("page_icons") == {}
 
     r2 = designer_client.put(
         "/api/designer/entity-type-navigation",
@@ -206,8 +243,17 @@ def test_api_designer_entity_type_navigation_get_put(designer_client, tmp_path, 
                     "nav_order": "0",
                     "nav_page": "Hosts & Services",
                     "tab": "IP Hosts",
+                    "nav_icon": "dns",
                 }
-            }
+            },
+            "page_icons": {
+                "network|hosts & services": {
+                    "nav_section": "Network",
+                    "nav_page": "Hosts & Services",
+                    "icon": "shield",
+                    "hidden": True,
+                }
+            },
         },
     )
     assert r2.status_code == 200
@@ -216,12 +262,98 @@ def test_api_designer_entity_type_navigation_get_put(designer_client, tmp_path, 
     assert b2["entries"]["ip_host"]["display_name"] == "IP Host"
     assert b2["entries"]["ip_host"]["nav_order"] == "0"
     assert b2["entries"]["ip_host"]["kind"] == "Objects"
+    assert b2["entries"]["ip_host"]["nav_icon"] == "dns"
+    assert b2["page_icons"]["network|hosts & services"]["icon"] == "shield"
+    assert b2["page_icons"]["network|hosts & services"]["hidden"] is True
 
     r3 = designer_client.get("/api/designer/entity-type-navigation")
     j3 = r3.json()
     assert j3["entries"]["ip_host"]["nav_page"] == "Hosts & Services"
     assert "facet_orders" in j3
     assert isinstance(j3["facet_orders"].get("sections"), list)
+    assert j3["page_icons"]["network|hosts & services"]["icon"] == "shield"
+    assert j3["page_icons"]["network|hosts & services"]["hidden"] is True
+
+
+def test_build_firewalls_v2_object_nav_tree_includes_page_icon(tmp_path, monkeypatch) -> None:
+    from app import designer_entity_type_navigation as mod
+
+    monkeypatch.setattr(mod, "properties_file_path", lambda: tmp_path / "nav_icon_tree.json")
+    save_navigation_entries(
+        {
+            "entries": {
+                "zone": {
+                    "kind": "Objects",
+                    "display_name": "Zone",
+                    "nav_section": "Protect",
+                    "nav_order": "1",
+                    "nav_page": "Firewall",
+                    "tab": "Rules",
+                }
+            },
+            "page_icons": {
+                "protect|firewall": {
+                    "nav_section": "Protect",
+                    "nav_page": "Firewall",
+                    "icon": "shield",
+                }
+            },
+        }
+    )
+
+    tree = build_firewalls_v2_object_nav_tree()
+    assert tree
+    first_page = tree[0]["pages"][0]
+    assert first_page["icon"] == "shield"
+
+
+def test_build_firewalls_v2_object_nav_tree_skips_hidden_page(tmp_path, monkeypatch) -> None:
+    from app import designer_entity_type_navigation as mod
+
+    monkeypatch.setattr(mod, "properties_file_path", lambda: tmp_path / "nav_hidden_tree.json")
+    save_navigation_entries(
+        {
+            "entries": {
+                "zone": {
+                    "kind": "Objects",
+                    "display_name": "Zone",
+                    "nav_section": "Protect",
+                    "nav_order": "1",
+                    "nav_page": "Firewall",
+                    "tab": "Rules",
+                },
+                "addr": {
+                    "kind": "Objects",
+                    "display_name": "Address",
+                    "nav_section": "Protect",
+                    "nav_order": "2",
+                    "nav_page": "Address",
+                    "tab": "Objects",
+                },
+            },
+            "page_icons": {
+                "protect|firewall": {
+                    "nav_section": "Protect",
+                    "nav_page": "Firewall",
+                    "icon": "shield",
+                    "hidden": True,
+                },
+                "protect|address": {
+                    "nav_section": "Protect",
+                    "nav_page": "Address",
+                    "icon": "dns",
+                    "hidden": False,
+                },
+            },
+        }
+    )
+
+    tree = build_firewalls_v2_object_nav_tree()
+    assert tree
+    pages = tree[0]["pages"]
+    page_labels = [p["label"] for p in pages]
+    assert "Firewall" not in page_labels
+    assert "Address" in page_labels
 
 
 def test_api_designer_entity_type_navigation_put_invalid_entries_type(designer_client) -> None:

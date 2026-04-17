@@ -14,6 +14,7 @@ SCHEMA_VERSION = 1
 
 _FIELD_MAX = 512
 _ENTITY_TYPE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,127}$")
+_ICON_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
 def properties_file_path() -> Path:
@@ -21,7 +22,12 @@ def properties_file_path() -> Path:
 
 
 def default_document() -> dict[str, Any]:
-    return {"version": SCHEMA_VERSION, "entries": {}, "facet_orders": _default_facet_orders()}
+    return {
+        "version": SCHEMA_VERSION,
+        "entries": {},
+        "facet_orders": _default_facet_orders(),
+        "page_icons": {},
+    }
 
 
 def _default_facet_orders() -> dict[str, Any]:
@@ -55,6 +61,24 @@ def _normalize_kind(raw: Any) -> str:
     return "Objects"
 
 
+def _normalize_icon_name(raw: Any) -> str:
+    t = _clip_str(raw, _FIELD_MAX).strip().replace("-", "_").replace(" ", "_").casefold()
+    if not t:
+        return ""
+    if not _ICON_NAME_RE.match(t):
+        return ""
+    return t
+
+
+def _normalize_hidden_flag(raw: Any) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return raw != 0
+    t = _clip_str(raw, _FIELD_MAX).strip().casefold()
+    return t in {"1", "true", "yes", "on"}
+
+
 def _normalize_entry(raw: Any) -> dict[str, str]:
     if not isinstance(raw, dict):
         raw = {}
@@ -65,6 +89,7 @@ def _normalize_entry(raw: Any) -> dict[str, str]:
         "nav_order": _clip_str(raw.get("nav_order"), _FIELD_MAX).strip(),
         "nav_page": _clip_str(raw.get("nav_page"), _FIELD_MAX).strip(),
         "tab": _clip_str(raw.get("tab"), _FIELD_MAX).strip(),
+        "nav_icon": _normalize_icon_name(raw.get("nav_icon")),
     }
 
 
@@ -235,6 +260,87 @@ def _merge_facet_orders_with_entries(
     return fo
 
 
+def _collect_unique_nav_pages(
+    entries: dict[str, dict[str, str]],
+) -> dict[str, tuple[str, str]]:
+    """section_key|page_key -> (section_label, page_label)."""
+    out: dict[str, tuple[str, str]] = {}
+    for ent in entries.values():
+        sec = (ent.get("nav_section") or "").strip()
+        page = (ent.get("nav_page") or "").strip()
+        if not sec or not page:
+            continue
+        sk = sec.casefold()
+        pk = page.casefold()
+        key = f"{sk}|{pk}"
+        if key not in out:
+            out[key] = (sec, page)
+    return out
+
+
+def _merge_page_icons_with_entries(
+    raw_page_icons: Any,
+    entries: dict[str, dict[str, str]],
+    facet_orders: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Keep only section/page pairs currently present in entries; normalize icon names."""
+    page_pairs = _collect_unique_nav_pages(entries)
+    incoming = raw_page_icons if isinstance(raw_page_icons, dict) else {}
+    sections = (
+        facet_orders.get("sections") if isinstance(facet_orders.get("sections"), list) else []
+    )
+    pbs = (
+        facet_orders.get("pagesBySection")
+        if isinstance(facet_orders.get("pagesBySection"), dict)
+        else {}
+    )
+
+    def sort_key(pair_key: str) -> tuple:
+        sk, _ = pair_key.split("|", 1)
+        sec_label, page_label = page_pairs[pair_key]
+        sec_rank = _facet_rank([str(x) for x in sections], sec_label)
+        pages = pbs.get(sk)
+        page_rank = _facet_rank([str(x) for x in pages] if isinstance(pages, list) else None, page_label)
+        return (sec_rank, page_rank, page_label.casefold())
+
+    out: dict[str, dict[str, Any]] = {}
+    for pair_key in sorted(page_pairs.keys(), key=sort_key):
+        sec_label, page_label = page_pairs[pair_key]
+        raw_item = incoming.get(pair_key)
+        icon = _normalize_icon_name(raw_item.get("icon") if isinstance(raw_item, dict) else "")
+        hidden = _normalize_hidden_flag(
+            raw_item.get("hidden") if isinstance(raw_item, dict) else False
+        )
+        out[pair_key] = {
+            "nav_section": sec_label,
+            "nav_page": page_label,
+            "icon": icon,
+            "hidden": hidden,
+        }
+    return out
+
+
+def entity_type_nav_icons_map() -> dict[str, str]:
+    """Map ``entity_type`` → ``nav_icon`` for entries with a non-empty icon.
+
+    Used by Firewalls v2 object UI (embedded JSON) so list rows can match the
+    object navigator without calling the designer-only navigation API.
+    """
+    data = get_navigation_entries()
+    entries_in = data.get("entries")
+    if not isinstance(entries_in, dict):
+        return {}
+    out: dict[str, str] = {}
+    for et_key, row in entries_in.items():
+        et = str(et_key).strip() if et_key is not None else ""
+        if not et or not isinstance(row, dict):
+            continue
+        icon = _normalize_icon_name(row.get("nav_icon"))
+        if icon:
+            out[et] = icon
+    return out
+
+
 def get_navigation_entries() -> dict[str, Any]:
     doc = load_document()
     entries_in = doc.get("entries")
@@ -249,7 +355,13 @@ def get_navigation_entries() -> dict[str, Any]:
     raw_fo = doc.get("facet_orders")
     facet_orders = _merge_facet_orders_with_entries(raw_fo, tmp)
     out = _entries_sorted_by_nav(tmp, facet_orders)
-    return {"version": SCHEMA_VERSION, "entries": out, "facet_orders": facet_orders}
+    page_icons = _merge_page_icons_with_entries(doc.get("page_icons"), out, facet_orders)
+    return {
+        "version": SCHEMA_VERSION,
+        "entries": out,
+        "facet_orders": facet_orders,
+        "page_icons": page_icons,
+    }
 
 
 def _parse_entries_payload(raw_entries: Any) -> dict[str, dict[str, str]]:
@@ -271,12 +383,14 @@ def _parse_entries_payload(raw_entries: Any) -> dict[str, dict[str, str]]:
 def _write_navigation_document(
     entries: dict[str, dict[str, str]],
     facet_orders: dict[str, Any],
+    page_icons: dict[str, dict[str, Any]],
 ) -> None:
     path = properties_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     doc = default_document()
     doc["entries"] = entries
     doc["facet_orders"] = facet_orders
+    doc["page_icons"] = page_icons
     text = json.dumps(doc, indent=2, sort_keys=False) + "\n"
     tmp = path.with_suffix(".tmp")
     tmp.write_text(text, encoding="utf-8")
@@ -292,9 +406,27 @@ def save_navigation_entries(body: dict[str, Any] | None) -> dict[str, Any]:
         existing = load_document()
         raw_fo = existing.get("facet_orders")
         facet_orders = _merge_facet_orders_with_entries(raw_fo, normalized)
+    if "page_icons" in payload:
+        page_icons = _merge_page_icons_with_entries(
+            payload.get("page_icons"),
+            normalized,
+            facet_orders,
+        )
+    else:
+        existing = load_document()
+        page_icons = _merge_page_icons_with_entries(
+            existing.get("page_icons"),
+            normalized,
+            facet_orders,
+        )
     ordered = _entries_sorted_by_nav(normalized, facet_orders)
-    _write_navigation_document(ordered, facet_orders)
-    return {"version": SCHEMA_VERSION, "entries": ordered, "facet_orders": facet_orders}
+    _write_navigation_document(ordered, facet_orders, page_icons)
+    return {
+        "version": SCHEMA_VERSION,
+        "entries": ordered,
+        "facet_orders": facet_orders,
+        "page_icons": page_icons,
+    }
 
 
 _FW_V2_SLUG_RE = re.compile(r"[^a-zA-Z0-9]+")
@@ -330,6 +462,7 @@ def build_firewalls_v2_object_nav_tree() -> list[dict[str, Any]]:
     fo = data.get("facet_orders")
     if not isinstance(fo, dict):
         return []
+    page_icons = data.get("page_icons") if isinstance(data.get("page_icons"), dict) else {}
     sections_in = fo.get("sections")
     if not isinstance(sections_in, list):
         return []
@@ -348,6 +481,19 @@ def build_firewalls_v2_object_nav_tree() -> list[dict[str, Any]]:
         for page_label, page_slug in _fw_v2_unique_slugs(page_labels):
             pk = page_label.casefold()
             tab_key = f"{sk}|{pk}"
+            icon_row = page_icons.get(tab_key)
+            icon_name = (
+                _normalize_icon_name(icon_row.get("icon"))
+                if isinstance(icon_row, dict)
+                else ""
+            )
+            hidden = (
+                _normalize_hidden_flag(icon_row.get("hidden"))
+                if isinstance(icon_row, dict)
+                else False
+            )
+            if hidden:
+                continue
             tabs_raw = tbm.get(tab_key)
             if not isinstance(tabs_raw, list):
                 tabs_raw = []
@@ -359,9 +505,12 @@ def build_firewalls_v2_object_nav_tree() -> list[dict[str, Any]]:
                     "label": page_label,
                     "slug": page_slug,
                     "page_key": pk,
+                    "icon": icon_name,
                     "tabs": tabs_out,
                 }
             )
+        if not pages_out:
+            continue
         tree.append(
             {
                 "label": sec_label,

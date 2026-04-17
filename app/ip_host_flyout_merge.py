@@ -3,7 +3,28 @@
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any, Mapping
+
+_IPV4_DOTTED = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
+
+
+def _forti_ipv4_subnet_wire_to_dotted(value: str) -> str:
+    """SFOS IPHost.Subnet expects dotted netmask; accept CIDR prefix like '16'."""
+    t = (value or "").strip()
+    if not t or _IPV4_DOTTED.match(t):
+        return t
+    if t.isdigit():
+        try:
+            p = int(t)
+        except ValueError:
+            return t
+        if 0 <= p <= 32:
+            if p == 0:
+                return "0.0.0.0"
+            mask = ((0xFFFFFFFF << (32 - p)) & 0xFFFFFFFF) & 0xFFFFFFFF
+            return ".".join(str((mask >> s) & 0xFF) for s in (24, 16, 8, 0))
+    return t
 
 _UI_TO_HOST_TYPE = {
     "ip": "IP",
@@ -26,7 +47,7 @@ def merge_ip_host_flyout_form(base: dict[str, Any], form: Mapping[str, Any]) -> 
 
     Form keys (from browser JSON):
       name, description, ip_family (IPv4|IPv6), host_type_ui (ip|network|iprange|iplist),
-      ip_address, subnet, start_ip, end_ip, ip_list (comma/newline separated for IP list type),
+      ip_address, subnet, start_ip, end_ip, ip_list, ListOfIPAddresses (comma/newline separated for IP list type),
       host_groups (list of IP host group names).
     """
     out = copy.deepcopy(base)
@@ -53,7 +74,7 @@ def merge_ip_host_flyout_form(base: dict[str, Any], form: Mapping[str, Any]) -> 
         host_type = _UI_TO_HOST_TYPE[ui_kind]
         out["HostType"] = host_type
 
-        for k in ("IPAddress", "Subnet", "StartIPAddress", "EndIPAddress"):
+        for k in ("IPAddress", "Subnet", "StartIPAddress", "EndIPAddress", "ListOfIPAddresses"):
             out.pop(k, None)
 
         if host_type == "IP":
@@ -66,6 +87,9 @@ def merge_ip_host_flyout_form(base: dict[str, Any], form: Mapping[str, Any]) -> 
                 out["IPAddress"] = ip
             sub = str(form.get("subnet") or form.get("Subnet") or "").strip()
             if sub:
+                ipfam = str(form.get("ip_family") or form.get("IPFamily") or out.get("IPFamily") or "").strip()
+                if ipfam == "IPv4":
+                    sub = _forti_ipv4_subnet_wire_to_dotted(sub)
                 out["Subnet"] = sub
         elif host_type == "IPRange":
             s_ip = str(
@@ -77,12 +101,16 @@ def merge_ip_host_flyout_form(base: dict[str, Any], form: Mapping[str, Any]) -> 
             if e_ip:
                 out["EndIPAddress"] = e_ip
         elif host_type == "IPList":
-            raw = str(form.get("ip_list") or form.get("IPAddress") or "").replace(
-                "\n", ","
-            )
+            raw = str(
+                form.get("ip_list")
+                or form.get("ListOfIPAddresses")
+                or form.get("IPAddress")
+                or ""
+            ).replace("\n", ",")
             parts = [p.strip() for p in raw.split(",") if p.strip()]
             if parts:
-                out["IPAddress"] = ", ".join(parts)
+                # SFOS XML uses ListOfIPAddresses (CSV) for HostType IPList.
+                out["ListOfIPAddresses"] = ",".join(parts)
 
     raw_hg = form.get("host_groups")
     if raw_hg is not None:

@@ -1140,9 +1140,11 @@ def test_ipam_accept_discovered_with_existing_pool(authed_client, main_session):
     )
     main_session.add(fw)
     main_session.flush()
-    b = random.randint(26, 90)
-    pool_cidr = f"172.{b}.0.0/16"
-    assign_cidr = f"172.{b}.5.0/24"
+    ub = uuid.uuid4().bytes
+    o1 = 160 + (ub[0] % 64)
+    o2 = 1 + (ub[1] % 200)
+    pool_cidr = f"10.{o1}.0.0/16"
+    assign_cidr = f"10.{o1}.{o2}.0/24"
     main_session.add(
         FirewallConfigEntry(
             firewall_id=fw.id,
@@ -1150,7 +1152,7 @@ def test_ipam_accept_discovered_with_existing_pool(authed_client, main_session):
             external_name="inside",
             payload_json=json.dumps(
                 {
-                    "IPAddress": f"172.{b}.5.1",
+                    "IPAddress": f"10.{o1}.{o2}.1",
                     "Netmask": "255.255.255.0",
                 }
             ),

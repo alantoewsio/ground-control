@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "instances": {
+    "gc-designer-tables": {
+      "title": "Master data-table",
+      "design_mode": true,
+      "entity_types": [
+        "fqdn_host"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": false,
+      "opt_read_only": false,
+      "column_visibility": null
+    },
+    "fw_v2_o_protect_intrusion-prevention": {
+      "title": "Preview table",
+      "design_mode": true,
+      "entity_types": [
+        "ips_custom_signature",
+        "ips_policy",
+        "trusted_mac"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "",
+      "column_overrides": "",
+      "opt_row_selectors": false,
+      "opt_add_btn": false,
+      "opt_delete_btn": false,
+      "opt_read_only": false,
+      "column_visibility": null
+    },
+    "fw_v2_o_configure_authentication_user-groups": {
+      "title": "User Groups",
+      "design_mode": true,
+      "entity_types": [
+        "user_group"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "column_visibility": null
+    },
+    "fw_v2_o_system_hosts-and-services_country-groups": {
+      "title": "Country Group",
+      "design_mode": true,
+      "entity_types": [
+        "country_group"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Description, firewall, CountryList.Country",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_hosts-and-services_fqdn-hosts": {
+      "title": "FQDN Hosts",
+      "design_mode": true,
+      "entity_types": [
+        "fqdn_host"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__name, Description, FQDN, FQDNHostGroupList.FQDNHostGroup, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_hosts-and-services_host-groups": {
+      "title": "Host Groups",
+      "design_mode": true,
+      "entity_types": [
+        "ip_hostgroup"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_hosts-and-services_hosts": {
+      "title": "Hosts",
+      "design_mode": true,
+      "entity_types": [
+        "ip_host"
+      ],
+      "secondary_filters": [
+        {
+          "prop": "HostType",
+          "op": "!=",
+          "scalar": "System Host"
+        }
+      ],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __lock, __name, Description, IPFamily, HostType, IPAddress, Subnet, StartIPAddress, EndIPAddress, HostGroupList.HostGroup, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_profiles_access-time-policies": {
+      "title": "Preview table",
+      "design_mode": false,
+      "entity_types": [
+        "access_time_policy"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Description, Schedule, Strategy, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_administration_acl-rules": {
+      "title": "Preview table",
+      "design_mode": false,
+      "entity_types": [
+        "acl_rule"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Action, Description, Hosts.Host, IPFamily, SourceZone, Position, RuleName, Services.Service, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": {
+        "__row_select": true,
+        "__name": true,
+        "Action": true,
+        "Description": true,
+        "Hosts.Host": true,
+        "IPFamily": true,
+        "Position": true,
+        "RuleName": false,
+        "Services.Service": false,
+        "__firewalls": true,
+        "SourceZone": true
+      }
+    },
+    "fw_v2_o_system_hosts-and-services_fqdn-host-groups": {
+      "title": "FQDN Host Groups",
+      "design_mode": true,
+      "entity_types": [
+        "fqdn_hostgroup"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Description, FQDNHostList.FQDNHost, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_hosts-and-services_services": {
+      "title": "Services",
+      "design_mode": true,
+      "entity_types": [
+        "service"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [
+        "ServiceDetails.ServiceDetail.ICMPCode",
+        "ServiceDetails.ServiceDetail.ICMPType",
+        "ServiceDetails.ServiceDetail.ICMPv6Code",
+        "ServiceDetails.ServiceDetail.ICMPv6Type",
+        "ServiceDetails.ServiceDetail.Protocol",
+        "ServiceDetails.ServiceDetail.ProtocolName",
+        "ServiceDetails.ServiceDetail.SourcePort"
+      ],
+      "column_order": "__row_select, __name, Description, ServiceDetails.ServiceDetail.Protocol, Type, ServiceDetails.ServiceDetail.DestinationPort, ServiceDetails.ServiceDetail.ProtocolName, ServiceDetails.ServiceDetail.SourcePort, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": {
+        "__row_select": true,
+        "__name": true,
+        "Description": true,
+        "ServiceDetails.ServiceDetail.Protocol": false,
+        "ServiceDetails.ServiceDetail.DestinationPort": true,
+        "ServiceDetails.ServiceDetail.ProtocolName": false,
+        "ServiceDetails.ServiceDetail.SourcePort": false,
+        "Type": true,
+        "__firewalls": true
+      }
+    },
+    "fw_v2_o_system_hosts-and-services_service-groups": {
+      "title": "Service Groups",
+      "design_mode": true,
+      "entity_types": [
+        "service_group"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Description, ServiceList.Service, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_hosts-and-services_mac-hosts-groups": {
+      "title": "MAC Hosts and Groups",
+      "design_mode": true,
+      "entity_types": [
+        "mac_host"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Description, Type, MACAddress, MACList.MACAddress, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    }
+  }
+}

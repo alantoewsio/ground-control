@@ -1,0 +1,33 @@
+{# =============================================================================
+   Canonical JS bundle for the object-edit flyout (#gc-designer-flyout-object-edit-modal)
+   and catalog field rendering (gc-designer-object-edit-catalog-fields).
+
+   Include this partial on every page that opens that flyout so behavior matches
+   Firewalls v2 object pages and Designer · Data Controls · Layout plans.
+
+   If this page already loads gc-option-selector.js earlier (e.g. right after
+   partials/gc_designer_controls_scripts.html), set before including:
+     {% set object_edit_bundle_include_option_selector = false %}
+   ============================================================================= #}
+{% set _oev = _gc_ver | default(app_about.app_version if app_about is defined else '0.3.3') %}
+{# Seed the entity-type → Material-Symbol map read by gc-designer-object-edit-dd-runtime.js
+   (navIconMapForDdRows). Firewalls v2 object pages set this earlier via their own inline
+   block; we only fall back if no upstream page has provided it, so the flyout member-lookup
+   shows per-object-type icons on Designer pages as well. #}
+{% if entity_type_nav_icons is defined %}
+<script>
+  if (!window.GC_ENTITY_TYPE_NAV_ICONS) {
+    window.GC_ENTITY_TYPE_NAV_ICONS = {{ entity_type_nav_icons | tojson }};
+  }
+</script>
+{% endif %}
+<script src="/static/gc-network-entity.js?v={{ _oev }}"></script>
+<script src="/static/gc-hosts-services-flyout.js?v={{ _oev }}"></script>
+{% if object_edit_bundle_include_option_selector is not defined or object_edit_bundle_include_option_selector %}
+<script src="/static/gc-option-selector.js?v={{ _oev }}"></script>
+{% endif %}
+<script src="/static/gc-designer-object-edit-dd-runtime.js?v={{ _oev }}"></script>
+<script src="/static/gc-ip-field-catalog-runtime.js?v={{ _oev }}"></script>
+<script src="/static/gc-data-controls-object-edit-layout.js?v={{ _oev }}"></script>
+<script src="/static/gc-designer-object-edit-catalog.js?v={{ _oev }}"></script>
+<script src="/static/gc-designer-stack-flyout-runtime.js?v={{ _oev }}"></script>

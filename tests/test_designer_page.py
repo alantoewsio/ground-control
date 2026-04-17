@@ -1,6 +1,7 @@
 """Designer UI reference page."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,63 @@ import pytest
 def test_designer_requires_auth(client):
     r = client.get("/designer", follow_redirects=False)
     assert r.status_code in (302, 303, 307, 401)
+
+
+def test_canonical_object_edit_dd_runtime_always_wins():
+    """Guard against re-introducing the divergence that broke the Designer
+    "Show Edit" flyout member-lookup (no checkboxes + wrong status line like
+    "291 object(s) from 1 type request(s).") while Firewalls v2 worked fine.
+
+    The inline `partials/gc_designer_controls_scripts.html` carries a legacy copy
+    of the dropdown runtime for the Designer canvas sandbox. Both Firewalls v2
+    and Designer must end up using the canonical, flyout-aware implementation
+    in `static/gc-designer-object-edit-dd-runtime.js`, which requires:
+
+    1. The canonical file must register its bridge unconditionally (no early
+       return when a prior `window.__gcDesignerControlsBridge.ddFieldRuntime`
+       already exists — the inline partial always sets one first on Designer
+       pages, so an early return would leave the legacy, flyout-oblivious
+       implementation in place).
+    2. It must install the `gcHsOnFlyoutFirewallSelectionChange` chain hook
+       every time (not guarded behind `__gcDesignerMlFwHookChained`), so the
+       flyout-aware reload wrapper always runs.
+    3. It must contain the flyout-aware helper `isFlyoutMemberLookupRoot` and
+       use it inside `applyRowsToList` so the member-lookup in the edit flyout
+       gets "N objects selected" rather than the raw rowcount status line.
+    """
+    src = (
+        Path(__file__).resolve().parents[1]
+        / "static"
+        / "gc-designer-object-edit-dd-runtime.js"
+    ).read_text(encoding="utf-8")
+
+    assert "isFlyoutMemberLookupRoot" in src
+    assert "formatFlyoutMemberLookupStatusLine" in src
+    assert "refreshMemberLookupFlyoutStatus" in src
+    assert "flyoutMl = isFlyoutMemberLookupRoot(root)" in src
+    assert "if (!flyoutMl) {" in src
+
+    assert (
+        "if (window.__gcDesignerControlsBridge && window.__gcDesignerControlsBridge.ddFieldRuntime)"
+        not in src
+    ), (
+        "gc-designer-object-edit-dd-runtime.js must NOT early-return when a "
+        "ddFieldRuntime bridge already exists — on Designer pages the inline "
+        "legacy runtime registers first and the canonical external runtime "
+        "must overwrite it, otherwise the member-lookup flyout behaves "
+        "differently from Firewalls v2."
+    )
+
+    assert "if (!globalThis.__gcDesignerMlFwHookChained)" not in src, (
+        "The flyout FW-selection-change chain hook must be installed "
+        "unconditionally; the legacy inline runtime sets the chained flag "
+        "before this file runs."
+    )
+    assert "globalThis.__gcDesignerMlFwHookChained = true;" in src
+    assert "globalThis.gcHsOnFlyoutFirewallSelectionChange = function" in src
+
+    assert "window.__gcDesignerControlsBridge.ddFieldRuntime = {" in src
+    assert "loadMemberLookupFromCache: loadMemberLookupFromCache," in src
 
 
 def test_designer_forbidden_for_admin_without_designer_role(authed_client):
@@ -53,8 +111,25 @@ def test_designer_data_controls_page(designer_client):
     assert r.status_code == 200
     assert "Data Controls" in r.text
     assert "Field catalog" in r.text
+    assert "Layout plans" in r.text
     assert "gc-designer-data-controls-tab-layout" in r.text
+
+    assert "gc-designer-object-edit-dd-runtime.js" in r.text
+    idx_inline = r.text.find("partials/gc_designer_controls_scripts.html")
+    idx_flyout_bundle = r.text.find("gc-designer-object-edit-dd-runtime.js")
+    idx_inline_marker = r.text.find(
+        'window.__gcDesignerControlsBridge.ddFieldRuntime = {\n'
+        '    loadDesignerDdFromCache: loadDesignerDdFromCache'
+    )
+    if idx_inline_marker >= 0:
+        assert idx_flyout_bundle > idx_inline_marker, (
+            "gc-designer-object-edit-dd-runtime.js must be loaded AFTER the inline "
+            "dd runtime in gc_designer_controls_scripts.html so the canonical "
+            "flyout-aware implementation wins the ddFieldRuntime bridge."
+        )
+    del idx_inline, idx_flyout_bundle, idx_inline_marker
     assert "gc-designer-data-controls-layout-controls" in r.text
+    assert "gc-designer-data-controls-layout-logic" in r.text
     assert "gc-designer-data-controls-layout.js" in r.text
     assert "gc-designer-data-controls-layout-reset" in r.text
     assert "gc-designer-data-controls-layout-add-and" in r.text
@@ -62,19 +137,34 @@ def test_designer_data_controls_page(designer_client):
     assert "gc-designer-data-controls-layout-add-not" in r.text
     assert "gc-designer-data-controls-layout-add-if-value" in r.text
     assert "gc-designer-data-controls-type" in r.text
-    assert 'data-gc-designer-object-selector="data-controls-entity-type"' in r.text
+    assert 'data-gc-designer-object-selector="object-selector-list-single"' in r.text
     assert "gc-designer-data-controls-entity-nav.js" in r.text
     assert "api/designer/entity-payload-fields" in r.text
     assert "gc-designer-data-controls-field-catalog.js" in r.text
     assert "entity-payload-fields/generate-missing" in r.text
+    assert "config-ui/data-controls-layout-locks" in r.text
+    assert "gc-designer-data-controls-generate-layout" in r.text
     assert "gc-designer-data-controls-save" in r.text
     assert "gc-designer-data-controls-entry-types" in r.text
     assert "hosts-services/table" in r.text
+    assert "gc-designer-flyout-object-edit-modal" in r.text
+    assert r.text.count('id="gc-designer-flyout-object-edit-modal"') == 1
+    assert "gc-designer-stack-flyout-runtime.js" in r.text
+    assert "gc-data-controls-object-edit-layout.js" in r.text
     assert 'href="/designer/navigation"' in r.text
     assert "Hidden" in r.text
     assert "text-single" in r.text
     assert "ip-list" in r.text
     assert "Updated (UTC)" not in r.text
+
+    assert "window.GC_ENTITY_TYPE_NAV_ICONS" in r.text, (
+        "Designer · Data Controls must expose the same entity-type → Material-Symbol "
+        "map that Firewalls v2 pages expose, so the flyout member-lookup dropdown "
+        "renders per-object-type icons (e.g. globe for fqdn_host) identically in "
+        "both places. If this fails, gc_object_edit_flyout_scripts.html is no longer "
+        "seeding window.GC_ENTITY_TYPE_NAV_ICONS, or _designer_template_context "
+        "stopped providing entity_type_nav_icons."
+    )
 
 
 def test_api_designer_entity_payload_fields_generate_missing(designer_client, main_session):
@@ -142,6 +232,11 @@ def test_api_designer_entity_payload_fields_generate_missing(designer_client, ma
     assert dets.get("Name") == "text-single"
     assert dets.get("Description") == "text-multiline"
     assert dets.get("Alpha") is None
+    assert dets.get("Beta") == "member-lookup"
+    assert dets.get("Gamma") is None
+    by_prop = {r.property_name: r for r in rows}
+    assert by_prop["Beta"].data_entry_properties is not None
+    assert json.loads(by_prop["Beta"].data_entry_properties).get("multi") is True
 
 
 def test_api_designer_data_controls_layout_roundtrip(
@@ -158,6 +253,9 @@ def test_api_designer_data_controls_layout_roundtrip(
     assert j0.get("ok") is True
     assert j0.get("layout", {}).get("connections") == []
     assert j0.get("layout", {}).get("control_add_only") == {}
+    assert j0.get("layout", {}).get("member_lookup_data_source") == {}
+    assert j0.get("layout", {}).get("member_lookup_multi") == {}
+    assert j0.get("layout", {}).get("layout_locked") is False
 
     payload = {
         "layout": {
@@ -185,6 +283,8 @@ def test_api_designer_data_controls_layout_roundtrip(
                 },
             ],
             "control_add_only": {"ctrl:1": True, "ctrl:2": False},
+            "member_lookup_data_source": {"ctrl:1": "zone", "ctrl:bad": "9bad", "field:1": "x"},
+            "member_lookup_multi": {"ctrl:1": "true", "ctrl:2": 0, "field:1": 1},
         }
     }
     r1 = designer_client.put(f"/api/designer/data-controls-layout/{et}", json=payload)
@@ -199,6 +299,8 @@ def test_api_designer_data_controls_layout_roundtrip(
     assert j1["layout"]["logic_nodes"][2]["true_value"] == "enabled"
     assert j1["layout"]["control_add_only"]["ctrl:1"] is True
     assert j1["layout"]["control_add_only"]["ctrl:2"] is False
+    assert j1["layout"]["member_lookup_data_source"] == {"ctrl:1": "zone"}
+    assert j1["layout"]["member_lookup_multi"] == {"ctrl:1": True, "ctrl:2": False}
 
     r2 = designer_client.get(f"/api/designer/data-controls-layout/{et}")
     assert r2.status_code == 200, r2.text
@@ -209,11 +311,93 @@ def test_api_designer_data_controls_layout_roundtrip(
     assert j2["layout"]["logic_nodes"][1]["op"] == "not"
     assert j2["layout"]["logic_nodes"][2]["false_value"] == "disabled"
     assert j2["layout"]["control_add_only"]["ctrl:1"] is True
+    assert j2["layout"]["member_lookup_data_source"] == {"ctrl:1": "zone"}
+    assert j2["layout"]["member_lookup_multi"] == {"ctrl:1": True, "ctrl:2": False}
+
+
+def test_api_designer_data_controls_layout_keeps_distinct_edges_same_tuple(
+    designer_client, monkeypatch, tmp_path,
+):
+    """Multiple wires with the same endpoints must not collapse when edge_id differs."""
+    from app import designer_data_controls_layout as layout_store
+
+    p = tmp_path / "dc_layout_dup_edges.json"
+    monkeypatch.setattr(layout_store, "layout_file_path", lambda: p)
+    et = "zone"
+    payload = {
+        "layout": {
+            "connections": [
+                {
+                    "source_node_id": "field:1",
+                    "source_handle": "loaded_value",
+                    "target_node_id": "ctrl:1",
+                    "target_handle": "selected",
+                    "edge_id": "dup_a",
+                },
+                {
+                    "source_node_id": "field:1",
+                    "source_handle": "loaded_value",
+                    "target_node_id": "ctrl:1",
+                    "target_handle": "selected",
+                    "edge_id": "dup_b",
+                },
+            ],
+        }
+    }
+    r1 = designer_client.put(f"/api/designer/data-controls-layout/{et}", json=payload)
+    assert r1.status_code == 200, r1.text
+    j1 = r1.json()
+    assert j1.get("ok") is True
+    con = j1["layout"]["connections"]
+    assert len(con) == 2
+    assert {c.get("edge_id") for c in con} == {"dup_a", "dup_b"}
+
+    r2 = designer_client.get(f"/api/designer/data-controls-layout/{et}")
+    assert r2.status_code == 200
+    j2 = r2.json()
+    assert len(j2["layout"]["connections"]) == 2
 
 
 def test_api_designer_data_controls_layout_bad_type(designer_client):
     r = designer_client.get("/api/designer/data-controls-layout/9bad")
     assert r.status_code == 400
+
+
+def test_api_designer_data_controls_layout_locked_put_blocked_and_patch_unlock(
+    designer_client, monkeypatch, tmp_path
+):
+    from app import designer_data_controls_layout as layout_store
+
+    p = tmp_path / "dc_layout_lock.json"
+    monkeypatch.setattr(layout_store, "layout_file_path", lambda: p)
+    et = "svcgrp"
+    r_put0 = designer_client.put(
+        f"/api/designer/data-controls-layout/{et}",
+        json={"layout": {"node_positions": {"field:1": {"x": 1, "y": 2}}}},
+    )
+    assert r_put0.status_code == 200, r_put0.text
+    r_patch = designer_client.patch(
+        f"/api/designer/data-controls-layout/{et}/layout-locked",
+        json={"layout_locked": True},
+    )
+    assert r_patch.status_code == 200, r_patch.text
+    assert r_patch.json().get("layout", {}).get("layout_locked") is True
+    r_put1 = designer_client.put(
+        f"/api/designer/data-controls-layout/{et}",
+        json={"layout": {"node_positions": {"field:1": {"x": 9, "y": 9}}}},
+    )
+    assert r_put1.status_code == 409
+    r_patch2 = designer_client.patch(
+        f"/api/designer/data-controls-layout/{et}/layout-locked",
+        json={"layout_locked": False},
+    )
+    assert r_patch2.status_code == 200
+    r_put2 = designer_client.put(
+        f"/api/designer/data-controls-layout/{et}",
+        json={"layout": {"node_positions": {"field:1": {"x": 9, "y": 9}}}},
+    )
+    assert r_put2.status_code == 200
+    assert r_put2.json()["layout"]["node_positions"]["field:1"]["x"] == 9
 
 
 def test_api_designer_entity_payload_fields_generate_missing_infers_unset_existing(
@@ -795,6 +979,8 @@ def test_designer_controls_page(designer_client):
     assert "gc-ip-correct-preview" in r.text
     assert "dotted IPv4 address" in r.text
     assert "valid IPv6 address" in r.text
+    assert "Must be CIDR Network" in r.text
+    assert "Interface Address" in r.text
     assert "gc-designer-text-panel" in r.text
     assert "gc-designer-text-single" in r.text
     assert "gc-designer-text-multi" in r.text

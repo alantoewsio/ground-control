@@ -13,6 +13,15 @@
     return String(x == null ? "" : x).replace(/^\s+|\s+$/g, "");
   }
 
+  function parseBoolLike(v) {
+    if (v === true || v === false) return v;
+    if (v == null) return false;
+    if (typeof v === "number") return v !== 0;
+    var s = trimStr(String(v)).toLowerCase();
+    if (!s) return false;
+    return s === "1" || s === "true" || s === "yes" || s === "on";
+  }
+
   function isSkippableDataEntryType(detRaw) {
     if (typeof globalThis.gcDcLayoutIsSkippableDataEntryType === "function") {
       return globalThis.gcDcLayoutIsSkippableDataEntryType(detRaw);
@@ -279,6 +288,27 @@
     return root;
   }
 
+  function catalogIpAutocorrectAttrEnabled(props) {
+    if (!props || props.autocorrect === false) return false;
+    var aa = props.appliedIpAttributes;
+    if (aa && typeof aa === "object") {
+      var raw = aa["data-gc-ip-autocorrect"];
+      if (raw === "false" || raw === false || raw === "0") return false;
+      if (raw === "true" || raw === true || raw === "1") return true;
+    }
+    return true;
+  }
+
+  function syncCatalogIpInputsAutocorrectAttr(inputs, props) {
+    var on = catalogIpAutocorrectAttrEnabled(props);
+    var list = Array.isArray(inputs) ? inputs : [inputs];
+    list.forEach(function (inp) {
+      if (!inp) return;
+      if (on) inp.setAttribute("data-gc-ip-autocorrect", "true");
+      else inp.removeAttribute("data-gc-ip-autocorrect");
+    });
+  }
+
   function buildIpField(props, family, fieldId) {
     var wrap = document.createElement("div");
     var uid = "gc-obj-edit-ip-" + family + "-" + fieldId;
@@ -318,6 +348,9 @@
     if (ipB) {
       if (props.clearAppliedIpAttributes) ipB.clearAllGcIpAttrs && ipB.clearAllGcIpAttrs(inp);
       else if (props.appliedIpAttributes) ipB.writeAllGcIpAttrs && ipB.writeAllGcIpAttrs(inp, props.appliedIpAttributes);
+    }
+    syncCatalogIpInputsAutocorrectAttr(inp, props);
+    if (ipB) {
       if (props.value != null) inp.value = String(props.value);
       if (ipB.wireCatalogIpInput) {
         ipB.wireCatalogIpInput(inp, err, ok, prev, pill, family);
@@ -327,6 +360,165 @@
       } catch (eBl) {}
     }
     return wrap;
+  }
+
+  /**
+   * Designer Controls · ip-address: IP family selector plus IPv4 and IPv6 panels (see
+   * templates/partials/gc_designer_controls_main_demo.html).
+   */
+  function buildIpAddressControl(props, fieldId) {
+    var ipB = (window.__gcDesignerControlsBridge || {}).ip;
+    var root = document.createElement("div");
+    root.className = "gc-obj-edit-ip-address-root";
+    root.setAttribute("data-gc-obj-edit-ip-address", "1");
+
+    var famField = document.createElement("label");
+    famField.className = "settings-form__field";
+    var famLab = document.createElement("span");
+    famLab.className = "settings-form__label";
+    var famSelId = "gc-obj-edit-ip-family-" + fieldId;
+    famLab.setAttribute("for", famSelId);
+    famLab.textContent = "IP family";
+    var famSel = document.createElement("select");
+    famSel.className = "settings-form__input gc-obj-edit-ip-address__family";
+    famSel.id = famSelId;
+    famSel.setAttribute("aria-label", "IP family");
+    ["IPv4", "IPv6"].forEach(function (lab) {
+      var opt = document.createElement("option");
+      opt.value = lab;
+      opt.textContent = lab;
+      famSel.appendChild(opt);
+    });
+    famField.appendChild(famLab);
+    famField.appendChild(famSel);
+    root.appendChild(famField);
+    if (props.useExternalIpFamilyRow) {
+      famField.hidden = true;
+      famField.style.display = "none";
+      famField.setAttribute("aria-hidden", "true");
+      famSel.setAttribute("tabindex", "-1");
+      famLab.classList.add("gc-sr-only");
+    }
+
+    function makePanel(family) {
+      var is4 = family === "ipv4";
+      var panel = document.createElement("div");
+      panel.className = "settings-form__field";
+      panel.setAttribute("data-gc-obj-edit-ip-panel", family);
+      var labEl = document.createElement("span");
+      labEl.className = "settings-form__label";
+      var labId = "gc-obj-edit-ip-addr-lab-" + family + "-" + fieldId;
+      labEl.id = labId;
+      labEl.textContent = is4 ? "IPv4 address" : "IPv6 address";
+      if (props.suppressInnerIpPanelLabels) {
+        labEl.classList.add("gc-sr-only");
+      }
+      var constr = document.createElement("span");
+      constr.className = "gc-sr-only";
+      var ipWrap = document.createElement("div");
+      ipWrap.className = "gc-ip-field";
+      var inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "settings-form__input mono gc-ip-field__input";
+      inp.id = "gc-obj-edit-ip-" + family + "-" + fieldId;
+      inp.autocomplete = "off";
+      if (is4) inp.setAttribute("inputmode", "decimal");
+      inp.placeholder = is4 ? "192.0.2.1" : "2001:db8::1";
+      inp.setAttribute("aria-labelledby", labId);
+      inp.setAttribute("aria-invalid", "false");
+      var pill = document.createElement("span");
+      pill.className = "gc-ip-field__mask-pill";
+      pill.hidden = true;
+      pill.setAttribute("aria-hidden", "true");
+      var ok = document.createElement("span");
+      ok.className = "gc-ip-field__ok";
+      ok.hidden = true;
+      ok.setAttribute("aria-hidden", "true");
+      ok.setAttribute("title", "Valid");
+      ok.innerHTML = "&#10003;";
+      ipWrap.appendChild(inp);
+      ipWrap.appendChild(pill);
+      ipWrap.appendChild(ok);
+      var prev = document.createElement("p");
+      prev.className = "settings-form__status gc-ip-correct-preview";
+      prev.setAttribute("role", "status");
+      prev.hidden = true;
+      var err = document.createElement("p");
+      err.className = "settings-form__status is-error";
+      err.setAttribute("role", "alert");
+      err.hidden = true;
+      panel.appendChild(labEl);
+      panel.appendChild(constr);
+      panel.appendChild(ipWrap);
+      panel.appendChild(prev);
+      panel.appendChild(err);
+      return { panel: panel, inp: inp, err: err, ok: ok, prev: prev, pill: pill };
+    }
+
+    var v4 = makePanel("ipv4");
+    var v6 = makePanel("ipv6");
+    var v4w = document.createElement("div");
+    v4w.className = "gc-obj-edit-ip-address-fields-v4";
+    v4w.appendChild(v4.panel);
+    var v6w = document.createElement("div");
+    v6w.className = "gc-obj-edit-ip-address-fields-v6";
+    v6w.appendChild(v6.panel);
+    root.appendChild(v4w);
+    root.appendChild(v6w);
+
+    function syncFamilyPanels() {
+      var is6 = famSel.value === "IPv6";
+      v4w.hidden = is6;
+      v6w.hidden = !is6;
+    }
+
+    if (ipB) {
+      if (props.clearAppliedIpAttributes) {
+        if (ipB.clearAllGcIpAttrs) {
+          ipB.clearAllGcIpAttrs(v4.inp);
+          ipB.clearAllGcIpAttrs(v6.inp);
+        }
+      } else if (props.appliedIpAttributes && ipB.writeAllGcIpAttrs) {
+        ipB.writeAllGcIpAttrs(v4.inp, props.appliedIpAttributes);
+        ipB.writeAllGcIpAttrs(v6.inp, props.appliedIpAttributes);
+      }
+    }
+    syncCatalogIpInputsAutocorrectAttr([v4.inp, v6.inp], props);
+    if (ipB && ipB.wireCatalogIpInput) {
+      ipB.wireCatalogIpInput(v4.inp, v4.err, v4.ok, v4.prev, v4.pill, "ipv4");
+      ipB.wireCatalogIpInput(v6.inp, v6.err, v6.ok, v6.prev, v6.pill, "ipv6");
+    }
+
+    famSel.value = ipFamilyFromProps(props) === "ipv6" ? "IPv6" : "IPv4";
+    syncFamilyPanels();
+
+    if (props.value != null) {
+      var s = String(props.value);
+      var tgt = s.indexOf(":") >= 0 ? v6.inp : v4.inp;
+      if (s.indexOf(":") >= 0) {
+        famSel.value = "IPv6";
+        syncFamilyPanels();
+      }
+      tgt.value = s;
+    }
+
+    famSel.addEventListener("change", function () {
+      syncFamilyPanels();
+      var vis = famSel.value === "IPv6" ? v6.inp : v4.inp;
+      if (vis) {
+        try {
+          vis.dispatchEvent(new Event("blur"));
+        } catch (e0) {}
+      }
+    });
+
+    if (ipB && ipB.wireCatalogIpInput) {
+      try {
+        (famSel.value === "IPv6" ? v6.inp : v4.inp).dispatchEvent(new Event("blur"));
+      } catch (eBl) {}
+    }
+
+    return root;
   }
 
   function parseIpListCsv(raw) {
@@ -348,6 +540,46 @@
     return String(famRaw || "").trim().toLowerCase() === "ipv6" ? "ipv6" : "ipv4";
   }
 
+  function isIpFamilyPropertyField(field) {
+    var p = trimStr(field && field.property_name).toLowerCase().replace(/_/g, "");
+    return p === "ipfamily";
+  }
+
+  function ipFamilyRowTypeRank(detRaw) {
+    var d = trimStr(detRaw).toLowerCase();
+    if (d === "selector") return 0;
+    if (d === "dropdown-single") return 1;
+    if (d === "dropdown-multi") return 2;
+    return 3;
+  }
+
+  /** Multiple IPFamily rows in the catalog (e.g. ip_host) → keep one; prefer selector over dropdowns. */
+  function dedupeIpFamilyCatalogFields(fields) {
+    var list = fields || [];
+    var idxs = [];
+    list.forEach(function (f, i) {
+      if (isIpFamilyPropertyField(f)) idxs.push(i);
+    });
+    if (idxs.length <= 1) return list;
+    idxs.sort(function (a, b) {
+      var ra = ipFamilyRowTypeRank(list[a].data_entry_type);
+      var rb = ipFamilyRowTypeRank(list[b].data_entry_type);
+      if (ra !== rb) return ra - rb;
+      return a - b;
+    });
+    var drop = {};
+    idxs.slice(1).forEach(function (i) {
+      drop[i] = true;
+    });
+    return list.filter(function (_, i) {
+      return !drop[i];
+    });
+  }
+
+  function catalogFieldsHaveSeparateIpFamilyRow(fields) {
+    return (fields || []).some(isIpFamilyPropertyField);
+  }
+
   function ipListReadonlyFromProps(props) {
     if (!props || typeof props !== "object") return false;
     if (props.readonly == null) return false;
@@ -364,6 +596,7 @@
     wrap.appendChild(list);
     var family = ipFamilyFromProps(props);
     var isReadonly = ipListReadonlyFromProps(props);
+    var itemSeq = 0;
 
     function syncErrorIcon(errEl, iconEl) {
       if (!errEl || !iconEl) return;
@@ -374,9 +607,96 @@
       iconEl.setAttribute("aria-label", show ? msg : "");
     }
 
-    function createItem(value, idx) {
+    function enforceIpOnlyConstraintMode(inp) {
+      if (!inp) return;
+      var autocorrectOn = catalogIpAutocorrectAttrEnabled(props);
+      if (ipB && ipB.readOptsFromInput && ipB.writeOptsToInput) {
+        var cur = ipB.readOptsFromInput(inp) || {};
+        ipB.writeOptsToInput(inp, {
+          withinCidr: "",
+          rangeLo: "",
+          rangeHi: "",
+          prefix: "",
+          cidrPrefixMin: "",
+          cidrPrefixMax: "",
+          storedPrefix: "",
+          requireNetwork: false,
+          requireValueCidr: false,
+          autocorrect: cur.autocorrect === true || autocorrectOn,
+        });
+        return;
+      }
+      [
+        "data-gc-ip-within-cidr",
+        "data-gc-ip-range-lo",
+        "data-gc-ip-range-hi",
+        "data-gc-ip-prefix",
+        "data-gc-ip-cidr-prefix-min",
+        "data-gc-ip-cidr-prefix-max",
+        "data-gc-ip-prefix-length",
+        "data-gc-ip-require-network",
+        "data-gc-ip-require-value-cidr",
+      ].forEach(function (attr) {
+        inp.removeAttribute(attr);
+      });
+      syncCatalogIpInputsAutocorrectAttr(inp, props);
+    }
+
+    function observeErrorIconTooltip(errEl, iconEl) {
+      if (!errEl || !iconEl || typeof MutationObserver !== "function") return;
+      var mo = new MutationObserver(function () {
+        syncErrorIcon(errEl, iconEl);
+      });
+      mo.observe(errEl, {
+        attributes: true,
+        attributeFilter: ["hidden"],
+        characterData: true,
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    function allListInputsHaveNonEmptyValue() {
+      var inputs = list.querySelectorAll(".gc-ip-list-field__item input.gc-ip-field__input");
+      if (!inputs.length) return false;
+      var all = true;
+      Array.prototype.forEach.call(inputs, function (inp) {
+        if (!trimStr(inp.value)) all = false;
+      });
+      return all;
+    }
+
+    function maybeExpandIfAllFilled() {
+      if (isReadonly) return;
+      if (!allListInputsHaveNonEmptyValue()) return;
+      createItem("");
+      syncValueCache();
+    }
+
+    function removeListItem(row) {
+      if (isReadonly || !row || !list.contains(row)) return;
+      row.remove();
+      if (!list.querySelector(".gc-ip-list-field__item")) {
+        createItem("");
+      }
+      syncValueCache();
+      maybeExpandIfAllFilled();
+    }
+
+    function afterInputChange() {
+      syncValueCache();
+      maybeExpandIfAllFilled();
+    }
+
+    function createItem(value) {
+      itemSeq += 1;
+      var uid = itemSeq;
       var row = document.createElement("div");
       row.className = "gc-ip-list-field__item";
+      var rowMain = document.createElement("div");
+      rowMain.className = "gc-ip-list-field__item-row";
+      var ipShell = document.createElement("div");
+      ipShell.className = "gc-ip-list-field__ip-shell";
       var ipWrap = document.createElement("div");
       ipWrap.className = "gc-ip-field";
       var inp = document.createElement("input");
@@ -384,7 +704,7 @@
       inp.className = "settings-form__input mono gc-ip-field__input";
       inp.autocomplete = "off";
       inp.readOnly = isReadonly;
-      inp.id = "gc-obj-edit-ip-list-" + fieldId + "-" + idx;
+      inp.id = "gc-obj-edit-ip-list-" + fieldId + "-" + uid;
       inp.placeholder = family === "ipv6" ? "2001:db8::1" : "192.0.2.1";
       inp.setAttribute("aria-invalid", "false");
       if (value != null) inp.value = String(value);
@@ -418,7 +738,28 @@
       ipWrap.appendChild(pill);
       ipWrap.appendChild(ok);
       ipWrap.appendChild(errIcon);
-      row.appendChild(ipWrap);
+      ipShell.appendChild(ipWrap);
+      rowMain.appendChild(ipShell);
+
+      if (!isReadonly) {
+        var rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "gc-ip-list-field__remove";
+        rm.setAttribute("aria-label", "Remove this entry");
+        rm.innerHTML =
+          '<svg class="gc-ip-list-field__remove-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5" />' +
+          '<path d="M9 9l6 6M15 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />' +
+          "</svg>";
+        rm.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          removeListItem(row);
+        });
+        rowMain.appendChild(rm);
+      }
+
+      row.appendChild(rowMain);
       row.appendChild(prev);
       row.appendChild(err);
       list.appendChild(row);
@@ -427,19 +768,22 @@
         if (props.clearAppliedIpAttributes) ipB.clearAllGcIpAttrs && ipB.clearAllGcIpAttrs(inp);
         else if (props.appliedIpAttributes)
           ipB.writeAllGcIpAttrs && ipB.writeAllGcIpAttrs(inp, props.appliedIpAttributes);
+        enforceIpOnlyConstraintMode(inp);
         ipB.wireCatalogIpInput(inp, err, ok, prev, pill, family);
         syncErrorIcon(err, errIcon);
+        observeErrorIconTooltip(err, errIcon);
         inp.addEventListener("input", function () {
           syncErrorIcon(err, errIcon);
-          syncValueCache();
+          afterInputChange();
         });
         inp.addEventListener("blur", function () {
           syncErrorIcon(err, errIcon);
-          syncValueCache();
+          afterInputChange();
         });
       } else {
-        inp.addEventListener("input", syncValueCache);
-        inp.addEventListener("blur", syncValueCache);
+        enforceIpOnlyConstraintMode(inp);
+        inp.addEventListener("input", afterInputChange);
+        inp.addEventListener("blur", afterInputChange);
       }
     }
 
@@ -455,9 +799,10 @@
     function setCsv(raw) {
       var values = parseIpListCsv(raw);
       list.innerHTML = "";
+      itemSeq = 0;
       if (!values.length) values = [""];
-      values.forEach(function (v, idx) {
-        createItem(v, idx);
+      values.forEach(function (v) {
+        createItem(v);
       });
       syncValueCache();
       list.querySelectorAll("input.gc-ip-field__input").forEach(function (inp) {
@@ -465,6 +810,7 @@
           inp.dispatchEvent(new Event("blur"));
         } catch (eBlur) {}
       });
+      maybeExpandIfAllFilled();
     }
 
     wrap.gcGetIpListValue = function () {
@@ -612,8 +958,10 @@
   function buildMemberLookup(props, fieldId, field) {
     var catalogTypes = catalogDataSourceEntityTypes(field);
     var uid = "gc-obj-edit-ml-" + fieldId;
-    var multi = !!(props && props.multi);
-    if (props && props.source && props.source.multi != null) multi = !!props.source.multi;
+    var multi = parseBoolLike(props && props.multi);
+    if (props && props.source && props.source.multi != null) {
+      multi = parseBoolLike(props.source.multi);
+    }
     if (catalogTypes.length) {
       props = props && typeof props === "object" ? props : {};
       props.source = props.source && typeof props.source === "object" ? props.source : {};
@@ -629,15 +977,9 @@
     if (catalogTypes.length) {
       wrap.setAttribute("data-gc-ml-catalog-entity-types", JSON.stringify(catalogTypes));
     }
-    var lblId = uid + "-ml-lbl";
     wrap.innerHTML =
-      '<span class="gc-sr-only" id="' +
-      escapeAttr(lblId) +
-      '">Member lookup</span>' +
       '<div class="gc-designer-dd__shell">' +
-      '<button type="button" class="settings-form__input gc-designer-dd__trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="' +
-      escapeAttr(lblId) +
-      '">' +
+      '<button type="button" class="settings-form__input gc-designer-dd__trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Select cached objects">' +
       (multi ? "None selected" : "Choose…") +
       "</button>" +
       '<div class="gc-designer-dd__panel" hidden>' +
@@ -652,7 +994,7 @@
       '" role="listbox" ' +
       (multi ? 'aria-multiselectable="true" ' : "") +
       'aria-label="Cached object names"></ul></div></div>' +
-      '<p class="gc-sr-only" id="' +
+      '<p class="gc-designer-member-lookup__status settings-form__status" id="' +
       escapeAttr(uid + "-ml-status") +
       '" aria-live="polite"></p>';
     var RT = (window.__gcDesignerControlsBridge || {}).ddFieldRuntime;
@@ -757,10 +1099,8 @@
         return buildSelector(props, field.id);
       case "tag-editor":
         return buildTagEditor(props, field.id);
-      case "ip-address": {
-        var wireFam = ipFamilyFromProps(props);
-        return buildIpField(props, wireFam, field.id);
-      }
+      case "ip-address":
+        return buildIpAddressControl(props, field.id);
       case "ip-list":
         return buildIpListField(props, field.id);
       case "ip-ipv4":
@@ -840,13 +1180,44 @@
         return;
       }
 
+      var ipAddrRoot = rowEl.querySelector('[data-gc-obj-edit-ip-address="1"]');
+      if (ipAddrRoot) {
+        var famSel = ipAddrRoot.querySelector("select.gc-obj-edit-ip-address__family");
+        var inp4 = ipAddrRoot.querySelector('[data-gc-obj-edit-ip-panel="ipv4"] input.gc-ip-field__input');
+        var inp6 = ipAddrRoot.querySelector('[data-gc-obj-edit-ip-panel="ipv6"] input.gc-ip-field__input');
+        var trimmed = trimStr(sval);
+        var defFam = rowEl.getAttribute("data-gc-catalog-default-ip-family") || "IPv4";
+        var use6 = trimmed.indexOf(":") >= 0;
+        if (famSel) {
+          if (!trimmed) {
+            famSel.value = defFam === "IPv6" ? "IPv6" : "IPv4";
+          } else {
+            famSel.value = use6 ? "IPv6" : "IPv4";
+          }
+          var is6b = famSel.value === "IPv6";
+          var v4w = ipAddrRoot.querySelector(".gc-obj-edit-ip-address-fields-v4");
+          var v6w = ipAddrRoot.querySelector(".gc-obj-edit-ip-address-fields-v6");
+          if (v4w) v4w.hidden = is6b;
+          if (v6w) v6w.hidden = !is6b;
+        }
+        var tgt = famSel && famSel.value === "IPv6" ? inp6 : inp4;
+        if (tgt) {
+          tgt.value = sval;
+          try {
+            tgt.dispatchEvent(new Event("input", { bubbles: true }));
+            tgt.dispatchEvent(new Event("blur"));
+          } catch (eIp) {}
+        }
+        return;
+      }
+
       var ipInp = rowEl.querySelector("input.gc-ip-field__input");
       if (ipInp) {
         ipInp.value = sval;
         try {
           ipInp.dispatchEvent(new Event("input", { bubbles: true }));
           ipInp.dispatchEvent(new Event("blur"));
-        } catch (eIp) {}
+        } catch (eIp2) {}
         return;
       }
 
@@ -856,7 +1227,32 @@
         return;
       }
 
-      var inp = rowEl.querySelector("input.settings-form__input:not([type=\"hidden\"])");
+      var ddEarly = rowEl.querySelector("[data-gc-designer-dd]");
+      if (ddEarly && CF) {
+        setTimeout(function () {
+          try {
+            if (
+              ddEarly.classList.contains("gc-designer-dd--multi") &&
+              typeof CF.ddSetMultiSelection === "function"
+            ) {
+              var pickedVals = sval
+                .split(/\x1e|[;,]/)
+                .map(function (x) {
+                  return trimStr(x);
+                })
+                .filter(Boolean);
+              CF.ddSetMultiSelection(ddEarly, pickedVals);
+            } else if (typeof CF.ddSetSingleSelection === "function") {
+              CF.ddSetSingleSelection(ddEarly, sval);
+            }
+          } catch (eDdEarly) {}
+        }, 120);
+        return;
+      }
+
+      var inp = rowEl.querySelector(
+        "input.settings-form__input:not([type=\"hidden\"]):not(.gc-designer-dd__search)",
+      );
       if (inp && inp.type !== "checkbox" && inp.type !== "radio") {
         inp.value = sval;
         return;
@@ -893,26 +1289,32 @@
         }
         return;
       }
-
-      var dd = rowEl.querySelector("[data-gc-designer-dd]");
-      if (dd && CF && CF.ddSetSingleSelection) {
-        setTimeout(function () {
-          try {
-            CF.ddSetSingleSelection(dd, sval);
-          } catch (eDd) {}
-        }, 120);
-      }
     });
   }
 
   function renderFields(container, statusEl, fields) {
     container.innerHTML = "";
     var visible = 0;
-    (fields || []).forEach(function (f) {
+    var fieldsForRender = dedupeIpFamilyCatalogFields(fields || []);
+    var hasSeparateIpFamily = catalogFieldsHaveSeparateIpFamilyRow(fieldsForRender);
+    fieldsForRender.forEach(function (f) {
       var det = f.data_entry_type != null ? String(f.data_entry_type) : "";
       if (isSkippableDataEntryType(det)) return;
       var props = parsePropsJson(f.data_entry_properties);
       var detLower = trimStr(det).toLowerCase();
+      if (
+        detLower === "ip-address" ||
+        detLower === "ip-ipv4" ||
+        detLower === "ip-ipv6"
+      ) {
+        props = Object.assign({ autocorrect: true }, props);
+      }
+      if (detLower === "ip-address" && hasSeparateIpFamily) {
+        props = Object.assign({}, props, { useExternalIpFamilyRow: true });
+      }
+      if (detLower === "ip-address") {
+        props = Object.assign({}, props, { suppressInnerIpPanelLabels: true });
+      }
       if (detLower === "selector" && f.allowed_options && Array.isArray(f.allowed_options)) {
         var ao = [];
         f.allowed_options.forEach(function (x) {
@@ -934,7 +1336,17 @@
       row.className = "settings-form__field gc-designer-object-edit-catalog-row";
       row.setAttribute("data-gc-catalog-property", f.property_name != null ? String(f.property_name) : "");
       row.setAttribute("data-gc-catalog-field-id", f.id != null ? String(f.id) : "");
-      row.appendChild(buildLabelRow(label, help));
+      if (detLower === "ip-address") {
+        row.setAttribute(
+          "data-gc-catalog-default-ip-family",
+          ipFamilyFromProps(props) === "ipv6" ? "IPv6" : "IPv4",
+        );
+      }
+      if (detLower !== "member-lookup") {
+        row.appendChild(buildLabelRow(label, help));
+      } else if (trimStr(help)) {
+        row.appendChild(buildLabelRow("", help));
+      }
       row.appendChild(ctrl);
       container.appendChild(row);
       visible++;
@@ -954,6 +1366,68 @@
 
   var hydrateObjectEditCatalogSeq = 0;
   var objectEditSelectorReevalWired = false;
+
+  function truthyLayoutFlag(map, key) {
+    if (!map || typeof map !== "object" || !key) return false;
+    if (!Object.prototype.hasOwnProperty.call(map, key)) return false;
+    var v = map[key];
+    if (v === true) return true;
+    if (v === false || v == null) return false;
+    var s = trimStr(String(v)).toLowerCase();
+    return s === "1" || s === "true" || s === "yes" || s === "on";
+  }
+
+  function applyObjectEditFlyoutControlLocks() {
+    var st = globalThis.__gcObjectEditFlyoutState;
+    var fieldsEl = document.getElementById("gc-designer-object-edit-catalog-fields");
+    if (!st || !fieldsEl) return;
+    var mode = trimStr(st.mode || "edit").toLowerCase() === "add" ? "add" : "edit";
+    var cmap =
+      st.layout && st.layout.control_add_only && typeof st.layout.control_add_only === "object"
+        ? st.layout.control_add_only
+        : {};
+
+    function setLocked(el, on) {
+      if (!el || el.nodeType !== 1) return;
+      if (el.classList && el.classList.contains("gc-object-edit-help-icon")) return;
+      var tag = el.tagName;
+      if (on) {
+        if (el.dataset.gcObjEditLocked === "1") return;
+        el.dataset.gcObjEditPrevRo = el.readOnly ? "1" : "0";
+        el.dataset.gcObjEditPrevDis = el.disabled ? "1" : "0";
+        el.dataset.gcObjEditLocked = "1";
+        if (tag === "SELECT") el.disabled = true;
+        else if (tag === "BUTTON") el.disabled = true;
+        else if (tag === "INPUT") {
+          var t = String(el.type || "").toLowerCase();
+          if (t === "checkbox" || t === "radio" || t === "button" || t === "submit" || t === "reset") {
+            el.disabled = true;
+          } else {
+            el.readOnly = true;
+          }
+        } else if (tag === "TEXTAREA") el.readOnly = true;
+      } else if (el.dataset.gcObjEditLocked === "1") {
+        el.readOnly = el.dataset.gcObjEditPrevRo === "1";
+        el.disabled = el.dataset.gcObjEditPrevDis === "1";
+        delete el.dataset.gcObjEditLocked;
+        delete el.dataset.gcObjEditPrevRo;
+        delete el.dataset.gcObjEditPrevDis;
+      }
+    }
+
+    fieldsEl.querySelectorAll(".gc-designer-object-edit-catalog-row").forEach(function (rowEl) {
+      var fid = trimStr(rowEl.getAttribute("data-gc-catalog-field-id"));
+      var ctrlId = fid ? "ctrl:" + fid : "";
+      var hiddenRow = rowEl.hidden || rowEl.style.display === "none";
+      var wantLock = !hiddenRow && mode === "edit" && ctrlId && truthyLayoutFlag(cmap, ctrlId);
+      rowEl.classList.toggle("gc-object-edit-catalog-row--add-only-locked", wantLock);
+      rowEl.querySelectorAll("input, textarea, select, button").forEach(function (el) {
+        if (el.classList && el.classList.contains("gc-object-edit-help-icon")) return;
+        if (el.closest && el.closest(".gc-object-edit-help-icon")) return;
+        setLocked(el, wantLock);
+      });
+    });
+  }
 
   function reevalObjectEditLayoutFromCurrentInputs() {
     var st = globalThis.__gcObjectEditFlyoutState;
@@ -976,6 +1450,52 @@
       fieldsEl,
     );
     notifyObjectEditCatalogVisibleFieldCount(countVisibleCatalogRows());
+    applyObjectEditFlyoutControlLocks();
+  }
+
+  function applyMemberLookupLayoutDataSourcesFromLayout(fieldsEl, layout) {
+    if (!fieldsEl) return;
+    var map =
+      layout &&
+      layout.member_lookup_data_source &&
+      typeof layout.member_lookup_data_source === "object" &&
+      !Array.isArray(layout.member_lookup_data_source)
+        ? layout.member_lookup_data_source
+        : {};
+    fieldsEl.querySelectorAll("[data-gc-designer-member-lookup]").forEach(function (root) {
+      var row = root.closest(".gc-designer-object-edit-catalog-row");
+      var fid = row ? trimStr(row.getAttribute("data-gc-catalog-field-id")) : "";
+      var ctrlId = fid ? "ctrl:" + fid : "";
+      var srcEt = ctrlId && map[ctrlId] ? trimStr(map[ctrlId]) : "";
+      if (srcEt && ENTITY_TYPE_RE.test(srcEt)) {
+        root.setAttribute("data-gc-ml-layout-source-type", srcEt);
+      } else {
+        root.removeAttribute("data-gc-ml-layout-source-type");
+      }
+    });
+  }
+
+  function applyMemberLookupMultiFromLayout(fields, layout) {
+    var map =
+      layout &&
+      layout.member_lookup_multi &&
+      typeof layout.member_lookup_multi === "object" &&
+      !Array.isArray(layout.member_lookup_multi)
+        ? layout.member_lookup_multi
+        : {};
+    return (fields || []).map(function (field) {
+      var f = field && typeof field === "object" ? field : {};
+      var fid = trimStr(f.id);
+      var ctrlId = fid ? "ctrl:" + fid : "";
+      if (!ctrlId || !Object.prototype.hasOwnProperty.call(map, ctrlId)) return f;
+      if (trimStr(f.data_entry_type).toLowerCase() !== "member-lookup") return f;
+      var nextOn = parseBoolLike(map[ctrlId]);
+      var props = parsePropsJson(f.data_entry_properties);
+      props.multi = nextOn;
+      props.source = props.source && typeof props.source === "object" ? props.source : {};
+      props.source.multi = nextOn;
+      return Object.assign({}, f, { data_entry_properties: JSON.stringify(props) });
+    });
   }
 
   function wireObjectEditSelectorReeval() {
@@ -1079,18 +1599,24 @@
         }
         var layoutJson =
           xl && xl.ok && xl.j && xl.j.layout && typeof xl.j.layout === "object" ? xl.j.layout : {};
+        var catalogFieldsIn = dedupeIpFamilyCatalogFields(
+          applyMemberLookupMultiFromLayout(xf.j.fields.slice(), layoutJson),
+        );
         var pack =
           typeof globalThis.gcDcLayoutOrderedFieldsForFlyout === "function"
-            ? globalThis.gcDcLayoutOrderedFieldsForFlyout(xf.j.fields, layoutJson)
+            ? globalThis.gcDcLayoutOrderedFieldsForFlyout(catalogFieldsIn, layoutJson)
             : {
-                fields: xf.j.fields,
+                fields: catalogFieldsIn,
                 connections: [],
                 nodeCatalog: {},
               };
+        var flyoutMode =
+          catalogHydrateOpts && trimStr(catalogHydrateOpts.mode).toLowerCase() === "add" ? "add" : "edit";
         globalThis.__gcObjectEditFlyoutState = {
           entityType: et,
+          mode: flyoutMode,
           fields: pack.fields,
-          allFields: xf.j.fields,
+          allFields: catalogFieldsIn,
           layout: layoutJson,
           connections: pack.connections,
           nodeCatalog: pack.nodeCatalog,
@@ -1100,6 +1626,7 @@
               : null,
         };
         renderFields(fieldsEl, statusEl, pack.fields);
+        applyMemberLookupLayoutDataSourcesFromLayout(fieldsEl, layoutJson);
         var rowForFlow =
           catalogHydrateOpts && catalogHydrateOpts.row && typeof catalogHydrateOpts.row === "object"
             ? catalogHydrateOpts.row
@@ -1116,23 +1643,24 @@
         }
         function applyLayoutFlowFromRow() {
           if (
-            typeof globalThis.gcDcLayoutComputeFlowFromRow !== "function" ||
-            typeof globalThis.gcDcLayoutApplyToObjectEditCatalog !== "function" ||
+            typeof globalThis.gcDcLayoutApplyFlowFromDesignToObjectEditCatalog !== "function" ||
             !pack.nodeCatalog ||
             !Object.keys(pack.nodeCatalog).length
           ) {
             return;
           }
-          var flow = globalThis.gcDcLayoutComputeFlowFromRow(
+          globalThis.gcDcLayoutApplyFlowFromDesignToObjectEditCatalog(
             pack.nodeCatalog,
-            pack.connections,
-            xf.j.fields,
+            layoutJson,
+            catalogFieldsIn,
             rowForFlow,
           );
-          globalThis.gcDcLayoutApplyToObjectEditCatalog(flow, xf.j.fields);
           notifyObjectEditCatalogVisibleFieldCount(countVisibleCatalogRows());
+          applyObjectEditFlyoutControlLocks();
         }
+        var skipEntityHydrate = flyoutMode === "add";
         if (
+          !skipEntityHydrate &&
           catalogHydrateOpts &&
           (catalogHydrateOpts.cells || catalogHydrateOpts.flat)
         ) {
@@ -1158,7 +1686,9 @@
       });
   }
 
+  globalThis.gcDesignerDedupeIpFamilyCatalogFields = dedupeIpFamilyCatalogFields;
   globalThis.gcDesignerHydrateObjectEditCatalogFields = hydrateObjectEditCatalogFields;
+  globalThis.gcDesignerApplyObjectEditFlyoutControlLocks = applyObjectEditFlyoutControlLocks;
   wireObjectEditSelectorReeval();
 
   globalThis.gcDesignerObjectEditFlyoutCollectSave = function () {
@@ -1186,6 +1716,7 @@
     );
     return {
       entity_type: st.entityType || "",
+      mode: trimStr(st.mode || "edit").toLowerCase() === "add" ? "add" : "edit",
       properties: save.properties || {},
       row: st.row || null,
     };

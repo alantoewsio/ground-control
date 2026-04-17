@@ -1,16 +1,109 @@
 /**
- * Dropdown + member-lookup runtime for the object-edit flyout on pages that do not load
- * partials/gc_designer_controls_scripts.html (e.g. Firewalls v2). Exposes the same
+ * Canonical dropdown + member-lookup runtime for the object-edit flyout
+ * (#gc-designer-flyout-object-edit-modal). Exposes the
  * __gcDesignerControlsBridge.ddFieldRuntime / catalogFieldUi surface the catalog expects.
+ *
+ * This file is loaded on every page that opens the object-edit flyout, including
+ * Designer pages that also load partials/gc_designer_controls_scripts.html (which
+ * contains a legacy inline copy of the same runtime for its sandbox/demo widgets).
+ * We intentionally register last so both Firewalls v2 and Designer use this single
+ * flyout-aware implementation — that's what guarantees the flyout member-lookup
+ * control behaves identically on both pages (correct "N selected" status line and
+ * proper reconciliation of pending multi-selection against freshly-loaded rows).
  */
 (function () {
   "use strict";
 
-  if (window.__gcDesignerControlsBridge && window.__gcDesignerControlsBridge.ddFieldRuntime) {
-    return;
+  var ddRoots = [];
+  var layoutLocksCache = null;
+  var layoutLocksFetchPromise = null;
+
+  function invalidateLayoutLocksCache() {
+    layoutLocksCache = null;
+    layoutLocksFetchPromise = null;
+  }
+  globalThis.gcInvalidateDataControlsLayoutLocksCache = invalidateLayoutLocksCache;
+
+  function fetchLayoutLocksMap() {
+    if (layoutLocksCache && typeof layoutLocksCache === "object") {
+      return Promise.resolve(layoutLocksCache);
+    }
+    if (layoutLocksFetchPromise) return layoutLocksFetchPromise;
+    layoutLocksFetchPromise = fetch("/api/firewalls/config-ui/data-controls-layout-locks", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok && j && j.ok, locks: j && j.locks };
+        });
+      })
+      .then(function (res) {
+        layoutLocksFetchPromise = null;
+        layoutLocksCache =
+          res.ok && res.locks && typeof res.locks === "object" ? res.locks : {};
+        return layoutLocksCache;
+      })
+      .catch(function () {
+        layoutLocksFetchPromise = null;
+        layoutLocksCache = {};
+        return layoutLocksCache;
+      });
+    return layoutLocksFetchPromise;
   }
 
-  var ddRoots = [];
+  function syncAllLayoutLockCheckboxesForEt(et, checked) {
+    var s = String(et || "");
+    var q =
+      'input.gc-designer-dd__layout-lock-cb[data-gc-dd-layout-lock-et="' +
+      s.replace(/\\/g, "\\\\").replace(/"/g, '\\"') +
+      '"]';
+    document.querySelectorAll(q).forEach(function (cb) {
+      cb.checked = !!checked;
+    });
+  }
+
+  if (!document.documentElement.dataset.gcDdLayoutLockDelegation) {
+    document.documentElement.dataset.gcDdLayoutLockDelegation = "1";
+    document.addEventListener("change", function (ev) {
+      var t = ev.target;
+      if (!t || !t.matches || !t.matches("input.gc-designer-dd__layout-lock-cb")) return;
+      if (globalThis.GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK !== true) return;
+      var et = String(t.getAttribute("data-gc-dd-layout-lock-et") || "").trim();
+      if (!et) return;
+      var want = !!t.checked;
+      ev.stopPropagation();
+      fetch(
+        "/api/designer/data-controls-layout/" + encodeURIComponent(et) + "/layout-locked",
+        {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
+          body: JSON.stringify({ layout_locked: want }),
+        },
+      )
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok && j && j.ok };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok) {
+            t.checked = !want;
+            return;
+          }
+          invalidateLayoutLocksCache();
+          syncAllLayoutLockCheckboxesForEt(et, want);
+        })
+        .catch(function () {
+          t.checked = !want;
+        });
+    });
+  }
 
   var LIST_COL_LABELS = {
     __firewall: "Scope",
@@ -58,6 +151,70 @@
     if (et !== "ip_host") return base;
     var ht = hostTypeSlug((row.flat && row.flat.HostType) || "");
     return base + (ht ? " gc-designer-dd__icon--ht-" + ht : "");
+  }
+
+  function navIconMapForDdRows() {
+    var m = globalThis.GC_ENTITY_TYPE_NAV_ICONS;
+    return m && typeof m === "object" ? m : null;
+  }
+
+  function rowLeadingVisualHtml(row, navIconMap) {
+    var et = String(row.entity_type || "").trim();
+    var raw =
+      navIconMap && Object.prototype.hasOwnProperty.call(navIconMap, et)
+        ? String(navIconMap[et] != null ? navIconMap[et] : "").trim()
+        : "";
+    if (raw) {
+      return (
+        '<span class="gc-designer-dd__leading gc-designer-dd__leading--nav-icon" aria-hidden="true">' +
+        '<span class="gc-material-symbol gc-designer-dd__material-icon">' +
+        escapeHtml(raw) +
+        "</span></span>"
+      );
+    }
+    if (navIconMap) return "";
+    var iconCl = iconClasses(row);
+    return (
+      '<span class="gc-designer-dd__leading gc-designer-dd__leading--swatch" aria-hidden="true">' +
+      '<span class="' +
+      iconCl +
+      '"></span></span>'
+    );
+  }
+
+  function isFlyoutMemberLookupRoot(root) {
+    return (
+      !!root &&
+      root.classList &&
+      root.classList.contains("gc-designer-member-lookup") &&
+      !!root.closest("#gc-designer-flyout-object-edit-modal")
+    );
+  }
+
+  function memberLookupFlyoutSelectedCount(root) {
+    var list = root.querySelector(".gc-designer-dd__list");
+    if (!list) return 0;
+    if (root.classList.contains("gc-designer-dd--multi")) {
+      var n = 0;
+      list.querySelectorAll(".gc-designer-dd__check input[type=\"checkbox\"]").forEach(function (cb) {
+        if (cb.checked) n++;
+      });
+      return n;
+    }
+    var tr = root.querySelector(".gc-designer-dd__trigger");
+    return tr && tr.getAttribute("data-gc-dd-value") ? 1 : 0;
+  }
+
+  function formatFlyoutMemberLookupStatusLine(n) {
+    if (n === 0) return "No objects selected";
+    if (n === 1) return "1 object selected";
+    return n + " objects selected";
+  }
+
+  function refreshMemberLookupFlyoutStatus(root, statusEl) {
+    if (!statusEl || !isFlyoutMemberLookupRoot(root)) return;
+    statusEl.textContent = formatFlyoutMemberLookupStatusLine(memberLookupFlyoutSelectedCount(root));
+    statusEl.classList.remove("is-error");
   }
 
   function rowStableValue(row) {
@@ -118,7 +275,35 @@
     return out;
   }
 
-  function renderRowHtml(row, cols, isMulti) {
+  function layoutLockCellHtml(etRaw, locksMap) {
+    var et = String(etRaw || "").trim();
+    if (!et) return "";
+    var locked = !!(locksMap && locksMap[et]);
+    var canEdit = globalThis.GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK === true;
+    return (
+      '<span class="gc-designer-dd__layout-lock-wrap">' +
+      '<label class="gc-designer-dd__layout-lock" title="Designer layout map locked for ' +
+      escapeAttr(et) +
+      ' (toggle requires Designer role)">' +
+      '<input type="checkbox" class="gc-designer-dd__layout-lock-cb" tabindex="-1" data-gc-dd-layout-lock-et="' +
+      escapeAttr(et) +
+      '" ' +
+      (locked ? "checked " : "") +
+      (!canEdit ? "disabled " : "") +
+      'aria-label="Layout locked for ' +
+      escapeAttr(et) +
+      '" />' +
+      '<span class="gc-designer-dd__layout-lock-ui" aria-hidden="true"></span>' +
+      "</label></span>"
+    );
+  }
+
+  function renderRowHtml(row, cols, isMulti, locksMap, rowCtx) {
+    rowCtx = rowCtx || {};
+    var omitLayoutLock = !!rowCtx.omitLayoutLock;
+    var navIconMap = rowCtx.navIconMap != null ? rowCtx.navIconMap : null;
+    var etType = String(row.entity_type || getCell(row, "entity_type") || "").trim();
+    var lockHtml = omitLayoutLock ? "" : layoutLockCellHtml(etType, locksMap || {});
     var primary = getCell(row, "__name") || row.external_name || "—";
     var metaParts = [];
     for (var i = 0; i < cols.length; i++) {
@@ -130,11 +315,10 @@
     }
     var meta = metaParts.join(" · ");
     var val = rowStableValue(row);
-    var iconCl = iconClasses(row);
-    var inner =
-      '<span class="' +
-      iconCl +
-      '" aria-hidden="true"></span><span class="gc-designer-dd__row-text"><span class="gc-designer-dd__primary">' +
+    var lead = rowLeadingVisualHtml(row, navIconMap);
+    var rowInner =
+      lead +
+      '<span class="gc-designer-dd__row-text"><span class="gc-designer-dd__primary">' +
       escapeHtml(primary) +
       "</span>" +
       (meta ? '<span class="gc-designer-dd__meta">' + escapeHtml(meta) + "</span>" : "") +
@@ -146,7 +330,8 @@
         '" data-gc-dd-primary="' +
         escapeAttr(primary) +
         '">' +
-        inner +
+        lockHtml +
+        rowInner +
         "</li>"
       );
     }
@@ -154,35 +339,254 @@
       '<li role="option" aria-selected="false" tabindex="-1" data-value="' +
       escapeAttr(val) +
       '" data-gc-dd-primary="' +
-      escapeAttr(primary) +
-      '"><label class="gc-designer-dd__check"><input type="checkbox" />' +
-      inner +
-      "</label></li>"
+        escapeAttr(primary) +
+        '">' +
+        lockHtml +
+        '<label class="gc-designer-dd__check"><input type="checkbox" />' +
+        rowInner +
+        "</label></li>"
     );
   }
 
-  function applyRowsToList(root, merged, cols, statusEl, typesCount) {
+  function normalizeDdMultiSelectionTokens(items) {
+    var seen = Object.create(null);
+    var out = [];
+    function pushOne(raw) {
+      var t = String(raw != null ? raw : "").trim();
+      if (!t || seen[t]) return;
+      seen[t] = true;
+      out.push(t);
+    }
+    function expand(str) {
+      var s = String(str != null ? str : "").trim();
+      if (!s) return;
+      if (s.charAt(0) === "[") {
+        try {
+          var j = JSON.parse(s);
+          if (Array.isArray(j)) {
+            j.forEach(function (x) {
+              pushOne(String(x != null ? x : ""));
+            });
+            return;
+          }
+        } catch (eJsonTok) {}
+      }
+      if (s.indexOf("\x1e") >= 0) {
+        s.split("\x1e").forEach(pushOne);
+        return;
+      }
+      if (/\r?\n/.test(s)) {
+        s.split(/\r?\n/).forEach(pushOne);
+        return;
+      }
+      s.split(/[,;]\s*/).forEach(pushOne);
+    }
+    if (items == null) return [];
+    if (typeof items === "string") {
+      expand(items);
+      return out;
+    }
+    (Array.isArray(items) ? items : []).forEach(function (x) {
+      if (typeof x === "string") expand(x);
+      else if (x && x.value != null) expand(String(x.value));
+    });
+    return out;
+  }
+
+  function tokenMatchesDdRow(tok, dataValue, primary) {
+    var t = String(tok || "").trim();
+    if (!t) return false;
+    var dv = String(dataValue || "");
+    if (t === dv) return true;
+    var pr = String(primary || "").trim();
+    if (pr && t === pr) return true;
+    if (pr && t.toLowerCase() === pr.toLowerCase()) return true;
+    return false;
+  }
+
+  function applyDdMultiSelectionTokens(root, tokens) {
+    if (!root || !root.classList.contains("gc-designer-dd--multi")) return;
+    var list = root.querySelector(".gc-designer-dd__list");
+    if (!list) return;
+    var toks = Array.isArray(tokens) ? tokens : normalizeDdMultiSelectionTokens(tokens);
+    if (!toks.length) {
+      list.querySelectorAll("li[role='option']").forEach(function (li) {
+        var cb = li.querySelector(".gc-designer-dd__check input[type='checkbox']");
+        if (cb) {
+          cb.checked = false;
+          li.setAttribute("aria-selected", "false");
+        }
+      });
+      if (root._gcDdRefreshMultiLabel) root._gcDdRefreshMultiLabel();
+      if (root.classList.contains("gc-designer-member-lookup") && isFlyoutMemberLookupRoot(root)) {
+        refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+      }
+      return;
+    }
+    var hasRealOptions = false;
+    list.querySelectorAll("li[role='option']").forEach(function (li) {
+      if (li.classList.contains("gc-designer-dd__empty")) return;
+      hasRealOptions = true;
+      var dv = li.getAttribute("data-value") || "";
+      var pr = li.getAttribute("data-gc-dd-primary") || "";
+      var hit = false;
+      for (var ti = 0; ti < toks.length; ti++) {
+        if (tokenMatchesDdRow(toks[ti], dv, pr)) {
+          hit = true;
+          break;
+        }
+      }
+      var cb = li.querySelector(".gc-designer-dd__check input[type='checkbox']");
+      if (!cb) return;
+      cb.checked = !!hit;
+      li.setAttribute("aria-selected", hit ? "true" : "false");
+    });
+    if (!hasRealOptions) return;
+    if (root._gcDdRefreshMultiLabel) root._gcDdRefreshMultiLabel();
+    if (root.classList.contains("gc-designer-member-lookup") && isFlyoutMemberLookupRoot(root)) {
+      refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+    }
+  }
+
+  function reorderMergedForFlyoutMemberLookup(root, merged) {
+    if (!Array.isArray(merged) || merged.length < 2) return merged;
+    var tokens = null;
+    if (root.classList.contains("gc-designer-dd--multi")) {
+      var pend = root._gcDdPendingMultiSelection;
+      if (Array.isArray(pend) && pend.length) tokens = pend.slice();
+    } else {
+      var pv = root._gcDdPendingSingleValue;
+      if (pv != null && String(pv).trim() !== "") tokens = [String(pv)];
+    }
+    if (!tokens || !tokens.length) return merged;
+    var selected = [];
+    var unselected = [];
+    for (var i = 0; i < merged.length; i++) {
+      var row = merged[i];
+      var dv = rowStableValue(row);
+      var pr = getCell(row, "__name") || row.external_name || "";
+      var hit = false;
+      for (var ti = 0; ti < tokens.length; ti++) {
+        if (tokenMatchesDdRow(tokens[ti], dv, pr)) {
+          hit = true;
+          break;
+        }
+      }
+      if (hit) selected.push(row);
+      else unselected.push(row);
+    }
+    if (!selected.length) return merged;
+    return selected.concat(unselected);
+  }
+
+  function reorderFlyoutMemberLookupListDom(root, list, trigger, isMulti) {
+    if (!list || !trigger || !isFlyoutMemberLookupRoot(root)) return;
+    var items = [];
+    list.querySelectorAll("li[role='option']").forEach(function (li) {
+      if (li.classList.contains("gc-designer-dd__empty")) return;
+      items.push(li);
+    });
+    if (items.length < 2) return;
+
+    function sortKey(li) {
+      var p = String(li.getAttribute("data-gc-dd-primary") || "").toLowerCase();
+      var v = String(li.getAttribute("data-value") || "");
+      return p || v;
+    }
+    function cmp(a, b) {
+      var ka = sortKey(a);
+      var kb = sortKey(b);
+      if (ka !== kb) return ka < kb ? -1 : 1;
+      return 0;
+    }
+
+    var ordered;
+    if (isMulti) {
+      var sel = [];
+      var unsel = [];
+      for (var i = 0; i < items.length; i++) {
+        var li = items[i];
+        var cb = li.querySelector(".gc-designer-dd__check input[type='checkbox']");
+        if (cb && cb.checked) sel.push(li);
+        else unsel.push(li);
+      }
+      if (!sel.length) return;
+      sel.sort(cmp);
+      unsel.sort(cmp);
+      ordered = sel.concat(unsel);
+    } else {
+      var val = String(trigger.getAttribute("data-gc-dd-value") || "").trim();
+      var picked = null;
+      if (val) {
+        for (var j = 0; j < items.length; j++) {
+          var liV = items[j];
+          if (String(liV.getAttribute("data-value") || "") === val) {
+            picked = liV;
+            break;
+          }
+        }
+      }
+      if (!picked) {
+        for (var k = 0; k < items.length; k++) {
+          if (items[k].getAttribute("aria-selected") === "true") {
+            picked = items[k];
+            break;
+          }
+        }
+      }
+      if (!picked) return;
+      var rest = [];
+      for (var r = 0; r < items.length; r++) {
+        if (items[r] !== picked) rest.push(items[r]);
+      }
+      rest.sort(cmp);
+      ordered = [picked].concat(rest);
+    }
+
+    for (var z = 0; z < ordered.length; z++) {
+      list.appendChild(ordered[z]);
+    }
+    var empty = list.querySelector("li.gc-designer-dd__empty");
+    if (empty) list.appendChild(empty);
+  }
+
+  function applyRowsToList(root, merged, cols, statusEl, typesCount, locksMap) {
     var list = root.querySelector(".gc-designer-dd__list");
     if (!list) return;
     var isMulti = root.classList.contains("gc-designer-dd--multi");
+    var flyoutMl = isFlyoutMemberLookupRoot(root);
+    var rowCtx = {
+      omitLayoutLock: flyoutMl,
+      navIconMap: flyoutMl ? navIconMapForDdRows() : null,
+    };
+    if (flyoutMl) merged = reorderMergedForFlyoutMemberLookup(root, merged);
     root._gcDdCachedRows = merged;
+    var lm = locksMap && typeof locksMap === "object" ? locksMap : {};
     if (!merged.length) {
       list.innerHTML =
         '<li class="gc-designer-dd__empty" role="presentation" style="cursor:default;color:var(--text-muted,#64748b)">No cached rows for this scope.</li>';
     } else {
       var html = "";
       for (var mi = 0; mi < merged.length; mi++) {
-        html += renderRowHtml(merged[mi], cols, isMulti);
+        html += renderRowHtml(merged[mi], cols, isMulti, lm, rowCtx);
       }
       list.innerHTML = html;
     }
     if (statusEl) {
-      statusEl.textContent =
-        merged.length + " object(s) from " + typesCount + " type request(s).";
-      statusEl.classList.remove("is-error");
+      if (!flyoutMl) {
+        statusEl.textContent =
+          merged.length + " object(s) from " + typesCount + " type request(s).";
+        statusEl.classList.remove("is-error");
+      }
     }
     var search = root.querySelector(".gc-designer-dd__search");
     if (search) search.value = "";
+    if (isMulti && root._gcDdPendingMultiSelection && root._gcDdPendingMultiSelection.length) {
+      applyDdMultiSelectionTokens(root, root._gcDdPendingMultiSelection);
+    }
+    if (statusEl && flyoutMl) {
+      refreshMemberLookupFlyoutStatus(root, statusEl);
+    }
     if (root._gcDdFilterList) root._gcDdFilterList();
     if (isMulti && root._gcDdRefreshMultiLabel) root._gcDdRefreshMultiLabel();
     if (!isMulti) {
@@ -190,6 +594,10 @@
       if (tr) {
         tr.textContent = "Choose…";
         tr.removeAttribute("data-gc-dd-value");
+      }
+      var pendSingle = root._gcDdPendingSingleValue;
+      if (pendSingle != null && String(pendSingle).trim() !== "") {
+        designerDdSetSingleSelection(root, String(pendSingle));
       }
     }
   }
@@ -266,6 +674,72 @@
     return { firewall_ids: s.firewall_ids, configuration_ids: s.configuration_ids };
   }
 
+  function isSpecialCountriesEntityType(et) {
+    var s = String(et || "").trim().toLowerCase();
+    /* Layout / catalog "countries" matches API entity_type ref_countries. */
+    return s === "ref_countries" || s === "countries";
+  }
+
+  function referenceCountriesApiUrl() {
+    var raw = String(globalThis.gcHsReferenceCountriesUrl || "").trim();
+    return raw || "/api/reference/countries";
+  }
+
+  function rowFromReferenceCountry(item) {
+    var obj = item && typeof item === "object" ? item : {};
+    var code = String(obj.code != null ? obj.code : "").trim();
+    if (!code) return null;
+    return {
+      entity_type: "ref_countries",
+      firewall_id: null,
+      configuration_id: null,
+      config_entry_id: "country:" + code,
+      external_name: code,
+      cells: {
+        __name: code,
+        __firewall: "",
+        entity_type: "ref_countries",
+      },
+      flat: {
+        Name: code,
+        Code: code,
+      },
+    };
+  }
+
+  function fetchMemberLookupRowsForType(et, scope) {
+    var entityType = String(et || "").trim();
+    if (isSpecialCountriesEntityType(entityType)) {
+      return fetch(referenceCountriesApiUrl(), {
+        credentials: "same-origin",
+        headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+      }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json().then(function (j) {
+          var rowsIn = j && Array.isArray(j.countries) ? j.countries : [];
+          var out = [];
+          for (var i = 0; i < rowsIn.length; i++) {
+            var row = rowFromReferenceCountry(rowsIn[i]);
+            if (row) out.push(row);
+          }
+          return { rows: out };
+        });
+      });
+    }
+    var tableUrl =
+      "/api/firewalls/hosts-services/table?entity_type=" +
+      encodeURIComponent(entityType) +
+      "&firewall_ids=" +
+      encodeURIComponent(scope.firewall_ids) +
+      "&configuration_ids=" +
+      encodeURIComponent(scope.configuration_ids) +
+      "&combine=false&limit=800";
+    return fetch(tableUrl, { credentials: "same-origin" }).then(function (r) {
+      if (!r.ok) throw new Error(String(r.status));
+      return r.json();
+    });
+  }
+
   function loadDesignerDdFromCache(root, statusEl, quietEmptyScope) {
     var fs = designerDdSourceFs(root);
     var list = root.querySelector(".gc-designer-dd__list");
@@ -280,7 +754,8 @@
       }
       return;
     }
-    if (!scope.firewall_ids && !scope.configuration_ids) {
+    var scopeOptional = types.every(isSpecialCountriesEntityType);
+    if (!scope.firewall_ids && !scope.configuration_ids && !scopeOptional) {
       if (statusEl) {
         if (quietEmptyScope) {
           statusEl.textContent = "";
@@ -299,26 +774,18 @@
       statusEl.classList.remove("is-error");
       statusEl.textContent = "Loading…";
     }
-    var urls = types.map(function (et) {
-      return (
-        "/api/firewalls/hosts-services/table?entity_type=" +
-        encodeURIComponent(et) +
-        "&firewall_ids=" +
-        encodeURIComponent(scope.firewall_ids) +
-        "&configuration_ids=" +
-        encodeURIComponent(scope.configuration_ids) +
-        "&combine=false&limit=800"
-      );
-    });
     Promise.all(
-      urls.map(function (url) {
-        return fetch(url, { credentials: "same-origin" }).then(function (r) {
-          if (!r.ok) throw new Error(String(r.status));
-          return r.json();
-        });
+      types.map(function (et) {
+        return fetchMemberLookupRowsForType(et, scope);
       }),
     )
       .then(function (payloads) {
+        return fetchLayoutLocksMap().then(function (locksMap) {
+          return { payloads: payloads, locksMap: locksMap };
+        });
+      })
+      .then(function (pack) {
+        var payloads = pack.payloads;
         var merged = [];
         for (var pi = 0; pi < payloads.length; pi++) {
           var rows = payloads[pi].rows || [];
@@ -331,7 +798,7 @@
           return String(a.entity_type || "").localeCompare(String(b.entity_type || ""));
         });
         merged = dedupeDesignerDdRowsByName(merged);
-        applyRowsToList(root, merged, cols, statusEl, types.length);
+        applyRowsToList(root, merged, cols, statusEl, types.length, pack.locksMap);
       })
       .catch(function () {
         if (statusEl) {
@@ -424,19 +891,36 @@
     if (!list) return;
     var scope = readMemberLookupScopeFromRoot(root);
     var types = [];
-    var catJson = root.getAttribute("data-gc-ml-catalog-entity-types");
-    if (catJson) {
-      try {
-        var arr = JSON.parse(catJson);
-        if (Array.isArray(arr)) {
-          arr.forEach(function (x) {
-            var t = String(x != null ? x : "").trim();
-            if (t && types.indexOf(t) === -1) types.push(t);
-          });
+    var layoutEt = String(root.getAttribute("data-gc-ml-layout-source-type") || "").trim();
+    var isFlyoutMl = isFlyoutMemberLookupRoot(root);
+    if (isFlyoutMl) {
+      if (!layoutEt || !/^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(layoutEt)) {
+        if (statusEl && !quietEmptyScope) {
+          statusEl.textContent =
+            "Set Data source on the Layout plan display card for this member list control.";
+          statusEl.classList.add("is-error");
         }
-      } catch (eMlCat) {}
+        return;
+      }
+      types = [layoutEt];
+    } else {
+      var catJson = root.getAttribute("data-gc-ml-catalog-entity-types");
+      if (catJson) {
+        try {
+          var arr = JSON.parse(catJson);
+          if (Array.isArray(arr)) {
+            arr.forEach(function (x) {
+              var t = String(x != null ? x : "").trim();
+              if (t && types.indexOf(t) === -1) types.push(t);
+            });
+          }
+        } catch (eMlCat) {}
+      }
+      if (!types.length && fs) types = readCheckedValues(fs, "[data-gc-ml-entity-type]");
+      if (layoutEt && /^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(layoutEt)) {
+        types = [layoutEt];
+      }
     }
-    if (!types.length && fs) types = readCheckedValues(fs, "[data-gc-ml-entity-type]");
     var cols = [];
     if (fs) cols = readCheckedValues(fs, "[data-gc-ml-list-col]");
     if (!cols.length) cols = ["__firewall", "entity_type"];
@@ -447,7 +931,8 @@
       }
       return;
     }
-    if (!scope.firewall_ids && !scope.configuration_ids) {
+    var allTypesAreScopeFree = types.length > 0 && types.every(isSpecialCountriesEntityType);
+    if (!scope.firewall_ids && !scope.configuration_ids && !allTypesAreScopeFree) {
       if (statusEl) {
         if (quietEmptyScope) {
           statusEl.textContent = "";
@@ -464,26 +949,18 @@
       statusEl.classList.remove("is-error");
       statusEl.textContent = "Loading…";
     }
-    var urls = types.map(function (et) {
-      return (
-        "/api/firewalls/hosts-services/table?entity_type=" +
-        encodeURIComponent(et) +
-        "&firewall_ids=" +
-        encodeURIComponent(scope.firewall_ids) +
-        "&configuration_ids=" +
-        encodeURIComponent(scope.configuration_ids) +
-        "&combine=false&limit=800"
-      );
-    });
     Promise.all(
-      urls.map(function (url) {
-        return fetch(url, { credentials: "same-origin" }).then(function (r) {
-          if (!r.ok) throw new Error(String(r.status));
-          return r.json();
-        });
+      types.map(function (et) {
+        return fetchMemberLookupRowsForType(et, scope);
       }),
     )
       .then(function (payloads) {
+        return fetchLayoutLocksMap().then(function (locksMap) {
+          return { payloads: payloads, locksMap: locksMap };
+        });
+      })
+      .then(function (pack) {
+        var payloads = pack.payloads;
         var merged = [];
         for (var pi = 0; pi < payloads.length; pi++) {
           var rows = payloads[pi].rows || [];
@@ -496,7 +973,7 @@
           return String(a.entity_type || "").localeCompare(String(b.entity_type || ""));
         });
         merged = dedupeDesignerDdRowsByName(merged);
-        applyRowsToList(root, merged, cols, statusEl, types.length);
+        applyRowsToList(root, merged, cols, statusEl, types.length, pack.locksMap);
       })
       .catch(function () {
         if (statusEl) {
@@ -590,10 +1067,16 @@
       if (panel) panel.hidden = !open;
       trigger.setAttribute("aria-expanded", open ? "true" : "false");
       if (mlToolbar) mlToolbar.hidden = !open || !isMultiNow() || !isMemberLookup;
-      if (open && search && !root.classList.contains("gc-designer-dd--no-search")) {
-        try {
-          search.focus();
-        } catch (e1) {}
+      if (open) {
+        if (isMemberLookup && isFlyoutMemberLookupRoot(root)) {
+          reorderFlyoutMemberLookupListDom(root, list, trigger, isMultiNow());
+          if (root._gcDdFilterList) root._gcDdFilterList();
+        }
+        if (search && !root.classList.contains("gc-designer-dd--no-search")) {
+          try {
+            search.focus();
+          } catch (e1) {}
+        }
       }
     }
 
@@ -611,10 +1094,20 @@
 
     if (search) search.addEventListener("input", filterList);
 
+    list.addEventListener(
+      "mousedown",
+      function (ev) {
+        if (ev.target.closest && ev.target.closest(".gc-designer-dd__layout-lock-wrap")) {
+          ev.stopPropagation();
+        }
+      },
+      true,
+    );
+
     function refreshMultiLabel() {
       if (!isMultiNow()) return;
       var labels = [];
-      var boxes = list.querySelectorAll("input[type='checkbox']");
+      var boxes = list.querySelectorAll(".gc-designer-dd__check input[type='checkbox']");
       for (var i = 0; i < boxes.length; i++) {
         if (boxes[i].checked) {
           var liM = boxes[i].closest("li");
@@ -622,7 +1115,24 @@
           if (pl) labels.push(pl);
         }
       }
-      trigger.textContent = labels.length ? labels.join(", ") : "None selected";
+      var n = labels.length;
+      var flyoutMl = isMemberLookup && isFlyoutMemberLookupRoot(root);
+      if (flyoutMl && n > 1) {
+        trigger.textContent = n + " items selected";
+        trigger.setAttribute(
+          "aria-label",
+          n + " items selected — open the list to review or change the selection",
+        );
+      } else {
+        trigger.textContent = n ? labels.join(", ") : "None selected";
+        if (flyoutMl) {
+          if (n === 1) trigger.setAttribute("aria-label", labels[0]);
+          else trigger.removeAttribute("aria-label");
+        }
+      }
+      if (flyoutMl) {
+        refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+      }
     }
     root._gcDdRefreshMultiLabel = refreshMultiLabel;
 
@@ -640,6 +1150,7 @@
 
     list.addEventListener("click", function (e) {
       if (isMultiNow()) return;
+      if (e.target.closest && e.target.closest(".gc-designer-dd__layout-lock-wrap")) return;
       var li = e.target.closest("li[role='option']");
       if (!li || li.hidden) return;
       var opts = list.querySelectorAll("li[role='option']");
@@ -649,12 +1160,19 @@
       var pl = li.getAttribute("data-gc-dd-primary") || li.textContent.trim();
       trigger.textContent = pl;
       trigger.setAttribute("data-gc-dd-value", li.getAttribute("data-value") || "");
+      if (isMemberLookup && isFlyoutMemberLookupRoot(root)) {
+        refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+      }
       setOpen(false);
     });
 
     list.addEventListener("change", function (e) {
       if (!isMultiNow()) return;
-      if (e.target && e.target.matches && e.target.matches("input[type='checkbox']")) {
+      if (
+        e.target &&
+        e.target.matches &&
+        e.target.matches(".gc-designer-dd__check input[type='checkbox']")
+      ) {
         var liC = e.target.closest("li");
         if (liC) liC.setAttribute("aria-selected", e.target.checked ? "true" : "false");
         refreshMultiLabel();
@@ -668,7 +1186,7 @@
         if (!isMultiNow()) return;
         list.querySelectorAll("li[role='option']").forEach(function (li) {
           if (li.hidden) return;
-          var cb = li.querySelector("input[type='checkbox']");
+          var cb = li.querySelector(".gc-designer-dd__check input[type='checkbox']");
           if (cb && !cb.disabled) cb.checked = true;
           li.setAttribute("aria-selected", "true");
         });
@@ -677,6 +1195,9 @@
     }
 
     if (isMultiNow()) refreshMultiLabel();
+    if (isMemberLookup && isFlyoutMemberLookupRoot(root) && !isMultiNow()) {
+      refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+    }
 
     root._gcDdSetOpen = setOpen;
     shell.addEventListener("click", function (e) {
@@ -690,44 +1211,63 @@
     if (!trigger || !list) return;
     var sv = value == null ? "" : String(value);
     if (sv === "") {
+      root._gcDdPendingSingleValue = null;
       trigger.textContent = "Choose…";
       trigger.removeAttribute("data-gc-dd-value");
       list.querySelectorAll("li[role='option']").forEach(function (li) {
         li.setAttribute("aria-selected", "false");
       });
+      if (root.classList.contains("gc-designer-member-lookup") && isFlyoutMemberLookupRoot(root)) {
+        refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+      }
       return;
     }
     var opts = list.querySelectorAll("li[role='option']");
+    var wantNorm = sv.trim().toLowerCase();
+    var pickedLi = null;
+    var pickedVal = "";
     for (var i = 0; i < opts.length; i++) {
       var li = opts[i];
-      if (li.getAttribute("data-value") === sv) {
-        var pl = li.getAttribute("data-gc-dd-primary") || li.textContent.trim();
-        trigger.textContent = pl;
-        trigger.setAttribute("data-gc-dd-value", sv);
-        list.querySelectorAll("li[role='option']").forEach(function (x) {
-          x.setAttribute("aria-selected", x === li ? "true" : "false");
-        });
-        return;
+      var v = String(li.getAttribute("data-value") || "");
+      if (v === sv) {
+        pickedLi = li;
+        pickedVal = v;
+        break;
       }
+    }
+    if (!pickedLi && wantNorm) {
+      for (var j = 0; j < opts.length; j++) {
+        var li2 = opts[j];
+        var primary = String(li2.getAttribute("data-gc-dd-primary") || "").trim().toLowerCase();
+        if (primary && primary === wantNorm) {
+          pickedLi = li2;
+          pickedVal = String(li2.getAttribute("data-value") || "");
+          break;
+        }
+      }
+    }
+    if (pickedLi) {
+      root._gcDdPendingSingleValue = null;
+      var pl = pickedLi.getAttribute("data-gc-dd-primary") || pickedLi.textContent.trim();
+      trigger.textContent = pl;
+      trigger.setAttribute("data-gc-dd-value", pickedVal);
+      list.querySelectorAll("li[role='option']").forEach(function (x) {
+        x.setAttribute("aria-selected", x === pickedLi ? "true" : "false");
+      });
+      if (root.classList.contains("gc-designer-member-lookup") && isFlyoutMemberLookupRoot(root)) {
+        refreshMemberLookupFlyoutStatus(root, memberLookupStatusElement(root));
+      }
+    } else if (wantNorm) {
+      root._gcDdPendingSingleValue = sv;
     }
   }
 
   function designerDdSetMultiSelection(root, items) {
     var list = root && root.querySelector(".gc-designer-dd__list");
-    if (!list) return;
-    var want = Object.create(null);
-    (Array.isArray(items) ? items : []).forEach(function (x) {
-      var v = typeof x === "string" ? x : x && x.value;
-      if (v != null && String(v) !== "") want[String(v)] = true;
-    });
-    list.querySelectorAll("li[role='option']").forEach(function (li) {
-      var v = li.getAttribute("data-value");
-      var cb = li.querySelector("input[type='checkbox']");
-      if (!cb) return;
-      cb.checked = !!want[String(v)];
-      li.setAttribute("aria-selected", cb.checked ? "true" : "false");
-    });
-    if (root._gcDdRefreshMultiLabel) root._gcDdRefreshMultiLabel();
+    if (!list || !root.classList.contains("gc-designer-dd--multi")) return;
+    var tokens = normalizeDdMultiSelectionTokens(items);
+    root._gcDdPendingMultiSelection = tokens.length ? tokens.slice() : null;
+    applyDdMultiSelectionTokens(root, tokens);
   }
 
   document.addEventListener("click", function () {
@@ -736,21 +1276,19 @@
     });
   });
 
-  if (!globalThis.__gcDesignerMlFwHookChained) {
-    globalThis.__gcDesignerMlFwHookChained = true;
-    (function chainMemberLookupFlyoutFwHook() {
-      var prev = globalThis.gcHsOnFlyoutFirewallSelectionChange;
-      globalThis.gcHsOnFlyoutFirewallSelectionChange = function (root) {
-        if (typeof prev === "function") {
-          try {
-            prev(root);
-          } catch (ePrev) {}
-        }
-        reloadMemberLookupRootsInObjectEditModal();
-        reloadObjectEditDdFromFlyoutFw();
-      };
-    })();
-  }
+  globalThis.__gcDesignerMlFwHookChained = true;
+  (function chainMemberLookupFlyoutFwHook() {
+    var prev = globalThis.gcHsOnFlyoutFirewallSelectionChange;
+    globalThis.gcHsOnFlyoutFirewallSelectionChange = function (root) {
+      if (typeof prev === "function") {
+        try {
+          prev(root);
+        } catch (ePrev) {}
+      }
+      reloadMemberLookupRootsInObjectEditModal();
+      reloadObjectEditDdFromFlyoutFw();
+    };
+  })();
 
   window.__gcDesignerControlsBridge = window.__gcDesignerControlsBridge || {};
   window.__gcDesignerControlsBridge.ddFieldRuntime = {
@@ -771,13 +1309,9 @@
   var selRebuild =
     typeof globalThis.gcOptionSelectorRebuild === "function" ? globalThis.gcOptionSelectorRebuild : null;
   window.__gcDesignerControlsBridge.catalogFieldUi = window.__gcDesignerControlsBridge.catalogFieldUi || {};
-  if (!window.__gcDesignerControlsBridge.catalogFieldUi.selectorRebuild && selRebuild) {
+  if (selRebuild) {
     window.__gcDesignerControlsBridge.catalogFieldUi.selectorRebuild = selRebuild;
   }
-  if (!window.__gcDesignerControlsBridge.catalogFieldUi.ddSetSingleSelection) {
-    window.__gcDesignerControlsBridge.catalogFieldUi.ddSetSingleSelection = designerDdSetSingleSelection;
-  }
-  if (!window.__gcDesignerControlsBridge.catalogFieldUi.ddSetMultiSelection) {
-    window.__gcDesignerControlsBridge.catalogFieldUi.ddSetMultiSelection = designerDdSetMultiSelection;
-  }
+  window.__gcDesignerControlsBridge.catalogFieldUi.ddSetSingleSelection = designerDdSetSingleSelection;
+  window.__gcDesignerControlsBridge.catalogFieldUi.ddSetMultiSelection = designerDdSetMultiSelection;
 })();

@@ -2253,6 +2253,63 @@
   var fwV2CombineModalClose = document.getElementById("gc-fw-v2-obj-combine-modal-close");
   var fwV2CombineModalDone = document.getElementById("gc-fw-v2-obj-combine-modal-done");
 
+  var fwV2AddTypeModal = document.getElementById("gc-fw-v2-obj-add-type-modal");
+  var fwV2AddTypeSel = document.getElementById("gc-fw-v2-obj-add-type-select");
+  var fwV2AddTypeCancel = document.getElementById("gc-fw-v2-obj-add-type-cancel");
+  var fwV2AddTypeContinue = document.getElementById("gc-fw-v2-obj-add-type-continue");
+  var fwV2AddTypeBackdrop = document.getElementById("gc-fw-v2-obj-add-type-modal-backdrop");
+
+  function closeFwV2AddTypeModal() {
+    if (!fwV2AddTypeModal) return;
+    fwV2AddTypeModal.hidden = true;
+    fwV2AddTypeModal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    fwV2AddTypeModal._gcOnPick = null;
+  }
+
+  function openFwV2AddTypeModal(types, onPick) {
+    if (!fwV2AddTypeModal || !fwV2AddTypeSel) return;
+    fwV2AddTypeSel.innerHTML = "";
+    (types || []).forEach(function (t) {
+      var s = fwV2ObjectEditTrim(t);
+      if (!s) return;
+      var o = document.createElement("option");
+      o.value = s;
+      o.textContent = s;
+      fwV2AddTypeSel.appendChild(o);
+    });
+    fwV2AddTypeModal._gcOnPick = typeof onPick === "function" ? onPick : null;
+    fwV2AddTypeModal.hidden = false;
+    fwV2AddTypeModal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    try {
+      fwV2AddTypeSel.focus();
+    } catch (eF) {}
+  }
+
+  function wireFwV2AddTypeModal() {
+    if (!fwV2AddTypeModal || fwV2AddTypeModal.getAttribute("data-gc-wired") === "1") return;
+    fwV2AddTypeModal.setAttribute("data-gc-wired", "1");
+    if (fwV2AddTypeCancel) fwV2AddTypeCancel.addEventListener("click", closeFwV2AddTypeModal);
+    if (fwV2AddTypeBackdrop) fwV2AddTypeBackdrop.addEventListener("click", closeFwV2AddTypeModal);
+    if (fwV2AddTypeContinue) {
+      fwV2AddTypeContinue.addEventListener("click", function () {
+        var cb = fwV2AddTypeModal._gcOnPick;
+        var v = fwV2AddTypeSel ? fwV2ObjectEditTrim(fwV2AddTypeSel.value) : "";
+        closeFwV2AddTypeModal();
+        if (cb && v) cb(v);
+      });
+    }
+    document.addEventListener("keydown", function (e) {
+      if (!fwV2AddTypeModal || fwV2AddTypeModal.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeFwV2AddTypeModal();
+      }
+    });
+  }
+  wireFwV2AddTypeModal();
+
   function closeFwV2ObjCombineModal() {
     if (!fwV2CombineModal) return;
     fwV2CombineModal.hidden = true;
@@ -2445,7 +2502,29 @@
   if (addPreviewBtn) {
     addPreviewBtn.addEventListener("click", function () {
       if (designerTableReadOnlyOn()) return;
-      window.alert("Add (designer preview — no data is changed).");
+      if (typeof globalThis.gcDesignerOpenObjectEditFlyoutFromDataControls !== "function") return;
+      var types = getSelectedEntityTypes();
+      if (!types.length) {
+        window.alert("Select at least one cached object type in table properties.");
+        return;
+      }
+      function openAddForEntityType(et) {
+        var t = fwV2ObjectEditTrim(et);
+        if (!t) return;
+        globalThis.gcDesignerOpenObjectEditFlyoutFromDataControls({
+          mode: "add",
+          entityType: t,
+          rowLabel: "",
+          row: { cells: {}, flat: {} },
+        });
+      }
+      if (types.length === 1) {
+        openAddForEntityType(types[0]);
+        return;
+      }
+      openFwV2AddTypeModal(types, function (picked) {
+        openAddForEntityType(picked);
+      });
     });
   }
   var delPreviewBtn = document.getElementById("gc-fw-v2-obj-delete-selected");
@@ -2751,6 +2830,391 @@
         designerTableApi.refresh();
       });
   }
+
+  function objectEditFlyoutHsEntityType(et) {
+    var t = String(et || "").trim();
+    if (!t) return false;
+    var bag = window.GC_HOSTS_SERVICES_TABLE_ENTITY_TYPES;
+    return !!(bag && typeof bag === "object" && bag[t]);
+  }
+
+  function collectObjectEditFlyoutFirewallIdsOrdered() {
+    var mount = document.getElementById("gc-designer-object-edit-fw-mount");
+    if (!mount) return [];
+    var ms = mount.querySelector("[data-gc-fw-ms]");
+    if (!ms) return [];
+    var out = [];
+    ms.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      if (!cb.checked) return;
+      if (!cb.hasAttribute("data-gc-fw-id")) return;
+      var n = parseInt(String(cb.getAttribute("data-gc-fw-id") || ""), 10);
+      if (!isNaN(n) && n > 0) out.push(n);
+    });
+    return out;
+  }
+
+  function objectEditFlyoutEditTargets(row) {
+    if (!row || typeof row !== "object") return [];
+    var hs = row.hs_edit_targets;
+    var ip = row.ip_host_edit_targets;
+    if (Array.isArray(hs) && hs.length) return hs;
+    if (Array.isArray(ip) && ip.length) return ip;
+    return Array.isArray(hs) ? hs : Array.isArray(ip) ? ip : [];
+  }
+
+  function objectEditFlyoutCollectEditConfigEntryIds(row, selFwIds) {
+    var targets = objectEditFlyoutEditTargets(row);
+    var sel = {};
+    selFwIds.forEach(function (id) {
+      sel[id] = true;
+    });
+    if (!targets.length) {
+      if (row && row.config_entry_id != null && selFwIds.length) {
+        var fid = row.firewall_id != null ? parseInt(String(row.firewall_id), 10) : NaN;
+        if (!isNaN(fid) && fid > 0 && sel[fid]) {
+          var ce = parseInt(String(row.config_entry_id), 10);
+          if (!isNaN(ce) && ce > 0) return [ce];
+        }
+      }
+      return [];
+    }
+    var out = [];
+    targets.forEach(function (t) {
+      if (!t || t.config_entry_id == null) return;
+      var fw =
+        t.firewall_id != null ? parseInt(String(t.firewall_id), 10) : NaN;
+      if (isNaN(fw) || fw <= 0 || !sel[fw]) return;
+      var cid = parseInt(String(t.config_entry_id), 10);
+      if (!isNaN(cid) && cid > 0) out.push(cid);
+    });
+    return out;
+  }
+
+  function objectEditFlyoutCollectCreateFirewallIds(row, selFwIds) {
+    var existing = {};
+    objectEditFlyoutEditTargets(row).forEach(function (t) {
+      if (!t || t.firewall_id == null) return;
+      var oid = parseInt(String(t.firewall_id), 10);
+      if (!isNaN(oid) && oid > 0) existing[oid] = true;
+    });
+    if (row && row.firewall_id != null && row.config_entry_id != null) {
+      var f0 = parseInt(String(row.firewall_id), 10);
+      if (!isNaN(f0) && f0 > 0) existing[f0] = true;
+    }
+    var out = [];
+    selFwIds.forEach(function (id) {
+      if (!existing[id]) out.push(id);
+    });
+    return out;
+  }
+
+  function objectEditFlyoutCollectDeleteConfigEntryIds(row, deletedFwIds) {
+    if (!row || typeof row !== "object" || !deletedFwIds.length) return [];
+    var delSet = {};
+    deletedFwIds.forEach(function (id) {
+      delSet[id] = true;
+    });
+    var targets = objectEditFlyoutEditTargets(row);
+    var seen = {};
+    var out = [];
+    targets.forEach(function (t) {
+      if (!t || t.config_entry_id == null) return;
+      var fw = t.firewall_id != null ? parseInt(String(t.firewall_id), 10) : NaN;
+      if (isNaN(fw) || fw <= 0 || !delSet[fw]) return;
+      var ce = parseInt(String(t.config_entry_id), 10);
+      if (isNaN(ce) || ce <= 0 || seen[ce]) return;
+      seen[ce] = true;
+      out.push(ce);
+    });
+    if (!targets.length && row.firewall_id != null && row.config_entry_id != null) {
+      var f0 = parseInt(String(row.firewall_id), 10);
+      var c0 = parseInt(String(row.config_entry_id), 10);
+      if (!isNaN(f0) && f0 > 0 && delSet[f0] && !isNaN(c0) && c0 > 0) out.push(c0);
+    }
+    return out;
+  }
+
+  function notifyFwV2ObjectEditTaskQueueUpdated() {
+    try {
+      document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+    } catch (eN) {}
+  }
+
+  function wireFwV2ObjectEditFlyoutTaskQueueSave() {
+    if (
+      !document.querySelector("[data-gc-fw-v2-object-table]") &&
+      !document.querySelector("main.gc-fw-v2-object-layout")
+    ) {
+      return;
+    }
+    if (document.documentElement.dataset.gcFwV2ObjEditFlyoutTaskQueueWired === "1") return;
+    document.documentElement.dataset.gcFwV2ObjEditFlyoutTaskQueueWired = "1";
+
+    function closeObjectEditModal() {
+      var root = document.getElementById("gc-designer-flyout-object-edit-modal");
+      if (root && typeof globalThis.gcDesignerFlyoutCloseModal === "function") {
+        globalThis.gcDesignerFlyoutCloseModal(root);
+      }
+    }
+
+    document.addEventListener(
+      "gc-object-edit-flyout-save",
+      function (e) {
+        var d = e && e.detail && typeof e.detail === "object" ? e.detail : {};
+        var et = String(d.entity_type || "").trim();
+        if (!objectEditFlyoutHsEntityType(et)) {
+          e.preventDefault();
+          window.alert(
+            "Saving to the task queue from this flyout is only supported for Hosts & Services cache types " +
+              "(for example fqdn_host, service, ip_host).",
+          );
+          return;
+        }
+        var crUrl =
+          typeof globalThis.gcHsEnqueueCreatesBatchUrl === "string"
+            ? globalThis.gcHsEnqueueCreatesBatchUrl
+            : "";
+        var upUrl =
+          typeof globalThis.gcHsEnqueueUpdatesBatchUrl === "string"
+            ? globalThis.gcHsEnqueueUpdatesBatchUrl
+            : "";
+        var delUrl =
+          typeof globalThis.gcHsEnqueueDeletesBatchUrl === "string"
+            ? globalThis.gcHsEnqueueDeletesBatchUrl
+            : "";
+        var form = d.properties && typeof d.properties === "object" ? d.properties : {};
+        var mode = String(d.mode || "edit").trim().toLowerCase() === "add" ? "add" : "edit";
+        var row = d.row && typeof d.row === "object" ? d.row : null;
+
+        var selFw = collectObjectEditFlyoutFirewallIdsOrdered();
+        var initialFw =
+          Array.isArray(globalThis.__gcObjectEditFlyoutEditInitialFwIds)
+            ? globalThis.__gcObjectEditFlyoutEditInitialFwIds
+            : null;
+
+        var deletedFwIds = [];
+        if (mode === "edit" && initialFw && initialFw.length) {
+          var curSet0 = {};
+          selFw.forEach(function (id) {
+            curSet0[id] = true;
+          });
+          initialFw.forEach(function (raw) {
+            var n0 = parseInt(String(raw), 10);
+            if (!isNaN(n0) && n0 > 0 && !curSet0[n0]) deletedFwIds.push(n0);
+          });
+        }
+
+        var deleteEntryIds =
+          mode === "edit" && row && deletedFwIds.length
+            ? objectEditFlyoutCollectDeleteConfigEntryIds(row, deletedFwIds)
+            : [];
+
+        if (!selFw.length && !deleteEntryIds.length) {
+          e.preventDefault();
+          window.alert(
+            "Select at least one firewall in the flyout, or remove a firewall that was selected when this editor opened to queue a delete.",
+          );
+          return;
+        }
+
+        if (deletedFwIds.length && deleteEntryIds.length !== deletedFwIds.length) {
+          e.preventDefault();
+          window.alert(
+            "Could not resolve a cache entry for every removed firewall. Save was canceled.",
+          );
+          return;
+        }
+
+        var onlyDeletes = mode === "edit" && deleteEntryIds.length > 0 && !selFw.length;
+
+        if (!onlyDeletes) {
+          var nameGuess = String(
+            form.Name != null ? form.Name : form.name != null ? form.name : "",
+          ).trim();
+          if (!nameGuess) {
+            e.preventDefault();
+            window.alert("Name is required.");
+            return;
+          }
+          if (et === "fqdn_host") {
+            var fqGuess = String(
+              form.FQDN != null ? form.FQDN : form.fqdn != null ? form.fqdn : "",
+            ).trim();
+            if (!fqGuess) {
+              e.preventDefault();
+              window.alert("FQDN is required.");
+              return;
+            }
+          }
+        }
+
+        e.preventDefault();
+
+        function parseJsonResponse(r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, j: j };
+          });
+        }
+
+        function showErr(x) {
+          var msg =
+            (x.j && (x.j.detail || x.j.message)) || "Could not enqueue task(s).";
+          window.alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+        }
+
+        function finishOk() {
+          globalThis.__gcObjectEditFlyoutEditInitialFwIds = null;
+          if (typeof globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome === "function") {
+            globalThis.gcDesignerSyncObjectEditFlyoutDeleteChrome();
+          }
+          notifyFwV2ObjectEditTaskQueueUpdated();
+          closeObjectEditModal();
+          designerTableApi.refresh();
+        }
+
+        if (mode === "add") {
+          if (!crUrl) {
+            window.alert("Task queue batch create URL is not configured.");
+            return;
+          }
+          fetch(crUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({
+              entity_type: et,
+              form: form,
+              firewall_ids: selFw,
+            }),
+          })
+            .then(parseJsonResponse)
+            .then(function (x) {
+              if (!x.ok) {
+                showErr(x);
+                return;
+              }
+              finishOk();
+            })
+            .catch(function () {
+              window.alert("Network error.");
+            });
+          return;
+        }
+
+        function runUpdateThenCreateThenFinish() {
+          var updateEntryIds = objectEditFlyoutCollectEditConfigEntryIds(row, selFw);
+          var createFwIds = objectEditFlyoutCollectCreateFirewallIds(row, selFw);
+          if (!updateEntryIds.length && !createFwIds.length) {
+            finishOk();
+            return;
+          }
+
+          function doCreates() {
+            if (!createFwIds.length) {
+              finishOk();
+              return;
+            }
+            if (!crUrl) {
+              window.alert("Task queue batch create URL is not configured.");
+              return;
+            }
+            fetch(crUrl, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "Ground-Control",
+              },
+              body: JSON.stringify({
+                entity_type: et,
+                form: form,
+                firewall_ids: createFwIds,
+              }),
+            })
+              .then(parseJsonResponse)
+              .then(function (x) {
+                if (!x.ok) {
+                  showErr(x);
+                  return;
+                }
+                finishOk();
+              })
+              .catch(function () {
+                window.alert("Network error.");
+              });
+          }
+
+          if (updateEntryIds.length) {
+            if (!upUrl) {
+              window.alert("Task queue batch update URL is not configured.");
+              return;
+            }
+            fetch(upUrl, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "Ground-Control",
+              },
+              body: JSON.stringify({ config_entry_ids: updateEntryIds, form: form }),
+            })
+              .then(parseJsonResponse)
+              .then(function (x) {
+                if (!x.ok) {
+                  showErr(x);
+                  return;
+                }
+                doCreates();
+              })
+              .catch(function () {
+                window.alert("Network error.");
+              });
+          } else {
+            doCreates();
+          }
+        }
+
+        function runDeletesThenRest() {
+          if (!deleteEntryIds.length) {
+            runUpdateThenCreateThenFinish();
+            return;
+          }
+          if (!delUrl) {
+            window.alert("Task queue batch delete URL is not configured.");
+            return;
+          }
+          fetch(delUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: deleteEntryIds }),
+          })
+            .then(parseJsonResponse)
+            .then(function (x) {
+              if (!x.ok) {
+                showErr(x);
+                return;
+              }
+              runUpdateThenCreateThenFinish();
+            })
+            .catch(function () {
+              window.alert("Network error.");
+            });
+        }
+
+        runDeletesThenRest();
+      },
+      true,
+    );
+  }
+
+  wireFwV2ObjectEditFlyoutTaskQueueSave();
 
   bootstrapDesignerTablePropsAndData();
 })();

@@ -1,6 +1,6 @@
 [project]
 name = "ground-control"
-version = "0.3.8"
+version = "0.3.9"
 description = "On-premises firewall management for Sophos Firewalls"
 readme = "README.md"
 license = { file = "LICENSE" }

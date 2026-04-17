@@ -159,6 +159,8 @@ _TOOLTIP_UPDATE = (
 _TOOLTIP_APP_MENU = "App menu"
 _GIT_FETCH_TIMEOUT_SEC = 120.0
 _GIT_UPDATE_POLL_INTERVAL_MS = 300_000
+_NATIVE_START_WATCHDOG_TIMEOUT_SEC = 6.0
+_UVICORN_RUNNING_LINE_RE = re.compile(r"^\s*INFO:\s+Uvicorn running on https?://", re.IGNORECASE)
 
 
 def _parse_docker_inspect_started_at(raw: str) -> float | None:
@@ -1680,6 +1682,10 @@ class GcTrayApp:
         self._metrics_stop = threading.Event()
         self._samples: collections.deque[Sample] = collections.deque(maxlen=1440)
         self._last_tree_pid: int | None = None
+        self._native_uvicorn_ready: bool = False
+        self._native_start_watchdog_job: str | None = None
+        self._native_start_generation: int = 0
+        self._native_start_retry_allowed: bool = True
 
         import tkinter as tk
 
@@ -1839,6 +1845,99 @@ class GcTrayApp:
         self._ports_in_use_cache_deadline = 0.0
         self._docker_uptime_cid = None
         self._docker_uptime_started_wall = None
+
+    def _cancel_native_start_watchdog_locked(self) -> None:
+        job = self._native_start_watchdog_job
+        self._native_start_watchdog_job = None
+        if job is None:
+            return
+        try:
+            self._root.after_cancel(job)
+        except self._tk.TclError:
+            pass
+
+    def _arm_native_start_watchdog_locked(self, generation: int) -> None:
+        self._cancel_native_start_watchdog_locked()
+        delay_ms = max(1000, int(_NATIVE_START_WATCHDOG_TIMEOUT_SEC * 1000))
+        self._native_start_watchdog_job = self._root.after(
+            delay_ms,
+            lambda g=generation: self._native_start_watchdog_fired(g),
+        )
+
+    def _terminate_native_child(self, child: subprocess.Popen[str] | None) -> None:
+        if child is not None and child.poll() is None:
+            _kill_process_tree(child.pid)
+            try:
+                child.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                pass
+        http_p, https_p = self._http_https_ports()
+        _stop_listeners_on_ports((http_p, https_p))
+
+    def _native_start_watchdog_fired(self, generation: int) -> None:
+        child: subprocess.Popen[str] | None = None
+        should_retry = False
+        with self._lock:
+            if generation != self._native_start_generation:
+                return
+            self._native_start_watchdog_job = None
+            if self._run_mode != "native" or not self._starting or self._native_uvicorn_ready:
+                return
+            child = self._child
+            self._child = None
+            self._last_tree_pid = None
+            self._native_uvicorn_ready = False
+            if self._native_start_retry_allowed:
+                self._native_start_retry_allowed = False
+                self._starting = False
+                should_retry = True
+            else:
+                self._starting = False
+        timeout_s = int(_NATIVE_START_WATCHDOG_TIMEOUT_SEC)
+        if should_retry:
+            self._enqueue_log_note(
+                f"\n=== Native startup watchdog: no Uvicorn running message after {timeout_s}s; retrying start once ===\n"
+            )
+            self._terminate_native_child(child)
+            self.start_gc(_allow_start_watchdog_retry=False)
+            return
+        self._enqueue_log_note(
+            f"\n=== Native startup watchdog: no Uvicorn running message after {timeout_s}s; start failed ===\n"
+        )
+        self._terminate_native_child(child)
+        self._invalidate_runtime_probe_cache()
+        self._refresh_dashboard_buttons()
+        self._update_status_indicator()
+
+    def _maybe_detect_native_start_from_log(self, proc: subprocess.Popen[str], line: str) -> None:
+        msg = (line or "").strip()
+        if not msg or _UVICORN_RUNNING_LINE_RE.search(msg) is None:
+            return
+        pid = proc.pid
+        self._schedule(lambda p=pid: self._on_native_uvicorn_running(p))
+
+    def _on_native_uvicorn_running(self, pid: int) -> None:
+        with self._lock:
+            child = self._child
+            if (
+                self._run_mode != "native"
+                or child is None
+                or child.pid != pid
+                or not self._starting
+                or self._native_uvicorn_ready
+            ):
+                return
+            self._native_uvicorn_ready = True
+            self._starting = False
+            self._cancel_native_start_watchdog_locked()
+        self._reset_console_ansi()
+        self._enqueue_log_note(
+            f"\n=== Ground Control started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+            "(output captured below) ===\n"
+        )
+        self._invalidate_runtime_probe_cache()
+        self._refresh_dashboard_buttons()
+        self._update_status_indicator()
 
     def _ports_in_use(self, *, force: bool = False) -> bool:
         http_p, https_p = self._http_https_ports()
@@ -2145,10 +2244,18 @@ class GcTrayApp:
 
     def _service_running_for_status(self) -> bool:
         """True if HTTP/HTTPS listeners exist or our native child / compose service is up."""
-        if self._child_running():
-            return True
+        with self._lock:
+            mode = self._run_mode
+            native_starting = self._starting and mode == "native"
+            native_ready = self._native_uvicorn_ready
+            child = self._child
+        child_running = child is not None and child.poll() is None
+        if mode == "native" and child_running:
+            return native_ready
         if self._docker_container_running():
             return True
+        if native_starting:
+            return False
         return self._ports_in_use()
 
     def _status_tuple(self) -> tuple[str, str]:
@@ -3174,6 +3281,7 @@ class GcTrayApp:
                     break
                 with self._log_lines_lock:
                     self._log_lines.append(line)
+                self._maybe_detect_native_start_from_log(proc, line)
         finally:
             try:
                 out.close()
@@ -3957,7 +4065,7 @@ class GcTrayApp:
         if want != self._ui_dark:
             self._schedule(lambda w=want: self._apply_os_theme(w))
 
-    def start_gc(self) -> None:
+    def start_gc(self, *, _allow_start_watchdog_retry: bool = True) -> None:
         with self._lock:
             if self._starting or self._stopping:
                 return
@@ -3979,24 +4087,29 @@ class GcTrayApp:
 
         with self._lock:
             self._starting = True
+            self._native_uvicorn_ready = False
+            self._native_start_retry_allowed = bool(_allow_start_watchdog_retry)
+            self._native_start_generation += 1
+            generation = self._native_start_generation
+            self._cancel_native_start_watchdog_locked()
         started = False
         try:
+            self._enqueue_log_note("\n=== Starting Ground Control (native) ===\n")
             http_p, https_p = self._http_https_ports()
             _stop_listeners_on_ports((http_p, https_p))
             with self._lock:
                 self._spawn_gc_locked()
+                self._arm_native_start_watchdog_locked(generation)
             started = True
         except OSError as e:
             self._enqueue_log_note(f"\n=== Failed to start Ground Control: {e} ===\n")
         finally:
-            with self._lock:
-                self._starting = False
-        if started:
-            self._reset_console_ansi()
-            self._enqueue_log_note(
-                f"\n=== Ground Control started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
-                "(output captured below) ===\n"
-            )
+            if not started:
+                with self._lock:
+                    self._starting = False
+                    self._native_uvicorn_ready = False
+                    self._native_start_retry_allowed = False
+                    self._cancel_native_start_watchdog_locked()
         self._invalidate_runtime_probe_cache()
         self._refresh_dashboard_buttons()
         self._update_status_indicator()
@@ -4008,6 +4121,9 @@ class GcTrayApp:
             mode = self._run_mode
             child = self._child
             self._child = None
+            self._native_uvicorn_ready = False
+            self._native_start_retry_allowed = False
+            self._cancel_native_start_watchdog_locked()
             self._stopping = True
         self._stop_docker_logs_pump()
         self._enqueue_log_note("\n=== Stopping Ground Control ===\n")
@@ -5863,6 +5979,9 @@ class GcTrayApp:
                 mode = self._run_mode
                 ch = self._child
                 self._child = None
+                self._native_uvicorn_ready = False
+                self._native_start_retry_allowed = False
+                self._cancel_native_start_watchdog_locked()
             if mode == "docker":
                 argv = _docker_compose_argv("stop", _DOCKER_COMPOSE_SERVICE)
                 if argv:

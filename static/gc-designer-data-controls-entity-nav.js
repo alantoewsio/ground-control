@@ -5,8 +5,10 @@
  * Object selectors (named for reuse on other pages; instances are independent — no cross-widget sync):
  *   data-gc-designer-object-selector="object-selector" (single-select dropdown)
  *   data-gc-designer-object-selector="object-selector-list" (multi-select checklist; row checkboxes)
+ *   data-gc-designer-object-selector="object-selector-list-single" (single-select checklist; row radios)
  *   window.gcDesignerObjectSelectorNames, gcQueryDesignerObjectSelector(name), gcQueryDesignerObjectSelectorAll(name)
- * Standalone pages: gcDesignerHydrateObjectSelectorDropdown(select), gcDesignerHydrateObjectSelectorList(container)
+ * Standalone pages: gcDesignerHydrateObjectSelectorDropdown(select), gcDesignerHydrateObjectSelectorList(container),
+ *   gcDesignerHydrateObjectSelectorListSingle(container)
  * Option text = display name (entity_type if blank); value = entity_type; groups section · page; refresh on table render.
  */
 (function () {
@@ -17,8 +19,337 @@
   var DL_SECTION_ID = "gc-designer-entity-nav-dl-section";
   var PAGE_DL_PREFIX = "gc-designer-entity-nav-dl-page--";
   var TAB_DL_PREFIX = "gc-designer-entity-nav-dl-tab--";
+  var ICON_PLACEHOLDER = "menu";
+  var ICON_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+  var MATERIAL_ICONS = [
+    "menu",
+    "home",
+    "dashboard",
+    "dashboard_customize",
+    "widgets",
+    "apps",
+    "space_dashboard",
+    "view_quilt",
+    "view_sidebar",
+    "view_compact",
+    "view_list",
+    "grid_view",
+    "table_rows",
+    "table_chart",
+    "table_view",
+    "list_alt",
+    "checklist",
+    "task_alt",
+    "fact_check",
+    "check_circle",
+    "check_circle_outline",
+    "radio_button_unchecked",
+    "indeterminate_check_box",
+    "more_horiz",
+    "more_vert",
+    "expand_more",
+    "expand_less",
+    "expand_circle_down",
+    "tune",
+    "filter_alt",
+    "filter_list",
+    "sort",
+    "search",
+    "manage_search",
+    "travel_explore",
+    "saved_search",
+    "find_in_page",
+    "manage_accounts",
+    "account_circle",
+    "group",
+    "supervisor_account",
+    "badge",
+    "fingerprint",
+    "verified_user",
+    "admin_panel_settings",
+    "policy",
+    "rule",
+    "gpp_good",
+    "gpp_bad",
+    "gpp_maybe",
+    "security",
+    "shield",
+    "shield_moon",
+    "shield_lock",
+    "privacy_tip",
+    "health_and_safety",
+    "warning",
+    "warning_amber",
+    "error",
+    "report_problem",
+    "bug_report",
+    "crisis_alert",
+    "emergency",
+    "fire_extinguisher",
+    "bolt",
+    "flash_on",
+    "power_settings_new",
+    "settings",
+    "settings_applications",
+    "settings_suggest",
+    "settings_input_component",
+    "settings_ethernet",
+    "settings_input_antenna",
+    "construction",
+    "build",
+    "handyman",
+    "engineering",
+    "terminal",
+    "code",
+    "data_object",
+    "dataset",
+    "dataset_linked",
+    "storage",
+    "database",
+    "public",
+    "public_off",
+    "language",
+    "dns",
+    "lan",
+    "hub",
+    "route",
+    "alt_route",
+    "polyline",
+    "share",
+    "share_location",
+    "device_hub",
+    "account_tree",
+    "schema",
+    "router",
+    "wifi",
+    "wifi_tethering",
+    "signal_wifi_4_bar",
+    "signal_cellular_4_bar",
+    "network_check",
+    "network_ping",
+    "settings_overscan",
+    "perm_data_setting",
+    "cable",
+    "swap_horiz",
+    "swap_vert",
+    "compare_arrows",
+    "sync_alt",
+    "sync",
+    "cloud_sync",
+    "cloud",
+    "cloud_done",
+    "cloud_upload",
+    "cloud_download",
+    "cloud_queue",
+    "cloud_off",
+    "backup",
+    "backup_table",
+    "update",
+    "history",
+    "schedule",
+    "timer",
+    "alarm",
+    "event",
+    "calendar_month",
+    "timeline",
+    "monitoring",
+    "monitor_heart",
+    "analytics",
+    "query_stats",
+    "bar_chart",
+    "stacked_line_chart",
+    "insights",
+    "trending_up",
+    "trending_down",
+    "show_chart",
+    "equalizer",
+    "ssid_chart",
+    "pie_chart",
+    "donut_small",
+    "leaderboard",
+    "inventory",
+    "inventory_2",
+    "category",
+    "extension",
+    "token",
+    "sell",
+    "shopping_bag",
+    "folder",
+    "folder_open",
+    "folder_shared",
+    "drive_file_move",
+    "description",
+    "article",
+    "snippet_folder",
+    "newspaper",
+    "content_paste",
+    "content_copy",
+    "edit_note",
+    "sticky_note_2",
+    "notes",
+    "book",
+    "bookmarks",
+    "bookmark",
+    "bookmark_added",
+    "star",
+    "star_border",
+    "grade",
+    "flag",
+    "outlined_flag",
+    "label",
+    "label_important",
+    "link",
+    "link_off",
+    "open_in_new",
+    "launch",
+    "arrow_outward",
+    "subdirectory_arrow_right",
+    "call_split",
+    "merge",
+    "apartment",
+    "domain",
+    "business",
+    "corporate_fare",
+    "storefront",
+    "location_city",
+    "place",
+    "map",
+    "map_search",
+    "my_location",
+    "near_me",
+    "explore",
+    "explore_off",
+    "pin_drop",
+    "where_to_vote",
+    "devices",
+    "devices_other",
+    "device_unknown",
+    "phonelink",
+    "computer",
+    "desktop_windows",
+    "laptop",
+    "tablet_mac",
+    "phone_iphone",
+    "watch",
+    "memory",
+    "smart_toy",
+    "developer_board",
+    "sensors",
+    "qr_code",
+    "qr_code_scanner",
+    "view_in_ar",
+    "shelves",
+    "layers",
+    "layers_clear",
+    "view_stream",
+    "segment",
+    "reorder",
+    "drag_indicator",
+    "density_small",
+    "density_medium",
+    "density_large",
+    "palette",
+    "color_lens",
+    "brush",
+    "draw",
+    "edit",
+    "delete",
+    "delete_outline",
+    "archive",
+    "unarchive",
+    "download",
+    "upload",
+    "file_upload",
+    "file_download",
+    "publish",
+    "logout",
+    "login",
+    "refresh",
+    "restart_alt",
+    "cached",
+    "undo",
+    "redo",
+    "help",
+    "help_outline",
+    "info",
+    "info_outline",
+    "tips_and_updates",
+    "lightbulb",
+    "support",
+    "support_agent",
+    "contact_support",
+    "forum",
+    "feedback",
+    "announcement",
+    "campaign",
+    "mail",
+    "notifications",
+    "notifications_active",
+    "notifications_none",
+    "notifications_off",
+    "mark_email_read",
+    "mark_email_unread",
+    "lock",
+    "lock_open",
+    "vpn_key",
+    "key",
+    "password",
+    "no_encryption",
+    "visibility",
+    "visibility_off",
+    "https",
+    "http",
+    "verified",
+    "manage_history",
+    "assignment",
+    "assignment_turned_in",
+    "approved",
+    "pending_actions",
+    "hourglass_empty",
+    "hourglass_full",
+    "event_note",
+    "receipt_long",
+    "summarize",
+    "auto_graph",
+    "precision_manufacturing",
+    "factory",
+    "local_shipping",
+    "send",
+    "rocket_launch",
+    "safety_check",
+    "psychology",
+    "science",
+    "biotech",
+    "mediation",
+    "interests",
+    "compare",
+    "splitscreen",
+    "move_up",
+    "move_down",
+    "first_page",
+    "last_page",
+    "arrow_back",
+    "arrow_forward",
+    "arrow_upward",
+    "arrow_downward",
+    "north_east",
+    "south_west",
+    "done_all",
+    "mark_chat_read",
+    "menu_book",
+    "web",
+  ];
 
-  var state = { types: [], tbody: null, rowBaseline: {}, facetOrders: null };
+  var state = {
+    types: [],
+    tbody: null,
+    pageIconsTbody: null,
+    pageIconsSaveBtn: null,
+    statusEl: null,
+    rowBaseline: {},
+    facetOrders: null,
+    pageIcons: {},
+  };
   var BLANK_DRAG_IMAGE =
     "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   var facetOverlayState = {
@@ -32,6 +363,7 @@
   var ROW_DIMMED_CLASS = "gc-designer-entity-nav__tr--dimmed";
   var TABLE_DRAG_ACTIVE_CLASS = "gc-designer-entity-nav__table--drag-active";
   var dragState = { tr: null, groupKey: null };
+  var iconPickerState = { mode: "", entityType: "", pageKey: "", focusTarget: null };
 
   function trimStr(x) {
     return String(x == null ? "" : x).replace(/^\s+|\s+$/g, "");
@@ -43,6 +375,28 @@
 
   function pageKey(s) {
     return trimStr(s).toLowerCase();
+  }
+
+  function normalizeIconName(raw) {
+    var t = trimStr(raw).replace(/[-\s]+/g, "_").toLowerCase();
+    return ICON_NAME_RE.test(t) ? t : "";
+  }
+
+  function normalizeBool(raw) {
+    if (raw === true) return true;
+    if (typeof raw === "number") return raw !== 0;
+    if (typeof raw === "string") {
+      var t = trimStr(raw).toLowerCase();
+      return t === "1" || t === "true" || t === "yes" || t === "on";
+    }
+    return false;
+  }
+
+  function pageIconKey(sectionLabel, pageLabel) {
+    var sk = sectionKey(sectionLabel);
+    var pk = pageKey(pageLabel);
+    if (!sk || !pk) return "";
+    return sk + "|" + pk;
   }
 
   function setSaveStatus(el, msg) {
@@ -107,6 +461,26 @@
       });
     }
     return fo;
+  }
+
+  function normalizePageIcons(raw) {
+    var out = {};
+    if (!raw || typeof raw !== "object") return out;
+    Object.keys(raw).forEach(function (key) {
+      var row = raw[key];
+      if (!row || typeof row !== "object") return;
+      var sec = trimStr(row.nav_section);
+      var page = trimStr(row.nav_page);
+      var k = pageIconKey(sec, page);
+      if (!k) return;
+      out[k] = {
+        nav_section: sec,
+        nav_page: page,
+        icon: normalizeIconName(row.icon),
+        hidden: normalizeBool(row.hidden),
+      };
+    });
+    return out;
   }
 
   function cloneFacetOrders(fo) {
@@ -581,20 +955,76 @@
         });
       })
       .then(function (res) {
-        var empty = { entries: {}, facet_orders: defaultFacetOrders() };
+        var empty = { entries: {}, facet_orders: defaultFacetOrders(), page_icons: {} };
         if (!res.ok || !res.j || !res.j.entries || typeof res.j.entries !== "object") return empty;
         return {
           entries: res.j.entries,
           facet_orders: normalizeFacetOrders(res.j.facet_orders),
+          page_icons: normalizePageIcons(res.j.page_icons),
         };
       })
       .catch(function () {
-        return { entries: {}, facet_orders: defaultFacetOrders() };
+        return { entries: {}, facet_orders: defaultFacetOrders(), page_icons: {} };
       });
   }
 
   function normalizeKind(v) {
     return trimStr(v) === "Settings" ? "Settings" : "Objects";
+  }
+
+  function buildIconButton(iconName, ariaLabel) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "gc-designer-entity-nav__icon-btn";
+    btn.setAttribute("aria-label", ariaLabel);
+    var icon = document.createElement("span");
+    icon.className = "gc-material-symbol";
+    icon.setAttribute("aria-hidden", "true");
+    var resolved = normalizeIconName(iconName) || ICON_PLACEHOLDER;
+    icon.textContent = resolved;
+    btn.appendChild(icon);
+    var label = document.createElement("span");
+    label.className = "gc-designer-entity-nav__icon-btn-label mono";
+    label.textContent = normalizeIconName(iconName) || "placeholder";
+    btn.appendChild(label);
+    btn.setAttribute("data-icon", normalizeIconName(iconName));
+    return btn;
+  }
+
+  function updateIconButton(btn, iconName) {
+    if (!btn) return;
+    var clean = normalizeIconName(iconName);
+    btn.setAttribute("data-icon", clean);
+    var icon = btn.querySelector(".gc-material-symbol");
+    if (icon) icon.textContent = clean || ICON_PLACEHOLDER;
+    var label = btn.querySelector(".gc-designer-entity-nav__icon-btn-label");
+    if (label) label.textContent = clean || "placeholder";
+  }
+
+  function cellRowIcon(et, iconName) {
+    var td = document.createElement("td");
+    td.className = "gc-designer-entity-nav__td-icon";
+    var wrap = document.createElement("div");
+    wrap.className = "gc-designer-entity-nav__icon-cell";
+    var hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.className = "gc-designer-entity-nav__input-icon";
+    hidden.value = normalizeIconName(iconName);
+    var btn = buildIconButton(iconName, "Select icon for " + et);
+    btn.setAttribute("data-icon-target", "row");
+    btn.setAttribute("data-entity-type", et);
+    wrap.appendChild(btn);
+    wrap.appendChild(hidden);
+    td.appendChild(wrap);
+    return td;
+  }
+
+  function setRowIconValue(tr, iconName) {
+    if (!tr) return;
+    var hidden = tr.querySelector(".gc-designer-entity-nav__input-icon");
+    if (hidden) hidden.value = normalizeIconName(iconName);
+    updateIconButton(tr.querySelector('.gc-designer-entity-nav__icon-btn[data-icon-target="row"]'), iconName);
+    refreshRowDirtyClass(tr);
   }
 
   function cellSelectKind(value, ariaLabel) {
@@ -740,6 +1170,7 @@
       nav_page: trimStr(r.nav_page),
       nav_order: trimStr(r.nav_order),
       tab: trimStr(r.tab),
+      nav_icon: normalizeIconName(r.nav_icon),
     };
   }
 
@@ -789,16 +1220,30 @@
     return dn || item.et;
   }
 
+  function shouldIncludeSpecialCountriesOption(selectEl) {
+    return (
+      !!selectEl &&
+      selectEl.classList &&
+      selectEl.classList.contains(
+        "gc-designer-data-controls-layout__panel-ml-source-select",
+      )
+    );
+  }
+
   /**
    * Visits grouped structure: { type: "group", label } then { type: "item", item } for each leaf in that group.
    */
-  function iterateObjectSelectorStructure(types, entries, visit) {
+  function iterateObjectSelectorStructure(types, entries, visit, opts) {
     if (!types || !types.length) return;
+    opts = opts && typeof opts === "object" ? opts : {};
+    var includeSpecialCountries = opts.includeSpecialCountries === true;
 
     var merged = mergeEntriesForSort(types, entries);
     var assigned = [];
     var unassigned = [];
+    var knownEt = {};
     types.forEach(function (et) {
+      knownEt[et] = true;
       var item = navRowFromEntry(et, merged[et]);
       if (item.nav_section && item.nav_page) assigned.push(item);
       else unassigned.push(item);
@@ -862,6 +1307,23 @@
         visit({ type: "item", item: item });
       });
     }
+
+    if (includeSpecialCountries && !knownEt.ref_countries) {
+      visit({ type: "group", label: "Special" });
+      visit({
+        type: "item",
+        item: {
+          et: "ref_countries",
+          display_name: "Countries",
+          nav_section: "",
+          nav_page: "",
+          tab: "",
+          nav_order: "",
+          kind: "Objects",
+          nav_icon: "",
+        },
+      });
+    }
   }
 
   function fillObjectSelectorDropdown(sel, types, entries) {
@@ -883,7 +1345,10 @@
     sel.disabled = false;
 
     var currentOg = null;
-    iterateObjectSelectorStructure(types, entries, function (node) {
+    iterateObjectSelectorStructure(
+      types,
+      entries,
+      function (node) {
       if (node.type === "group") {
         currentOg = document.createElement("optgroup");
         currentOg.label = node.label;
@@ -895,12 +1360,17 @@
         if (trimStr(node.item.display_name)) opt.title = node.item.et;
         currentOg.appendChild(opt);
       }
-    });
+      },
+      { includeSpecialCountries: shouldIncludeSpecialCountriesOption(sel) },
+    );
 
     var want = {};
     types.forEach(function (t) {
       want[t] = true;
     });
+    if (shouldIncludeSpecialCountriesOption(sel)) {
+      want.ref_countries = true;
+    }
     sel.value = prev && want[prev] ? prev : "";
   }
 
@@ -966,12 +1436,72 @@
     });
   }
 
+  function fillObjectSelectorListSingle(container, types, entries) {
+    if (!container) return;
+    var prev = "";
+    var prevEl = container.querySelector(".gc-designer-object-selector-list__radio:checked");
+    if (prevEl) prev = trimStr(prevEl.value);
+    var idBase = trimStr(container.id) || "gc-object-selector-list-single";
+    var radioName = idBase.replace(/[^a-zA-Z0-9_-]/g, "_") + "-entity-type";
+    var rowIdx = 0;
+
+    container.innerHTML = "";
+    container.classList.remove("is-disabled");
+
+    if (!types || !types.length) {
+      container.classList.add("is-disabled");
+      var empty = document.createElement("p");
+      empty.className = "muted gc-designer-object-selector-list__empty";
+      empty.textContent = "No entity types in cache yet (run a config sync)";
+      container.appendChild(empty);
+      return;
+    }
+
+    iterateObjectSelectorStructure(types, entries, function (node) {
+      if (node.type === "group") {
+        var gh = document.createElement("div");
+        gh.className = "gc-designer-object-selector-list__group mono";
+        gh.setAttribute("role", "presentation");
+        gh.textContent = node.label;
+        container.appendChild(gh);
+      } else if (node.type === "item") {
+        var item = node.item;
+        var row = document.createElement("div");
+        row.className = "gc-designer-object-selector-list__row";
+        var radId = idBase + "-rad-" + rowIdx;
+        rowIdx += 1;
+
+        var rad = document.createElement("input");
+        rad.type = "radio";
+        rad.name = radioName;
+        rad.className = "gc-designer-object-selector-list__radio";
+        rad.value = item.et;
+        rad.id = radId;
+        rad.checked = !!prev && trimStr(item.et) === prev;
+        rad.setAttribute("data-entity-type", item.et);
+
+        var lab = document.createElement("label");
+        lab.className = "gc-designer-object-selector-list__label mono";
+        lab.htmlFor = radId;
+        lab.textContent = objectSelectorOptionLabel(item);
+        if (trimStr(item.display_name)) lab.title = item.et;
+
+        row.appendChild(rad);
+        row.appendChild(lab);
+        container.appendChild(row);
+      }
+    });
+  }
+
   function refreshObjectSelectorControls(types, entries) {
     document.querySelectorAll('[data-gc-designer-object-selector="object-selector"]').forEach(function (el) {
       fillObjectSelectorDropdown(el, types, entries);
     });
     document.querySelectorAll('[data-gc-designer-object-selector="object-selector-list"]').forEach(function (el) {
       fillObjectSelectorList(el, types, entries);
+    });
+    document.querySelectorAll('[data-gc-designer-object-selector="object-selector-list-single"]').forEach(function (el) {
+      fillObjectSelectorListSingle(el, types, entries);
     });
   }
 
@@ -982,13 +1512,14 @@
     if (!types.length) {
       var tr0 = document.createElement("tr");
       var td0 = document.createElement("td");
-      td0.colSpan = 8;
+      td0.colSpan = 9;
       td0.className = "muted";
       td0.textContent = "No entity types in cache yet (run a config sync).";
       tr0.appendChild(td0);
       tbody.appendChild(tr0);
       removeStalePerRowDatalists([]);
       setRowBaselines([], {});
+      renderPageIconsTable({});
       refreshObjectSelectorControls(types, entries);
       return;
     }
@@ -1008,6 +1539,8 @@
       tdEt.className = "mono";
       tdEt.textContent = et;
       tr.appendChild(tdEt);
+
+      tr.appendChild(cellRowIcon(et, row.nav_icon));
 
       var tdKind = document.createElement("td");
       tdKind.appendChild(cellSelectKind(row.kind, "Type for " + et));
@@ -1062,8 +1595,145 @@
       tbody.appendChild(tr);
     });
     refreshDatalists(tbody);
+    renderPageIconsTable(collectEntriesFromDom(tbody));
     setRowBaselines(types, entries);
     refreshObjectSelectorControls(types, entries);
+  }
+
+  function collectUniqueNavPageRows(entries) {
+    var rows = [];
+    var byKey = {};
+    var secOrder = (state.facetOrders && state.facetOrders.sections) || [];
+    var secOrderIdx = {};
+    secOrder.forEach(function (lab, i) {
+      secOrderIdx[sectionKey(lab)] = i;
+    });
+    Object.keys(entries || {}).forEach(function (et) {
+      var e = entries[et] || {};
+      var sec = trimStr(e.nav_section);
+      var page = trimStr(e.nav_page);
+      if (!sec || !page) return;
+      var key = pageIconKey(sec, page);
+      if (!key || byKey[key]) return;
+      byKey[key] = true;
+      rows.push({
+        key: key,
+        nav_section: sec,
+        nav_page: page,
+      });
+    });
+    rows.sort(function (a, b) {
+      var ask = sectionKey(a.nav_section);
+      var bsk = sectionKey(b.nav_section);
+      var aSecIdx = Object.prototype.hasOwnProperty.call(secOrderIdx, ask) ? secOrderIdx[ask] : 999999;
+      var bSecIdx = Object.prototype.hasOwnProperty.call(secOrderIdx, bsk) ? secOrderIdx[bsk] : 999999;
+      if (aSecIdx !== bSecIdx) return aSecIdx - bSecIdx;
+      var pages = (state.facetOrders && state.facetOrders.pagesBySection && state.facetOrders.pagesBySection[ask]) || [];
+      var pageOrderIdx = {};
+      pages.forEach(function (lab, i) {
+        pageOrderIdx[pageKey(lab)] = i;
+      });
+      var apk = pageKey(a.nav_page);
+      var bpk = pageKey(b.nav_page);
+      var aPageIdx = Object.prototype.hasOwnProperty.call(pageOrderIdx, apk) ? pageOrderIdx[apk] : 999999;
+      var bPageIdx = Object.prototype.hasOwnProperty.call(pageOrderIdx, bpk) ? pageOrderIdx[bpk] : 999999;
+      if (aPageIdx !== bPageIdx) return aPageIdx - bPageIdx;
+      var c = cmpNav(a.nav_section, b.nav_section);
+      if (c !== 0) return c;
+      return cmpNav(a.nav_page, b.nav_page);
+    });
+    return rows;
+  }
+
+  function syncPageIconsWithRows(rows) {
+    var next = {};
+    (rows || []).forEach(function (row) {
+      var existing = state.pageIcons[row.key];
+      next[row.key] = {
+        nav_section: row.nav_section,
+        nav_page: row.nav_page,
+        icon: normalizeIconName(existing && existing.icon),
+        hidden: normalizeBool(existing && existing.hidden),
+      };
+    });
+    state.pageIcons = next;
+  }
+
+  function renderPageIconsTable(entries) {
+    var tbody = state.pageIconsTbody;
+    if (!tbody) return;
+    var rows = collectUniqueNavPageRows(entries || {});
+    syncPageIconsWithRows(rows);
+    tbody.innerHTML = "";
+    if (!rows.length) {
+      var tr0 = document.createElement("tr");
+      var td0 = document.createElement("td");
+      td0.colSpan = 4;
+      td0.className = "muted";
+      td0.textContent = "Set nav section and nav page values in Object Navigation to map page icons.";
+      tr0.appendChild(td0);
+      tbody.appendChild(tr0);
+      return;
+    }
+    rows.forEach(function (row) {
+      var tr = document.createElement("tr");
+      tr.setAttribute("data-page-key", row.key);
+      var tdS = document.createElement("td");
+      tdS.className = "mono";
+      tdS.textContent = row.nav_section;
+      tr.appendChild(tdS);
+      var tdP = document.createElement("td");
+      tdP.className = "mono";
+      tdP.textContent = row.nav_page;
+      tr.appendChild(tdP);
+      var tdI = document.createElement("td");
+      tdI.className = "gc-designer-entity-nav__td-icon";
+      var btn = buildIconButton(state.pageIcons[row.key] && state.pageIcons[row.key].icon, "Select icon for " + row.nav_section + " · " + row.nav_page);
+      btn.setAttribute("data-icon-target", "page");
+      btn.setAttribute("data-page-key", row.key);
+      tdI.appendChild(btn);
+      tr.appendChild(tdI);
+      var tdH = document.createElement("td");
+      tdH.className = "gc-designer-entity-nav__td-hidden";
+      var toggle = document.createElement("label");
+      toggle.className = "gc-toolbar-combine gc-designer-entity-nav__hidden-toggle";
+      var toggleText = document.createElement("span");
+      toggleText.className = "gc-toolbar-combine__text";
+      toggleText.textContent = "Hidden";
+      var toggleInput = document.createElement("input");
+      toggleInput.type = "checkbox";
+      toggleInput.className = "gc-toolbar-combine__input gc-designer-entity-nav__page-hidden-input";
+      toggleInput.checked = normalizeBool(state.pageIcons[row.key] && state.pageIcons[row.key].hidden);
+      toggleInput.setAttribute("data-page-key", row.key);
+      toggleInput.setAttribute(
+        "aria-label",
+        "Hide " + row.nav_section + " · " + row.nav_page + " from Firewalls v2 left navigation",
+      );
+      var track = document.createElement("span");
+      track.className = "gc-toolbar-combine__track";
+      track.setAttribute("aria-hidden", "true");
+      var thumb = document.createElement("span");
+      thumb.className = "gc-toolbar-combine__thumb";
+      track.appendChild(thumb);
+      toggle.appendChild(toggleText);
+      toggle.appendChild(toggleInput);
+      toggle.appendChild(track);
+      tdH.appendChild(toggle);
+      tr.appendChild(tdH);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function applyPageIcon(pageKeyValue, iconName) {
+    if (!pageKeyValue || !state.pageIcons[pageKeyValue]) return;
+    state.pageIcons[pageKeyValue].icon = normalizeIconName(iconName);
+    var btn = state.pageIconsTbody && state.pageIconsTbody.querySelector('.gc-designer-entity-nav__icon-btn[data-icon-target="page"][data-page-key="' + pageKeyValue + '"]');
+    if (btn) updateIconButton(btn, state.pageIcons[pageKeyValue].icon);
+  }
+
+  function applyPageHidden(pageKeyValue, hidden) {
+    if (!pageKeyValue || !state.pageIcons[pageKeyValue]) return;
+    state.pageIcons[pageKeyValue].hidden = normalizeBool(hidden);
   }
 
   function readRowFieldsFromTr(tr) {
@@ -1073,6 +1743,7 @@
     var np = tr.querySelector(".gc-designer-entity-nav__input-page");
     var tb = tr.querySelector(".gc-designer-entity-nav__input-tab");
     var ks = tr.querySelector(".gc-designer-entity-nav__select-kind");
+    var ic = tr.querySelector(".gc-designer-entity-nav__input-icon");
     return {
       kind: normalizeKind(ks && ks.value),
       display_name: trimStr(dn && dn.value),
@@ -1080,6 +1751,7 @@
       nav_order: trimStr(no && no.value),
       nav_page: trimStr(np && np.value),
       tab: trimStr(tb && tb.value),
+      nav_icon: normalizeIconName(ic && ic.value),
     };
   }
 
@@ -1090,7 +1762,8 @@
       a.nav_section === b.nav_section &&
       a.nav_order === b.nav_order &&
       a.nav_page === b.nav_page &&
-      a.tab === b.tab
+      a.tab === b.tab &&
+      a.nav_icon === b.nav_icon
     );
   }
 
@@ -1107,6 +1780,7 @@
         nav_order: n.nav_order,
         nav_page: n.nav_page,
         tab: n.tab,
+        nav_icon: n.nav_icon,
       };
     });
   }
@@ -1145,6 +1819,7 @@
           nav_order: e.nav_order,
           nav_page: e.nav_page,
           tab: e.tab,
+          nav_icon: normalizeIconName(e.nav_icon),
         }
         : {
           kind: "Objects",
@@ -1153,6 +1828,7 @@
           nav_order: "",
           nav_page: "",
           tab: "",
+          nav_icon: "",
         };
     });
     return ordered;
@@ -1405,6 +2081,175 @@
     });
   }
 
+  function renderIconPickerChoices(filterTerm) {
+    var grid = document.getElementById("gc-designer-entity-nav-icon-grid");
+    if (!grid) return;
+    var filter = trimStr(filterTerm).toLowerCase();
+    grid.innerHTML = "";
+    var matches = MATERIAL_ICONS.filter(function (name) {
+      return !filter || name.indexOf(filter) !== -1;
+    });
+    if (!matches.length) {
+      var empty = document.createElement("p");
+      empty.className = "gc-designer-entity-nav-icon-overlay__empty";
+      empty.textContent = "No icons match that search.";
+      grid.appendChild(empty);
+      return;
+    }
+    matches.forEach(function (name) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gc-designer-entity-nav-icon-overlay__choice";
+      btn.setAttribute("data-icon-name", name);
+      var icon = document.createElement("span");
+      icon.className = "gc-material-symbol";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = name;
+      var text = document.createElement("span");
+      text.className = "gc-designer-entity-nav-icon-overlay__choice-name mono";
+      text.textContent = name;
+      btn.appendChild(icon);
+      btn.appendChild(text);
+      grid.appendChild(btn);
+    });
+  }
+
+  function closeIconOverlay(restoreFocus) {
+    var overlay = document.getElementById("gc-designer-entity-nav-icon-overlay");
+    if (!overlay) return;
+    overlay.hidden = true;
+    overlay.setAttribute("aria-hidden", "true");
+    if (restoreFocus && iconPickerState.focusTarget && typeof iconPickerState.focusTarget.focus === "function") {
+      iconPickerState.focusTarget.focus();
+    }
+    iconPickerState = { mode: "", entityType: "", pageKey: "", focusTarget: null };
+  }
+
+  function applyPickedIcon(iconName) {
+    var clean = normalizeIconName(iconName);
+    if (iconPickerState.mode === "row") {
+      if (!state.tbody || !iconPickerState.entityType) return;
+      var tr = state.tbody.querySelector('tr[data-entity-type="' + iconPickerState.entityType + '"]');
+      if (!tr) return;
+      setRowIconValue(tr, clean);
+    } else if (iconPickerState.mode === "page") {
+      applyPageIcon(iconPickerState.pageKey, clean);
+    }
+  }
+
+  function openIconOverlay(mode, options) {
+    var overlay = document.getElementById("gc-designer-entity-nav-icon-overlay");
+    var title = document.getElementById("gc-designer-entity-nav-icon-title");
+    var search = document.getElementById("gc-designer-entity-nav-icon-search");
+    if (!overlay || !title || !search) return;
+    iconPickerState.mode = mode || "";
+    iconPickerState.entityType = options && options.entityType ? String(options.entityType) : "";
+    iconPickerState.pageKey = options && options.pageKey ? String(options.pageKey) : "";
+    iconPickerState.focusTarget = options && options.focusTarget ? options.focusTarget : null;
+    if (iconPickerState.mode === "row") {
+      title.textContent = "Select icon for " + (iconPickerState.entityType || "row");
+    } else {
+      title.textContent = "Select page icon";
+    }
+    overlay.hidden = false;
+    overlay.setAttribute("aria-hidden", "false");
+    search.value = "";
+    renderIconPickerChoices("");
+    search.focus();
+  }
+
+  function bindIconOverlayUiOnce() {
+    var overlay = document.getElementById("gc-designer-entity-nav-icon-overlay");
+    if (!overlay || overlay.dataset.gcIconOverlayBound) return;
+    overlay.dataset.gcIconOverlayBound = "1";
+    var search = document.getElementById("gc-designer-entity-nav-icon-search");
+    var clearBtn = document.getElementById("gc-designer-entity-nav-icon-clear");
+    var cancelBtn = document.getElementById("gc-designer-entity-nav-icon-cancel");
+    var backdrop = overlay.querySelector(".gc-designer-entity-nav-icon-overlay__backdrop");
+    var grid = document.getElementById("gc-designer-entity-nav-icon-grid");
+
+    if (search) {
+      search.addEventListener("input", function () {
+        renderIconPickerChoices(search.value);
+      });
+    }
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        applyPickedIcon("");
+        closeIconOverlay(true);
+      });
+    }
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", function () {
+        closeIconOverlay(true);
+      });
+    }
+    if (backdrop) {
+      backdrop.addEventListener("click", function () {
+        closeIconOverlay(true);
+      });
+    }
+    if (grid) {
+      grid.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest("[data-icon-name]");
+        if (!btn || !grid.contains(btn)) return;
+        applyPickedIcon(btn.getAttribute("data-icon-name") || "");
+        closeIconOverlay(true);
+      });
+    }
+    document.addEventListener("keydown", function (e) {
+      if (!overlay || overlay.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeIconOverlay(true);
+      }
+    });
+  }
+
+  function bindIconPickersOnce(tbody, pageIconsTbody) {
+    if (tbody && !tbody.dataset.gcIconPickerBound) {
+      tbody.dataset.gcIconPickerBound = "1";
+      tbody.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest('.gc-designer-entity-nav__icon-btn[data-icon-target="row"]');
+        if (!btn || !tbody.contains(btn)) return;
+        openIconOverlay("row", {
+          entityType: btn.getAttribute("data-entity-type") || "",
+          focusTarget: btn,
+        });
+      });
+    }
+    if (pageIconsTbody && !pageIconsTbody.dataset.gcIconPickerBound) {
+      pageIconsTbody.dataset.gcIconPickerBound = "1";
+      pageIconsTbody.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest('.gc-designer-entity-nav__icon-btn[data-icon-target="page"]');
+        if (!btn || !pageIconsTbody.contains(btn)) return;
+        openIconOverlay("page", {
+          pageKey: btn.getAttribute("data-page-key") || "",
+          focusTarget: btn,
+        });
+      });
+    }
+  }
+
+  function pageIconsPayloadFromState() {
+    var out = {};
+    Object.keys(state.pageIcons || {}).forEach(function (k) {
+      var row = state.pageIcons[k];
+      if (!row || typeof row !== "object") return;
+      var sec = trimStr(row.nav_section);
+      var page = trimStr(row.nav_page);
+      var key = pageIconKey(sec, page);
+      if (!key) return;
+      out[key] = {
+        nav_section: sec,
+        nav_page: page,
+        icon: normalizeIconName(row.icon),
+        hidden: normalizeBool(row.hidden),
+      };
+    });
+    return out;
+  }
+
   function save(tbody, saveBtn, statusEl) {
     if (!tbody) return;
     var raw = collectEntriesFromDom(tbody);
@@ -1422,6 +2267,7 @@
       body: JSON.stringify({
         entries: ordered,
         facet_orders: cloneFacetOrders(state.facetOrders || defaultFacetOrders()),
+        page_icons: pageIconsPayloadFromState(),
       }),
     })
       .then(function (r) {
@@ -1444,6 +2290,7 @@
         if (res.j.facet_orders) {
           state.facetOrders = normalizeFacetOrders(res.j.facet_orders);
         }
+        state.pageIcons = normalizePageIcons(res.j.page_icons);
         renderTable(tbody, state.types, res.j.entries || {});
       })
       .catch(function () {
@@ -1454,26 +2301,36 @@
 
   function init() {
     var tbody = document.getElementById("gc-designer-entity-nav-tbody");
+    var pageIconsTbody = document.getElementById("gc-designer-entity-nav-page-icons-tbody");
+    var pageIconsSaveBtn = document.getElementById("gc-designer-entity-nav-page-icons-save");
     var saveBtn = document.getElementById("gc-designer-entity-nav-save");
     var statusEl = document.getElementById("gc-designer-entity-nav-save-status");
     if (!tbody) return;
 
     state.tbody = tbody;
+    state.pageIconsTbody = pageIconsTbody;
+    state.pageIconsSaveBtn = pageIconsSaveBtn;
+    state.statusEl = statusEl;
     state.facetOrders = defaultFacetOrders();
+    state.pageIcons = {};
     ensureSectionDatalist();
     bindEntityNavDragOnce(tbody);
     bindFacetHandleDragOnce(tbody);
     bindFacetOverlayUiOnce();
+    bindIconOverlayUiOnce();
+    bindIconPickersOnce(tbody, pageIconsTbody);
 
     Promise.all([loadDistinctTypes(), loadSavedEntries()]).then(function (pair) {
       state.types = pair[0];
       var pack = pair[1];
       state.facetOrders = (pack && pack.facet_orders) || defaultFacetOrders();
+      state.pageIcons = (pack && pack.page_icons) || {};
       renderTable(tbody, state.types, (pack && pack.entries) || {});
     });
 
     function onTbodyFieldEdit(ev) {
       scheduleRefreshDatalists(tbody);
+      renderPageIconsTable(collectEntriesFromDom(tbody));
       var tr = ev.target.closest && ev.target.closest("tr[data-entity-type]");
       if (tr) refreshRowDirtyClass(tr);
     }
@@ -1483,6 +2340,18 @@
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         save(tbody, saveBtn, statusEl);
+      });
+    }
+    if (pageIconsSaveBtn) {
+      pageIconsSaveBtn.addEventListener("click", function () {
+        save(tbody, pageIconsSaveBtn, statusEl);
+      });
+    }
+    if (pageIconsTbody) {
+      pageIconsTbody.addEventListener("change", function (ev) {
+        var input = ev.target.closest && ev.target.closest(".gc-designer-entity-nav__page-hidden-input");
+        if (!input || !pageIconsTbody.contains(input)) return;
+        applyPageHidden(input.getAttribute("data-page-key") || "", input.checked);
       });
     }
   }
@@ -1577,9 +2446,50 @@
         });
     };
 
+    window.gcDesignerHydrateObjectSelectorListSingle = function (containerEl, onReady) {
+      if (!containerEl) return;
+      Promise.all([loadDistinctTypes(), loadSavedEntries()])
+        .then(function (pair) {
+          var types = pair[0];
+          var pack = pair[1] || {};
+          var entries = pack.entries && typeof pack.entries === "object" ? pack.entries : {};
+          var fo = normalizeFacetOrders(pack.facet_orders);
+          var prevFo = state.facetOrders;
+          state.facetOrders = fo;
+          try {
+            fillObjectSelectorListSingle(containerEl, types, entries);
+          } finally {
+            state.facetOrders = prevFo;
+          }
+          if (typeof onReady === "function") {
+            try {
+              onReady(containerEl);
+            } catch (eCb) {
+              /* ignore */
+            }
+          }
+        })
+        .catch(function () {
+          containerEl.innerHTML = "";
+          containerEl.classList.add("is-disabled");
+          var empty = document.createElement("p");
+          empty.className = "muted gc-designer-object-selector-list__empty";
+          empty.textContent = "Could not load entity types.";
+          containerEl.appendChild(empty);
+          if (typeof onReady === "function") {
+            try {
+              onReady(containerEl);
+            } catch (eCb2) {
+              /* ignore */
+            }
+          }
+        });
+    };
+
     window.gcDesignerObjectSelectorNames = {
       objectSelector: "object-selector",
       objectSelectorList: "object-selector-list",
+      objectSelectorListSingle: "object-selector-list-single",
       dataControlsEntityType: "data-controls-entity-type",
     };
     window.gcQueryDesignerObjectSelector = function (name) {

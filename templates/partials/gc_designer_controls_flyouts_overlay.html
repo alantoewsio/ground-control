@@ -24,17 +24,17 @@
           <fieldset class="settings-form gc-designer-ip-fieldset" id="gc-designer-ip-constraint-panel">
             <legend class="gc-designer-ip-fieldset__legend">Validation options</legend>
             <p class="gc-designer__note" style="margin-top: 0">
-              <strong>Save</strong> writes <code class="mono">data-gc-ip-*</code> on the demo inputs (after that, validation uses those attributes). Until you Save, the fields follow the settings below. <strong>IPv4 range</strong> applies only to the IPv4 field. Use separate CIDR fields for IPv4 and IPv6 containment. With <strong>CIDR /prefix min–max</strong>, enter values as <code class="mono">address/prefix</code>; prefix must fall in that range (per family: 0–32 or 0–128). <strong>Must be a CIDR subnet</strong> requires <code class="mono">host/prefix</code>; on blur the host is normalized to the network address for that prefix (e.g. <code class="mono">10.1.2.3/16</code> → <code class="mono">10.1.0.0/16</code>).
+              <strong>Save</strong> writes <code class="mono">data-gc-ip-*</code> on the demo inputs (after that, validation uses those attributes). Until you Save, the fields follow the settings below. <strong>IPv4 range</strong> applies only to the IPv4 field. Use separate CIDR fields for IPv4 and IPv6 containment. With <strong>CIDR /prefix min–max</strong>, enter values as <code class="mono">address/prefix</code>; prefix must fall in that range (per family: 0–32 or 0–128). <strong>Must be CIDR Network</strong> (constraint mode <strong>Network</strong>) requires a plain address that is already the network address for the <strong>Prefix length</strong> you set (host bits zero). <strong>Interface Address</strong> requires <code class="mono">host/prefix</code> in the field; on blur the value is normalized to the network address for that prefix (e.g. <code class="mono">10.1.2.3/16</code> → <code class="mono">10.1.0.0/16</code>).
             </p>
             <div class="gc-designer__row" style="flex-wrap: wrap; align-items: flex-end; gap: 12px 16px">
               <label class="settings-form__field" style="min-width: 12rem">
                 <span class="settings-form__label">Constraint mode</span>
                 <select class="settings-form__input" id="gc-designer-ip-constraint-mode" aria-label="Constraint mode">
-                  <option value="none">None (format only)</option>
-                  <option value="cidr-subnet">Within CIDR subnet</option>
-                  <option value="ip-range">Within IPv4 range (low–high)</option>
-                  <option value="network-only">Must be CIDR network address</option>
-                  <option value="value-cidr">Must be a CIDR subnet</option>
+                  <option value="none">IP</option>
+                  <option value="cidr-subnet">Assignment</option>
+                  <option value="ip-range">IPRange</option>
+                  <option value="network-only">Network</option>
+                  <option value="value-cidr">Interface Address</option>
                 </select>
               </label>
               <label class="settings-form__field" style="min-width: 12rem; flex: 1">

@@ -462,10 +462,9 @@
 {% endblock %}
 {% block scripts %}
 {% include "partials/gc_designer_controls_scripts.html" %}
-<script src="/static/gc-hosts-services-flyout.js"></script>
-<script src="/static/gc-data-controls-object-edit-layout.js"></script>
-<script src="/static/gc-designer-object-edit-catalog.js"></script>
-<script src="/static/gc-designer-stack-flyout-runtime.js"></script>
+{% set object_edit_bundle_include_option_selector = false %}
+{% include "partials/gc_object_edit_flyout_scripts.html" %}
+{% set object_edit_bundle_include_option_selector = true %}
 <script>
   (function () {
     var openModal = globalThis.gcDesignerFlyoutOpenModal;
