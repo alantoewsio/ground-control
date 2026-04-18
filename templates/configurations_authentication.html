@@ -1,0 +1,160 @@
+{% extends "configurations_base.html" %}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% set cfg_subnav_active = "authentication" %}
+{% block title %}Authentication &middot; Configuration &middot; Ground Control{% endblock %}
+{% block page_title %}Authentication{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls?tab=configurations">Configuration</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Authentication</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Clientless users stored on each configuration. Edits are saved directly to the configuration cache.
+</p>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page gc-hosts-services-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ net_filters_aside("gc-cfg-cu", false) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        <div class="gc-tabs" role="tablist" aria-label="Authentication views">
+          <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
+            id="gc-cfg-cu-tab" data-gc-cfg-auth-tab="clientless_users">Clientless users</button>
+        </div>
+        <div class="gc-tab-panels">
+          <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-cfg-cu-tab"
+            id="gc-cfg-cu-panel">
+            {{ net_entity_table_wrap("gc-cfg-cu", "Clientless users", "Search clientless users", true,
+              "gc-cfg-cu-add", "Add clientless user",
+              "Combined view merges users with the same name across configurations.",
+              "gc-cfg-cu-delete-selected", "Delete selected", toolbar_page_sync=false) }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ net_cols_modal("gc-cfg-cu") }}
+
+<div id="gc-cu-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-cu-flyout-title" tabindex="-1">
+    <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-cu-flyout-title" class="gc-if-flyout__title">Clientless user</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-cu-flyout-close" aria-label="Close" title="Close">&times;</button>
+    </header>
+    <div class="gc-if-flyout__panel-form">
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p id="gc-cu-flyout-meta" class="muted gc-hs-flyout__meta"></p>
+          <div id="gc-cu-flyout-fields"></div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="button" class="btn primary" id="gc-cu-flyout-save" hidden>Save</button>
+        <button type="button" class="btn btn--secondary" id="gc-cu-flyout-done">Close</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div id="gc-cu-no-fw-banner" class="gc-hs-no-fw-banner" hidden role="alert" aria-live="assertive">
+  <span class="gc-icon gc-icon--xs" aria-hidden="true" style="flex-shrink:0">info</span>
+  Select one or more configurations in the top bar to add objects.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-clientless-user-flyout.js?v={{ app_about.app_version }}"></script>
+<script>
+  window.gcClientlessUserEntityTarget = "configuration";
+  window.gcHsApplyDeletesBatchUrl = {{ url_api_configurations_apply_hs_deletes_batch | tojson }};
+  window.gcHsApplyUpdatesBatchUrl = {{ url_api_configurations_apply_hs_updates_batch | tojson }};
+  window.gcHsApplyCreatesBatchUrl = {{ url_api_configurations_apply_hs_creates_batch | tojson }};
+</script>
+<script>
+  (function () {
+    var API_BASE = {{ url_api_configurations_hosts_services_table | tojson }};
+    var t = gcCreateNetworkEntityTable({
+      prefix: "gc-cfg-cu",
+      apiUrl: API_BASE,
+      emptySelectionMessage: "Select one or more configurations in the top bar.",
+      apiEntityType: "clientless_user",
+      lsKey: "ground-control-cfg-cu-cols-v1",
+      dataRowClass: "gc-cfg-cu-data-row",
+      rowClickable: true,
+      rowAriaEntitySingular: "clientless user",
+      bulkRowSelect: true,
+      combineQuery: { param: "combine" },
+      target: "configuration",
+      onRowClick: function (tr) {
+        if (window.gcClientlessUserFlyoutOpenFromTr) window.gcClientlessUserFlyoutOpenFromTr(tr);
+      },
+      labels: {
+        countSingular: "clientless user",
+        countPlural: "clientless users",
+        emptyCache: "No clientless users in the cache for the selected configurations.",
+        emptyFilter: "No clientless users match the current search or filters.",
+        loadError: "Could not load clientless users.",
+      },
+    });
+    document.addEventListener("gc-configuration-selection-changed", function () { t.refresh(); });
+    document.addEventListener("gc-configuration-entries-updated", function () { t.refresh(); });
+    if (window.gcClientlessUserFlyoutInit) window.gcClientlessUserFlyoutInit();
+
+    function cfgIds() {
+      return window.gcGetSelectedConfigurationIds && typeof window.gcGetSelectedConfigurationIds === "function"
+        ? window.gcGetSelectedConfigurationIds() : [];
+    }
+    var addBtn = document.getElementById("gc-cfg-cu-add");
+    if (addBtn) addBtn.addEventListener("click", function () {
+      if (cfgIds().length < 1) {
+        var b = document.getElementById("gc-cu-no-fw-banner");
+        if (b) { b.hidden = false; setTimeout(function () { b.hidden = true; }, 4000); }
+        return;
+      }
+      if (window.gcClientlessUserFlyoutOpenAdd) window.gcClientlessUserFlyoutOpenAdd();
+    });
+    var delBtn = document.getElementById("gc-cfg-cu-delete-selected");
+    if (delBtn) delBtn.addEventListener("click", function () {
+      if (typeof t.getDeleteConfigEntryIdsFromSelection !== "function") return;
+      var ids = t.getDeleteConfigEntryIdsFromSelection();
+      if (!ids.length) { window.gcAlert("Select one or more rows to delete."); return; }
+      var n = ids.length;
+      var msg = "Delete " + n + " clientless user" + (n === 1 ? "" : "s") + " from the selected configurations?";
+      (window.gcConfirm ? window.gcConfirm(msg) : Promise.resolve(globalThis.confirm(msg))).then(function (ok) {
+        if (!ok) return;
+        delBtn.disabled = true;
+        fetch(window.gcHsApplyDeletesBatchUrl, {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config_entry_ids: ids })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            delBtn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.message)) || "Could not delete.";
+              window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            document.dispatchEvent(new CustomEvent("gc-configuration-entries-updated"));
+            t.refresh();
+          }).catch(function () { delBtn.disabled = false; window.gcAlert("Network error."); });
+      });
+    });
+  })();
+</script>
+{% endblock %}

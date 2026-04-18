@@ -1,0 +1,87 @@
+{% extends "firewalls_base.html" %}
+{% from "partials/_routing_page.html" import routing_filter_asides, routing_tablist, routing_tab_panels, routing_cols_modals, routing_edit_flyout, routing_no_selection_banner %}
+{% set fw_subnav_active = "routing" %}
+{% block title %}Routing &middot; Firewalls &middot; Ground Control{% endblock %}
+{% block page_title %}Routing{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls">Firewalls</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Routing</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Static routes, failover gateways and per-zone custom gateways from the config cache. Select firewalls in the
+  top bar and enable the matching sync types under <strong>Inventory</strong> to populate data.
+</p>
+{% endblock %}
+
+{% block content %}
+{% set rt_prefix = "gc-rt" %}
+{% set rt_v4_subtitle = "Combined view merges rows that share the same destination IP. When other details differ across firewalls, the switch turns yellow &mdash; click to compare, or Shift+click to show one row per firewall." %}
+{% set rt_v6_subtitle = rt_v4_subtitle %}
+{% set rt_gateway_subtitle = "Combined view merges rows that share the same gateway name. When details differ across firewalls, the switch turns yellow." %}
+{% set rt_custom_subtitle = "Combined view merges rows that share the same name. When details differ across firewalls, the switch turns yellow." %}
+
+<main class="layout single gc-network-page gc-hosts-services-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ routing_filter_asides(rt_prefix) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        {{ routing_tablist(rt_prefix, rt_prefix ~ "-main-tablist", "data-gc-rt-tab") }}
+        {{ routing_tab_panels(rt_prefix, rt_v4_subtitle, rt_v6_subtitle, rt_gateway_subtitle, rt_custom_subtitle, true) }}
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ routing_cols_modals(rt_prefix) }}
+{{ routing_edit_flyout("Save to task queue") }}
+{{ routing_no_selection_banner("firewalls") }}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-routing-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-routing-page.js?v={{ app_about.app_version }}"></script>
+<script>
+  window.gcRoutingEntityTarget = "firewall";
+  window.gcHsEnqueueDeletesBatchUrl = {{ url_api_task_queue_enqueue_hs_deletes_batch | tojson }};
+  window.gcHsEnqueueUpdatesBatchUrl = {{ url_api_task_queue_enqueue_hs_updates_batch | tojson }};
+  window.gcHsEnqueueCreatesBatchUrl = {{ url_api_task_queue_enqueue_hs_creates_batch | tojson }};
+</script>
+<script>
+  (function () {
+    gcRoutingPageInit({
+      prefix: "gc-rt",
+      tablistId: "gc-rt-main-tablist",
+      tabDataAttr: "data-gc-rt-tab",
+      lsKey: "ground-control-routing-main-tab",
+      lsColsPrefix: "ground-control-rt-cols-",
+      apiBase: {{ url_api_hosts_services_table | tojson }},
+      target: "firewall",
+      deleteUrl: window.gcHsEnqueueDeletesBatchUrl,
+      emptySelectionMsg: "Select one or more firewalls in the top bar.",
+      bannerId: "gc-rt-no-fw-banner",
+      refreshEvents: ["gc-firewall-selection-changed", "gc-task-queue-updated"],
+      entriesUpdatedEvent: "gc-task-queue-updated",
+      getSelectedIds: function () {
+        return window.gcGetSelectedFirewallIds && typeof window.gcGetSelectedFirewallIds === "function"
+          ? window.gcGetSelectedFirewallIds() : [];
+      },
+      buildEmptyCache: function (countPlural) {
+        return "No " + countPlural + " in the cache for the selected firewalls. Enable the matching type under Inventory \u2192 Edit firewall \u2192 Sync from firewall, then run sync.";
+      },
+      deleteConfirmMsg: function (n, countPlural) {
+        return "Queue " + n + " delete task" + (n === 1 ? "" : "s") + " for the selected " + countPlural + "?";
+      },
+    });
+  })();
+</script>
+{% endblock %}

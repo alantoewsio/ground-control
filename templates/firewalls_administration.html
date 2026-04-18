@@ -26,6 +26,7 @@
     <div class="split gc-network-split">
       <div class="gc-net-filters-column">
         {{ net_filters_aside("gc-netflow", false) }}
+        {{ net_filters_aside("gc-lsacl", true) }}
       </div>
       <div class="content-pane gc-network-panel__content">
         <div class="gc-tabs" role="tablist" aria-label="Administration views" id="gc-admin-tablist">
@@ -38,6 +39,16 @@
             id="gc-tab-admin-netflow"
           >
             Netflow
+          </button>
+          <button
+            type="button"
+            class="gc-tabs__tab"
+            role="tab"
+            aria-selected="false"
+            data-gc-admin-tab="lsacl"
+            id="gc-tab-admin-lsacl"
+          >
+            Local Service ACL
           </button>
         </div>
         <div class="gc-tab-panels">
@@ -58,6 +69,27 @@
               )
             }}
           </div>
+          <div
+            class="gc-tab-panel"
+            role="tabpanel"
+            id="gc-panel-admin-lsacl"
+            aria-labelledby="gc-tab-admin-lsacl"
+            hidden
+          >
+            {{
+              net_entity_table_wrap(
+                "gc-lsacl",
+                "Local Service ACL rules",
+                "Search rules",
+                true,
+                "gc-lsacl-add",
+                "Add rule",
+                "Combined view merges rows that share the same rule name. When details differ across firewalls, the switch turns yellow.",
+                "gc-lsacl-delete-selected",
+                "Delete selected",
+              )
+            }}
+          </div>
         </div>
       </div>
     </div>
@@ -65,7 +97,36 @@
 </main>
 
 {{ net_cols_modal("gc-netflow") }}
+{{ net_cols_modal("gc-lsacl") }}
 {% include "partials/gc_netflow_flyout.html" %}
+
+<div id="gc-lsacl-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-lsacl-flyout-title" tabindex="-1">
+    <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-lsacl-flyout-title" class="gc-if-flyout__title">Local Service ACL</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-lsacl-flyout-close" aria-label="Close" title="Close">&times;</button>
+    </header>
+    <div class="gc-if-flyout__panel-form">
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p id="gc-lsacl-flyout-meta" class="muted gc-hs-flyout__meta"></p>
+          <div id="gc-lsacl-flyout-fields"></div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="button" class="btn primary" id="gc-lsacl-flyout-save" hidden>Save to task queue</button>
+        <button type="button" class="btn btn--secondary" id="gc-lsacl-flyout-done">Close</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div id="gc-lsacl-no-fw-banner" class="gc-hs-no-fw-banner" hidden role="alert" aria-live="assertive">
+  <span class="gc-icon gc-icon--xs" aria-hidden="true" style="flex-shrink:0">info</span>
+  Select one or more firewalls in the top bar to add rules.
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -74,5 +135,105 @@
   window.GC_NETFLOW_ENQUEUE_UPDATE_URL = {{ url_api_task_queue_enqueue_netflow_configuration_update | tojson }};
 </script>
 <script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
 <script src="/static/gc-system-admin-netflow.js"></script>
+<script src="/static/gc-local-service-acl-flyout.js?v={{ app_about.app_version }}"></script>
+<script>
+  window.gcLocalServiceAclEntityTarget = "firewall";
+  window.gcHsEnqueueDeletesBatchUrl = {{ url_api_task_queue_enqueue_hs_deletes_batch | tojson }};
+  window.gcHsEnqueueUpdatesBatchUrl = {{ url_api_task_queue_enqueue_hs_updates_batch | tojson }};
+  window.gcHsEnqueueCreatesBatchUrl = {{ url_api_task_queue_enqueue_hs_creates_batch | tojson }};
+</script>
+<script>
+  (function () {
+    var API_BASE = {{ url_api_hosts_services_table | tojson }};
+    var t = gcCreateNetworkEntityTable({
+      prefix: "gc-lsacl",
+      apiUrl: API_BASE,
+      emptySelectionMessage: "Select one or more firewalls in the top bar.",
+      apiEntityType: "acl_rule",
+      lsKey: "ground-control-lsacl-cols-v1",
+      dataRowClass: "gc-lsacl-data-row",
+      rowClickable: true,
+      rowAriaEntitySingular: "ACL rule",
+      bulkRowSelect: true,
+      combineQuery: { param: "combine" },
+      onRowClick: function (tr) {
+        if (window.gcLocalServiceAclFlyoutOpenFromTr) window.gcLocalServiceAclFlyoutOpenFromTr(tr);
+      },
+      labels: {
+        countSingular: "ACL rule",
+        countPlural: "ACL rules",
+        emptyCache: "No ACL rules in the cache for the selected firewalls.",
+        emptyFilter: "No rules match the current search or filters.",
+        loadError: "Could not load ACL rules.",
+      },
+    });
+    document.addEventListener("gc-firewall-selection-changed", function () { t.refresh(); });
+    document.addEventListener("gc-task-queue-updated", function () { t.refresh(); });
+    if (window.gcLocalServiceAclFlyoutInit) window.gcLocalServiceAclFlyoutInit();
+
+    function fwIds() {
+      return window.gcGetSelectedFirewallIds && typeof window.gcGetSelectedFirewallIds === "function"
+        ? window.gcGetSelectedFirewallIds() : [];
+    }
+    var addBtn = document.getElementById("gc-lsacl-add");
+    if (addBtn) addBtn.addEventListener("click", function () {
+      if (fwIds().length < 1) {
+        var b = document.getElementById("gc-lsacl-no-fw-banner");
+        if (b) { b.hidden = false; setTimeout(function () { b.hidden = true; }, 4000); }
+        return;
+      }
+      if (window.gcLocalServiceAclFlyoutOpenAdd) window.gcLocalServiceAclFlyoutOpenAdd();
+    });
+    var delBtn = document.getElementById("gc-lsacl-delete-selected");
+    if (delBtn) delBtn.addEventListener("click", function () {
+      if (typeof t.getDeleteConfigEntryIdsFromSelection !== "function") return;
+      var ids = t.getDeleteConfigEntryIdsFromSelection();
+      if (!ids.length) { window.gcAlert("Select one or more rows to delete."); return; }
+      var n = ids.length;
+      var msg = "Queue " + n + " delete task" + (n === 1 ? "" : "s") + " for the selected ACL rules?";
+      (window.gcConfirm ? window.gcConfirm(msg) : Promise.resolve(globalThis.confirm(msg))).then(function (ok) {
+        if (!ok) return;
+        delBtn.disabled = true;
+        fetch(window.gcHsEnqueueDeletesBatchUrl, {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config_entry_ids: ids })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            delBtn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
+              window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            t.refresh();
+          }).catch(function () { delBtn.disabled = false; window.gcAlert("Network error."); });
+      });
+    });
+
+    function showTab(key) {
+      var tabs = document.querySelectorAll("#gc-admin-tablist [data-gc-admin-tab]");
+      tabs.forEach(function (b) {
+        var on = b.getAttribute("data-gc-admin-tab") === key;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      var nf = document.getElementById("gc-panel-admin-netflow");
+      var ls = document.getElementById("gc-panel-admin-lsacl");
+      if (nf) { nf.classList.toggle("is-active", key === "netflow"); nf.hidden = key !== "netflow"; }
+      if (ls) { ls.classList.toggle("is-active", key === "lsacl"); ls.hidden = key !== "lsacl"; }
+      var nfFa = document.getElementById("gc-netflow-filters-aside");
+      var lsFa = document.getElementById("gc-lsacl-filters-aside");
+      if (nfFa) nfFa.hidden = key !== "netflow";
+      if (lsFa) lsFa.hidden = key !== "lsacl";
+      if (key === "lsacl") t.refresh();
+    }
+    document.querySelectorAll("#gc-admin-tablist [data-gc-admin-tab]").forEach(function (b) {
+      b.addEventListener("click", function () { showTab(b.getAttribute("data-gc-admin-tab")); });
+    });
+  })();
+</script>
 {% endblock %}

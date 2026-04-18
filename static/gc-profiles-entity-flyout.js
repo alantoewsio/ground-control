@@ -8,7 +8,7 @@
     if (typeof globalThis.gcGlobalBannerShowResult === "function") {
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
-      alert(msg);
+      window.gcAlert(msg);
     }
   }
 
@@ -231,11 +231,9 @@
     btn.type = "button";
     btn.className = "gc-pe-sched-detail-remove";
     btn.setAttribute("aria-label", "Remove period");
-    btn.innerHTML =
-      '<svg class="gc-pe-sched-detail-remove__svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">' +
-      '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>' +
-      '<path fill="currentColor" d="M8 12h8v1H8z"/>' +
-      "</svg>";
+    btn.innerHTML = (window.gcIcon
+      ? window.gcIcon("do_not_disturb_on", { size: "md", cls: "gc-pe-sched-detail-remove__svg" })
+      : "");
     tdR.appendChild(btn);
     tr.appendChild(tdD);
     tr.appendChild(tdS);

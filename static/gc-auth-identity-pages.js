@@ -8,7 +8,7 @@
     if (typeof globalThis.gcGlobalBannerShowResult === "function") {
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
-      alert(msg);
+      window.gcAlert(msg);
     }
   }
 
@@ -613,7 +613,7 @@
     let activeTab = "users";
     try {
       let s = localStorage.getItem(AUTH_TAB_LS);
-      if (s === "groups") activeTab = "groups";
+      if (s === "groups" || s === "clientless_users") activeTab = s;
     } catch (e) {}
 
     function applyAuthTabs() {
@@ -624,6 +624,7 @@
       });
       let pu = document.getElementById("gc-panel-auth-users");
       let pg = document.getElementById("gc-panel-auth-groups");
+      let pc = document.getElementById("gc-panel-auth-clientless-users");
       if (pu) {
         pu.classList.toggle("is-active", activeTab === "users");
         pu.hidden = activeTab !== "users";
@@ -632,10 +633,16 @@
         pg.classList.toggle("is-active", activeTab === "groups");
         pg.hidden = activeTab !== "groups";
       }
+      if (pc) {
+        pc.classList.toggle("is-active", activeTab === "clientless_users");
+        pc.hidden = activeTab !== "clientless_users";
+      }
       let fa = document.getElementById("gc-auth-u-filters-aside");
       let fb = document.getElementById("gc-auth-g-filters-aside");
+      let fc = document.getElementById("gc-auth-cu-filters-aside");
       if (fa) fa.hidden = activeTab !== "users";
       if (fb) fb.hidden = activeTab !== "groups";
+      if (fc) fc.hidden = activeTab !== "clientless_users";
     }
 
     document.querySelectorAll("[data-gc-auth-tab]").forEach(function (btn) {
@@ -697,44 +704,44 @@
           bannerResult(false, "Select one or more rows.");
           return;
         }
-        if (
-          !globalThis.confirm(
-            "Queue deletion of " + ids.length + " " + noun + " on the firewall(s)?",
-          )
-        ) {
-          return;
-        }
-        btn.disabled = true;
-        fetch(url, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        let qMsg = "Queue deletion of " + ids.length + " " + noun + " on the firewall(s)?";
+        let cf = window.gcConfirm
+          ? window.gcConfirm(qMsg, { tone: "danger", confirmLabel: "Queue deletes" })
+          : Promise.resolve(globalThis.confirm(qMsg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          btn.disabled = true;
+          fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              bannerResult(true, "Delete tasks queued.");
+              dispatchTaskQueueUpdated();
+              if (table.refresh) table.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              bannerResult(false, "Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
-              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            bannerResult(true, "Delete tasks queued.");
-            dispatchTaskQueueUpdated();
-            if (table.refresh) table.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            bannerResult(false, "Network error.");
-          });
+        });
       });
     }
 
@@ -1164,40 +1171,44 @@
           bannerResult(false, "Select one or more profiles.");
           return;
         }
-        if (!globalThis.confirm("Queue deletion of " + ids.length + " profile(s) on the firewall(s)?")) {
-          return;
-        }
-        btn.disabled = true;
-        fetch(DEL_URL, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        let qMsg2 = "Queue deletion of " + ids.length + " profile(s) on the firewall(s)?";
+        let cf2 = window.gcConfirm
+          ? window.gcConfirm(qMsg2, { tone: "danger", confirmLabel: "Queue deletes" })
+          : Promise.resolve(globalThis.confirm(qMsg2));
+        cf2.then(function (ok) {
+          if (!ok) return;
+          btn.disabled = true;
+          fetch(DEL_URL, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              bannerResult(true, "Delete tasks queued.");
+              dispatchTaskQueueUpdated();
+              if (table.refresh) table.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              bannerResult(false, "Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
-              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            bannerResult(true, "Delete tasks queued.");
-            dispatchTaskQueueUpdated();
-            if (table.refresh) table.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            bannerResult(false, "Network error.");
-          });
+        });
       });
     }
 

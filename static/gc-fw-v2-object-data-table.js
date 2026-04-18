@@ -1794,8 +1794,9 @@
     pencil.setAttribute("title", "Data source & table properties");
     pencil.hidden = true;
     pencil.disabled = true;
-    pencil.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+    pencil.innerHTML = (window.gcIcon
+      ? window.gcIcon("edit", { size: "sm" })
+      : "");
     pencil.addEventListener("click", function (ev) {
       ev.preventDefault();
       if (!isDesignerTableDesignModeOn()) return;
@@ -1864,14 +1865,18 @@
             ovn[colId] != null && String(ovn[colId]).trim() !== ""
               ? String(ovn[colId]).trim()
               : base;
-          var nv = window.prompt("Column display name", shown);
-          if (nv == null) return;
-          nv = String(nv).trim();
-          if (nv === "" || nv === base) delete ovn[colId];
-          else ovn[colId] = nv;
-          document.getElementById("gc-fw-v2-obj-col-overrides").value = formatOverrides(ovn);
-          designerTableApi.refresh();
-          scheduleDesignerTableLayoutAutosave();
+          var pf = window.gcPrompt
+            ? window.gcPrompt("Column display name", shown, { title: "Rename column" })
+            : Promise.resolve(window.prompt("Column display name", shown));
+          pf.then(function (nv) {
+            if (nv == null) return;
+            nv = String(nv).trim();
+            if (nv === "" || nv === base) delete ovn[colId];
+            else ovn[colId] = nv;
+            document.getElementById("gc-fw-v2-obj-col-overrides").value = formatOverrides(ovn);
+            designerTableApi.refresh();
+            scheduleDesignerTableLayoutAutosave();
+          });
         } else if (act === "revert") {
           var ovr = parseOverrides(document.getElementById("gc-fw-v2-obj-col-overrides").value);
           delete ovr[colId];
@@ -2505,7 +2510,7 @@
       if (typeof globalThis.gcDesignerOpenObjectEditFlyoutFromDataControls !== "function") return;
       var types = getSelectedEntityTypes();
       if (!types.length) {
-        window.alert("Select at least one cached object type in table properties.");
+        window.gcAlert("Select at least one cached object type in table properties.");
         return;
       }
       function openAddForEntityType(et) {
@@ -2532,7 +2537,7 @@
     delPreviewBtn.addEventListener("click", function () {
       if (designerTableReadOnlyOn()) return;
       var n = designerPreviewSelectedRowCount();
-      window.alert(
+      window.gcAlert(
         n
           ? "Delete " + n + " selected row(s) (designer preview — no data is changed)."
           : "No rows selected.",
@@ -2964,7 +2969,7 @@
         var et = String(d.entity_type || "").trim();
         if (!objectEditFlyoutHsEntityType(et)) {
           e.preventDefault();
-          window.alert(
+          window.gcAlert(
             "Saving to the task queue from this flyout is only supported for Hosts & Services cache types " +
               "(for example fqdn_host, service, ip_host).",
           );
@@ -3011,7 +3016,7 @@
 
         if (!selFw.length && !deleteEntryIds.length) {
           e.preventDefault();
-          window.alert(
+          window.gcAlert(
             "Select at least one firewall in the flyout, or remove a firewall that was selected when this editor opened to queue a delete.",
           );
           return;
@@ -3019,7 +3024,7 @@
 
         if (deletedFwIds.length && deleteEntryIds.length !== deletedFwIds.length) {
           e.preventDefault();
-          window.alert(
+          window.gcAlert(
             "Could not resolve a cache entry for every removed firewall. Save was canceled.",
           );
           return;
@@ -3033,7 +3038,7 @@
           ).trim();
           if (!nameGuess) {
             e.preventDefault();
-            window.alert("Name is required.");
+            window.gcAlert("Name is required.");
             return;
           }
           if (et === "fqdn_host") {
@@ -3042,7 +3047,7 @@
             ).trim();
             if (!fqGuess) {
               e.preventDefault();
-              window.alert("FQDN is required.");
+              window.gcAlert("FQDN is required.");
               return;
             }
           }
@@ -3059,7 +3064,7 @@
         function showErr(x) {
           var msg =
             (x.j && (x.j.detail || x.j.message)) || "Could not enqueue task(s).";
-          window.alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+          window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
         }
 
         function finishOk() {
@@ -3074,7 +3079,7 @@
 
         if (mode === "add") {
           if (!crUrl) {
-            window.alert("Task queue batch create URL is not configured.");
+            window.gcAlert("Task queue batch create URL is not configured.");
             return;
           }
           fetch(crUrl, {
@@ -3099,7 +3104,7 @@
               finishOk();
             })
             .catch(function () {
-              window.alert("Network error.");
+              window.gcAlert("Network error.");
             });
           return;
         }
@@ -3118,7 +3123,7 @@
               return;
             }
             if (!crUrl) {
-              window.alert("Task queue batch create URL is not configured.");
+              window.gcAlert("Task queue batch create URL is not configured.");
               return;
             }
             fetch(crUrl, {
@@ -3143,13 +3148,13 @@
                 finishOk();
               })
               .catch(function () {
-                window.alert("Network error.");
+                window.gcAlert("Network error.");
               });
           }
 
           if (updateEntryIds.length) {
             if (!upUrl) {
-              window.alert("Task queue batch update URL is not configured.");
+              window.gcAlert("Task queue batch update URL is not configured.");
               return;
             }
             fetch(upUrl, {
@@ -3170,7 +3175,7 @@
                 doCreates();
               })
               .catch(function () {
-                window.alert("Network error.");
+                window.gcAlert("Network error.");
               });
           } else {
             doCreates();
@@ -3183,7 +3188,7 @@
             return;
           }
           if (!delUrl) {
-            window.alert("Task queue batch delete URL is not configured.");
+            window.gcAlert("Task queue batch delete URL is not configured.");
             return;
           }
           fetch(delUrl, {
@@ -3204,7 +3209,7 @@
               runUpdateThenCreateThenFinish();
             })
             .catch(function () {
-              window.alert("Network error.");
+              window.gcAlert("Network error.");
             });
         }
 

@@ -1,0 +1,31 @@
+{# ---------------------------------------------------------------------------
+   Google Material Symbols (Filled) -- icon macro
+
+   Project standard: every icon in Ground Control renders FILLED. The CSS
+   already sets FILL=1 on `.gc-icon`, so the `filled` arg is now a no-op
+   alias kept for backwards compatibility.
+
+   Use:
+     {% from "partials/_icons.html" import icon %}
+     {{ icon("close") }}
+     {{ icon("delete", size="sm", cls="gc-icon--danger") }}
+     {{ icon("check_circle", size="lg", aria_label="Saved") }}
+
+   Args:
+     name        Material Symbols glyph name (e.g. "close", "search", "info")
+     size        "xs" | "sm" | "md" (default) | "lg" | "xl"
+     filled      Deprecated -- icons are always filled. Kept for back-compat.
+     bold        True for wght 600
+     cls         Extra classes (e.g. "gc-icon--accent")
+     aria_label  If set, exposes the icon to assistive tech; otherwise icon is decorative
+     attrs       Extra HTML attributes string (e.g. 'data-foo="bar"')
+   ------------------------------------------------------------------------- #}
+
+{% macro icon(name, size="md", filled=True, bold=False, cls="", aria_label=None, attrs="") -%}
+{% set classes = ["gc-icon", "gc-icon--" ~ size] -%}
+{% if bold %}{% set _ = classes.append("gc-icon--bold") %}{% endif -%}
+{% if cls %}{% set _ = classes.append(cls) %}{% endif -%}
+<span class="{{ classes | join(' ') }}"
+      {% if aria_label %}role="img" aria-label="{{ aria_label }}"{% else %}aria-hidden="true"{% endif %}
+      {{ attrs | safe }}>{{ name }}</span>
+{%- endmacro %}

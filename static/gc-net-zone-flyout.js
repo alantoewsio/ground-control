@@ -474,7 +474,7 @@
   function save() {
     let form = collectFormPayload();
     if (!form.name) {
-      alert("Name is required.");
+      window.gcAlert("Name is required.");
       return;
     }
     let upBatch = isCfgTarget()
@@ -494,12 +494,12 @@
 
     if (addMode) {
       if (!crBatch) {
-        alert("Zone create URL is not configured.");
+        window.gcAlert("Zone create URL is not configured.");
         return;
       }
       let scopeIds = collectFlyoutScopeIdsOrdered();
       if (!scopeIds.length) {
-        alert(
+        window.gcAlert(
           isCfgTarget()
             ? "Select at least one configuration in the flyout."
             : "Select at least one firewall in the flyout.",
@@ -515,7 +515,7 @@
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (!x.ok) {
             let em = (x.j && (x.j.detail || x.j.message)) || "Could not save.";
-            alert(typeof em === "string" ? em : JSON.stringify(em));
+            window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
           notifyOk();
@@ -523,19 +523,19 @@
         })
         .catch(function () {
           if (els.saveBtn) els.saveBtn.disabled = false;
-          alert("Network error.");
+          window.gcAlert("Network error.");
         });
       return;
     }
 
     if (!upBatch) {
-      alert("Zone update URL is not configured.");
+      window.gcAlert("Zone update URL is not configured.");
       return;
     }
     let tmap = targetsMapFromRow(currentRow);
     let checked = collectFlyoutScopeIdsOrdered();
     if (!checked.length) {
-      alert(
+      window.gcAlert(
         isCfgTarget()
           ? "Select at least one configuration."
           : "Select at least one firewall.",
@@ -559,7 +559,7 @@
         return;
       }
       if (!crBatch) {
-        alert("Zone create batch URL is not configured.");
+        window.gcAlert("Zone create batch URL is not configured.");
         if (els.saveBtn) els.saveBtn.disabled = false;
         return;
       }
@@ -571,7 +571,7 @@
           if (els.saveBtn) els.saveBtn.disabled = false;
           if (!x.ok) {
             let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue zone creates.";
-            alert(typeof em === "string" ? em : JSON.stringify(em));
+            window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
           notifyOk();
@@ -579,7 +579,7 @@
         })
         .catch(function () {
           if (els.saveBtn) els.saveBtn.disabled = false;
-          alert("Network error.");
+          window.gcAlert("Network error.");
         });
     }
 
@@ -589,14 +589,14 @@
           if (!x.ok) {
             if (els.saveBtn) els.saveBtn.disabled = false;
             let em = (x.j && (x.j.detail || x.j.message)) || "Could not save zone updates.";
-            alert(typeof em === "string" ? em : JSON.stringify(em));
+            window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
             return;
           }
           doCreates();
         })
         .catch(function () {
           if (els.saveBtn) els.saveBtn.disabled = false;
-          alert("Network error.");
+          window.gcAlert("Network error.");
         });
     } else {
       doCreates();

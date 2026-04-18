@@ -665,7 +665,7 @@
       if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
       var ids = tbl.getDeleteConfigEntryIdsFromSelection();
       if (!ids.length) {
-        alert("Select one or more rows to delete.");
+        window.gcAlert("Select one or more rows to delete.");
         return;
       }
       var n = ids.length;
@@ -675,46 +675,51 @@
         " selected " +
         labelPlural +
         " from the configuration cache?";
-      if (!window.confirm(msg)) return;
-      var url =
-        typeof window.gcHsEnqueueDeletesBatchUrl === "string"
-          ? window.gcHsEnqueueDeletesBatchUrl
-          : "";
-      if (!url) {
-        alert("Delete batch URL is not configured.");
-        return;
-      }
-      btn.disabled = true;
-      fetch(url, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config_entry_ids: ids }),
-      })
-        .then(function (r) {
-          return r.json().then(function (j) {
-            return { ok: r.ok, j: j };
+      var cf = window.gcConfirm
+        ? window.gcConfirm(msg)
+        : Promise.resolve(globalThis.confirm(msg));
+      cf.then(function (ok) {
+        if (!ok) return;
+        var url =
+          typeof window.gcHsEnqueueDeletesBatchUrl === "string"
+            ? window.gcHsEnqueueDeletesBatchUrl
+            : "";
+        if (!url) {
+          window.gcAlert("Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em =
+                (x.j && (x.j.detail || x.j.message)) || "Could not delete selected rows.";
+              window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            if (typeof window.gcHsDispatchAfterDeleteBatch === "function") {
+              window.gcHsDispatchAfterDeleteBatch();
+            } else {
+              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            }
+            if (tbl.refresh) tbl.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            window.gcAlert("Network error.");
           });
-        })
-        .then(function (x) {
-          btn.disabled = false;
-          if (!x.ok) {
-            var em =
-              (x.j && (x.j.detail || x.j.message)) || "Could not delete selected rows.";
-            alert(typeof em === "string" ? em : JSON.stringify(em));
-            return;
-          }
-          if (typeof window.gcHsDispatchAfterDeleteBatch === "function") {
-            window.gcHsDispatchAfterDeleteBatch();
-          } else {
-            document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-          }
-          if (tbl.refresh) tbl.refresh();
-        })
-        .catch(function () {
-          btn.disabled = false;
-          alert("Network error.");
-        });
+      });
     });
   }
 

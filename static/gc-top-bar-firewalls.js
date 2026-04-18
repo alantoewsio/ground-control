@@ -248,11 +248,9 @@
     return filtered;
   };
 
-  let ICON_CIRCLE_MINUS =
-    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path fill="currentColor" d="M8 11.25h8v1.5H8z"/></svg>';
+  let ICON_CIRCLE_MINUS = (window.gcIcon ? window.gcIcon("do_not_disturb_on", { size: "sm" }) : "");
 
-  let ICON_EYE_EXCLUSIVE =
-    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  let ICON_EYE_EXCLUSIVE = (window.gcIcon ? window.gcIcon("visibility", { size: "sm" }) : "");
 
   (function syncFirewallInventoryFromPageJson() {
     let fws = typeof globalThis !== "undefined" ? globalThis.gcNavFirewallsJson : null;
@@ -297,23 +295,14 @@
     return !!(shell && shell.hasAttribute("data-gc-skip-fw-table-filter"));
   };
 
-  /* Compact action icons for “In scope” rows (inventory table uses 18px). */
-  let ICON_WEBADMIN =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>';
-  let ICON_SSH =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5a2 2 0 012-2h12a2 2 0 012 2v4H4V5zm0 6h16v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8zm3.5 2.5l2 2-2 2 1.06 1.06L11.56 14 8.56 11l-1.06 1.06zm4.5 4.5h5v1.5h-5V14z"/></svg>';
-  let ICON_MONITOR =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3 17h2v-7H3v7zm4 0h2V7H7v10zm4 0h2v-4h-2v4zm4 0h2v-8h-2v8zm4 0h2V3h-2v14z"/></svg>';
-  let ICON_CONFIG_VIEWER =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>';
-  let ICON_SYNC =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
-  /* MDI hat-fedora — detective / “inspect” (Apache-2.0, pictogrammers.com) */
-  let ICON_TEST =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.11,11.92C19.13,11.71 19.14,11.5 19.14,11.29C19.14,7.86 17.71,4.14 16.28,4.14C14.85,4.14 13.42,5.57 12,5.57C10.57,5.57 9.14,4.14 7.71,4.14C6.28,4.14 4.86,7.79 4.86,11.29C4.86,11.5 4.86,11.71 4.88,11.92C7.22,12.45 9.6,12.72 12,12.71C14.45,12.71 16.83,12.44 19.11,11.92M3.45,18.18C9,19.85 14.96,19.86 20.54,18.18C20.96,18.04 21.33,17.77 21.59,17.41C21.85,17.05 22,16.61 22,16.17C22,15.72 21.86,15.29 21.61,14.92C21.35,14.56 21,14.29 20.56,14.14C17.86,15 15,15.45 12,15.45C9,15.45 6.13,15 3.43,14.14C3,14.29 2.65,14.57 2.39,14.93C2.14,15.29 2,15.72 2,16.17C2,17.11 2.61,17.9 3.45,18.18Z"/></svg>';
-  /* Lucide "wrench" (stroke reads clearly at 18px; fill="none" avoids muddy blob). */
-  let ICON_INVENTORY_WRENCH =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+  /* Compact action icons for “In scope” rows (inventory table uses xs == 16px). */
+  let ICON_WEBADMIN = (window.gcIcon ? window.gcIcon("public", { size: "xs" }) : "");
+  let ICON_SSH = (window.gcIcon ? window.gcIcon("terminal", { size: "xs" }) : "");
+  let ICON_MONITOR = (window.gcIcon ? window.gcIcon("bar_chart", { size: "xs" }) : "");
+  let ICON_CONFIG_VIEWER = (window.gcIcon ? window.gcIcon("search", { size: "xs" }) : "");
+  let ICON_SYNC = (window.gcIcon ? window.gcIcon("sync", { size: "xs" }) : "");
+  let ICON_TEST = (window.gcIcon ? window.gcIcon("science", { size: "xs" }) : "");
+  let ICON_INVENTORY_WRENCH = (window.gcIcon ? window.gcIcon("build", { size: "sm" }) : "");
 
   let LS_KEY_SYNC_ENTITIES = "ground-control-fw-sync-entities-v1";
   let CONFIG_SYNC_PROGRESS_MSG = "Syncing configuration cache from the firewall…";

@@ -1,0 +1,87 @@
+{% extends "configurations_base.html" %}
+{% from "partials/_routing_page.html" import routing_filter_asides, routing_tablist, routing_tab_panels, routing_cols_modals, routing_edit_flyout, routing_no_selection_banner %}
+{% set cfg_subnav_active = "routing" %}
+{% block title %}Routing &middot; Configuration &middot; Ground Control{% endblock %}
+{% block page_title %}Routing{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls?tab=configurations">Configuration</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Routing</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Static routes, failover gateways and per-zone custom gateways stored on each configuration. Edits are saved
+  directly to the configuration cache &mdash; not the task queue.
+</p>
+{% endblock %}
+
+{% block content %}
+{% set rt_prefix = "gc-cfg-rt" %}
+{% set rt_v4_subtitle = "Combined view merges rows that share the same destination IP across configurations." %}
+{% set rt_v6_subtitle = rt_v4_subtitle %}
+{% set rt_gateway_subtitle = "Combined view merges gateways with the same name across configurations." %}
+{% set rt_custom_subtitle = "Combined view merges custom gateways with the same name across configurations." %}
+
+<main class="layout single gc-network-page gc-hosts-services-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ routing_filter_asides(rt_prefix) }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        {{ routing_tablist(rt_prefix, rt_prefix ~ "-main-tablist", "data-gc-cfg-rt-tab") }}
+        {{ routing_tab_panels(rt_prefix, rt_v4_subtitle, rt_v6_subtitle, rt_gateway_subtitle, rt_custom_subtitle, false) }}
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ routing_cols_modals(rt_prefix) }}
+{{ routing_edit_flyout("Save") }}
+{{ routing_no_selection_banner("configurations") }}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-combine-flyout-conflicts.js"></script>
+<script src="/static/gc-routing-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-routing-page.js?v={{ app_about.app_version }}"></script>
+<script>
+  window.gcRoutingEntityTarget = "configuration";
+  window.gcHsApplyDeletesBatchUrl = {{ url_api_configurations_apply_hs_deletes_batch | tojson }};
+  window.gcHsApplyUpdatesBatchUrl = {{ url_api_configurations_apply_hs_updates_batch | tojson }};
+  window.gcHsApplyCreatesBatchUrl = {{ url_api_configurations_apply_hs_creates_batch | tojson }};
+</script>
+<script>
+  (function () {
+    gcRoutingPageInit({
+      prefix: "gc-cfg-rt",
+      tablistId: "gc-cfg-rt-main-tablist",
+      tabDataAttr: "data-gc-cfg-rt-tab",
+      lsKey: "ground-control-cfg-routing-main-tab",
+      lsColsPrefix: "ground-control-cfg-rt-cols-",
+      apiBase: {{ url_api_configurations_hosts_services_table | tojson }},
+      target: "configuration",
+      deleteUrl: window.gcHsApplyDeletesBatchUrl,
+      emptySelectionMsg: "Select one or more configurations in the top bar.",
+      bannerId: "gc-rt-no-fw-banner",
+      refreshEvents: ["gc-configuration-selection-changed", "gc-configuration-entries-updated"],
+      entriesUpdatedEvent: "gc-configuration-entries-updated",
+      getSelectedIds: function () {
+        return window.gcGetSelectedConfigurationIds && typeof window.gcGetSelectedConfigurationIds === "function"
+          ? window.gcGetSelectedConfigurationIds() : [];
+      },
+      buildEmptyCache: function (countPlural) {
+        return "No " + countPlural + " in the cache for the selected configurations.";
+      },
+      deleteConfirmMsg: function (n, countPlural) {
+        return "Delete " + n + " " + countPlural + " from the selected configurations?";
+      },
+    });
+  })();
+</script>
+{% endblock %}

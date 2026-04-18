@@ -81,13 +81,18 @@ from app.firewall_config_sync import (
 )
 from app.firewall_connectivity import firewall_is_online
 from app.hs_flyout_merge import (
+    merge_clientless_user_form,
     merge_country_group_form,
     merge_fqdn_host_form,
     merge_fqdn_hostgroup_form,
+    merge_gateway_form,
+    merge_gateway_host_form,
     merge_ip_hostgroup_form,
+    merge_local_service_acl_form,
     merge_mac_host_form,
     merge_service_form,
     merge_service_group_form,
+    merge_unicast_route_form,
 )
 from app.interface_flyout_merge import (
     alias_create_merged_payload,
@@ -171,22 +176,26 @@ GENERIC_SYNC_XML_ENTITY_TAGS: dict[str, str] = {
     "admin_authen": "AdminAuthentication",
     "admin_settings": "AdminSettings",
     "backup": "BackupRestore",
+    "clientless_user": "ClientlessUser",
     "dns_forwarders": "DNS",
     ENTITY_DOS_BYPASS_RULE: "DoSBypassRule",
     ENTITY_FIREWALL_RULE: "FirewallRule",
     ENTITY_IPS_FULL_SIGNATURE_PACK: "IPSFullSignaturePack",
+    "gateway_host": "GatewayHost",
     "notification": "Notification",
     "notification_list": "NotificationList",
     "reports_retention": "DataManagement",
     ENTITY_FIREWALL_RULE_GROUP: "FirewallRuleGroup",
     "snmpv3_user": "SNMPv3User",
     "syslog_server": "SyslogServers",
+    "unicast_route": "UnicastRoute",
     "url_group": "WebFilterURLGroup",
     "useractivity": "UserActivity",
 }
 
 GENERIC_SYNC_LOOKUP_XML_KEYS: dict[str, str] = {
     "acl_rule": "RuleName",
+    "unicast_route": "DestinationIP",
 }
 
 GENERIC_SYNC_SINGLETON_ENTITY_TYPES: frozenset[str] = frozenset(
@@ -876,11 +885,14 @@ def sync_catalog_ids_for_task_entity(entity_type: str) -> list[str]:
         "admin_authen": "admin_authen",
         "admin_settings": "admin_settings",
         "backup": "backup",
+        "clientless_user": "clientless_user",
         "dns_forwarders": "dns_forwarders",
         ENTITY_DOS_BYPASS_RULE: ENTITY_DOS_BYPASS_RULE,
         ENTITY_FIREWALL_RULE: ENTITY_FIREWALL_RULE,
         "fqdn_host": "fqdn_host",
         "fqdn_hostgroup": "fqdn_hostgroup",
+        "gateway": "gateway",
+        "gateway_host": "gateway_host",
         ENTITY_IPS_FULL_SIGNATURE_PACK: ENTITY_IPS_FULL_SIGNATURE_PACK,
         "mac_host": "mac_host",
         "notification": "notification",
@@ -892,6 +904,7 @@ def sync_catalog_ids_for_task_entity(entity_type: str) -> list[str]:
         "snmpv3_user": "snmpv3_user",
         "syslog_server": "syslog_server",
         "country_group": "country_group",
+        "unicast_route": "unicast_route",
         "url_group": "url_group",
         "useractivity": "useractivity",
     }
@@ -1149,6 +1162,7 @@ _TASK_QUEUE_SEND_SUPPORTED_ENTITY_TYPES = frozenset(
         ENTITY_LAG,
         ENTITY_ALIAS,
         ENTITY_ZONE,
+        "clientless_user",
         "dns_forwarders",
         ENTITY_DOS_BYPASS_RULE,
         ENTITY_IPS_SWITCH,
@@ -1159,6 +1173,8 @@ _TASK_QUEUE_SEND_SUPPORTED_ENTITY_TYPES = frozenset(
         ENTITY_IPS_POLICY,
         ENTITY_WEBFILTER_POLICY,
         ENTITY_IPS_CUSTOM_SIGNATURE,
+        "gateway",
+        "gateway_host",
         "notification",
         "notification_list",
         "reports_retention",
@@ -1166,6 +1182,7 @@ _TASK_QUEUE_SEND_SUPPORTED_ENTITY_TYPES = frozenset(
         "snmpv3_user",
         "syslog_server",
         ENTITY_TRUSTED_MAC,
+        "unicast_route",
         "url_group",
         "useractivity",
         ENTITY_IP_HOST,
@@ -1185,6 +1202,7 @@ _TASK_QUEUE_CREATE_SUPPORTED_ENTITY_TYPES = frozenset(
         ENTITY_LAG,
         ENTITY_ALIAS,
         "backup",
+        "clientless_user",
         "dns_forwarders",
         ENTITY_DOS_BYPASS_RULE,
         ENTITY_ZONE,
@@ -1196,6 +1214,8 @@ _TASK_QUEUE_CREATE_SUPPORTED_ENTITY_TYPES = frozenset(
         ENTITY_IPS_POLICY,
         ENTITY_WEBFILTER_POLICY,
         ENTITY_IPS_CUSTOM_SIGNATURE,
+        "gateway",
+        "gateway_host",
         "notification",
         "notification_list",
         "reports_retention",
@@ -1203,6 +1223,7 @@ _TASK_QUEUE_CREATE_SUPPORTED_ENTITY_TYPES = frozenset(
         "snmpv3_user",
         "syslog_server",
         ENTITY_TRUSTED_MAC,
+        "unicast_route",
         "url_group",
         "useractivity",
         ENTITY_IP_HOST,
@@ -4036,6 +4057,17 @@ HS_TASK_ENTITY_TYPES = frozenset(
         "country_group",
         "service",
         "service_group",
+        # Routing / Authentication / Administration entities reuse the HS-style
+        # flyout-merge + enqueue/apply pipeline.  ``acl_rule`` and the others all
+        # have ``merge_*_form`` dispatchers in ``hs_flyout_merge``; XML push for
+        # them runs via ``HS_XML_TAG`` (gateway) or ``GENERIC_SYNC_XML_ENTITY_TAGS``
+        # (the rest), so the dispatch in ``process_task`` already targets the
+        # correct lookup_key per entity.
+        "acl_rule",
+        "clientless_user",
+        "gateway",
+        "gateway_host",
+        "unicast_route",
     }
 )
 
@@ -4057,7 +4089,36 @@ HS_XML_TAG: dict[str, str] = {
     "service": "Services",
     "service_group": "ServiceGroup",
     "country_group": "CountryGroup",
+    # Gateway must be wrapped in <GatewayConfiguration> on add; the special
+    # case lives in ``_process_hs_create_or_add`` (calls ``_submit_gateway_xml_add``).
+    # Updates use the standard ``fw.update("Gateway", ..., lookup_key="Name")`` path.
+    "gateway": "Gateway",
 }
+
+# Identity field per entity_type for the HS-style flyout/create flow.  Most
+# entities use ``Name``; a couple use a different XML key (matches
+# ``GENERIC_SYNC_LOOKUP_XML_KEYS`` plus ``acl_rule``/``RuleName``).
+HS_ENTITY_IDENTITY_KEYS: dict[str, str] = {
+    "acl_rule": "RuleName",
+    "unicast_route": "DestinationIP",
+}
+
+
+def hs_entity_external_name(entity_type: str, merged: dict[str, Any]) -> str:
+    """Return the cache external_name for ``entity_type`` from a merged payload."""
+    key = HS_ENTITY_IDENTITY_KEYS.get(entity_type, "Name")
+    raw = merged.get(key)
+    return str(raw or "").strip()
+
+
+def hs_entity_identity_label(entity_type: str) -> str:
+    """Friendly label for the identity field, used in user-facing errors."""
+    key = HS_ENTITY_IDENTITY_KEYS.get(entity_type, "Name")
+    if key == "RuleName":
+        return "Rule name"
+    if key == "DestinationIP":
+        return "Destination IP"
+    return "Name"
 
 
 def merge_hs_flyout_form(
@@ -4079,6 +4140,16 @@ def merge_hs_flyout_form(
         return merge_service_group_form(base, form)
     if entity_type == "country_group":
         return merge_country_group_form(base, form)
+    if entity_type == "unicast_route":
+        return merge_unicast_route_form(base, form)
+    if entity_type == "gateway":
+        return merge_gateway_form(base, form)
+    if entity_type == "gateway_host":
+        return merge_gateway_host_form(base, form)
+    if entity_type == "clientless_user":
+        return merge_clientless_user_form(base, form)
+    if entity_type == "acl_rule":
+        return merge_local_service_acl_form(base, form)
     raise ValueError(f"Unsupported hosts/services entity type: {entity_type}")
 
 
@@ -4183,6 +4254,33 @@ def _submit_hs_xml_add(fw: SophosFirewall, root_tag: str, merged: dict[str, Any]
     fw.submit_xml(inner.strip(), {}, set_operation="add")
 
 
+def _submit_gateway_xml_add(fw: SophosFirewall, merged: dict[str, Any]) -> None:
+    """Submit a new Gateway via the ``<GatewayConfiguration>`` envelope.
+
+    The Sophos XML API for failover gateways does not accept a bare
+    ``<Gateway>`` root on Set add - it must be wrapped with
+    ``<GatewayConfiguration><GatewayFailoverTimeout>...<Gateway>...``.
+    The wrapper plus default failover timeout are added here so the merge
+    payload can stay focused on the entity itself.
+    """
+    body = {k: v for k, v in merged.items() if not str(k).startswith("@") and k != "__gc_op"}
+    clean = _prune_none_values(body)
+    if not isinstance(clean, dict):
+        clean = {}
+    timeout_raw = clean.pop("GatewayFailoverTimeout", None)
+    timeout = str(timeout_raw).strip() if timeout_raw not in (None, "") else "60"
+    envelope = {
+        "GatewayConfiguration": {
+            "GatewayFailoverTimeout": timeout,
+            "Gateway": clean,
+        }
+    }
+    inner = xmltodict.unparse(envelope, pretty=True, full_document=False, encoding="utf-8")
+    if isinstance(inner, bytes):
+        inner = inner.decode("utf-8")
+    fw.submit_xml(inner.strip(), {}, set_operation="add")
+
+
 def _process_hs_create_or_add(
     fw: SophosFirewall,
     db: Session,
@@ -4228,6 +4326,9 @@ def _process_hs_create_or_add(
         desc = merged.get("Description")
         desc_s = "" if desc is None else str(desc)
         IPHostGroup(fw.client).create(name, hosts, desc_s, debug=False)
+        return
+    if et == "gateway":
+        _submit_gateway_xml_add(fw, merged)
         return
     _submit_hs_xml_add(fw, xml_tag, merged)
 
@@ -4477,9 +4578,9 @@ def enqueue_hs_entity_create_many(
         raise ValueError("Select at least one firewall")
     base: dict[str, Any] = {}
     merged = merge_hs_flyout_form(entity_type, base, form)
-    name = str(merged.get("Name") or "").strip()
+    name = hs_entity_external_name(entity_type, merged)
     if not name:
-        raise ValueError("Name is required")
+        raise ValueError(hs_entity_identity_label(entity_type) + " is required")
     payload = {**merged, "__gc_op": "add"}
     payload_json = json.dumps(payload, separators=(",", ":"), default=str)
     tasks: list[TaskQueue] = []

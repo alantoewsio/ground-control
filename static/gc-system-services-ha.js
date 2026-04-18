@@ -271,19 +271,19 @@
       copyBtn.addEventListener("click", function () {
         if (!lastPassphraseForCopy) {
           try {
-            alert("No passphrase value in the cached sync payload.");
+            window.gcAlert("No passphrase value in the cached sync payload.");
           } catch (e) {}
           return;
         }
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(lastPassphraseForCopy).catch(function () {
             try {
-              alert("Could not copy to clipboard.");
+              window.gcAlert("Could not copy to clipboard.");
             } catch (e2) {}
           });
         } else {
           try {
-            alert("Clipboard API not available.");
+            window.gcAlert("Clipboard API not available.");
           } catch (e3) {}
         }
       });

@@ -164,8 +164,10 @@
     function bannerResult(ok, msg) {
       if (typeof window.gcGlobalBannerShowResult === "function") {
         window.gcGlobalBannerShowResult(ok, msg);
+      } else if (typeof window.gcAlert === "function") {
+        window.gcAlert(msg);
       } else {
-        alert(msg);
+        globalThis.alert(msg);
       }
     }
 
@@ -478,23 +480,23 @@
           bannerResult(false, "Select one or more policies to delete.");
           return;
         }
-        if (
-          !window.confirm(
-            "Queue deletion of " +
-              ids.length +
-              " web filter polic" +
-              (ids.length === 1 ? "y" : "ies") +
-              " on the firewall(s)? Policies are removed when the tasks are sent from the queue.",
-          )
-        ) {
-          return;
-        }
-        if (!ENQUEUE_WFP_DELETES) {
-          bannerResult(false, "Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(ENQUEUE_WFP_DELETES, {
+        var msg =
+          "Queue deletion of " +
+          ids.length +
+          " web filter polic" +
+          (ids.length === 1 ? "y" : "ies") +
+          " on the firewall(s)? Policies are removed when the tasks are sent from the queue.";
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!ENQUEUE_WFP_DELETES) {
+            bannerResult(false, "Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(ENQUEUE_WFP_DELETES, {
           method: "POST",
           credentials: "same-origin",
           headers: {
@@ -528,6 +530,7 @@
             btn.disabled = false;
             bannerResult(false, "Network error.");
           });
+        });
       });
     })();
 

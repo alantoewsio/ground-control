@@ -69,9 +69,9 @@
           </div>
         </div>
       </div>
-      <footer class="gc-if-flyout__footer">
-        <button type="submit" class="btn primary" id="gc-alias-flyout-save" disabled>Save</button>
-        <button type="button" class="link-btn" id="gc-alias-flyout-cancel">Cancel</button>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-alias-flyout-save" disabled>{{ save_label | default('Save') }}</button>
+        <button type="button" class="btn btn--secondary" id="gc-alias-flyout-cancel">Close</button>
       </footer>
     </form>
   </div>

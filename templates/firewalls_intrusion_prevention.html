@@ -575,8 +575,10 @@
     function bannerResult(ok, msg) {
       if (typeof window.gcGlobalBannerShowResult === "function") {
         window.gcGlobalBannerShowResult(ok, msg);
+      } else if (typeof window.gcAlert === "function") {
+        window.gcAlert(msg);
       } else {
-        alert(msg);
+        globalThis.alert(msg);
       }
     }
 
@@ -665,46 +667,47 @@
         var nextOn = !currentlyOn;
         var verb = nextOn ? "enable" : "disable";
         var fwLabel = (row.cells && row.cells.__name) || "this firewall";
-        if (
-          !window.confirm(
-            "Add a task to the queue to " +
-              verb +
-              " IPS on " +
-              fwLabel +
-              "? The firewall is updated when the task is sent from the queue.",
-          )
-        ) {
-          return;
-        }
-        btn.disabled = true;
-        enqueueIpsSwitchItems([
-          {
-            config_entry_id: row.config_entry_id,
-            status: nextOn ? "Enable" : "Disable",
-          },
-        ])
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.error)) || "Request failed.";
-              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            var n = (x.j && x.j.count) || 0;
-            if (n < 1) {
-              bannerResult(
-                true,
-                "Nothing queued — the cached IPS state already matches the requested setting.",
-              );
-            } else {
-              bannerResult(true, "Added 1 task to the queue.");
-              dispatchTaskQueueUpdated();
-            }
-          })
-          .catch(function () {
-            btn.disabled = false;
-            bannerResult(false, "Network error.");
-          });
+        var msg =
+          "Add a task to the queue to " +
+          verb +
+          " IPS on " +
+          fwLabel +
+          "? The firewall is updated when the task is sent from the queue.";
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          btn.disabled = true;
+          enqueueIpsSwitchItems([
+            {
+              config_entry_id: row.config_entry_id,
+              status: nextOn ? "Enable" : "Disable",
+            },
+          ])
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em = (x.j && (x.j.detail || x.j.error)) || "Request failed.";
+                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              var n = (x.j && x.j.count) || 0;
+              if (n < 1) {
+                bannerResult(
+                  true,
+                  "Nothing queued — the cached IPS state already matches the requested setting.",
+                );
+              } else {
+                bannerResult(true, "Added 1 task to the queue.");
+                dispatchTaskQueueUpdated();
+              }
+            })
+            .catch(function () {
+              btn.disabled = false;
+              bannerResult(false, "Network error.");
+            });
+        });
       });
     }
 
@@ -726,48 +729,49 @@
       });
       if (!items.length) return;
       var verb = enableTargets ? "enable" : "disable";
-      if (
-        !window.confirm(
-          "Add " +
-            items.length +
-            " task" +
-            (items.length === 1 ? "" : "s") +
-            " to the queue to " +
-            verb +
-            " IPS on the selected firewalls? Firewalls are updated when tasks are sent from the queue.",
-        )
-      ) {
-        return;
-      }
-      var btn = enableTargets ? enableBulkBtn : disableBulkBtn;
-      if (btn) btn.disabled = true;
-      enqueueIpsSwitchItems(items)
-        .then(function (x) {
-          if (btn) btn.disabled = false;
-          if (!x.ok) {
-            var em = (x.j && (x.j.detail || x.j.error)) || "Request failed.";
-            bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-            return;
-          }
-          var n = (x.j && x.j.count) || 0;
-          if (n < 1) {
-            bannerResult(
-              true,
-              "Nothing queued — selected firewalls already match the requested IPS state in the cache.",
-            );
-          } else {
-            bannerResult(
-              true,
-              n === 1 ? "Added 1 task to the queue." : "Added " + n + " tasks to the queue.",
-            );
-            dispatchTaskQueueUpdated();
-          }
-          syncIpsBulkToolbar();
-        })
-        .catch(function () {
-          if (btn) btn.disabled = false;
-          bannerResult(false, "Network error.");
-        });
+      var msg =
+        "Add " +
+        items.length +
+        " task" +
+        (items.length === 1 ? "" : "s") +
+        " to the queue to " +
+        verb +
+        " IPS on the selected firewalls? Firewalls are updated when tasks are sent from the queue.";
+      var cf = window.gcConfirm
+        ? window.gcConfirm(msg)
+        : Promise.resolve(globalThis.confirm(msg));
+      cf.then(function (ok) {
+        if (!ok) return;
+        var btn = enableTargets ? enableBulkBtn : disableBulkBtn;
+        if (btn) btn.disabled = true;
+        enqueueIpsSwitchItems(items)
+          .then(function (x) {
+            if (btn) btn.disabled = false;
+            if (!x.ok) {
+              var em = (x.j && (x.j.detail || x.j.error)) || "Request failed.";
+              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            var n = (x.j && x.j.count) || 0;
+            if (n < 1) {
+              bannerResult(
+                true,
+                "Nothing queued — selected firewalls already match the requested IPS state in the cache.",
+              );
+            } else {
+              bannerResult(
+                true,
+                n === 1 ? "Added 1 task to the queue." : "Added " + n + " tasks to the queue.",
+              );
+              dispatchTaskQueueUpdated();
+            }
+            syncIpsBulkToolbar();
+          })
+          .catch(function () {
+            if (btn) btn.disabled = false;
+            bannerResult(false, "Network error.");
+          });
+      });
     }
 
     if (enableBulkBtn) {
@@ -987,56 +991,57 @@
           bannerResult(false, "Select one or more policies to delete.");
           return;
         }
-        if (
-          !window.confirm(
-            "Queue deletion of " +
-              ids.length +
-              " IPS polic" +
-              (ids.length === 1 ? "y" : "ies") +
-              " on the firewall(s)? Policies are removed when the tasks are sent from the queue.",
-          )
-        ) {
-          return;
-        }
-        if (!ENQUEUE_IPS_POLICY_DELETES) {
-          bannerResult(false, "Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(ENQUEUE_IPS_POLICY_DELETES, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var msg =
+          "Queue deletion of " +
+          ids.length +
+          " IPS polic" +
+          (ids.length === 1 ? "y" : "ies") +
+          " on the firewall(s)? Policies are removed when the tasks are sent from the queue.";
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!ENQUEUE_IPS_POLICY_DELETES) {
+            bannerResult(false, "Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(ENQUEUE_IPS_POLICY_DELETES, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              var n = (x.j && x.j.count) || 0;
+              bannerResult(
+                true,
+                n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
+              );
+              dispatchTaskQueueUpdated();
+              if (tablePol.refresh) tablePol.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              bannerResult(false, "Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
-              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            var n = (x.j && x.j.count) || 0;
-            bannerResult(
-              true,
-              n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
-            );
-            dispatchTaskQueueUpdated();
-            if (tablePol.refresh) tablePol.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            bannerResult(false, "Network error.");
-          });
+        });
       });
     })();
 
@@ -1050,56 +1055,57 @@
           bannerResult(false, "Select one or more trusted MAC entries to delete.");
           return;
         }
-        if (
-          !window.confirm(
-            "Queue deletion of " +
-              ids.length +
-              " trusted MAC entr" +
-              (ids.length === 1 ? "y" : "ies") +
-              " on the firewall(s)? Entries are removed when the tasks are sent from the queue.",
-          )
-        ) {
-          return;
-        }
-        if (!ENQUEUE_IPS_TRUSTED_MAC_DELETES) {
-          bannerResult(false, "Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(ENQUEUE_IPS_TRUSTED_MAC_DELETES, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var msg =
+          "Queue deletion of " +
+          ids.length +
+          " trusted MAC entr" +
+          (ids.length === 1 ? "y" : "ies") +
+          " on the firewall(s)? Entries are removed when the tasks are sent from the queue.";
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!ENQUEUE_IPS_TRUSTED_MAC_DELETES) {
+            bannerResult(false, "Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(ENQUEUE_IPS_TRUSTED_MAC_DELETES, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              var n = (x.j && x.j.count) || 0;
+              bannerResult(
+                true,
+                n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
+              );
+              dispatchTaskQueueUpdated();
+              if (tableTmac.refresh) tableTmac.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              bannerResult(false, "Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
-              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            var n = (x.j && x.j.count) || 0;
-            bannerResult(
-              true,
-              n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
-            );
-            dispatchTaskQueueUpdated();
-            if (tableTmac.refresh) tableTmac.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            bannerResult(false, "Network error.");
-          });
+        });
       });
     })();
 
@@ -1113,56 +1119,57 @@
           bannerResult(false, "Select one or more custom signatures to delete.");
           return;
         }
-        if (
-          !window.confirm(
-            "Queue deletion of " +
-              ids.length +
-              " custom IPS signature" +
-              (ids.length === 1 ? "" : "s") +
-              " on the firewall(s)? Objects are removed when the tasks are sent from the queue.",
-          )
-        ) {
-          return;
-        }
-        if (!ENQUEUE_IPS_CUSTOM_SIG_DELETES) {
-          bannerResult(false, "Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(ENQUEUE_IPS_CUSTOM_SIG_DELETES, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var msg =
+          "Queue deletion of " +
+          ids.length +
+          " custom IPS signature" +
+          (ids.length === 1 ? "" : "s") +
+          " on the firewall(s)? Objects are removed when the tasks are sent from the queue.";
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!ENQUEUE_IPS_CUSTOM_SIG_DELETES) {
+            bannerResult(false, "Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(ENQUEUE_IPS_CUSTOM_SIG_DELETES, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              var n = (x.j && x.j.count) || 0;
+              bannerResult(
+                true,
+                n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
+              );
+              dispatchTaskQueueUpdated();
+              if (tableSig.refresh) tableSig.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              bannerResult(false, "Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em = (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
-              bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            var n = (x.j && x.j.count) || 0;
-            bannerResult(
-              true,
-              n === 1 ? "Added 1 delete task to the queue." : "Added " + n + " delete tasks to the queue.",
-            );
-            dispatchTaskQueueUpdated();
-            if (tableSig.refresh) tableSig.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            bannerResult(false, "Network error.");
-          });
+        });
       });
     })();
 

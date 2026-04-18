@@ -2406,16 +2406,40 @@
      * Fill a standalone object-selector-list mount (data-gc-designer-object-selector="object-selector-list")
      * with grouped entity types: distinct cache types plus Designer · Navigation labels and facet order.
      */
-    window.gcDesignerHydrateObjectSelectorList = function (containerEl, onReady) {
+    /**
+     * @param {HTMLElement} containerEl
+     * @param {Function=}   onReady
+     * @param {Object=}     opts
+     * @param {string[]=}   opts.extraTypes  Additional entity_type ids to surface
+     *   even if the cache does not yet contain rows for them. Used by the Sync
+     *   object selector so newly registered (but never-synced) entity types
+     *   appear as opt-in toggles instead of being hidden until a successful
+     *   sync produces rows.
+     */
+    window.gcDesignerHydrateObjectSelectorList = function (containerEl, onReady, opts) {
       if (!containerEl) return;
+      var extraTypes = opts && Array.isArray(opts.extraTypes) ? opts.extraTypes : [];
       Promise.all([loadDistinctTypes(), loadSavedEntries()])
         .then(function (pair) {
-          var types = pair[0];
+          var cachedTypes = pair[0];
           var pack = pair[1] || {};
           var entries = pack.entries && typeof pack.entries === "object" ? pack.entries : {};
           var fo = normalizeFacetOrders(pack.facet_orders);
           var prevFo = state.facetOrders;
           state.facetOrders = fo;
+          // Merge cached types with extras (catalog seed) preserving order and
+          // deduping. Cached types come first so the historical ordering for
+          // existing pages is unchanged.
+          var seen = {};
+          var types = [];
+          cachedTypes.forEach(function (t) {
+            var k = trimStr(t);
+            if (k && !seen[k]) { seen[k] = true; types.push(k); }
+          });
+          extraTypes.forEach(function (t) {
+            var k = trimStr(t);
+            if (k && !seen[k]) { seen[k] = true; types.push(k); }
+          });
           try {
             fillObjectSelectorList(containerEl, types, entries);
           } finally {

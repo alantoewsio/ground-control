@@ -746,11 +746,9 @@
         rm.type = "button";
         rm.className = "gc-ip-list-field__remove";
         rm.setAttribute("aria-label", "Remove this entry");
-        rm.innerHTML =
-          '<svg class="gc-ip-list-field__remove-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-          '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5" />' +
-          '<path d="M9 9l6 6M15 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />' +
-          "</svg>";
+        rm.innerHTML = (window.gcIcon
+          ? window.gcIcon("cancel", { size: "md", cls: "gc-ip-list-field__remove-icon" })
+          : "");
         rm.addEventListener("click", function (ev) {
           ev.preventDefault();
           ev.stopPropagation();

@@ -28,13 +28,13 @@
   let syncOutcomes = [];
   let syncBaseMessage = "Syncing configuration cache from the firewall…";
 
-  let CHECK_SVG =
-    '<svg class="gc-global-banner__glyph" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
-    '<path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+  let CHECK_SVG = (window.gcIcon
+    ? window.gcIcon("check", { size: "md", cls: "gc-global-banner__glyph" })
+    : "");
 
-  let ERROR_SVG =
-    '<svg class="gc-global-banner__glyph" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
-    '<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
+  let ERROR_SVG = (window.gcIcon
+    ? window.gcIcon("error", { size: "md", cls: "gc-global-banner__glyph" })
+    : "");
 
   function root() {
     return document.getElementById("gc-global-banner");

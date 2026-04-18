@@ -8,7 +8,7 @@
     if (typeof globalThis.gcGlobalBannerShowResult === "function") {
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
-      alert(msg);
+      window.gcAlert(msg);
     }
   }
 
@@ -274,38 +274,44 @@
             bannerResult(false, "Select one or more rows.");
             return;
           }
-          if (!globalThis.confirm("Queue deletion of " + ids.length + " row(s)?")) return;
-          delBtn.disabled = true;
-          fetch(urls.deleteBatch, {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              "X-Requested-With": "Ground-Control",
-            },
-            body: JSON.stringify({ config_entry_ids: ids }),
-          })
-            .then(function (r) {
-              return r.json().then(function (j) {
-                return { ok: r.ok, j: j };
+          let qMsg = "Queue deletion of " + ids.length + " row(s)?";
+          let cf = window.gcConfirm
+            ? window.gcConfirm(qMsg, { tone: "danger", confirmLabel: "Queue deletes" })
+            : Promise.resolve(globalThis.confirm(qMsg));
+          cf.then(function (ok) {
+            if (!ok) return;
+            delBtn.disabled = true;
+            fetch(urls.deleteBatch, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                "X-Requested-With": "Ground-Control",
+              },
+              body: JSON.stringify({ config_entry_ids: ids }),
+            })
+              .then(function (r) {
+                return r.json().then(function (j) {
+                  return { ok: r.ok, j: j };
+                });
+              })
+              .then(function (x) {
+                delBtn.disabled = false;
+                if (!x.ok) {
+                  let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
+                  bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
+                  return;
+                }
+                bannerResult(true, "Delete tasks queued.");
+                dispatchTaskQueueUpdated();
+                if (table.refresh) table.refresh();
+              })
+              .catch(function () {
+                delBtn.disabled = false;
+                bannerResult(false, "Network error.");
               });
-            })
-            .then(function (x) {
-              delBtn.disabled = false;
-              if (!x.ok) {
-                let em = (x.j && (x.j.detail || x.j.message)) || "Could not queue.";
-                bannerResult(false, typeof em === "string" ? em : JSON.stringify(em));
-                return;
-              }
-              bannerResult(true, "Delete tasks queued.");
-              dispatchTaskQueueUpdated();
-              if (table.refresh) table.refresh();
-            })
-            .catch(function () {
-              delBtn.disabled = false;
-              bannerResult(false, "Network error.");
-            });
+          });
         });
       }
     });

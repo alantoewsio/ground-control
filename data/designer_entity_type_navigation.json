@@ -237,12 +237,48 @@
     },
     "acl_rule": {
       "kind": "Objects",
-      "display_name": "Access Control Rule",
+      "display_name": "Local Service ACL",
       "nav_section": "SYSTEM",
       "nav_order": "",
       "nav_page": "Administration",
-      "tab": "ACL Rules",
+      "tab": "Local Service ACL",
       "nav_icon": "rule"
+    },
+    "unicast_route": {
+      "kind": "Objects",
+      "display_name": "Unicast route",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Routing",
+      "tab": "Unicast Routes",
+      "nav_icon": "alt_route"
+    },
+    "gateway": {
+      "kind": "Objects",
+      "display_name": "Gateway",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Routing",
+      "tab": "Gateways",
+      "nav_icon": "router"
+    },
+    "gateway_host": {
+      "kind": "Objects",
+      "display_name": "Custom gateway",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Routing",
+      "tab": "Custom Gateways",
+      "nav_icon": "settings_ethernet"
+    },
+    "clientless_user": {
+      "kind": "Objects",
+      "display_name": "Clientless user",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Authentication",
+      "tab": "Clientless Users",
+      "nav_icon": "person_off"
     },
     "admin_settings": {
       "kind": "Settings",

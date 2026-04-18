@@ -311,7 +311,7 @@
             });
           }
           let msg = (x.j && x.j.detail) || "Could not allocate from pool.";
-          alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+          window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
           return null;
         }
         return x;
@@ -320,7 +320,7 @@
         if (!x) return;
         if (!x.ok || !x.j || !x.j.cidr) {
           let msg2 = (x.j && x.j.detail) || "Could not allocate from pool.";
-          alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
+          window.gcAlert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
           return;
         }
         applyNextCidrToV4Row(tr, x.j.cidr);
@@ -333,7 +333,7 @@
         dirty(ro);
       })
       .catch(function () {
-        alert("Network error while requesting next CIDR.");
+        window.gcAlert("Network error while requesting next CIDR.");
       });
   }
 
@@ -353,7 +353,7 @@
       .then(function (x) {
         if (!x.ok || !x.j || !x.j.cidr) {
           let msg = (x.j && x.j.detail) || "Could not allocate from pool.";
-          alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+          window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
           return;
         }
         applyNextCidrToV6Row(tr, x.j.cidr);
@@ -366,7 +366,7 @@
         dirty(ro);
       })
       .catch(function () {
-        alert("Network error while requesting next CIDR.");
+        window.gcAlert("Network error while requesting next CIDR.");
       });
   }
 

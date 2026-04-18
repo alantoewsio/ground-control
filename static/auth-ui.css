@@ -1453,6 +1453,8 @@
 .settings-field-external-src__icon {
   display: block;
   vertical-align: middle;
+  color: #ca8a04;
+  font-size: 16px;
 }
 
 .settings-panel {

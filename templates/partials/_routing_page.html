@@ -1,0 +1,133 @@
+{# ---------------------------------------------------------------------------
+   Shared routing-page markup macros.
+
+   The Configurations and Firewalls routing pages share an almost identical
+   layout (filter asides, tab list, tab panels with the four entity tables,
+   column-picker modals, edit flyout and "no selection" banner). These macros
+   factor that markup into a single source so the two pages only need to pass
+   their own id-prefix and a few labels.
+
+   Args:
+     prefix             id prefix used by all elements ("gc-rt" or "gc-cfg-rt")
+     tablist_id         id for the main tablist
+     parent_label       "configurations" or "firewalls"
+     v4_subtitle        subtitle for the IPv4 unicast routes tab
+     v6_subtitle        subtitle for the IPv6 unicast routes tab
+     gateway_subtitle   subtitle for the Gateways tab
+     custom_subtitle    subtitle for the Custom gateways tab
+     toolbar_page_sync  forwarded to net_entity_table_wrap (true/false)
+     save_label         label for the flyout Save button
+   --------------------------------------------------------------------------- #}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+
+{% macro routing_filter_asides(prefix) -%}
+  {{ net_filters_aside(prefix ~ "-unicast-route-v4", false) }}
+  {{ net_filters_aside(prefix ~ "-unicast-route-v6", true) }}
+  {{ net_filters_aside(prefix ~ "-gateway", true) }}
+  {{ net_filters_aside(prefix ~ "-gateway-host", true) }}
+{%- endmacro %}
+
+{# data_attr is the *top* tab data attribute (e.g. "data-gc-rt-tab"). The
+   sub-tab data attribute is derived from it by swapping the trailing "-tab"
+   for "-subtab" so callers don't have to pass two values. #}
+{% macro routing_tablist(prefix, tablist_id, data_attr) -%}
+<div class="gc-tabs" role="tablist" aria-label="Routing views" id="{{ tablist_id }}">
+  <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
+    id="{{ prefix }}-tab-unicast-route" {{ data_attr }}="unicast_route">Unicast routes</button>
+  <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
+    id="{{ prefix }}-tab-gateway" {{ data_attr }}="gateway">Gateways</button>
+  <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
+    id="{{ prefix }}-tab-gateway-host" {{ data_attr }}="gateway_host">Custom gateways</button>
+</div>
+{%- endmacro %}
+
+{% macro routing_tab_panels(prefix, v4_subtitle, v6_subtitle, gateway_subtitle, custom_subtitle, toolbar_page_sync) -%}
+{# e.g. prefix "gc-rt" -> "data-gc-rt-subtab"; "gc-cfg-rt" -> "data-gc-cfg-rt-subtab" #}
+{% set sub_attr = "data-" ~ prefix ~ "-subtab" %}
+<div class="gc-tab-panels">
+  <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="{{ prefix }}-tab-unicast-route"
+    id="{{ prefix }}-panel-unicast-route">
+    <div class="gc-tabs gc-tabs--sub" role="tablist" aria-label="IP family"
+      id="{{ prefix }}-unicast-route-subtablist"
+      style="margin-bottom:0.5rem;font-size:0.875rem">
+      <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
+        id="{{ prefix }}-subtab-unicast-route-v4"
+        {{ sub_attr }}="unicast_route_v4">IPv4</button>
+      <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
+        id="{{ prefix }}-subtab-unicast-route-v6"
+        {{ sub_attr }}="unicast_route_v6">IPv6</button>
+    </div>
+    <div class="gc-tab-panels">
+      <div class="gc-tab-panel is-active" role="tabpanel"
+        aria-labelledby="{{ prefix }}-subtab-unicast-route-v4" id="{{ prefix }}-panel-unicast-route-v4">
+        {{ net_entity_table_wrap(prefix ~ "-unicast-route-v4", "Unicast IPv4 routes", "Search IPv4 unicast routes", true,
+          prefix ~ "-unicast-route-v4-add", "Add IPv4 unicast route",
+          v4_subtitle,
+          prefix ~ "-unicast-route-v4-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+      </div>
+      <div class="gc-tab-panel" role="tabpanel"
+        aria-labelledby="{{ prefix }}-subtab-unicast-route-v6" id="{{ prefix }}-panel-unicast-route-v6" hidden>
+        {{ net_entity_table_wrap(prefix ~ "-unicast-route-v6", "Unicast IPv6 routes", "Search IPv6 unicast routes", true,
+          prefix ~ "-unicast-route-v6-add", "Add IPv6 unicast route",
+          v6_subtitle,
+          prefix ~ "-unicast-route-v6-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+      </div>
+    </div>
+  </div>
+  <div class="gc-tab-panel" role="tabpanel" aria-labelledby="{{ prefix }}-tab-gateway"
+    id="{{ prefix }}-panel-gateway" hidden>
+    {# Gateways are part of <GatewayConfiguration> on the firewall and cannot be added
+       independently via the XML API; only edit / delete is exposed here. #}
+    {{ net_entity_table_wrap(prefix ~ "-gateway", "Gateways", "Search gateways", true,
+      none, none,
+      gateway_subtitle,
+      prefix ~ "-gateway-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+  </div>
+  <div class="gc-tab-panel" role="tabpanel" aria-labelledby="{{ prefix }}-tab-gateway-host"
+    id="{{ prefix }}-panel-gateway-host" hidden>
+    {{ net_entity_table_wrap(prefix ~ "-gateway-host", "Custom gateways", "Search custom gateways", true,
+      prefix ~ "-gateway-host-add", "Add custom gateway",
+      custom_subtitle,
+      prefix ~ "-gateway-host-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro routing_cols_modals(prefix) -%}
+{{ net_cols_modal(prefix ~ "-unicast-route-v4") }}
+{{ net_cols_modal(prefix ~ "-unicast-route-v6") }}
+{{ net_cols_modal(prefix ~ "-gateway") }}
+{{ net_cols_modal(prefix ~ "-gateway-host") }}
+{%- endmacro %}
+
+{% macro routing_edit_flyout(save_label) -%}
+<div id="gc-rt-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-rt-flyout-title" tabindex="-1">
+    <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-rt-flyout-title" class="gc-if-flyout__title">Routing object</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-rt-flyout-close" aria-label="Close" title="Close">&times;</button>
+    </header>
+    <div class="gc-if-flyout__panel-form">
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p id="gc-rt-flyout-meta" class="muted gc-hs-flyout__meta"></p>
+          <div id="gc-rt-flyout-fields"></div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="button" class="btn primary" id="gc-rt-flyout-save" hidden>{{ save_label }}</button>
+        <button type="button" class="btn btn--secondary" id="gc-rt-flyout-done">Close</button>
+      </footer>
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro routing_no_selection_banner(parent_label) -%}
+<div id="gc-rt-no-fw-banner" class="gc-hs-no-fw-banner" hidden role="alert" aria-live="assertive">
+  <span class="gc-icon gc-icon--xs" aria-hidden="true" style="flex-shrink:0">info</span>
+  Select one or more {{ parent_label }} in the top bar to add objects.
+</div>
+{%- endmacro %}

@@ -13,22 +13,7 @@
     aria-label="Collapse navigation"
   >
     <span class="app-sidebar__toggle-icon" aria-hidden="true">
-      <svg
-        class="app-sidebar__collapse-svg"
-        viewBox="0 0 28 22"
-        width="25"
-        height="20"
-        aria-hidden="true"
-      >
-        <path
-          class="app-sidebar__collapse-bars"
-          fill="currentColor"
-          d="M1.25 4.25h14.5v2.35H1.25zm0 5.575h10.25v2.35H1.25zm0 5.575h16.25v2.35H1.25z"
-        />
-        <g class="app-sidebar__collapse-arrow-wrap">
-          <path fill="currentColor" d="M16.35 11L25 3.35v15.3L16.35 11z" />
-        </g>
-      </svg>
+      <span class="gc-icon gc-icon--lg app-sidebar__collapse-svg" aria-hidden="true">menu_open</span>
     </span>
   </button>
   <p class="app-sidebar__title" id="app-nav-heading">Designer</p>
@@ -39,12 +24,7 @@
         class="app-nav__item{% if designer_subnav_active == 'navigation' %} is-active{% endif %}"
       >
         <span class="app-nav__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path
-              fill="currentColor"
-              d="M3 5h14v2H3V5zm0 6h10v2H3v-2zm0 6h14v2H3v-2zm16-7l4 3-4 3v-6z"
-            />
-          </svg>
+          <span class="gc-icon gc-icon--xs" aria-hidden="true">playlist_play</span>
         </span>
         <span class="app-nav__label">Navigation</span>
       </a>
@@ -53,12 +33,7 @@
         class="app-nav__item{% if designer_subnav_active == 'data_controls' %} is-active{% endif %}"
       >
         <span class="app-nav__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path
-              fill="currentColor"
-              d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2zm12 0 4-3-4-3v6z"
-            />
-          </svg>
+          <span class="gc-icon gc-icon--xs" aria-hidden="true">tune</span>
         </span>
         <span class="app-nav__label">Data Controls</span>
       </a>
@@ -67,12 +42,7 @@
         class="app-nav__item{% if designer_subnav_active == 'modals' %} is-active{% endif %}"
       >
         <span class="app-nav__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path
-              fill="currentColor"
-              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7v-7zm4-3h2v10h-2V7zm4 6h2v4h-2v-4z"
-            />
-          </svg>
+          <span class="gc-icon gc-icon--xs" aria-hidden="true">analytics</span>
         </span>
         <span class="app-nav__label">Modals</span>
       </a>
@@ -81,12 +51,7 @@
         class="app-nav__item{% if designer_subnav_active == 'controls' %} is-active{% endif %}"
       >
         <span class="app-nav__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path
-              fill="currentColor"
-              d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2h-6v2h6zm-6-4h2v-2h4V5h-4V3h-2v6z"
-            />
-          </svg>
+          <span class="gc-icon gc-icon--xs" aria-hidden="true">tune</span>
         </span>
         <span class="app-nav__label">Controls</span>
       </a>
@@ -95,12 +60,7 @@
         class="app-nav__item{% if designer_subnav_active == 'tables' %} is-active{% endif %}"
       >
         <span class="app-nav__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path
-              fill="currentColor"
-              d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"
-            />
-          </svg>
+          <span class="gc-icon gc-icon--xs" aria-hidden="true">grid_view</span>
         </span>
         <span class="app-nav__label">Tables</span>
       </a>

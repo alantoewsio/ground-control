@@ -796,16 +796,16 @@
 
         let formObj = collectAliasForm();
         if (!formObj.interface_parent) {
-          alert("Select a parent interface.");
+          window.gcAlert("Select a parent interface.");
           return;
         }
         let fl = ifaceIpFlags(ifacePayloadByName[formObj.interface_parent] || {});
         if (formObj.ip_family === "ipv4" && !fl.v4) {
-          alert("IPv4 is not enabled on the selected parent interface.");
+          window.gcAlert("IPv4 is not enabled on the selected parent interface.");
           return;
         }
         if (formObj.ip_family === "ipv6" && !fl.v6) {
-          alert("IPv6 is not enabled on the selected parent interface.");
+          window.gcAlert("IPv6 is not enabled on the selected parent interface.");
           return;
         }
         if (formObj.ip_family === "ipv4") {
@@ -818,12 +818,12 @@
             formObj.ipv4_netmask = els.netmaskSel.value.trim();
           }
           if (!formObj.ipv4_ip || !formObj.ipv4_netmask) {
-            alert("IPv4 address and netmask are required.");
+            window.gcAlert("IPv4 address and netmask are required.");
             return;
           }
         } else {
           if (!formObj.ipv6 || !formObj.prefix) {
-            alert("IPv6 address and prefix length are required.");
+            window.gcAlert("IPv6 address and prefix length are required.");
             return;
           }
         }
@@ -833,12 +833,12 @@
             let createUrl =
               typeof globalThis.gcNetAliasApplyCreateUrl === "string" ? globalThis.gcNetAliasApplyCreateUrl : "";
             if (!createUrl) {
-              alert("Alias create URL is not configured.");
+              window.gcAlert("Alias create URL is not configured.");
               return;
             }
             let cfgId = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
             if (!els.addCfgSelect || !els.addCfgSelect.value.trim() || isNaN(cfgId) || cfgId <= 0) {
-              alert("Select a configuration.");
+              window.gcAlert("Select a configuration.");
               return;
             }
             if (els.saveBtn) els.saveBtn.disabled = true;
@@ -856,7 +856,7 @@
               .then(function (x) {
                 if (!x.ok) {
                   let msg = (x.j && (x.j.detail || x.j.message)) || "Could not add alias.";
-                  alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+                  window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
                   if (els.saveBtn) els.saveBtn.disabled = false;
                   syncDirty();
                   return;
@@ -865,7 +865,7 @@
                 close(root);
               })
               .catch(function () {
-                alert("Network error.");
+                window.gcAlert("Network error.");
                 if (els.saveBtn) els.saveBtn.disabled = false;
                 syncDirty();
               });
@@ -874,12 +874,12 @@
           let createFwUrl =
             typeof globalThis.gcNetAliasEnqueueCreateUrl === "string" ? globalThis.gcNetAliasEnqueueCreateUrl : "";
           if (!createFwUrl) {
-            alert("Alias create URL is not configured.");
+            window.gcAlert("Alias create URL is not configured.");
             return;
           }
           let fwId = els.addFwSelect ? parseInt(els.addFwSelect.value.trim(), 10) : NaN;
           if (!els.addFwSelect || !els.addFwSelect.value.trim() || isNaN(fwId) || fwId <= 0) {
-            alert("Select a firewall.");
+            window.gcAlert("Select a firewall.");
             return;
           }
           if (els.saveBtn) els.saveBtn.disabled = true;
@@ -897,7 +897,7 @@
             .then(function (x) {
               if (!x.ok) {
                 let msg2 = (x.j && (x.j.detail || x.j.message)) || "Could not queue alias.";
-                alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
+                window.gcAlert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
                 if (els.saveBtn) els.saveBtn.disabled = false;
                 syncDirty();
                 return;
@@ -906,7 +906,7 @@
               close(root);
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
             });
@@ -922,7 +922,7 @@
             : "";
         let cid = currentNetRow && currentNetRow.config_entry_id;
         if (!url || cid == null) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "Save URL is not configured or the row is missing an id."
               : "Task queue URL is not configured or the row is missing an id.",
@@ -946,7 +946,7 @@
               let msg3 =
                 (x.j && (x.j.detail || x.j.message)) ||
                 (isCfg ? "Could not save configuration." : "Could not save to task queue.");
-              alert(typeof msg3 === "string" ? msg3 : JSON.stringify(msg3));
+              window.gcAlert(typeof msg3 === "string" ? msg3 : JSON.stringify(msg3));
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
               return;
@@ -955,7 +955,7 @@
             close(root);
           })
           .catch(function () {
-            alert("Network error.");
+            window.gcAlert("Network error.");
             if (els.saveBtn) els.saveBtn.disabled = false;
             syncDirty();
           });

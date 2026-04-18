@@ -1819,7 +1819,7 @@
     if (!found) {
       let scopeWord = gcHsIsConfigurationTarget() ? "configurations" : "firewalls";
       let hint = tabHint || "the matching tab";
-      alert(
+      window.gcAlert(
         "No " +
           entitySingularLabel +
           ' row found for "' +
@@ -2083,16 +2083,16 @@
         if (fk === "hs-entity") {
           let et = currentHsRow && String(currentHsRow.entity_type || "").trim();
           if (!et || typeof globalThis.gcHsCollectFlyoutEntityForm !== "function") {
-            alert("Form is not available.");
+            window.gcAlert("Form is not available.");
             return;
           }
           let gForm = globalThis.gcHsCollectFlyoutEntityForm(fieldsRoot, et);
           if (!gForm || !String(gForm.name || "").trim()) {
-            alert("Name is required.");
+            window.gcAlert("Name is required.");
             return;
           }
           if (et === "fqdn_host" && !String(gForm.fqdn || "").trim()) {
-            alert("FQDN is required.");
+            window.gcAlert("FQDN is required.");
             return;
           }
           saveBtn.disabled = true;
@@ -2114,7 +2114,7 @@
           if (em === "add") {
             let fwIdsA = collectFlyoutFirewallIdsOrdered();
             if (!crUrl || !fwIdsA.length) {
-              alert(
+              window.gcAlert(
                 gcHsIsConfigurationTarget()
                   ? "Select at least one configuration in the flyout, or the batch create URL is not configured."
                   : "Select at least one firewall in the flyout, or the batch create URL is not configured.",
@@ -2139,14 +2139,14 @@
                 if (!x.ok) {
                   let msg =
                     (x.j && (x.j.detail || x.j.message)) || "Could not enqueue create tasks.";
-                  alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+                  window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
                   saveBtn.disabled = false;
                   return;
                 }
                 finishHsOk();
               })
               .catch(function () {
-                alert("Network error.");
+                window.gcAlert("Network error.");
                 saveBtn.disabled = false;
               });
             return;
@@ -2155,7 +2155,7 @@
           let updateEntryIdsH = collectEditConfigEntryIds();
           let createFwIdsH = collectEditCreateFirewallIds();
           if (!updateEntryIdsH.length && !createFwIdsH.length) {
-            alert(gcHsIsConfigurationTarget() ? "Select at least one configuration." : "Select at least one firewall.");
+            window.gcAlert(gcHsIsConfigurationTarget() ? "Select at least one configuration." : "Select at least one firewall.");
             saveBtn.disabled = false;
             return;
           }
@@ -2166,7 +2166,7 @@
               return;
             }
             if (!crUrl) {
-              alert("Task queue batch create URL is not configured.");
+              window.gcAlert("Task queue batch create URL is not configured.");
               saveBtn.disabled = false;
               return;
             }
@@ -2190,21 +2190,21 @@
                 if (!x.ok) {
                   let msgC =
                     (x.j && (x.j.detail || x.j.message)) || "Could not enqueue create tasks.";
-                  alert(typeof msgC === "string" ? msgC : JSON.stringify(msgC));
+                  window.gcAlert(typeof msgC === "string" ? msgC : JSON.stringify(msgC));
                   saveBtn.disabled = false;
                   return;
                 }
                 finishHsOk();
               })
               .catch(function () {
-                alert("Network error.");
+                window.gcAlert("Network error.");
                 saveBtn.disabled = false;
               });
           }
 
           if (updateEntryIdsH.length) {
             if (!upUrl) {
-              alert("Task queue batch update URL is not configured.");
+              window.gcAlert("Task queue batch update URL is not configured.");
               saveBtn.disabled = false;
               return;
             }
@@ -2223,14 +2223,14 @@
                 if (!x.ok) {
                   let msg2 =
                     (x.j && (x.j.detail || x.j.message)) || "Could not enqueue update tasks.";
-                  alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
+                  window.gcAlert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
                   saveBtn.disabled = false;
                   return;
                 }
                 doCreatesH();
               })
               .catch(function () {
-                alert("Network error.");
+                window.gcAlert("Network error.");
                 saveBtn.disabled = false;
               });
           } else {
@@ -2242,7 +2242,7 @@
         let mode = flyout.dataset.gcHsIpHostMode;
         let form = collectIpHostForm(fieldsRoot);
         if (!form.name) {
-          alert("Name is required.");
+          window.gcAlert("Name is required.");
           return;
         }
         saveBtn.disabled = true;
@@ -2253,7 +2253,7 @@
               : "";
           let fwIds = collectFlyoutFirewallIdsOrdered();
           if (!bUrl || !fwIds.length) {
-            alert(
+            window.gcAlert(
               gcHsIsConfigurationTarget()
                 ? "Select at least one configuration in the flyout, or the batch create URL is not configured."
                 : "Select at least one firewall in the flyout, or the batch create URL is not configured.",
@@ -2276,7 +2276,7 @@
               if (!x.ok) {
                 let msg =
                   (x.j && (x.j.detail || x.j.message)) || "Could not save to task queue.";
-                alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+                window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
                 saveBtn.disabled = false;
                 return;
               }
@@ -2284,7 +2284,7 @@
               closeFlyout();
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               saveBtn.disabled = false;
             });
           return;
@@ -2292,7 +2292,7 @@
         let updateEntryIds = collectEditConfigEntryIds();
         let createFwIds = collectEditCreateFirewallIds();
         if (!updateEntryIds.length && !createFwIds.length) {
-          alert(gcHsIsConfigurationTarget() ? "Select at least one configuration." : "Select at least one firewall.");
+          window.gcAlert(gcHsIsConfigurationTarget() ? "Select at least one configuration." : "Select at least one firewall.");
           saveBtn.disabled = false;
           return;
         }
@@ -2316,7 +2316,7 @@
             return;
           }
           if (!createBatchUrl) {
-            alert("Task queue batch create URL is not configured.");
+            window.gcAlert("Task queue batch create URL is not configured.");
             saveBtn.disabled = false;
             return;
           }
@@ -2335,21 +2335,21 @@
               if (!x.ok) {
                 let msgC =
                   (x.j && (x.j.detail || x.j.message)) || "Could not enqueue creates.";
-                alert(typeof msgC === "string" ? msgC : JSON.stringify(msgC));
+                window.gcAlert(typeof msgC === "string" ? msgC : JSON.stringify(msgC));
                 saveBtn.disabled = false;
                 return;
               }
               finishOk();
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               saveBtn.disabled = false;
             });
         }
 
         if (updateEntryIds.length) {
           if (!batchUpUrl) {
-            alert("Task queue batch update URL is not configured.");
+            window.gcAlert("Task queue batch update URL is not configured.");
             saveBtn.disabled = false;
             return;
           }
@@ -2368,14 +2368,14 @@
               if (!x.ok) {
                 let msg2 =
                   (x.j && (x.j.detail || x.j.message)) || "Could not save to task queue.";
-                alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
+                window.gcAlert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
                 saveBtn.disabled = false;
                 return;
               }
               doCreates();
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               saveBtn.disabled = false;
             });
         } else {

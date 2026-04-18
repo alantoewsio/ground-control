@@ -83,7 +83,7 @@
   }
 
   function notify(title, message) {
-    globalThis.alert([title, message].filter(Boolean).join("\n"));
+    window.gcAlert([title, message].filter(Boolean).join("\n"));
   }
 
   function stopSessionIdleWatch() {
@@ -797,19 +797,17 @@
         const currentTag = row.is_current
           ? '<span class="active-admins-dialog__me-pill" aria-label="This is your session">ME</span>'
           : "";
+        const chatIcon = window.gcIcon ? window.gcIcon("chat", { size: "xs" }) : "";
+        const logoutIcon = window.gcIcon ? window.gcIcon("logout", { size: "xs" }) : "";
         const chatButton = row.is_current
           ? ""
           : `<button type="button" class="active-admins-dialog__chat-btn" data-admin-chat-peer="${escapeHtml(row.session_id || "")}" aria-label="Message ${displayName}" title="Message ${displayName}">
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="currentColor" d="M4 4h16v11H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z" />
-              </svg>
+              ${chatIcon}
             </button>`;
         const logoutButton = row.is_current
           ? ""
           : `<button type="button" class="active-admins-dialog__logout-btn" data-admin-logout-peer="${escapeHtml(row.session_id || "")}" aria-label="Request logout for ${displayName}" title="Request logout">
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="currentColor" d="M10.09 15.59 11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H7c-1.11 0-2 .9-2 2v4h2V5h12v14H7v-4H5v4c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
-              </svg>
+              ${logoutIcon}
             </button>`;
         return `<tr>
           <td><span class="active-admins-dialog__admin-name">${displayName}</span>${chatButton}${logoutButton}</td>
@@ -881,9 +879,12 @@
   }
 
   function speechBubbleSvg(size = 16) {
-    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">
-      <path fill="currentColor" d="M4 4h16v11H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z" />
-    </svg>`;
+    var sz = "xs";
+    if (size >= 28) sz = "xl";
+    else if (size >= 24) sz = "lg";
+    else if (size >= 20) sz = "md";
+    else if (size >= 18) sz = "sm";
+    return window.gcIcon ? window.gcIcon("chat", { size: sz }) : "";
   }
 
   function setAdminChatStatus(message, isError) {
@@ -2365,7 +2366,7 @@
     if (!isAdmin()) return;
     const addBtn = document.getElementById("settings-test-firewalls-add");
     const cleanupBtn = document.getElementById("settings-test-firewalls-cleanup");
-    if (!globalThis.confirm("Remove all test firewalls?")) return;
+    if (!(await (window.gcConfirm ? window.gcConfirm("Remove all test firewalls?") : Promise.resolve(globalThis.confirm("Remove all test firewalls?"))))) return;
     closeSettingsModal();
     if (addBtn) addBtn.disabled = true;
     if (cleanupBtn) cleanupBtn.disabled = true;
@@ -2658,9 +2659,11 @@
       setBackupStatus("Create a backup on this server first.", "error");
       return;
     }
-    const ok = globalThis.confirm(
-      "Restore merge from the last backup created on this server? Matching database rows will be replaced with the backup version, and files from that backup will be written over existing TLS / Let’s Encrypt / policy files.",
-    );
+    const restoreMsg =
+      "Restore merge from the last backup created on this server? Matching database rows will be replaced with the backup version, and files from that backup will be written over existing TLS / Let’s Encrypt / policy files.";
+    const ok = await (window.gcConfirm
+      ? window.gcConfirm(restoreMsg)
+      : Promise.resolve(globalThis.confirm(restoreMsg)));
     if (!ok) return;
     const btn = document.getElementById("settings-backup-restore-last");
     if (btn) btn.disabled = true;
@@ -2906,13 +2909,12 @@
 
   async function runHistoryRetentionCleanup() {
     if (!isAdmin()) return;
-    if (
-      !globalThis.confirm(
-        "Run retention cleanup now? Rows older than the configured max age, or over the max size (oldest removed first), will be deleted permanently.",
-      )
-    ) {
-      return;
-    }
+    const retMsg =
+      "Run retention cleanup now? Rows older than the configured max age, or over the max size (oldest removed first), will be deleted permanently.";
+    const retOk = await (window.gcConfirm
+      ? window.gcConfirm(retMsg)
+      : Promise.resolve(globalThis.confirm(retMsg)));
+    if (!retOk) return;
     const btn = document.getElementById("settings-dm-run-history-retention");
     if (btn) btn.disabled = true;
     setDmStatus("Running cleanup…", null);
@@ -2932,13 +2934,12 @@
 
   async function cleanupOrphanedFirewallCache() {
     if (!isAdmin()) return;
-    if (
-      !globalThis.confirm(
-        "Delete all cached firewall configuration rows that no longer reference a firewall? This cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    const orphMsg =
+      "Delete all cached firewall configuration rows that no longer reference a firewall? This cannot be undone.";
+    const orphOk = await (window.gcConfirm
+      ? window.gcConfirm(orphMsg)
+      : Promise.resolve(globalThis.confirm(orphMsg)));
+    if (!orphOk) return;
     const btn = document.getElementById("settings-dm-cleanup-orphaned-cache");
     if (btn) btn.disabled = true;
     setDmStatus("Removing orphaned cache rows…", null);
@@ -3487,7 +3488,12 @@
     document.getElementById("user-edit-profile-set-password")?.addEventListener("click", async () => {
       const id = document.getElementById("user-edit-profile-id")?.value?.trim() || "";
       if (!id) return;
-      const pw = globalThis.prompt("New password (min. 10 characters)");
+      const pw = await (window.gcPrompt
+        ? window.gcPrompt("New password (min. 10 characters)", "", {
+            title: "Set password",
+            tone: "warning",
+          })
+        : Promise.resolve(globalThis.prompt("New password (min. 10 characters)")));
       if (pw == null) return;
       if (pw.length < 10) {
         notify("Password too short", "Password must be at least 10 characters.");
@@ -3506,7 +3512,8 @@
     document.getElementById("user-edit-profile-delete")?.addEventListener("click", async () => {
       const id = document.getElementById("user-edit-profile-id")?.value?.trim() || "";
       if (!id) return;
-      if (!globalThis.confirm("Remove this user? They will no longer be able to sign in.")) return;
+      const rmMsg = "Remove this user? They will no longer be able to sign in.";
+      if (!(await (window.gcConfirm ? window.gcConfirm(rmMsg) : Promise.resolve(globalThis.confirm(rmMsg))))) return;
       try {
         await apiRequestJson(`/api/settings/users/${encodeURIComponent(id)}`, {
           method: "DELETE",

@@ -322,8 +322,8 @@
       <footer class="gc-designer-modal__footer gc-designer-tables-props-flyout__footer">
         <span class="gc-designer-tables-props-save-status muted" id="gc-designer-tables-props-save-status" aria-live="polite"></span>
         <div class="gc-designer-tables-props-flyout__footer-btns">
-          <button type="button" class="btn btn--secondary" id="gc-designer-tables-props-flyout-cancel">Cancel</button>
           <button type="button" class="btn primary" id="gc-designer-tables-props-flyout-save">Save</button>
+          <button type="button" class="btn btn--secondary" id="gc-designer-tables-props-flyout-cancel">Close</button>
         </div>
       </footer>
     </div>
@@ -2006,7 +2006,7 @@
     pencil.hidden = true;
     pencil.disabled = true;
     pencil.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+      '<span class="gc-icon gc-icon--sm" aria-hidden="true">edit</span>';
     pencil.addEventListener("click", function (ev) {
       ev.preventDefault();
       if (!isDesignerTableDesignModeOn()) return;
@@ -2075,13 +2075,17 @@
             ovn[colId] != null && String(ovn[colId]).trim() !== ""
               ? String(ovn[colId]).trim()
               : base;
-          var nv = window.prompt("Column display name", shown);
-          if (nv == null) return;
-          nv = String(nv).trim();
-          if (nv === "" || nv === base) delete ovn[colId];
-          else ovn[colId] = nv;
-          document.getElementById("gc-designer-tables-col-overrides").value = formatOverrides(ovn);
-          designerTableApi.refresh();
+          var pf = window.gcPrompt
+            ? window.gcPrompt("Column display name", shown, { title: "Rename column" })
+            : Promise.resolve(window.prompt("Column display name", shown));
+          pf.then(function (nv) {
+            if (nv == null) return;
+            nv = String(nv).trim();
+            if (nv === "" || nv === base) delete ovn[colId];
+            else ovn[colId] = nv;
+            document.getElementById("gc-designer-tables-col-overrides").value = formatOverrides(ovn);
+            designerTableApi.refresh();
+          });
         } else if (act === "revert") {
           var ovr = parseOverrides(document.getElementById("gc-designer-tables-col-overrides").value);
           delete ovr[colId];
@@ -2401,7 +2405,7 @@
   if (addPreviewBtn) {
     addPreviewBtn.addEventListener("click", function () {
       if (designerTableReadOnlyOn()) return;
-      window.alert("Add (designer preview — no data is changed).");
+      window.gcAlert("Add (designer preview — no data is changed).");
     });
   }
   var delPreviewBtn = document.getElementById("gc-designer-tables-delete-selected");
@@ -2409,7 +2413,7 @@
     delPreviewBtn.addEventListener("click", function () {
       if (designerTableReadOnlyOn()) return;
       var n = designerPreviewSelectedRowCount();
-      window.alert(
+      window.gcAlert(
         n
           ? "Delete " + n + " selected row(s) (designer preview — no data is changed)."
           : "No rows selected.",

@@ -72,9 +72,12 @@
     }
   }
 
-  /** Always use this window's `confirm`. `parent.confirm` opens behind the task-queue dock (high z-index) and looks like a no-op. */
+  /** Custom themed confirm modal (see static/gc-dialog.js). Returns Promise<boolean>. */
   function taskQueueConfirm(message) {
-    return globalThis.confirm(message);
+    if (typeof window.gcConfirm === "function") {
+      return window.gcConfirm(message);
+    }
+    return Promise.resolve(globalThis.confirm(message));
   }
 
   function taskQueueDeleteUrl() {
@@ -316,6 +319,12 @@
       t.id +
       "\">" +
       esc(approveOrRetryLabel(t.status)) +
+      "</button><button type=\"button\" class=\"btn task-queue-row-action-btn task-queue-row-action-btn--compare task-queue-compare\" data-task-id=\"" +
+      t.id +
+      "\" title=\"Compare stored vs queued payload\" aria-label=\"Compare stored vs queued payload for task " +
+      t.id +
+      "\">" +
+      (window.gcIcon ? window.gcIcon("compare_arrows", { size: "sm" }) : "Compare") +
       "</button><button type=\"button\" class=\"btn task-queue-row-action-btn task-queue-row-action-btn--reject task-queue-reject\" data-task-id=\"" +
       t.id +
       "\">Reject</button></td></tr>"
@@ -1100,34 +1109,38 @@
     delBtn.addEventListener("click", function () {
       let ids = selectedIds();
       if (!ids.length) return;
-      if (!taskQueueConfirm("Reject " + ids.length + " task(s) and remove them from the queue?")) return;
-      delBtn.disabled = true;
-      if (approveSelectedBtn) approveSelectedBtn.disabled = true;
-      if (approveAllBtn) approveAllBtn.disabled = true;
-      bannerProgress("Removing tasks from the queue…");
-      fetch(taskQueueDeleteUrl(), {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: ids }),
-      })
-        .then(function (r) {
-          return r.json().then(function (j) {
-            return { ok: r.ok, j: j };
+      taskQueueConfirm(
+        "Reject " + ids.length + " task(s) and remove them from the queue?",
+      ).then(function (ok) {
+        if (!ok) return;
+        delBtn.disabled = true;
+        if (approveSelectedBtn) approveSelectedBtn.disabled = true;
+        if (approveAllBtn) approveAllBtn.disabled = true;
+        bannerProgress("Removing tasks from the queue…");
+        fetch(taskQueueDeleteUrl(), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            if (!x.ok) throw new Error((x.j && x.j.detail) || "Reject failed");
+            bannerResult(true, "Rejected " + (x.j.deleted || ids.length) + " task(s).");
+            refreshTable();
+          })
+          .catch(function (err) {
+            bannerResult(false, err.message || "Reject failed.");
+          })
+          .finally(function () {
+            if (approveAllBtn) approveAllBtn.disabled = false;
+            syncSelectionActionBtns();
           });
-        })
-        .then(function (x) {
-          if (!x.ok) throw new Error((x.j && x.j.detail) || "Reject failed");
-          bannerResult(true, "Rejected " + (x.j.deleted || ids.length) + " task(s).");
-          refreshTable();
-        })
-        .catch(function (err) {
-          bannerResult(false, err.message || "Reject failed.");
-        })
-        .finally(function () {
-          if (approveAllBtn) approveAllBtn.disabled = false;
-          syncSelectionActionBtns();
-        });
+      });
     });
   }
 
@@ -1171,30 +1184,27 @@
 
   if (approveAllBtn && cfg.sendAllUrl) {
     approveAllBtn.addEventListener("click", function () {
-      if (
-        !confirm(
-          "Approve every task pending approval or failed with an error and sync to its firewall, in queue order? This may take a while.",
-        )
-      ) {
-        return;
-      }
-      approveAllBtn.disabled = true;
-      if (approveSelectedBtn) approveSelectedBtn.disabled = true;
-      if (delBtn) delBtn.disabled = true;
-      bannerProgress("Approving all tasks and syncing to firewalls…");
-      let sendBody = "{}";
-      if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
-        let fwIds = globalThis.gcGetSelectedFirewallIds() || [];
-        if (fwIds.length) {
-          sendBody = JSON.stringify({ firewall_ids: fwIds });
+      taskQueueConfirm(
+        "Approve every task pending approval or failed with an error and sync to its firewall, in queue order? This may take a while.",
+      ).then(function (ok) {
+        if (!ok) return;
+        approveAllBtn.disabled = true;
+        if (approveSelectedBtn) approveSelectedBtn.disabled = true;
+        if (delBtn) delBtn.disabled = true;
+        bannerProgress("Approving all tasks and syncing to firewalls…");
+        let sendBody = "{}";
+        if (typeof globalThis.gcGetSelectedFirewallIds === "function") {
+          let fwIds = globalThis.gcGetSelectedFirewallIds() || [];
+          if (fwIds.length) {
+            sendBody = JSON.stringify({ firewall_ids: fwIds });
+          }
         }
-      }
-      fetch(cfg.sendAllUrl, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: sendBody,
-      })
+        fetch(cfg.sendAllUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: sendBody,
+        })
         .then(function (r) {
           return r.json().then(function (j) {
             return { ok: r.ok, status: r.status, j: j };
@@ -1241,6 +1251,7 @@
           if (delBtn) delBtn.disabled = false;
           syncSelectionActionBtns();
         });
+      });
     });
   }
 
@@ -1248,20 +1259,17 @@
     approveSelectedBtn.addEventListener("click", function () {
       let ids = selectedIds();
       if (!ids.length) return;
-      if (
-        !confirm(
-          "Approve and sync " +
-            ids.length +
-            " selected task(s)? Tasks already syncing are skipped.",
-        )
-      ) {
-        return;
-      }
-      approveSelectedBtn.disabled = true;
-      if (approveAllBtn) approveAllBtn.disabled = true;
-      if (delBtn) delBtn.disabled = true;
-      bannerProgress("Approving selected tasks and syncing…");
-      fetch(cfg.sendSelectedUrl, {
+      taskQueueConfirm(
+        "Approve and sync " +
+          ids.length +
+          " selected task(s)? Tasks already syncing are skipped.",
+      ).then(function (ok) {
+        if (!ok) return;
+        approveSelectedBtn.disabled = true;
+        if (approveAllBtn) approveAllBtn.disabled = true;
+        if (delBtn) delBtn.disabled = true;
+        bannerProgress("Approving selected tasks and syncing…");
+        fetch(cfg.sendSelectedUrl, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -1316,26 +1324,40 @@
           if (delBtn) delBtn.disabled = false;
           syncSelectionActionBtns();
         });
+      });
     });
   }
 
   document.addEventListener("click", function (e) {
+    /* Per-row Compare icon: shortcut for clicking the row, kept next to
+       Reject so the diff/compare action is discoverable from the toolbar
+       cluster instead of relying solely on the row-click affordance. */
+    let cmp = e.target.closest(".task-queue-compare");
+    if (cmp) {
+      e.preventDefault();
+      e.stopPropagation();
+      let cid = parseInt(cmp.dataset.taskId, 10);
+      if (!isNaN(cid)) openCompareModal(cid);
+      return;
+    }
     let rej = e.target.closest(".task-queue-reject");
     if (rej) {
       let rid = parseInt(rej.dataset.taskId, 10);
       if (isNaN(rid)) return;
-      if (!taskQueueConfirm("Reject task " + rid + " and remove it from the queue?")) return;
-      let rrow = rej.closest("tr.task-queue-row");
-      let rApprove = rrow && rrow.querySelector(".task-queue-approve");
-      rejectTaskFromQueue(rid, {
-        affectCompareModal: false,
-        disableElements: [rej, rApprove],
-        onOk: function () {
-          if (compareOpen && compareModalTaskId === rid) closeCompareModal();
-        },
-        onCatch: function () {
-          if (compareOpen && compareModalTaskId === rid) refetchCompareModal(rid);
-        },
+      taskQueueConfirm("Reject task " + rid + " and remove it from the queue?").then(function (rok) {
+        if (!rok) return;
+        let rrow = rej.closest("tr.task-queue-row");
+        let rApprove = rrow && rrow.querySelector(".task-queue-approve");
+        rejectTaskFromQueue(rid, {
+          affectCompareModal: false,
+          disableElements: [rej, rApprove],
+          onOk: function () {
+            if (compareOpen && compareModalTaskId === rid) closeCompareModal();
+          },
+          onCatch: function () {
+            if (compareOpen && compareModalTaskId === rid) refetchCompareModal(rid);
+          },
+        });
       });
       return;
     }
@@ -1343,15 +1365,17 @@
     if (!btn) return;
     let id = parseInt(btn.dataset.taskId, 10);
     if (isNaN(id)) return;
-    if (!taskQueueConfirm("Approve task " + id + " and sync it to the firewall?")) return;
-    let row = btn.closest("tr.task-queue-row");
-    let rowReject = row && row.querySelector(".task-queue-reject");
-    sendTaskToFirewall(id, {
-      row: row,
-      approveBtnEls: rowReject ? [btn, rowReject] : [btn],
-      onCatch: function () {
-        if (compareOpen && compareModalTaskId === id) refetchCompareModal(id);
-      },
+    taskQueueConfirm("Approve task " + id + " and sync it to the firewall?").then(function (aok) {
+      if (!aok) return;
+      let row = btn.closest("tr.task-queue-row");
+      let rowReject = row && row.querySelector(".task-queue-reject");
+      sendTaskToFirewall(id, {
+        row: row,
+        approveBtnEls: rowReject ? [btn, rowReject] : [btn],
+        onCatch: function () {
+          if (compareOpen && compareModalTaskId === id) refetchCompareModal(id);
+        },
+      });
     });
   });
 

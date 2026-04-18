@@ -350,3 +350,316 @@ def merge_country_group_form(base: dict[str, Any], form: Mapping[str, Any]) -> d
         elif len(cleaned) > 1:
             out["CountryList"] = {"Country": cleaned}
     return out
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared by the new entity merges (Routing / Authentication / Admin).
+# ---------------------------------------------------------------------------
+
+
+def _overlay_scalar(
+    out: dict[str, Any],
+    form: Mapping[str, Any],
+    *,
+    field: str,
+    aliases: tuple[str, ...] = (),
+    blank_clears: bool = False,
+) -> None:
+    """Overlay a single scalar value from form into out[field].
+
+    The form may use the schema name (``field``) or any of the given lower-cased
+    ``aliases`` (e.g. ``"description"`` for the ``Description`` field).  When
+    ``blank_clears`` is True, an empty value writes ``None`` rather than being
+    skipped, mirroring how Description is treated by Hosts/Services merges.
+    """
+    keys: tuple[str, ...] = (field, *aliases)
+    present = any(k in form for k in keys)
+    if not present:
+        return
+    raw_value: Any = None
+    for k in keys:
+        if k in form:
+            raw_value = form.get(k)
+            break
+    if raw_value is None:
+        if blank_clears:
+            out[field] = None
+        return
+    s = str(raw_value).strip()
+    if not s:
+        if blank_clears:
+            out[field] = None
+        return
+    out[field] = s
+
+
+def _form_list_field(
+    form: Mapping[str, Any], primary_key: str, *flat_keys: str
+) -> list[str] | None:
+    """Pull a list from form[primary_key] or one of the flat ``a.b`` CSV keys.
+
+    Returns ``None`` if no key was present (caller should leave field alone).
+    Returns a possibly-empty list of cleaned strings otherwise.
+    """
+    if primary_key in form:
+        raw = form.get(primary_key)
+        if raw is None:
+            return []
+        if isinstance(raw, str):
+            parts = [p.strip() for p in raw.split(",") if p.strip()]
+            return parts
+        if isinstance(raw, list):
+            return [str(x).strip() for x in raw if str(x).strip()]
+        return []
+    for fk in flat_keys:
+        v = _split_csv_field(form, fk)
+        if v is not None:
+            return v
+    return None
+
+
+def _form_repeating_rows(
+    form: Mapping[str, Any], primary_key: str
+) -> list[dict[str, Any]] | None:
+    """Pull a list of dict rows from form[primary_key] (already structured).
+
+    Returns ``None`` when the key was not provided so the caller can keep the
+    base value unchanged.  Returns ``[]`` to clear the group.
+    """
+    if primary_key not in form:
+        return None
+    raw = form.get(primary_key)
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for row in raw:
+        if isinstance(row, dict):
+            out.append({str(k): row[k] for k in row})
+    return out
+
+
+def _wrap_repeating(items: list[dict[str, Any]], child_tag: str) -> dict[str, Any] | None:
+    """Wrap a list of dicts as ``{child_tag: ...}`` for xmltodict (single vs list)."""
+    cleaned = [r for r in items if any(str(v).strip() for v in r.values() if v is not None)]
+    if not cleaned:
+        return None
+    if len(cleaned) == 1:
+        return {child_tag: cleaned[0]}
+    return {child_tag: cleaned}
+
+
+# ---------------------------------------------------------------------------
+# Routing : Unicast Route  (XML root <UnicastRoute>)
+# ---------------------------------------------------------------------------
+
+_UNICAST_ROUTE_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("IPFamily", ("ip_family",)),
+    ("Status", ("status",)),
+    ("DestinationIP", ("destination_ip",)),
+    ("Netmask", ("netmask",)),
+    ("Gateway", ("gateway",)),
+    ("Interface", ("interface",)),
+    ("Distance", ("distance",)),
+    ("AdministrativeDistance", ("administrative_distance",)),
+    ("Blackhole", ("blackhole",)),
+)
+
+
+def merge_unicast_route_form(base: dict[str, Any], form: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply Unicast Route flyout edits onto a cached <UnicastRoute> payload."""
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _UNICAST_ROUTE_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    _overlay_description(out, form)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Routing : Gateway  (XML root <Gateway>; pushed inside <GatewayConfiguration>)
+# ---------------------------------------------------------------------------
+
+_GATEWAY_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("IPFamily", ("ip_family",)),
+    ("IPAddress", ("ip_address",)),
+    ("Type", ("type",)),
+    ("Weight", ("weight",)),
+    ("DefaultGateway", ("default_gateway",)),
+)
+
+_GATEWAY_FAILOVER_SUBFIELDS: tuple[str, ...] = (
+    "Protocol",
+    "IPAddress",
+    "Port",
+    "Condition",
+)
+
+
+def _normalize_gateway_failover_rule(row: Mapping[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for sf in _GATEWAY_FAILOVER_SUBFIELDS:
+        if sf in row and row[sf] is not None:
+            s = str(row[sf]).strip()
+            if s:
+                out[sf] = s
+    return out
+
+
+def merge_gateway_form(base: dict[str, Any], form: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply Gateway flyout edits onto a cached <Gateway> payload."""
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _GATEWAY_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    rows = _form_repeating_rows(form, "fail_over_rules")
+    if rows is None:
+        rows = _form_repeating_rows(form, "FailOverRules")
+    if rows is not None:
+        cleaned = [_normalize_gateway_failover_rule(r) for r in rows]
+        wrapped = _wrap_repeating(cleaned, "Rule")
+        if wrapped is None:
+            out["FailOverRules"] = None
+        else:
+            out["FailOverRules"] = wrapped
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Routing : Custom Gateway / GatewayHost  (XML root <GatewayHost>)
+# ---------------------------------------------------------------------------
+
+_GATEWAY_HOST_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("IPFamily", ("ip_family",)),
+    ("GatewayIP", ("gateway_ip",)),
+    ("Interface", ("interface",)),
+    ("NetworkZone", ("network_zone",)),
+    ("Healthcheck", ("healthcheck",)),
+    ("MailNotification", ("mail_notification",)),
+    ("Interval", ("interval",)),
+    ("FailureRetries", ("failure_retries",)),
+    ("Timeout", ("timeout",)),
+)
+
+_GATEWAY_HOST_MONITORING_SUBFIELDS: tuple[str, ...] = (
+    "Protocol",
+    "Port",
+    "IPAddress",
+    "Condition",
+)
+
+
+def _normalize_gateway_host_rule(row: Mapping[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for sf in _GATEWAY_HOST_MONITORING_SUBFIELDS:
+        if sf in row and row[sf] is not None:
+            s = str(row[sf]).strip()
+            if s:
+                out[sf] = s
+    return out
+
+
+def merge_gateway_host_form(base: dict[str, Any], form: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply Custom Gateway flyout edits onto a cached <GatewayHost> payload."""
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _GATEWAY_HOST_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    rows = _form_repeating_rows(form, "monitoring_condition")
+    if rows is None:
+        rows = _form_repeating_rows(form, "MonitoringCondition")
+    if rows is not None:
+        cleaned = [_normalize_gateway_host_rule(r) for r in rows]
+        wrapped = _wrap_repeating(cleaned, "Rule")
+        if wrapped is None:
+            out["MonitoringCondition"] = None
+        else:
+            out["MonitoringCondition"] = wrapped
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Authentication : Clientless User  (XML root <ClientlessUser>)
+# ---------------------------------------------------------------------------
+
+_CLIENTLESS_USER_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("UserName", ("user_name", "username")),
+    ("IPAddress", ("ip_address",)),
+    ("ClientLessGroup", ("client_less_group", "clientless_group")),
+    ("Email", ("email",)),
+    ("Status", ("status",)),
+    ("QuarantineDigest", ("quarantine_digest",)),
+    ("QoSPolicy", ("qos_policy",)),
+)
+
+
+def merge_clientless_user_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply Clientless User flyout edits onto a cached <ClientlessUser> payload."""
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _CLIENTLESS_USER_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    _overlay_description(out, form)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Administration : Local Service ACL  (entity_type ``acl_rule``, XML <LocalServiceACL>)
+# ---------------------------------------------------------------------------
+
+_LOCAL_SERVICE_ACL_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("RuleName", ("rule_name", "name")),
+    ("IPFamily", ("ip_family",)),
+    ("SourceZone", ("source_zone",)),
+    ("Action", ("action",)),
+)
+
+
+def merge_local_service_acl_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply Local Service ACL flyout edits onto a cached <LocalServiceACL> payload.
+
+    The form carries three list-style fields that are merged into one ``Hosts``
+    block (``Host`` for source, ``DstHost`` for destination) and a ``Services``
+    block, matching what xmltodict expects.
+    """
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _LOCAL_SERVICE_ACL_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    _overlay_description(out, form)
+
+    src_hosts = _form_list_field(form, "source_hosts", "Hosts.Host")
+    dst_hosts = _form_list_field(form, "dst_hosts", "Hosts.DstHost")
+    if src_hosts is not None or dst_hosts is not None:
+        existing_hosts = out.get("Hosts") if isinstance(out.get("Hosts"), dict) else {}
+        if src_hosts is None:
+            current = existing_hosts.get("Host") if isinstance(existing_hosts, dict) else None
+            src_hosts = (
+                [current] if isinstance(current, str) and current.strip() else
+                ([str(x).strip() for x in current if str(x).strip()] if isinstance(current, list) else [])
+            )
+        if dst_hosts is None:
+            current = existing_hosts.get("DstHost") if isinstance(existing_hosts, dict) else None
+            dst_hosts = (
+                [current] if isinstance(current, str) and current.strip() else
+                ([str(x).strip() for x in current if str(x).strip()] if isinstance(current, list) else [])
+            )
+        host_block: dict[str, Any] = {}
+        if src_hosts:
+            host_block["Host"] = src_hosts[0] if len(src_hosts) == 1 else src_hosts
+        if dst_hosts:
+            host_block["DstHost"] = dst_hosts[0] if len(dst_hosts) == 1 else dst_hosts
+        out["Hosts"] = host_block if host_block else None
+
+    services = _form_list_field(form, "services", "Services.Service")
+    if services is not None:
+        if not services:
+            out["Services"] = None
+        elif len(services) == 1:
+            out["Services"] = {"Service": services[0]}
+        else:
+            out["Services"] = {"Service": services}
+    return out
