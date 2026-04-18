@@ -90,8 +90,10 @@
     function bannerResult(ok, msg) {
       if (typeof window.gcGlobalBannerShowResult === "function") {
         window.gcGlobalBannerShowResult(ok, msg);
+      } else if (typeof window.gcAlert === "function") {
+        window.gcAlert(msg);
       } else {
-        alert(msg);
+        globalThis.alert(msg);
       }
     }
 

@@ -292,10 +292,16 @@
         var target = trimStr(btn.getAttribute("data-gc-dc-tab"));
         var from = currentDataControlsTabId();
         if (target !== from && isLayoutDirty()) {
-          var ok = globalThis.confirm(
-            "You have unsaved layout changes. Switch tabs anyway? Unsaved changes stay in the page until you leave or reload.",
-          );
-          if (!ok) return;
+          var dirtyMsg =
+            "You have unsaved layout changes. Switch tabs anyway? Unsaved changes stay in the page until you leave or reload.";
+          var cf = window.gcConfirm
+            ? window.gcConfirm(dirtyMsg, { tone: "warning", confirmLabel: "Switch tabs" })
+            : Promise.resolve(globalThis.confirm(dirtyMsg));
+          cf.then(function (ok) {
+            if (!ok) return;
+            setActiveTab(target);
+          });
+          return;
         }
         setActiveTab(target);
       });
@@ -3181,28 +3187,35 @@
   function reloadLayoutFromServer() {
     var et = trimStr(state.entityType);
     if (!et) return Promise.resolve(false);
+    var reloadProceed;
     if (isLayoutDirty()) {
-      var go = globalThis.confirm(
-        "Discard unsaved layout changes and reload the last saved layout from the server?",
-      );
-      if (!go) return Promise.resolve(false);
+      var rmsg =
+        "Discard unsaved layout changes and reload the last saved layout from the server?";
+      reloadProceed = window.gcConfirm
+        ? window.gcConfirm(rmsg, { tone: "warning", confirmLabel: "Discard & reload" })
+        : Promise.resolve(globalThis.confirm(rmsg));
+    } else {
+      reloadProceed = Promise.resolve(true);
     }
-    var fetchForEt = et;
-    setStatus("Reloading saved layout…");
-    return loadLayoutFromServerAndApply(fetchForEt, 3, "Reloading saved layout").then(function (result) {
-      if (trimStr(state.entityType) !== fetchForEt) return false;
-      if (!result || !result.ok) {
-        if (result && result.reason === "entity-changed") return false;
-        setStatus("Could not reload layout after retries.");
-        refreshLayoutDirtyState();
-        return false;
-      }
-      var edges = result.finalEdges;
-      var suffix = result.retried ? " (after retry)." : ".";
-      setStatus(
-        edges ? "Reloaded saved layout" + suffix : "Reloaded layout (empty wiring)" + suffix,
-      );
-      return true;
+    return reloadProceed.then(function (go) {
+      if (!go) return false;
+      var fetchForEt = et;
+      setStatus("Reloading saved layout…");
+      return loadLayoutFromServerAndApply(fetchForEt, 3, "Reloading saved layout").then(function (result) {
+        if (trimStr(state.entityType) !== fetchForEt) return false;
+        if (!result || !result.ok) {
+          if (result && result.reason === "entity-changed") return false;
+          setStatus("Could not reload layout after retries.");
+          refreshLayoutDirtyState();
+          return false;
+        }
+        var edges = result.finalEdges;
+        var suffix = result.retried ? " (after retry)." : ".";
+        setStatus(
+          edges ? "Reloaded saved layout" + suffix : "Reloaded layout (empty wiring)" + suffix,
+        );
+        return true;
+      });
     });
   }
 

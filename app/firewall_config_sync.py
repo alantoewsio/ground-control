@@ -73,6 +73,13 @@ ENTITY_DECRYPTION_PROFILE = "decryption_profile"
 ENTITY_VPN_PROFILE = "vpn_profile"
 ENTITY_HA_CONFIGURE = "ha_configure"
 ENTITY_NETFLOW_CONFIGURATION = "netflow_configuration"
+ENTITY_UNICAST_ROUTE = "unicast_route"
+ENTITY_GATEWAY = "gateway"
+ENTITY_GATEWAY_HOST = "gateway_host"
+ENTITY_CLIENTLESS_USER = "clientless_user"
+# `acl_rule` is the legacy entity_type string for Local Service ACL (see SyncEntitySpec
+# below). Alias kept here for code that wants the friendlier name.
+ENTITY_LOCAL_SERVICE_ACL = "acl_rule"
 
 _DEFAULT_SYNC_IDS = (ENTITY_INTERFACE, ENTITY_VLAN, ENTITY_ZONE)
 
@@ -117,6 +124,42 @@ def _spec_get(method: str) -> SophosFetch:
 def _spec_tag(xml_tag: str) -> SophosFetch:
     def _run(fw: SophosFirewall) -> Any:
         return fw.client.get_tag(xml_tag)
+
+    return _run
+
+
+def _spec_gateway_get() -> SophosFetch:
+    """
+    GET Gateway entries.
+
+    The firewall does not accept ``<Get><Gateway>`` directly (returns
+    ``529: Input request module is Invalid``). Gateways are exposed under the
+    ``<GatewayConfiguration>`` envelope which also carries
+    ``<GatewayFailoverTimeout>``. We unwrap the inner ``<Gateway>`` block and
+    re-shape the response so :func:`_normalize_items` can extract gateway rows
+    using the standard ``response_key="Gateway"`` path.
+    """
+
+    def _run(fw: SophosFirewall) -> Any:
+        data = fw.client.get_tag("GatewayConfiguration")
+        if not isinstance(data, dict):
+            return {"Response": {"Gateway": []}}
+        resp = data.get("Response")
+        if not isinstance(resp, dict):
+            return {"Response": {"Gateway": []}}
+        envelope = resp.get("GatewayConfiguration")
+        if isinstance(envelope, list):
+            envelope = envelope[0] if envelope else None
+        if not isinstance(envelope, dict):
+            return {"Response": {"Gateway": []}}
+        gateways = envelope.get("Gateway")
+        if isinstance(gateways, dict):
+            gateways = [gateways]
+        elif gateways is None:
+            gateways = []
+        elif not isinstance(gateways, list):
+            gateways = []
+        return {"Response": {"Gateway": gateways}}
 
     return _run
 
@@ -260,6 +303,36 @@ _SYNC_ENTITY_SPECS: tuple[SyncEntitySpec, ...] = (
         _spec_tag("DHCPServer"),
     ),
     SyncEntitySpec("acl_rule", "ACL rules", "LocalServiceACL", _spec_get("get_acl_rule"), ("RuleName",)),
+    # Routing
+    SyncEntitySpec(
+        ENTITY_UNICAST_ROUTE,
+        "Unicast routes",
+        "UnicastRoute",
+        _spec_tag("UnicastRoute"),
+        ("DestinationIP",),
+    ),
+    SyncEntitySpec(
+        ENTITY_GATEWAY,
+        "Gateways",
+        "Gateway",
+        _spec_gateway_get(),
+        ("Name",),
+    ),
+    SyncEntitySpec(
+        ENTITY_GATEWAY_HOST,
+        "Custom gateways",
+        "GatewayHost",
+        _spec_tag("GatewayHost"),
+        ("Name",),
+    ),
+    # Authentication
+    SyncEntitySpec(
+        ENTITY_CLIENTLESS_USER,
+        "Clientless users",
+        "ClientlessUser",
+        _spec_tag("ClientlessUser"),
+        ("Name",),
+    ),
     SyncEntitySpec(
         "admin_authen",
         "Admin authentication",
@@ -706,6 +779,11 @@ def _sync_entity_type(
     for item in items:
         if isinstance(item, dict):
             record_entity_payload_field_rows(db, entity_type, item)
+            # Session uses ``autoflush=False``; without this flush, a subsequent
+            # iteration's lookup in ``record_entity_payload_field_rows`` cannot
+            # see rows we just added, so the same ``(entity_type, property_name)``
+            # would be inserted twice and trip the UNIQUE constraint on commit.
+            db.flush()
         name = name_fn(item) if name_fn else _extract_item_name(item, name_keys)
         if not name:
             if singleton and len(items) == 1:

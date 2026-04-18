@@ -349,8 +349,9 @@
       trig.className = "gc-combine-flyout-conflict-trigger";
       trig.setAttribute("aria-label", "Compare values across firewalls and pick one");
       trig.title = "Values differ across firewalls — click to compare and apply one";
-      trig.innerHTML =
-        '<svg class="gc-combine-flyout-conflict-trigger__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>';
+      trig.innerHTML = (window.gcIcon
+        ? window.gcIcon("error", { size: "sm", cls: "gc-combine-flyout-conflict-trigger__svg" })
+        : "");
       trig.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();

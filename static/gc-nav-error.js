@@ -107,7 +107,7 @@
   function showNavErrorModal(status, title, message) {
     ensureDom();
     if (!modal || !bodyEl) {
-      globalThis.alert([title, message].filter(Boolean).join("\n\n"));
+      window.gcAlert([title, message].filter(Boolean).join("\n\n"));
       return;
     }
     if (titleEl) titleEl.textContent = title || "Something went wrong";

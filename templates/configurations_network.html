@@ -924,7 +924,7 @@
         if (typeof tableIf.getDeleteConfigEntryIdsFromSelection !== "function") return;
         var ids = tableIf.getDeleteConfigEntryIdsFromSelection();
         if (!ids.length) {
-          alert("Select one or more rows to delete.");
+          window.gcAlert("Select one or more rows to delete.");
           return;
         }
         var msg =
@@ -932,44 +932,49 @@
           "You are about to remove the selected VLAN, bridge pair, LAG, and/or alias objects from the stored configuration only. " +
           "Nothing is pushed to a firewall from this action, but anything that still references those names in this configuration may be left pointing at objects that no longer exist.\n\n" +
           "Proceed?";
-        if (!window.confirm(msg)) return;
-        if (!batchUrl) {
-          alert("Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(batchUrl, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!batchUrl) {
+            window.gcAlert("Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(batchUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em =
+                  (x.j && (x.j.detail || x.j.message)) || "Could not delete selected rows.";
+                window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              try {
+                document.dispatchEvent(new CustomEvent("gc-configuration-entries-updated"));
+              } catch (e2) {}
+              if (tableIf.refresh) tableIf.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              window.gcAlert("Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em =
-                (x.j && (x.j.detail || x.j.message)) || "Could not delete selected rows.";
-              alert(typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            try {
-              document.dispatchEvent(new CustomEvent("gc-configuration-entries-updated"));
-            } catch (e2) {}
-            if (tableIf.refresh) tableIf.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            alert("Network error.");
-          });
+        });
       });
     })();
 
@@ -1068,51 +1073,56 @@
         if (typeof tableZone.getDeleteConfigEntryIdsFromSelection !== "function") return;
         var ids = tableZone.getDeleteConfigEntryIdsFromSelection();
         if (!ids.length) {
-          alert("Select one or more rows to delete.");
+          window.gcAlert("Select one or more rows to delete.");
           return;
         }
         var msg =
           "You are about to remove the selected zone objects from the stored configuration only. " +
           "Nothing is pushed to a firewall from this action, but anything that still references those zone names may be left pointing at objects that no longer exist.\n\n" +
           "Proceed?";
-        if (!window.confirm(msg)) return;
-        if (!batchUrl) {
-          alert("Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(batchUrl, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!batchUrl) {
+            window.gcAlert("Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(batchUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em =
+                  (x.j && (x.j.detail || x.j.message)) || "Could not delete selected rows.";
+                window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              try {
+                document.dispatchEvent(new CustomEvent("gc-configuration-entries-updated"));
+              } catch (e2) {}
+              if (tableZone.refresh) tableZone.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              window.gcAlert("Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em =
-                (x.j && (x.j.detail || x.j.message)) || "Could not delete selected rows.";
-              alert(typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            try {
-              document.dispatchEvent(new CustomEvent("gc-configuration-entries-updated"));
-            } catch (e2) {}
-            if (tableZone.refresh) tableZone.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            alert("Network error.");
-          });
+        });
       });
     })();
 

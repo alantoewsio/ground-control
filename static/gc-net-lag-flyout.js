@@ -182,8 +182,9 @@
     return escapeHtml(s).replace(/'/g, "&#39;");
   }
 
-  let MEMBER_TRASH_SVG =
-    '<svg class="gc-bridge-flyout__member-trash-svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4v-2h-3.5l-1-1h-5l-1 1H5v2h14zM8 9h8v10H8V9z"/></svg>';
+  let MEMBER_TRASH_SVG = (window.gcIcon
+    ? window.gcIcon("delete", { size: "xs", cls: "gc-bridge-flyout__member-trash-svg" })
+    : "");
 
   function populateMemberSelect(selectEl, currentValue, choiceList) {
     let cur = currentValue != null ? String(currentValue).trim() : "";
@@ -851,7 +852,7 @@
               ? globalThis.gcNetLagEnqueueCreateUrl
               : "";
           if (!createUrl) {
-            alert(
+            window.gcAlert(
               isCfg
                 ? "LAG configuration create URL is not configured."
                 : "LAG queue-create URL is not configured.",
@@ -863,24 +864,24 @@
           if (isCfg) {
             cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
             if (!els.addCfgSelect || !els.addCfgSelect.value.trim() || isNaN(cfgIdSel) || cfgIdSel <= 0) {
-              alert("Select a configuration.");
+              window.gcAlert("Select a configuration.");
               return;
             }
           } else {
             fwIdSel = els.addFwSelect ? parseInt(els.addFwSelect.value.trim(), 10) : NaN;
             if (!els.addFwSelect || !els.addFwSelect.value.trim() || isNaN(fwIdSel) || fwIdSel <= 0) {
-              alert("Select a firewall.");
+              window.gcAlert("Select a firewall.");
               return;
             }
           }
           let hw = els.hwInp ? els.hwInp.value.trim() : "";
           if (!hw || !/^[A-Za-z][A-Za-z0-9_]*$/.test(hw) || hw.length > 10) {
-            alert("Hardware must be 1–10 characters, start with a letter, letters/digits/underscores only.");
+            window.gcAlert("Hardware must be 1–10 characters, start with a letter, letters/digits/underscores only.");
             return;
           }
           let mems = collectLagForm().lag_members;
           if (mems.length < 2 || mems.length > 4) {
-            alert("Select 2–4 member interfaces.");
+            window.gcAlert("Select 2–4 member interfaces.");
             return;
           }
           if (els.saveBtn) els.saveBtn.disabled = true;
@@ -914,14 +915,19 @@
                 let code = typeof d === "object" && d && d.code;
                 let msg = detailMessage(x.j, "Could not add LAG.");
                 if (x.status === 409 && code === "lag_cache_conflict") {
-                  if (
-                    globalThis.confirm(
-                      msg + "\n\nQueue this add anyway? Choose OK to proceed, or Cancel to stop.",
-                    )
-                  ) {
+                  let lagQ = msg + "\n\nQueue this add anyway? Choose OK to proceed, or Cancel to stop.";
+                  let cf = window.gcConfirm
+                    ? window.gcConfirm(lagQ, { tone: "warning", confirmLabel: "Queue anyway" })
+                    : Promise.resolve(globalThis.confirm(lagQ));
+                  return cf.then(function (lagOk) {
+                    if (!lagOk) {
+                      if (els.saveBtn) els.saveBtn.disabled = false;
+                      syncDirty();
+                      return;
+                    }
                     return runCreate(true).then(function (x2) {
                       if (!x2.ok) {
-                        alert(detailMessage(x2.j, "Could not add LAG."));
+                        window.gcAlert(detailMessage(x2.j, "Could not add LAG."));
                         if (els.saveBtn) els.saveBtn.disabled = false;
                         syncDirty();
                         return;
@@ -929,12 +935,9 @@
                       document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
                       close(root);
                     });
-                  }
-                  if (els.saveBtn) els.saveBtn.disabled = false;
-                  syncDirty();
-                  return;
+                  });
                 }
-                alert(msg);
+                window.gcAlert(msg);
                 if (els.saveBtn) els.saveBtn.disabled = false;
                 syncDirty();
                 return;
@@ -943,7 +946,7 @@
               close(root);
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
             });
@@ -959,7 +962,7 @@
             : "";
         let cid = currentNetRow && currentNetRow.config_entry_id;
         if (!url || cid == null) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "LAG save URL is not configured or the row is missing a config entry id."
               : "Task queue URL is not configured or the row is missing a config entry id.",
@@ -983,7 +986,7 @@
               let errMsg =
                 (x.j && (x.j.detail || x.j.message)) ||
                 (isCfg ? "Could not queue configuration change." : "Could not save to task queue.");
-              alert(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
+              window.gcAlert(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
               return;
@@ -992,7 +995,7 @@
             close(root);
           })
           .catch(function () {
-            alert("Network error.");
+            window.gcAlert("Network error.");
             if (els.saveBtn) els.saveBtn.disabled = false;
             syncDirty();
           });

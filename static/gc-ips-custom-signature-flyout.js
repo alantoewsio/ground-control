@@ -15,7 +15,7 @@
     if (typeof globalThis.gcGlobalBannerShowResult === "function") {
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
-      alert(msg);
+      window.gcAlert(msg);
     }
   }
 

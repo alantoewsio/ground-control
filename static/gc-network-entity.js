@@ -710,23 +710,28 @@ function gcCreateNetworkEntityTable(cfg) {
     return null;
   }
 
-  let LOCK_ICON_SVG =
-    '<svg class="gc-hs-lock-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z"/></svg>';
+  let LOCK_ICON_SVG = (window.gcIcon
+    ? window.gcIcon("lock", { size: "xs", cls: "gc-hs-lock-icon" })
+    : "");
 
   /** Circled exclamation (merged-row field drift); keep in sync with combined-view skill. */
-  let COMBINE_ROW_CONFLICT_ICON_SVG =
-    '<svg class="gc-combine-row-conflict-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>';
+  let COMBINE_ROW_CONFLICT_ICON_SVG = (window.gcIcon
+    ? window.gcIcon("error", { size: "sm", cls: "gc-combine-row-conflict-svg" })
+    : "");
 
   /** Circled question (merged row exists on a subset of selected scopes). */
-  let COMBINE_ROW_PARTIAL_SCOPE_ICON_SVG =
-    '<svg class="gc-combine-row-partial-scope-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>';
+  let COMBINE_ROW_PARTIAL_SCOPE_ICON_SVG = (window.gcIcon
+    ? window.gcIcon("help", { size: "sm", cls: "gc-combine-row-partial-scope-svg" })
+    : "");
 
   /** Interfaces tab Address (CIDR): matches IPAM assignment on this firewall. */
-  let IPAM_IF_CIDR_VERIFIED_SVG =
-    '<svg class="gc-if-ipam-cidr-icon__svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+  let IPAM_IF_CIDR_VERIFIED_SVG = (window.gcIcon
+    ? window.gcIcon("check", { size: "xs", cls: "gc-if-ipam-cidr-icon__svg" })
+    : "");
   /** Same-VRF overlap (IPAM / discovered), aligned with Address Management conflict flag. */
-  let IPAM_IF_CIDR_CONFLICT_SVG =
-    '<svg class="gc-if-ipam-cidr-icon__svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
+  let IPAM_IF_CIDR_CONFLICT_SVG = (window.gcIcon
+    ? window.gcIcon("error", { size: "xs", cls: "gc-if-ipam-cidr-icon__svg" })
+    : "");
 
   let thead = document.getElementById(prefix + "-thead");
   let tbody = document.getElementById(prefix + "-tbody");
@@ -1016,10 +1021,10 @@ function gcCreateNetworkEntityTable(cfg) {
         '<span class="gc-if-status-inline__icon" role="img" aria-label="' +
         escapeHtml(full) +
         '">' +
-        '<svg class="gc-if-status-inline__svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">' +
-        '<path fill="currentColor" d="M8 5h8v2h2v4h2v6h-2v2H8v-2H6v-6h2V7H8V5zm2 6v8h4v-8h-4z"/>' +
-        '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 20L19 6"/>' +
-        "</svg></span></span>"
+        (window.gcIcon
+          ? window.gcIcon("power_off", { size: "md", cls: "gc-if-status-inline__svg" })
+          : "") +
+        "</span></span>"
       );
     }
     if (interfaceStatusMatchesConnected(parts)) {
@@ -1030,11 +1035,10 @@ function gcCreateNetworkEntityTable(cfg) {
         '<span class="gc-if-status-inline__icon" role="img" aria-label="' +
         escapeHtml(full) +
         '">' +
-        '<svg class="gc-if-status-inline__svg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">' +
-        '<path fill="currentColor" d="M7 6h10v2h2v4h-2v7H7v-7H5V8h2V6zm2 6v6h6v-6H9z"/>' +
-        '<circle cx="17.5" cy="8.5" r="5" fill="#16a34a"/>' +
-        '<path fill="none" stroke="#fff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M14.3 8.5l1.5 1.5 3.2-3.2"/>' +
-        "</svg></span></span>"
+        (window.gcIcon
+          ? window.gcIcon("power", { size: "md", cls: "gc-if-status-inline__svg gc-if-status-inline__svg--connected" })
+          : "") +
+        "</span></span>"
       );
     }
     return null;
@@ -1085,23 +1089,21 @@ function gcCreateNetworkEntityTable(cfg) {
             : et === "alias"
               ? "gc-net-entity-type-icon gc-net-entity-type-icon--alias"
               : "gc-net-entity-type-icon gc-net-entity-type-icon--interface";
-    let svg;
+    let iconName;
     if (et === "vlan") {
-      svg =
-        '<svg class="gc-net-entity-type-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 8h4v4H4V8zm6-5h4v4h-4V3zm0 10h4v4h-4v-4zm6-5h4v4h-4V8zM4 14h4v4H4v-4zm12 5h4v4h-4v-4z"/></svg>';
+      iconName = "view_module";
     } else if (et === "bridge_pair") {
-      svg =
-        '<svg class="gc-net-entity-type-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M15 9h2V7h-2v2zm-4 0h2V7h-2v2zm-4 0h2V7H7v2zm-2 4v2h14v-2H5zm2 4h2v-2H7v2zm4 0h2v-2h-2v2zm4 0h2v-2h-2v2z"/></svg>';
+      iconName = "device_hub";
     } else if (et === "lag") {
-      svg =
-        '<svg class="gc-net-entity-type-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 7h16v2H4V7zm0 4h16v2H4v-2zm0 4h10v2H4v-2z"/><path fill="currentColor" d="M16 15h4v4h-4v-4z" opacity=".85"/></svg>';
+      iconName = "merge";
     } else if (et === "alias") {
-      svg =
-        '<svg class="gc-net-entity-type-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5 5h8v4H5V5zm0 6h10v4H5v-4zm0 6h6v3H5v-3z"/><path fill="currentColor" d="M16 6h3v12h-3V6z" opacity=".85"/></svg>';
+      iconName = "alternate_email";
     } else {
-      svg =
-        '<svg class="gc-net-entity-type-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M9 5h6l1.5 3H18v11H6V8h1.5L9 5zm0.75 6.5h7v7h-7v-7z"/><path fill="currentColor" d="M9.85 17.15h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55zm0.95 0h0.55v2.75h-0.55z"/></svg>';
+      iconName = "settings_ethernet";
     }
+    let svg = (window.gcIcon
+      ? window.gcIcon(iconName, { size: "sm", cls: "gc-net-entity-type-icon__svg" })
+      : "");
     return (
       '<span class="' +
       cls +

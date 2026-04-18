@@ -37,6 +37,8 @@ from app.task_queue_service import (
     LagCreateCacheConflictError,
     enqueue_configuration_delete,
     enqueue_configuration_merged,
+    hs_entity_external_name,
+    hs_entity_identity_label,
     merge_hs_flyout_form,
 )
 
@@ -933,9 +935,9 @@ def apply_configuration_hs_entity_create_many(
         raise ValueError("Select at least one configuration")
     base: dict[str, Any] = {}
     merged = merge_hs_flyout_form(entity_type, base, form)
-    name = str(merged.get("Name") or "").strip()
+    name = hs_entity_external_name(entity_type, merged)
     if not name:
-        raise ValueError("Name is required")
+        raise ValueError(hs_entity_identity_label(entity_type) + " is required")
     uid, un = _audit(
         created_by_user_id=created_by_user_id,
         created_by_username=created_by_username,

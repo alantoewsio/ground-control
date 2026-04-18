@@ -919,7 +919,7 @@
         if (typeof tableIf.getDeleteConfigEntryIdsFromSelection !== "function") return;
         var ids = tableIf.getDeleteConfigEntryIdsFromSelection();
         if (!ids.length) {
-          alert("Select one or more rows to delete.");
+          window.gcAlert("Select one or more rows to delete.");
           return;
         }
         var msg =
@@ -927,44 +927,49 @@
           "You are about to queue deletion of the selected VLAN, bridge pair, LAG, and/or alias objects on the firewall. " +
           "That can immediately affect connectivity, routing, DHCP, VPN tunnels, and any rules or references that still use those objects when the tasks are sent.\n\n" +
           "Proceed and add remove operations to the task queue?";
-        if (!window.confirm(msg)) return;
-        if (!batchUrl) {
-          alert("Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(batchUrl, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!batchUrl) {
+            window.gcAlert("Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(batchUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em =
+                  (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+                window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              try {
+                document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+              } catch (e1) {}
+              if (tableIf.refresh) tableIf.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              window.gcAlert("Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em =
-                (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
-              alert(typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            try {
-              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-            } catch (e1) {}
-            if (tableIf.refresh) tableIf.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            alert("Network error.");
-          });
+        });
       });
     })();
 
@@ -1060,51 +1065,56 @@
         if (typeof tableZone.getDeleteConfigEntryIdsFromSelection !== "function") return;
         var ids = tableZone.getDeleteConfigEntryIdsFromSelection();
         if (!ids.length) {
-          alert("Select one or more rows to delete.");
+          window.gcAlert("Select one or more rows to delete.");
           return;
         }
         var msg =
           "You are about to queue deletion of the selected zone objects on each firewall. " +
           "That can affect rules and references that use those zone names when the tasks are sent.\n\n" +
           "Proceed and add remove operations to the task queue?";
-        if (!window.confirm(msg)) return;
-        if (!batchUrl) {
-          alert("Delete batch URL is not configured.");
-          return;
-        }
-        btn.disabled = true;
-        fetch(batchUrl, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({ config_entry_ids: ids }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, j: j };
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          if (!batchUrl) {
+            window.gcAlert("Delete batch URL is not configured.");
+            return;
+          }
+          btn.disabled = true;
+          fetch(batchUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({ config_entry_ids: ids }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              btn.disabled = false;
+              if (!x.ok) {
+                var em =
+                  (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
+                window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              try {
+                document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+              } catch (e1) {}
+              if (tableZone.refresh) tableZone.refresh();
+            })
+            .catch(function () {
+              btn.disabled = false;
+              window.gcAlert("Network error.");
             });
-          })
-          .then(function (x) {
-            btn.disabled = false;
-            if (!x.ok) {
-              var em =
-                (x.j && (x.j.detail || x.j.message)) || "Could not queue delete tasks.";
-              alert(typeof em === "string" ? em : JSON.stringify(em));
-              return;
-            }
-            try {
-              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-            } catch (e1) {}
-            if (tableZone.refresh) tableZone.refresh();
-          })
-          .catch(function () {
-            btn.disabled = false;
-            alert("Network error.");
-          });
+        });
       });
     })();
 

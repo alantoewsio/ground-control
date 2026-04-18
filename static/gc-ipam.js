@@ -2244,26 +2244,31 @@
           cascade +
           " other prefix(es) in the address plan (assignments, hosts, or nested pools). They will be deleted as well.";
       }
-      if (!globalThis.confirm(msg)) return;
-      setFormStatus("Deleting…", false);
-      let delUrl =
-        apiList.replace(/\/?$/, "") + "/" + encodeURIComponent(String(editId));
-      fetch(delUrl, { method: "DELETE", credentials: "same-origin" })
-        .then(function (r) {
-          return parseJsonSafe(r).then(function (j) {
-            return { ok: r.ok, status: r.status, body: j };
+      let cf = window.gcConfirm
+        ? window.gcConfirm(msg, { tone: "danger", confirmLabel: "Delete" })
+        : Promise.resolve(globalThis.confirm(msg));
+      cf.then(function (ok) {
+        if (!ok) return;
+        setFormStatus("Deleting…", false);
+        let delUrl =
+          apiList.replace(/\/?$/, "") + "/" + encodeURIComponent(String(editId));
+        fetch(delUrl, { method: "DELETE", credentials: "same-origin" })
+          .then(function (r) {
+            return parseJsonSafe(r).then(function (j) {
+              return { ok: r.ok, status: r.status, body: j };
+            });
+          })
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error(detailMessage(res.body.detail) || "Delete failed.");
+            }
+            closeFlyout();
+            applyFilters();
+          })
+          .catch(function (e) {
+            setFormStatus(e.message || String(e), true);
           });
-        })
-        .then(function (res) {
-          if (!res.ok) {
-            throw new Error(detailMessage(res.body.detail) || "Delete failed.");
-          }
-          closeFlyout();
-          applyFilters();
-        })
-        .catch(function (e) {
-          setFormStatus(e.message || String(e), true);
-        });
+      });
     });
   }
 
@@ -2355,15 +2360,15 @@
   let acceptAllBtn = document.getElementById("gc-ipam-accept-all");
   if (acceptAllBtn && apiAcceptBatch) {
     acceptAllBtn.addEventListener("click", function () {
-      if (
-        !globalThis.confirm(
-          "Accept every discovered prefix that already sits in a pool, passes individual checks, and has no same-VRF conflict with another assignment?"
-        )
-      ) {
-        return;
-      }
-      setStatus("Accepting…", false);
-      fetch(apiAcceptBatch, {
+      let aMsg =
+        "Accept every discovered prefix that already sits in a pool, passes individual checks, and has no same-VRF conflict with another assignment?";
+      let cf = window.gcConfirm
+        ? window.gcConfirm(aMsg, { confirmLabel: "Accept all" })
+        : Promise.resolve(globalThis.confirm(aMsg));
+      cf.then(function (ok) {
+        if (!ok) return;
+        setStatus("Accepting…", false);
+        fetch(apiAcceptBatch, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -2391,6 +2396,7 @@
         .catch(function (e) {
           setStatus(e.message || String(e), true);
         });
+      });
     });
   }
 

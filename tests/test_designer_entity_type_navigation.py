@@ -356,6 +356,32 @@ def test_build_firewalls_v2_object_nav_tree_skips_hidden_page(tmp_path, monkeypa
     assert "Address" in page_labels
 
 
+def test_real_navigation_data_includes_new_entity_types() -> None:
+    """The shipped designer navigation JSON must register all five new entities."""
+    from app import designer_entity_type_navigation as mod
+
+    p = mod.properties_file_path()
+    assert p.exists(), f"Missing designer navigation file: {p}"
+    raw = json.loads(p.read_text(encoding="utf-8"))
+    entries = raw.get("entries") or {}
+
+    expected = {
+        "unicast_route": ("CONFIGURE", "Routing", "Unicast Routes"),
+        "gateway": ("CONFIGURE", "Routing", "Gateways"),
+        "gateway_host": ("CONFIGURE", "Routing", "Custom Gateways"),
+        "clientless_user": ("CONFIGURE", "Authentication", "Clientless Users"),
+        "acl_rule": ("SYSTEM", "Administration", "Local Service ACL"),
+    }
+    for et, (section, page, tab) in expected.items():
+        assert et in entries, f"Navigation entry missing for {et}"
+        e = entries[et]
+        assert e.get("nav_section") == section
+        assert e.get("nav_page") == page
+        assert e.get("tab") == tab
+        assert (e.get("display_name") or "").strip()
+        assert (e.get("nav_icon") or "").strip()
+
+
 def test_api_designer_entity_type_navigation_put_invalid_entries_type(designer_client) -> None:
     r = designer_client.put(
         "/api/designer/entity-type-navigation",

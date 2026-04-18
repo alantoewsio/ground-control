@@ -33,7 +33,7 @@
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
       try {
-        alert(msg);
+        window.gcAlert(msg);
       } catch (e0) {}
     }
   }

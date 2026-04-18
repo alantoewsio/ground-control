@@ -267,6 +267,96 @@
       "opt_combine_view": true,
       "combine_by_column": "",
       "column_visibility": null
+    },
+    "fw_v2_o_configure_routing_unicast-routes": {
+      "title": "Unicast Routes",
+      "design_mode": true,
+      "entity_types": [
+        "unicast_route"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, DestinationIP, Netmask, Gateway, Interface, Distance, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_configure_routing_gateways": {
+      "title": "Gateways",
+      "design_mode": true,
+      "entity_types": [
+        "gateway"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, IPAddress, Zone, Weight, Timeout, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": false,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_configure_routing_custom-gateways": {
+      "title": "Custom Gateways",
+      "design_mode": true,
+      "entity_types": [
+        "gateway_host"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, Zone, IPAddress, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_configure_authentication_clientless-users": {
+      "title": "Clientless Users",
+      "design_mode": true,
+      "entity_types": [
+        "clientless_user"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, UserName, IPAddress, ClientLessGroup, Email, Status, Description, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
+    },
+    "fw_v2_o_system_administration_local-service-acl": {
+      "title": "Local Service ACL",
+      "design_mode": true,
+      "entity_types": [
+        "acl_rule"
+      ],
+      "secondary_filters": [],
+      "hidden_column_ids": [],
+      "column_order": "__row_select, __name, RuleName, Action, IPFamily, SourceZone, Hosts.Host, Hosts.DstHost, Services.Service, Description, __firewalls",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
     }
   }
 }

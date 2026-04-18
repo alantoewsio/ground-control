@@ -29,7 +29,7 @@
     if (typeof globalThis.gcGlobalBannerShowResult === "function") {
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
-      alert(msg);
+      window.gcAlert(msg);
     }
   }
 
@@ -1101,7 +1101,7 @@
               if (typeof globalThis.gcGlobalBannerShowResult === "function") {
                 globalThis.gcGlobalBannerShowResult(false, "Could not parse stored policy JSON for that firewall.");
               } else {
-                alert("Could not parse stored policy JSON for that firewall.");
+                window.gcAlert("Could not parse stored policy JSON for that firewall.");
               }
             }
           },

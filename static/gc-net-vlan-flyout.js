@@ -1004,7 +1004,7 @@
 
         if (addMode) {
           if (!isCfg) {
-            alert(
+            window.gcAlert(
               "Adding a new VLAN to the task queue is not supported yet. Use Configuration · Network to add a VLAN to a saved configuration, or edit an existing VLAN row to queue an update.",
             );
             return;
@@ -1012,18 +1012,18 @@
           let createUrl =
             typeof globalThis.gcNetVlanApplyCreateUrl === "string" ? globalThis.gcNetVlanApplyCreateUrl : "";
           if (!createUrl) {
-            alert("VLAN create URL is not configured.");
+            window.gcAlert("VLAN create URL is not configured.");
             return;
           }
           let cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
           if (!els.addCfgSelect || !els.addCfgSelect.value.trim() || isNaN(cfgIdSel) || cfgIdSel <= 0) {
-            alert("Select a configuration.");
+            window.gcAlert("Select a configuration.");
             return;
           }
           let vid = els.vlanIdInp ? els.vlanIdInp.value.trim() : "";
           let n = parseInt(vid, 10);
           if (!vid || String(n) !== vid || n < 1 || n > 4094) {
-            alert("VLAN ID must be a number from 1 to 4094.");
+            window.gcAlert("VLAN ID must be a number from 1 to 4094.");
             return;
           }
           let payload = JSON.stringify({
@@ -1045,7 +1045,7 @@
             .then(function (x) {
               if (!x.ok) {
                 let msg = (x.j && (x.j.detail || x.j.message)) || "Could not add VLAN.";
-                alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+                window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
                 if (els.saveBtn) els.saveBtn.disabled = false;
                 syncDirty();
                 return;
@@ -1054,7 +1054,7 @@
               close(root);
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
             });
@@ -1069,7 +1069,7 @@
             ? globalThis.gcNetVlanEnqueueUrl
             : "";
         if (!url) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "VLAN save URL is not configured or the row is missing a config entry id."
               : "Task queue URL is not configured or the row is missing a config entry id.",
@@ -1092,7 +1092,7 @@
         if (combinedMulti) {
           let selectedScopes = collectFlyoutScopeIds(els.form);
           if (!selectedScopes.length) {
-            alert("Select at least one firewall or configuration to update.");
+            window.gcAlert("Select at least one firewall or configuration to update.");
             return;
           }
           let tb4m = els.ipv4CombinedTbody;
@@ -1143,7 +1143,7 @@
                   let msgM =
                     (x.j && (x.j.detail || x.j.message)) ||
                     (isCfg ? "Could not save configuration." : "Could not save to task queue.");
-                  alert(typeof msgM === "string" ? msgM : JSON.stringify(msgM));
+                  window.gcAlert(typeof msgM === "string" ? msgM : JSON.stringify(msgM));
                   if (els.saveBtn) els.saveBtn.disabled = false;
                   syncDirty();
                   return;
@@ -1151,7 +1151,7 @@
                 postOneVlan();
               })
               .catch(function () {
-                alert("Network error.");
+                window.gcAlert("Network error.");
                 if (els.saveBtn) els.saveBtn.disabled = false;
                 syncDirty();
               });
@@ -1162,7 +1162,7 @@
 
         let cid = currentNetRow && currentNetRow.config_entry_id;
         if (cid == null) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "VLAN save URL is not configured or the row is missing a config entry id."
               : "Task queue URL is not configured or the row is missing a config entry id.",
@@ -1190,7 +1190,7 @@
               let msg2 =
                 (x.j && (x.j.detail || x.j.message)) ||
                 (isCfg ? "Could not save configuration." : "Could not save to task queue.");
-              alert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
+              window.gcAlert(typeof msg2 === "string" ? msg2 : JSON.stringify(msg2));
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
               return;
@@ -1199,7 +1199,7 @@
             close(root);
           })
           .catch(function () {
-            alert("Network error.");
+            window.gcAlert("Network error.");
             if (els.saveBtn) els.saveBtn.disabled = false;
             syncDirty();
           });

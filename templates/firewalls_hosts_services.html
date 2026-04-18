@@ -77,35 +77,35 @@
             {{ net_entity_table_wrap("gc-hs-ip-host", "IP hosts", "Search IP hosts", true, "gc-hs-ip-host-add", "Add IP
             host", "Combined view merges rows that share the same host name and host type. When other details differ
             across firewalls, the switch turns yellow — click to compare, or Shift+click to show one row per firewall.",
-            "gc-hs-ip-host-delete-selected", "Delete selected") }}
+            "gc-hs-ip-host-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-ip-host-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-ip-hostgroup"
             id="gc-hs-panel-ip-hostgroup" hidden>
             {{ net_entity_table_wrap("gc-hs-ip-hostgroup", "IP host groups", "Search IP host groups", true,
             "gc-hs-ip-hostgroup-add", "Add IP host group", "Combined view merges rows that share the same group name.
             When members differ across firewalls, the switch turns yellow — click to compare, or Shift+click for one row
-            per firewall.", "gc-hs-ip-hostgroup-delete-selected", "Delete selected") }}
+            per firewall.", "gc-hs-ip-hostgroup-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-ip-hostgroup-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-mac-host" id="gc-hs-panel-mac-host"
             hidden>
             {{ net_entity_table_wrap("gc-hs-mac-host", "MAC hosts", "Search MAC hosts", true, "gc-hs-mac-host-add", "Add
             MAC host", "Combined view merges rows that share the same name and MAC host type. When details differ, the
             switch turns yellow — click to compare, or Shift+click for one row per firewall.",
-            "gc-hs-mac-host-delete-selected", "Delete selected") }}
+            "gc-hs-mac-host-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-mac-host-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-fqdn-host" id="gc-hs-panel-fqdn-host"
             hidden>
             {{ net_entity_table_wrap("gc-hs-fqdn-host", "FQDN hosts", "Search FQDN hosts", true, "gc-hs-fqdn-host-add",
             "Add FQDN host", "Combined view merges rows that share the same name and FQDN. When details differ, the
             switch turns yellow — click to compare, or Shift+click for one row per firewall.",
-            "gc-hs-fqdn-host-delete-selected", "Delete selected") }}
+            "gc-hs-fqdn-host-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-fqdn-host-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-fqdn-hostgroup"
             id="gc-hs-panel-fqdn-hostgroup" hidden>
             {{ net_entity_table_wrap("gc-hs-fqdn-hostgroup", "FQDN host groups", "Search FQDN host groups", true,
             "gc-hs-fqdn-hostgroup-add", "Add FQDN host group", "Combined view merges rows that share the same group
             name. When members differ, the switch turns yellow — click to compare, or Shift+click for one row per
-            firewall.", "gc-hs-fqdn-hostgroup-delete-selected", "Delete selected") }}
+            firewall.", "gc-hs-fqdn-hostgroup-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-fqdn-hostgroup-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-country-group"
             id="gc-hs-panel-country-group" hidden>
@@ -118,14 +118,14 @@
             {{ net_entity_table_wrap("gc-hs-service", "Services", "Search services", true, "gc-hs-service-add", "Add
             service", "Combined view merges rows that share the same service name and type (TCP/UDP, IP, ICMP, …). When
             details differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.",
-            "gc-hs-service-delete-selected", "Delete selected") }}
+            "gc-hs-service-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-service-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-hs-tab-service-group"
             id="gc-hs-panel-service-group" hidden>
             {{ net_entity_table_wrap("gc-hs-service-group", "Service groups", "Search service groups", true,
             "gc-hs-service-group-add", "Add service group", "Combined view merges rows that share the same group name.
             When members differ, the switch turns yellow — click to compare, or Shift+click for one row per firewall.",
-            "gc-hs-service-group-delete-selected", "Delete selected") }}
+            "gc-hs-service-group-delete-selected", "Delete selected", bulk_add_btn_id="gc-hs-service-group-bulk-add", bulk_add_btn_label="Bulk add") }}
           </div>
         </div>
       </div>
@@ -189,6 +189,97 @@
     </footer>
   </div>
 </div>
+
+{# ── "Select a firewall" toast shown when Add/Bulk-Add clicked without a FW ── #}
+<div id="gc-hs-no-fw-banner" class="gc-hs-no-fw-banner" hidden role="alert" aria-live="assertive">
+  <span class="gc-icon gc-icon--xs" aria-hidden="true" style="flex-shrink:0">info</span>
+  Select one or more firewalls in the top bar to add objects.
+</div>
+
+{# ── Bulk Add modal ────────────────────────────────────────────────────────── #}
+<div id="gc-hs-bulk-add-modal" class="gc-hs-bulk-add-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="gc-hs-bulk-add-title">
+  <div class="gc-hs-bulk-add-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="gc-hs-bulk-add-modal__panel">
+    <header class="gc-hs-bulk-add-modal__header">
+      <div class="gc-hs-bulk-add-modal__title-row">
+        <span class="gc-icon gc-icon--sm gc-hs-bulk-add-modal__title-icon" aria-hidden="true">upload</span>
+        <h2 id="gc-hs-bulk-add-title" class="gc-hs-bulk-add-modal__title">Bulk add</h2>
+      </div>
+      <button type="button" class="gc-hs-bulk-add-modal__close" id="gc-hs-bulk-add-close" aria-label="Close" title="Close">
+        <span class="gc-icon gc-icon--sm" aria-hidden="true">close</span>
+      </button>
+    </header>
+
+    <div class="gc-hs-bulk-add-modal__body">
+
+      <div class="gc-hs-bulk-add-modal__fw-section">
+        <div class="gc-hs-bulk-add-modal__fw-head">
+          <span class="gc-hs-bulk-add-modal__field-label">
+            Apply to firewalls <span class="gc-hs-bulk-add-modal__req" aria-hidden="true">*</span>
+          </span>
+          <div class="gc-hs-bulk-add-modal__fw-actions">
+            <button type="button" class="link-btn" id="gc-hs-bulk-add-fw-all">Select all</button>
+            <span aria-hidden="true" class="muted" style="margin:0 3px">·</span>
+            <button type="button" class="link-btn" id="gc-hs-bulk-add-fw-none">None</button>
+          </div>
+        </div>
+        <div class="gc-hs-bulk-add-modal__fw-list" id="gc-hs-bulk-add-fw-list"
+          role="group" aria-label="Firewalls to apply bulk-add to"></div>
+        <p class="gc-hs-bulk-add-modal__fw-empty" id="gc-hs-bulk-add-fw-empty" hidden>
+          No firewalls found. Add a firewall in <strong>Inventory</strong> first.
+        </p>
+      </div>
+
+      <div class="gc-hs-bulk-add-modal__textarea-wrap">
+        <label class="gc-hs-bulk-add-modal__field-label" for="gc-hs-bulk-add-textarea">
+          Entries <span class="gc-hs-bulk-add-modal__req" aria-hidden="true">*</span>
+          <span class="gc-hs-bulk-add-modal__field-hint">— one per line</span>
+        </label>
+        <textarea
+          id="gc-hs-bulk-add-textarea"
+          class="gc-hs-bulk-add-modal__textarea mono"
+          rows="9"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Paste entries here…"
+        ></textarea>
+      </div>
+
+      <div class="gc-hs-bulk-add-modal__format-box">
+        <div class="gc-hs-bulk-add-modal__format-box-title">
+          <span class="gc-icon gc-icon--xs" aria-hidden="true" style="flex-shrink:0;font-size:13px">info</span>
+          Format
+        </div>
+        <pre class="gc-hs-bulk-add-modal__format-pre" id="gc-hs-bulk-add-format-pre"></pre>
+        <p class="gc-hs-bulk-add-modal__format-hint" id="gc-hs-bulk-add-format-hint"></p>
+      </div>
+
+    </div>
+
+    <div class="gc-hs-bulk-add-modal__summary" id="gc-hs-bulk-add-summary" hidden>
+      <div class="gc-hs-bulk-add-modal__summary-valid" id="gc-hs-bulk-add-summary-valid" hidden>
+        <span class="gc-icon gc-icon--xs" aria-hidden="true" style="font-size:14px">check</span>
+        <span id="gc-hs-bulk-add-valid-count"></span>
+      </div>
+      <div class="gc-hs-bulk-add-modal__summary-invalid" id="gc-hs-bulk-add-summary-invalid" hidden>
+        <span class="gc-icon gc-icon--xs" aria-hidden="true" style="font-size:14px">info</span>
+        <span id="gc-hs-bulk-add-invalid-count"></span>
+        <div class="gc-hs-bulk-add-modal__invalid-lines" id="gc-hs-bulk-add-invalid-lines"></div>
+      </div>
+      <div class="gc-hs-bulk-add-modal__summary-dupe" id="gc-hs-bulk-add-summary-dupe" hidden>
+        <span class="gc-icon gc-icon--xs" aria-hidden="true" style="font-size:14px">warning</span>
+        <span id="gc-hs-bulk-add-dupe-count"></span>
+      </div>
+    </div>
+
+    <footer class="gc-hs-bulk-add-modal__footer">
+      <button type="button" class="btn btn--secondary" id="gc-hs-bulk-add-cancel">Cancel</button>
+      <button type="button" class="btn primary" id="gc-hs-bulk-add-submit" disabled>
+        Add entries
+      </button>
+    </footer>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -196,6 +287,7 @@
 <script src="/static/gc-combine-flyout-conflicts.js"></script>
 <script src="/static/gc-hs-flyout-entity-forms.js"></script>
 <script src="/static/gc-hosts-services-flyout.js"></script>
+<script src="/static/gc-hs-bulk-add.js?v={{ about.app_version }}"></script>
 <script>
   window.gcHsIpHostEnqueueUrl = {{ url_api_task_queue_enqueue_ip_host | tojson }};
   window.gcHsIpHostEnqueueUpdatesBatchUrl = {{ url_api_task_queue_enqueue_ip_host_updates_batch | tojson }};
@@ -623,6 +715,7 @@
   });
 
   if (window.gcHsFlyoutInit) window.gcHsFlyoutInit();
+  if (window.gcHsBulkAddInit) window.gcHsBulkAddInit();
 
   function gcHsSelectedFirewallIdsFromCheckboxes() {
     var ids = [];
@@ -642,14 +735,28 @@
   }
   window.gcHsTopBarFirewallIds = gcHsTopBarFirewallIds;
 
+  function gcHsShowNoFirewallBanner() {
+    var el = document.getElementById("gc-hs-no-fw-banner");
+    if (!el) return;
+    el.hidden = false;
+    clearTimeout(el._gcHsHideTimer);
+    el._gcHsHideTimer = setTimeout(function () { el.hidden = true; }, 4000);
+  }
+
   function syncAllHsAddButtons() {
     var ids = gcHsTopBarFirewallIds();
     var ok = ids.length >= 1;
     TAB_DEFS.forEach(function (t) {
       var btn = document.getElementById(t.prefix + "-add");
-      if (!btn) return;
-      btn.disabled = !ok;
-      btn.title = ok ? "Add (configure in flyout)" : "Select one or more firewalls in the top bar";
+      if (btn) {
+        btn.disabled = false;
+        btn.title = ok ? "Add (configure in flyout)" : "Select one or more firewalls in the top bar first";
+      }
+      var bulkBtn = document.getElementById(t.prefix + "-bulk-add");
+      if (bulkBtn) {
+        bulkBtn.disabled = false;
+        bulkBtn.title = ok ? "Bulk add multiple entries" : "Select one or more firewalls in the top bar first";
+      }
     });
   }
 
@@ -657,11 +764,26 @@
     var btn = document.getElementById(t.prefix + "-add");
     if (!btn) return;
     btn.addEventListener("click", function () {
-      if (gcHsTopBarFirewallIds().length < 1) return;
+      if (gcHsTopBarFirewallIds().length < 1) {
+        gcHsShowNoFirewallBanner();
+        return;
+      }
       if (window.gcHsFlyoutInit) window.gcHsFlyoutInit();
       if (window.gcHsFlyoutOpenAddForEntity) window.gcHsFlyoutOpenAddForEntity(t.key);
       else if (t.key === "ip_host" && window.gcHsFlyoutOpenAddIpHost) window.gcHsFlyoutOpenAddIpHost();
     });
+    // Bulk Add button
+    var bulkBtn = document.getElementById(t.prefix + "-bulk-add");
+    if (bulkBtn) {
+      bulkBtn.addEventListener("click", function () {
+        if (gcHsTopBarFirewallIds().length < 1) {
+          gcHsShowNoFirewallBanner();
+          return;
+        }
+        if (window.gcHsBulkAddInit) window.gcHsBulkAddInit();
+        if (window.gcHsBulkAddOpen) window.gcHsBulkAddOpen(t.key);
+      });
+    }
   });
   document.addEventListener("gc-firewall-selection-changed", syncAllHsAddButtons);
   syncAllHsAddButtons();
@@ -674,7 +796,7 @@
       if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
       var ids = tbl.getDeleteConfigEntryIdsFromSelection();
       if (!ids.length) {
-        alert("Select one or more rows to delete.");
+        window.gcAlert("Select one or more rows to delete.");
         return;
       }
       var n = ids.length;
@@ -686,46 +808,51 @@
         " for the selected " +
         labelPlural +
         "? This uses the task queue.";
-      if (!window.confirm(msg)) return;
-      var url =
-        typeof window.gcHsEnqueueDeletesBatchUrl === "string"
-          ? window.gcHsEnqueueDeletesBatchUrl
-          : "";
-      if (!url) {
-        alert("Delete batch URL is not configured.");
-        return;
-      }
-      btn.disabled = true;
-      fetch(url, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config_entry_ids: ids }),
-      })
-        .then(function (r) {
-          return r.json().then(function (j) {
-            return { ok: r.ok, j: j };
+      var cf = window.gcConfirm
+        ? window.gcConfirm(msg)
+        : Promise.resolve(globalThis.confirm(msg));
+      cf.then(function (ok) {
+        if (!ok) return;
+        var url =
+          typeof window.gcHsEnqueueDeletesBatchUrl === "string"
+            ? window.gcHsEnqueueDeletesBatchUrl
+            : "";
+        if (!url) {
+          window.gcAlert("Delete batch URL is not configured.");
+          return;
+        }
+        btn.disabled = true;
+        fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config_entry_ids: ids }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (x) {
+            btn.disabled = false;
+            if (!x.ok) {
+              var em =
+                (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
+              window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+              return;
+            }
+            if (typeof window.gcHsDispatchAfterDeleteBatch === "function") {
+              window.gcHsDispatchAfterDeleteBatch();
+            } else {
+              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            }
+            if (tbl.refresh) tbl.refresh();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            window.gcAlert("Network error.");
           });
-        })
-        .then(function (x) {
-          btn.disabled = false;
-          if (!x.ok) {
-            var em =
-              (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
-            alert(typeof em === "string" ? em : JSON.stringify(em));
-            return;
-          }
-          if (typeof window.gcHsDispatchAfterDeleteBatch === "function") {
-            window.gcHsDispatchAfterDeleteBatch();
-          } else {
-            document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-          }
-          if (tbl.refresh) tbl.refresh();
-        })
-        .catch(function () {
-          btn.disabled = false;
-          alert("Network error.");
-        });
+      });
     });
   }
 

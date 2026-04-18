@@ -517,8 +517,9 @@
     return "EnableRoutingOnBridge";
   }
 
-  let MEMBER_TRASH_SVG =
-    '<svg class="gc-bridge-flyout__member-trash-svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4v-2h-3.5l-1-1h-5l-1 1H5v2h14zM8 9h8v10H8V9z"/></svg>';
+  let MEMBER_TRASH_SVG = (window.gcIcon
+    ? window.gcIcon("delete", { size: "xs", cls: "gc-bridge-flyout__member-trash-svg" })
+    : "");
 
   /** Build options with DOM APIs and set .value — innerHTML on <select> is unreliable in some browsers. */
   function populateMemberSelect(selectEl, currentValue, choiceList) {
@@ -1231,7 +1232,7 @@
               ? globalThis.gcNetBridgePairEnqueueCreateUrl
               : "";
           if (!createUrl) {
-            alert(
+            window.gcAlert(
               isCfg
                 ? "Bridge pair create URL is not configured."
                 : "Bridge pair queue-create URL is not configured.",
@@ -1241,55 +1242,55 @@
           if (isCfg) {
             let cfgIdSel = els.addCfgSelect ? parseInt(els.addCfgSelect.value.trim(), 10) : NaN;
             if (!els.addCfgSelect || !els.addCfgSelect.value.trim() || isNaN(cfgIdSel) || cfgIdSel <= 0) {
-              alert("Select a configuration.");
+              window.gcAlert("Select a configuration.");
               return;
             }
           } else {
             let fwIdSel = els.addFwSelect ? parseInt(els.addFwSelect.value.trim(), 10) : NaN;
             if (!els.addFwSelect || !els.addFwSelect.value.trim() || isNaN(fwIdSel) || fwIdSel <= 0) {
-              alert("Select a firewall.");
+              window.gcAlert("Select a firewall.");
               return;
             }
           }
           let hw = els.hwInp ? els.hwInp.value.trim() : "";
           if (!hw) {
-            alert("Hardware name is required.");
+            window.gcAlert("Hardware name is required.");
             return;
           }
           if (hw.length > 10) {
-            alert("Hardware must be at most 10 characters.");
+            window.gcAlert("Hardware must be at most 10 characters.");
             return;
           }
           if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(hw)) {
-            alert(
+            window.gcAlert(
               "Hardware must start with a letter and contain only letters, digits, and underscores.",
             );
             return;
           }
           let nm = els.nameInp ? els.nameInp.value.trim() : "";
           if (nm.length > 58) {
-            alert("Name must be at most 58 characters.");
+            window.gcAlert("Name must be at most 58 characters.");
             return;
           }
           let dsc = els.descInp ? els.descInp.value.trim() : "";
           if (dsc.length > 100) {
-            alert("Description must be at most 100 characters.");
+            window.gcAlert("Description must be at most 100 characters.");
             return;
           }
           let mems = readMembersFromDom().filter(memberRowHasValue);
           if (mems.length < 2) {
-            alert("Add at least two member interfaces, each with a zone.");
+            window.gcAlert("Add at least two member interfaces, each with a zone.");
             return;
           }
           for (let mi = 0; mi < mems.length; mi++) {
             if (!mems[mi].iface || !mems[mi].zone) {
-              alert("Each member needs an interface and a zone.");
+              window.gcAlert("Each member needs an interface and a zone.");
               return;
             }
           }
           if (els.saveBtn) els.saveBtn.disabled = true;
           function finishBridgePairCreateError(msg) {
-            alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+            window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
             if (els.saveBtn) els.saveBtn.disabled = false;
             syncDirty();
           }
@@ -1329,19 +1330,23 @@
                   let q =
                     msg +
                     "\n\nQueue this add anyway? Choose OK to proceed, or Cancel to stop.";
-                  if (globalThis.confirm(q)) {
-                    return runBridgePairCreateRequest(true).then(function (x2) {
-                      if (!x2.ok) {
-                        finishBridgePairCreateError(detailMessage(x2.j, "Could not add bridge pair."));
-                        return;
-                      }
-                      document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-                      close(root);
-                    });
-                  }
-                  if (els.saveBtn) els.saveBtn.disabled = false;
-                  syncDirty();
-                  return;
+                  let cf = window.gcConfirm
+                    ? window.gcConfirm(q, { tone: "warning", confirmLabel: "Queue anyway" })
+                    : Promise.resolve(globalThis.confirm(q));
+                  return cf.then(function (cok) {
+                    if (cok) {
+                      return runBridgePairCreateRequest(true).then(function (x2) {
+                        if (!x2.ok) {
+                          finishBridgePairCreateError(detailMessage(x2.j, "Could not add bridge pair."));
+                          return;
+                        }
+                        document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+                        close(root);
+                      });
+                    }
+                    if (els.saveBtn) els.saveBtn.disabled = false;
+                    syncDirty();
+                  });
                 }
                 finishBridgePairCreateError(msg);
                 return;
@@ -1350,7 +1355,7 @@
               close(root);
             })
             .catch(function () {
-              alert("Network error.");
+              window.gcAlert("Network error.");
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
             });
@@ -1366,7 +1371,7 @@
             : "";
         let cid = currentNetRow && currentNetRow.config_entry_id;
         if (!url || cid == null) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "Bridge pair save URL is not configured or the row is missing a config entry id."
               : "Task queue URL is not configured or the row is missing a config entry id.",
@@ -1394,7 +1399,7 @@
               let msg =
                 (x.j && (x.j.detail || x.j.message)) ||
                 (isCfg ? "Could not save configuration." : "Could not save to task queue.");
-              alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+              window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
               if (els.saveBtn) els.saveBtn.disabled = false;
               syncDirty();
               return;
@@ -1403,7 +1408,7 @@
             close(root);
           })
           .catch(function () {
-            alert("Network error.");
+            window.gcAlert("Network error.");
             if (els.saveBtn) els.saveBtn.disabled = false;
             syncDirty();
           });

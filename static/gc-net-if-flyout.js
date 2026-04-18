@@ -922,7 +922,7 @@
             (typeof globalThis.gcNetIfCombinedStaticUsesV6 === "function" &&
               globalThis.gcNetIfCombinedStaticUsesV6(els, row0)));
         if (!url) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "Configuration save URL is not configured or the row is missing a config entry id."
               : "Task queue is not configured or row is missing config entry id.",
@@ -937,14 +937,14 @@
           close(root);
         }
         function failSave(msg) {
-          alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+          window.gcAlert(typeof msg === "string" ? msg : JSON.stringify(msg));
           if (els.saveBtn) els.saveBtn.disabled = false;
           syncDirty();
         }
         if (combinedMulti) {
           let selectedScopes = collectFlyoutScopeIds(els.form);
           if (!selectedScopes.length) {
-            alert("Select at least one firewall or configuration to update.");
+            window.gcAlert("Select at least one firewall or configuration to update.");
             return;
           }
           let tb4 = els.ipv4CombinedTbody;
@@ -1062,7 +1062,7 @@
         }
         let cid = row0 && row0.config_entry_id;
         if (cid == null) {
-          alert(
+          window.gcAlert(
             isCfg
               ? "Configuration save URL is not configured or the row is missing a config entry id."
               : "Task queue is not configured or row is missing config entry id.",

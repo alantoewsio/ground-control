@@ -988,79 +988,84 @@
     function applyConfigurationRowToMembers(tr, btn) {
       var cfgId = parseInt(tr.getAttribute("data-cfg-id") || "", 10);
       if (isNaN(cfgId) || cfgId <= 0) {
-        alert("Missing configuration id.");
+        window.gcAlert("Missing configuration id.");
         return;
       }
       if (!GC_APPLY_CFG_TO_MEMBERS_URL_TEMPLATE) {
-        alert("Apply URL is not configured.");
+        window.gcAlert("Apply URL is not configured.");
         return;
       }
       var cfgName = (tr.getAttribute("data-cfg-name") || "").trim();
       var cfgLabel = cfgName || "Configuration #" + cfgId;
-      if (!window.confirm("Queue create/update tasks to apply " + cfgLabel + " to all of its member firewalls?")) {
-        return;
-      }
-      var url = GC_APPLY_CFG_TO_MEMBERS_URL_TEMPLATE.replace("__CONFIG_ID__", encodeURIComponent(String(cfgId)));
-      if (btn) {
-        btn.disabled = true;
-        btn.classList.add("btn-icon--busy");
-      }
-      fetch(url, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "X-Requested-With": "Ground-Control",
-        },
-      })
-        .then(function (r) {
-          return r.json().then(function (j) {
-            return { ok: r.ok, body: j };
-          });
+      var confirmMsg =
+        "Queue create/update tasks to apply " + cfgLabel + " to all of its member firewalls?";
+      var cf = window.gcConfirm
+        ? window.gcConfirm(confirmMsg)
+        : Promise.resolve(globalThis.confirm(confirmMsg));
+      cf.then(function (ok) {
+        if (!ok) return;
+        var url = GC_APPLY_CFG_TO_MEMBERS_URL_TEMPLATE.replace("__CONFIG_ID__", encodeURIComponent(String(cfgId)));
+        if (btn) {
+          btn.disabled = true;
+          btn.classList.add("btn-icon--busy");
+        }
+        fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "X-Requested-With": "Ground-Control",
+          },
         })
-        .then(function (res) {
-          if (btn) {
-            btn.disabled = false;
-            btn.classList.remove("btn-icon--busy");
-          }
-          if (!res.ok) {
-            var err = (res.body && (res.body.detail || res.body.message)) || "Could not queue apply tasks.";
-            if (typeof err !== "string") err = JSON.stringify(err);
-            if (typeof window.gcGlobalBannerShowResult === "function") {
-              window.gcGlobalBannerShowResult(false, err);
-            } else {
-              alert(err);
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, body: j };
+            });
+          })
+          .then(function (res) {
+            if (btn) {
+              btn.disabled = false;
+              btn.classList.remove("btn-icon--busy");
             }
-            return;
-          }
-          var body = res.body || {};
-          var queued = parseInt(body.queued_count || 0, 10) || 0;
-          var unchanged = parseInt(body.unchanged_count || 0, 10) || 0;
-          var skipped = Array.isArray(body.skipped) ? body.skipped.length : 0;
-          var members = Array.isArray(body.member_firewall_ids) ? body.member_firewall_ids.length : 0;
-          var txt = "Queued " + queued + " task(s) for " + members + " member firewall" + (members === 1 ? "" : "s") + ".";
-          if (unchanged > 0) txt += " " + unchanged + " already matched.";
-          if (skipped > 0) txt += " " + skipped + " skipped.";
-          if (typeof window.gcGlobalBannerShowResult === "function") {
-            window.gcGlobalBannerShowResult(queued > 0, txt);
-          } else {
-            alert(txt);
-          }
-          try {
-            document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-          } catch (e3) {}
-        })
-        .catch(function () {
-          if (btn) {
-            btn.disabled = false;
-            btn.classList.remove("btn-icon--busy");
-          }
-          if (typeof window.gcGlobalBannerShowResult === "function") {
-            window.gcGlobalBannerShowResult(false, "Network error while queueing apply tasks.");
-          } else {
-            alert("Network error while queueing apply tasks.");
-          }
-        });
+            if (!res.ok) {
+              var err = (res.body && (res.body.detail || res.body.message)) || "Could not queue apply tasks.";
+              if (typeof err !== "string") err = JSON.stringify(err);
+              if (typeof window.gcGlobalBannerShowResult === "function") {
+                window.gcGlobalBannerShowResult(false, err);
+              } else {
+                window.gcAlert(err);
+              }
+              return;
+            }
+            var body = res.body || {};
+            var queued = parseInt(body.queued_count || 0, 10) || 0;
+            var unchanged = parseInt(body.unchanged_count || 0, 10) || 0;
+            var skipped = Array.isArray(body.skipped) ? body.skipped.length : 0;
+            var members = Array.isArray(body.member_firewall_ids) ? body.member_firewall_ids.length : 0;
+            var txt = "Queued " + queued + " task(s) for " + members + " member firewall" + (members === 1 ? "" : "s") + ".";
+            if (unchanged > 0) txt += " " + unchanged + " already matched.";
+            if (skipped > 0) txt += " " + skipped + " skipped.";
+            if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(queued > 0, txt);
+            } else {
+              window.gcAlert(txt);
+            }
+            try {
+              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+            } catch (e3) {}
+          })
+          .catch(function () {
+            if (btn) {
+              btn.disabled = false;
+              btn.classList.remove("btn-icon--busy");
+            }
+            if (typeof window.gcGlobalBannerShowResult === "function") {
+              window.gcGlobalBannerShowResult(false, "Network error while queueing apply tasks.");
+            } else {
+              window.gcAlert("Network error while queueing apply tasks.");
+            }
+          });
+      });
     }
 
     function bindCfgFlyoutResize(root) {
@@ -1189,7 +1194,7 @@
         e.preventDefault();
         var idField = document.getElementById("edit-cfg-id");
         if (!idField || !String(idField.value || "").trim()) {
-          alert("Missing configuration id. Close and open the panel again.");
+          window.gcAlert("Missing configuration id. Close and open the panel again.");
           return;
         }
         var fd = new FormData(editForm);
@@ -1221,11 +1226,11 @@
                 }
               } catch (e4) {}
             }
-            alert("Save failed.");
+            window.gcAlert("Save failed.");
           })
           .catch(function () {
             if (submitBtn) submitBtn.disabled = false;
-            alert("Save failed.");
+            window.gcAlert("Save failed.");
           });
       });
     }
@@ -1283,12 +1288,12 @@
               location.reload();
             } else {
               delConfirm.disabled = false;
-              alert("Delete failed");
+              window.gcAlert("Delete failed");
             }
           })
           .catch(function () {
             delConfirm.disabled = false;
-            alert("Delete failed");
+            window.gcAlert("Delete failed");
           });
       });
     }
@@ -1299,13 +1304,13 @@
       btn.addEventListener("click", function () {
         var cfgIds = getSelectedIds();
         if (cfgIds.length < 1) {
-          alert("Select one or more configurations.");
+          window.gcAlert("Select one or more configurations.");
           return;
         }
         var fwIds =
           typeof window.gcGetSelectedFirewallIds === "function" ? window.gcGetSelectedFirewallIds() : [];
         if (!Array.isArray(fwIds) || fwIds.length < 1) {
-          alert("Select one or more firewalls in the top bar first.");
+          window.gcAlert("Select one or more firewalls in the top bar first.");
           return;
         }
         var cN = cfgIds.length;
@@ -1320,62 +1325,67 @@
           " selected firewall" +
           (fN === 1 ? "" : "s") +
           "?";
-        if (!window.confirm(msg)) return;
-        btn.disabled = true;
-        fetch(GC_APPLY_TO_FIREWALLS_BATCH_URL, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "Ground-Control",
-          },
-          body: JSON.stringify({
-            configuration_ids: cfgIds,
-            firewall_ids: fwIds,
-          }),
-        })
-          .then(function (r) {
-            return r.json().then(function (j) {
-              return { ok: r.ok, body: j };
-            });
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          btn.disabled = true;
+          fetch(GC_APPLY_TO_FIREWALLS_BATCH_URL, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-Requested-With": "Ground-Control",
+            },
+            body: JSON.stringify({
+              configuration_ids: cfgIds,
+              firewall_ids: fwIds,
+            }),
           })
-          .then(function (res) {
-            btn.disabled = false;
-            if (!res.ok) {
-              var err = (res.body && (res.body.detail || res.body.message)) || "Could not queue apply tasks.";
-              if (typeof err !== "string") err = JSON.stringify(err);
-              if (typeof window.gcGlobalBannerShowResult === "function") {
-                window.gcGlobalBannerShowResult(false, err);
-              } else {
-                alert(err);
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, body: j };
+              });
+            })
+            .then(function (res) {
+              btn.disabled = false;
+              if (!res.ok) {
+                var err = (res.body && (res.body.detail || res.body.message)) || "Could not queue apply tasks.";
+                if (typeof err !== "string") err = JSON.stringify(err);
+                if (typeof window.gcGlobalBannerShowResult === "function") {
+                  window.gcGlobalBannerShowResult(false, err);
+                } else {
+                  window.gcAlert(err);
+                }
+                return;
               }
-              return;
-            }
-            var body = res.body || {};
-            var queued = parseInt(body.queued_count || 0, 10) || 0;
-            var unchanged = parseInt(body.unchanged_count || 0, 10) || 0;
-            var skipped = Array.isArray(body.skipped) ? body.skipped.length : 0;
-            var text = "Queued " + queued + " task(s).";
-            if (unchanged > 0) text += " " + unchanged + " already matched.";
-            if (skipped > 0) text += " " + skipped + " skipped.";
-            if (typeof window.gcGlobalBannerShowResult === "function") {
-              window.gcGlobalBannerShowResult(queued > 0, text);
-            } else {
-              alert(text);
-            }
-            try {
-              document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-            } catch (e6) {}
-          })
-          .catch(function () {
-            btn.disabled = false;
-            if (typeof window.gcGlobalBannerShowResult === "function") {
-              window.gcGlobalBannerShowResult(false, "Network error while queueing apply tasks.");
-            } else {
-              alert("Network error while queueing apply tasks.");
-            }
-          });
+              var body = res.body || {};
+              var queued = parseInt(body.queued_count || 0, 10) || 0;
+              var unchanged = parseInt(body.unchanged_count || 0, 10) || 0;
+              var skipped = Array.isArray(body.skipped) ? body.skipped.length : 0;
+              var text = "Queued " + queued + " task(s).";
+              if (unchanged > 0) text += " " + unchanged + " already matched.";
+              if (skipped > 0) text += " " + skipped + " skipped.";
+              if (typeof window.gcGlobalBannerShowResult === "function") {
+                window.gcGlobalBannerShowResult(queued > 0, text);
+              } else {
+                window.gcAlert(text);
+              }
+              try {
+                document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
+              } catch (e6) {}
+            })
+            .catch(function () {
+              btn.disabled = false;
+              if (typeof window.gcGlobalBannerShowResult === "function") {
+                window.gcGlobalBannerShowResult(false, "Network error while queueing apply tasks.");
+              } else {
+                window.gcAlert("Network error while queueing apply tasks.");
+              }
+            });
+        });
       });
     })();
 

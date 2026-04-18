@@ -47,11 +47,9 @@
       .replace(/</g, "&lt;");
   }
 
-  let DEL_SVG =
-    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4h-2.5z"/></svg>';
+  let DEL_SVG = (window.gcIcon ? window.gcIcon("delete", { size: "xs" }) : "");
 
-  let SYNC_SVG =
-    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
+  let SYNC_SVG = (window.gcIcon ? window.gcIcon("sync", { size: "xs" }) : "");
 
   let rootModal = null;
   let detailModal = null;
@@ -444,8 +442,12 @@
       " delete task" +
       (n === 1 ? "" : "s") +
       " for approval in the task queue? Cached objects remain until tasks are approved and applied.";
-    if (!globalThis.confirm(msg)) return;
-    fetch(apiQueueDeletesUrl(currentScope.kind, currentScope.id), {
+    let cf = window.gcConfirm
+      ? window.gcConfirm(msg, { tone: "danger", confirmLabel: "Queue deletes" })
+      : Promise.resolve(globalThis.confirm(msg));
+    cf.then(function (cok) {
+      if (!cok) return;
+      fetch(apiQueueDeletesUrl(currentScope.kind, currentScope.id), {
       method: "POST",
       credentials: "same-origin",
       headers: {
@@ -466,7 +468,7 @@
           if (typeof globalThis.gcGlobalBannerShowResult === "function") {
             globalThis.gcGlobalBannerShowResult(false, err || "Could not queue deletes.");
           } else {
-            alert(err || "Could not queue deletes.");
+            window.gcAlert(err || "Could not queue deletes.");
           }
           return;
         }
@@ -512,9 +514,10 @@
         if (typeof globalThis.gcGlobalBannerShowResult === "function") {
           globalThis.gcGlobalBannerShowResult(false, "Network error while queueing deletes.");
         } else {
-          alert("Network error while queueing deletes.");
+          window.gcAlert("Network error while queueing deletes.");
         }
       });
+    });
   }
 
   function configViewerSyncBannerMessage(res) {
@@ -553,26 +556,26 @@
       return;
     }
     let n = entityTypes.length;
-    if (
-      !globalThis.confirm(
-        "Start configuration sync for " +
-          n +
-          " object type" +
-          (n === 1 ? "" : "s") +
-          " in this scope?"
-      )
-    ) {
-      return;
-    }
-    let batch =
-      typeof globalThis.gcGlobalBannerSyncBegin === "function" &&
-      typeof globalThis.gcGlobalBannerSyncEnd === "function";
-    let bid = batch ? globalThis.gcGlobalBannerSyncBegin("Syncing configuration cache from the firewall…") : 0;
-    if (busyBtn) {
-      busyBtn.disabled = true;
-      busyBtn.classList.add("btn-icon--busy");
-    }
-    fetch(currentScope.configSyncUrl, {
+    let scopeMsg =
+      "Start configuration sync for " +
+      n +
+      " object type" +
+      (n === 1 ? "" : "s") +
+      " in this scope?";
+    let cf2 = window.gcConfirm
+      ? window.gcConfirm(scopeMsg, { confirmLabel: "Sync" })
+      : Promise.resolve(globalThis.confirm(scopeMsg));
+    cf2.then(function (sok) {
+      if (!sok) return;
+      let batch =
+        typeof globalThis.gcGlobalBannerSyncBegin === "function" &&
+        typeof globalThis.gcGlobalBannerSyncEnd === "function";
+      let bid = batch ? globalThis.gcGlobalBannerSyncBegin("Syncing configuration cache from the firewall…") : 0;
+      if (busyBtn) {
+        busyBtn.disabled = true;
+        busyBtn.classList.add("btn-icon--busy");
+      }
+      fetch(currentScope.configSyncUrl, {
       method: "POST",
       credentials: "same-origin",
       headers: {
@@ -630,6 +633,7 @@
           globalThis.gcGlobalBannerShowResult(false, "Request failed.");
         }
       });
+    });
   }
 
   function openEntryDetail(entryId) {

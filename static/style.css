@@ -1,4 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0");
+/* Google Material Symbols (Filled) -- single icon system, project-wide.
+   Variable axes: FILL fixed at 1 (filled), wght 400/500/600, GRAD -25..200, opsz 20..48.
+   See design-skill.md sec.1 + sec.7 (Icons). Loaded with display=block to avoid
+   the FOIT flash of unstyled glyph names. */
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..600,0..1,-25..200&display=block");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 :root {
   --page-gutter: 24px;
@@ -7,10 +12,32 @@
   --toolbar-pad-block: 14px;
   --toolbar-row-gap: 12px;
   --filter-cat: #8a8a8a;
-  --radius-sm: 4px;
+
+  /* Radius scale (design-skill.md sec.5) */
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* Spacing scale (design-skill.md sec.5) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
   --surface-raise: #f0f0f0;
-  --sophos-navy: #001b44;
-  --sophos-navy-hover: #001536;
+
+  /* Sophos brand navy (design-skill.md sec.3 header) */
+  --sophos-navy: #001a47;
+  --sophos-navy-hover: #001236;
+  --sophos-navy-border: #004A9F;
+
   --app-top-bar-height: 44px;
   /* Flyout sheets (.gc-if-flyout): distance from viewport top; synced with banner in gc-global-banner.js */
   --app-flyout-top-offset: var(--app-top-bar-height);
@@ -19,26 +46,70 @@
   --app-sidebar-muted: #b0b0b0;
   --app-sidebar-width: 216px;
   --app-sidebar-width-collapsed: 56px;
-  --accent: #0066cc;
-  --accent-hover: #0052a3;
-  --accent-dim: #0052a3;
-  --text: #1a1a1a;
-  --text-muted: #5c5c5c;
-  --text-header: #4a4a4a;
-  --border: #d9d9d9;
-  --border-light: #e8e8e8;
-  --row-alt: #f7f7f7;
+
+  /* Primary brand palette (design-skill.md sec.3) */
+  --accent: #0049BD;
+  --accent-hover: #004A9F;
+  --accent-dim: #004A9F;
+  --accent-tint: #E6F2FF;
+  /* Button primary uses #005BC8 per sec.7 (slightly brighter than link color #0049BD) */
+  --accent-btn: #005BC8;
+  --accent-btn-hover: #004A9F;
+
+  /* Secondary green accent (design-skill.md sec.3) */
+  --secondary: #00A651;
+  --secondary-hover: #008A43;
+  --secondary-tint: #E6F7ED;
+
+  /* Text scale (design-skill.md sec.3) */
+  --text: #2C2D2E;
+  --text-muted: #777A7D;
+  --text-header: #777A7D;
+  --text-tertiary: #6b7280;
+  --text-disabled: #9ca3af;
+  --text-inverse: #ffffff;
+
+  /* Border scale (design-skill.md sec.3) */
+  --border: #e5e7eb;
+  --border-light: #e5e7eb;
+  --border-medium: #d1d5db;
+  --border-dark: #9ca3af;
+
+  /* Backgrounds (design-skill.md sec.3) */
+  --row-alt: #f3f4f6;
   --surface: #ffffff;
   --surface-card: #ffffff;
-  --surface-subtle: #f5f7fa;
-  --muted: #666666;
-  --bg: #f5f7fa;
-  --success: #1a9b4a;
-  --danger: #c62828;
-  --error: #b8860b;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial,
-    sans-serif;
+  --surface-subtle: #f8f9fa;
+  --surface-hover: #f9fafb;
+  --surface-active: #f3f4f6;
+  --muted: #6b7280;
+  --bg: #f8f9fa;
+
+  /* Semantic / status colors (design-skill.md sec.3) */
+  --success: #00851D;
+  --success-bg: #E5F3E8;
+  --danger: #DA3E00;
+  --danger-bg: #fef2f2;
+  --error: #FF8F00;
+  --error-bg: #FFF4E5;
+  --info: #1e40af;
+  --info-bg: #eff6ff;
+
+  /* Elevation / shadow scale (design-skill.md sec.5) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 0 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.25);
+  --shadow: var(--shadow-sm);
+
+  /* Motion (design-skill.md sec.5) */
+  --motion-fast: 150ms;
+  --motion-normal: 200ms;
+  --motion-slow: 300ms;
+
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 }
 
 *,
@@ -251,7 +322,7 @@ body {
   color: var(--danger);
 }
 
-/* Designer · Modals: demo banners (countdown bar, /designer/modals only) */
+/* Designer ? Modals: demo banners (countdown bar, /designer/modals only) */
 .gc-designer-demo-banner-host {
   flex-shrink: 0;
   position: relative;
@@ -349,7 +420,7 @@ body {
   color: var(--accent, #06c);
 }
 
-/* Persistent consolidated row: no × on row; Finish in sandbox. */
+/* Persistent consolidated row: no ? on row; Finish in sandbox. */
 .gc-designer-demo-banner--persistent .gc-designer-demo-banner__row {
   padding-right: 0.25rem;
 }
@@ -969,9 +1040,15 @@ a.app-nav__item {
   line-height: 0;
 }
 
-.app-nav__icon svg {
+.app-nav__icon svg,
+.app-nav__icon .gc-icon {
   display: block;
   flex-shrink: 0;
+}
+
+/* Ensure sidebar nav icons render at the wrapper's 18px regardless of size class */
+.app-nav__icon .gc-icon {
+  font-size: 18px;
 }
 
 .app-nav__item.is-active .app-nav__icon {
@@ -991,6 +1068,8 @@ a.app-nav__item {
   word-wrap: normal;
   direction: ltr;
   font-feature-settings: "liga";
+  /* Filled by default (project-wide standard) */
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
 .gc-material-symbol--sidebar {
@@ -1372,7 +1451,7 @@ a.app-nav__item {
   max-width: min(960px, calc(100vw - 16px));
   min-width: min(100%, 760px);
   width: max-content;
-  /* Top bar is light-on-dark; dropdown surface is light — reset text/icon color. */
+  /* Top bar is light-on-dark; dropdown surface is light ? reset text/icon color. */
   color: var(--text);
 }
 
@@ -1387,7 +1466,7 @@ a.app-nav__item {
   align-items: stretch;
 }
 
-/* Left column ~30% wider than prior 58% share → ~64% / 36% split. */
+/* Left column ~30% wider than prior 58% share ? ~64% / 36% split. */
 .gc-net-fw-dropdown--split .gc-net-fw-dropdown__selected {
   flex: 1 1 64%;
   min-width: 364px;
@@ -1434,7 +1513,7 @@ a.app-nav__item {
   text-align: left;
 }
 
-/* Borderless icon (not .btn-icon) — wrench to inventory. */
+/* Borderless icon (not .btn-icon) ? wrench to inventory. */
 a.gc-net-fw-selected__inventory-link {
   flex-shrink: 0;
   display: inline-flex;
@@ -1597,7 +1676,7 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   color: var(--text);
 }
 
-/* a.btn-icon uses color: inherit globally — in the top bar that hid SVGs (currentColor) until hover. */
+/* a.btn-icon uses color: inherit globally ? in the top bar that hid SVGs (currentColor) until hover. */
 .top-bar .gc-net-fw-selected__actions a.btn-icon.gc-net-fw-selected__action-icon {
   color: var(--text);
 }
@@ -1638,7 +1717,7 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   color: var(--danger, #b91c1c);
 }
 
-/* IP host flyout–style firewall picker in the top bar (search, checkbox list). */
+/* IP host flyout?style firewall picker in the top bar (search, checkbox list). */
 .gc-multiselect--top-bar .gc-hs-ip-host-flyout__fw-ms {
   width: 100%;
   min-width: 0;
@@ -1938,22 +2017,42 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   font-family: inherit;
 }
 
-.btn:hover {
+/* :where(...) keeps the disabled/[disabled] guard but contributes 0 to
+   specificity, so variant rules like `.btn.primary:hover` (specificity 0,3,0)
+   can properly override the generic hover color. Without :where(...), the
+   negations would push this selector to (0,4,0) and primary buttons would
+   render blue-on-blue text on hover. */
+.btn:hover:where(:not(:disabled):not([disabled])) {
   border-color: var(--accent);
   color: var(--accent);
 }
 
+/* Primary button -- design-skill.md sec.7
+   bg #005BC8 hover #004A9F ? text #ffffff ? radius 6 ? weight 500 */
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--accent-btn);
+  border-color: var(--accent-btn);
+  color: var(--text-inverse);
   font-weight: 500;
+  transition: background-color var(--motion-fast) ease-in-out,
+              border-color var(--motion-fast) ease-in-out;
 }
 
 .btn.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-  color: #fff;
+  background: var(--accent-btn-hover);
+  border-color: var(--accent-btn-hover);
+  color: var(--text-inverse);
+}
+
+.btn.primary:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 2px;
+}
+
+.btn.primary[disabled],
+.btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn.danger {
@@ -2027,19 +2126,37 @@ tbody tr:nth-child(even) {
   pointer-events: none;
 }
 
+/* Secondary / ghost button -- design-skill.md sec.7
+   bg #f3f4f6 hover #e5e7eb ? text #005BC8 ? border transparent ? radius 6 */
 .btn--secondary {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--border);
+  background: var(--surface-active);
+  color: var(--accent-btn);
+  border-color: transparent;
   font-family: inherit;
+  font-weight: 500;
+  transition: background-color var(--motion-fast) ease-in-out,
+              color var(--motion-fast) ease-in-out,
+              border-color var(--motion-fast) ease-in-out;
 }
 
 .btn--secondary:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: #e5e7eb;
+  border-color: transparent;
+  color: var(--accent-btn-hover);
 }
 
-/* ---------- Firewalls table (Sophos Central–style chrome) ---------- */
+.btn--secondary:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 2px;
+}
+
+.btn--secondary[disabled],
+.btn--secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Firewalls table (Sophos Central?style chrome) ---------- */
 .layout.single .firewalls-page {
   flex: 1;
   display: flex;
@@ -2051,7 +2168,7 @@ tbody tr:nth-child(even) {
   align-self: stretch;
 }
 
-/* Firewalls v2 · object navigator: full width of app-main (avoid stacked horizontal gutters). */
+/* Firewalls v2 ? object navigator: full width of app-main (avoid stacked horizontal gutters). */
 main.layout.gc-fw-v2-object-layout {
   padding-left: 0;
   padding-right: 0;
@@ -2102,7 +2219,7 @@ main.layout.gc-fw-v2-object-layout {
   margin-bottom: 0;
 }
 
-/* Inset object page content (tabs, table, settings) — small horizontal and bottom padding. */
+/* Inset object page content (tabs, table, settings) ? small horizontal and bottom padding. */
 .gc-fw-v2-object-layout .gc-fw-v2-object-page-body {
   padding-left: 0.75rem;
   padding-right: 0.75rem;
@@ -2922,7 +3039,7 @@ main.layout.gc-fw-v2-object-layout {
 }
 
 /* Same tabs: .gc-tab-panel already applies horizontal page gutter; .content-pane must not
-   add a second gutter (matches Network · … pattern: gc-network-panel__content padding 0). */
+   add a second gutter (matches Network ? ? pattern: gc-network-panel__content padding 0). */
 .firewalls-page .gc-fw-inventory-tab-panels>.gc-tab-panel .split>.content-pane {
   padding-inline: 0;
 }
@@ -3054,12 +3171,12 @@ main.layout.gc-fw-v2-object-layout {
 
 .data-table thead th.gc-th-sortable[aria-sort="ascending"]::after,
 .task-queue-diff-table thead th.gc-th-sortable[aria-sort="ascending"]::after {
-  content: "▲";
+  content: "?";
 }
 
 .data-table thead th.gc-th-sortable[aria-sort="descending"]::after,
 .task-queue-diff-table thead th.gc-th-sortable[aria-sort="descending"]::after {
-  content: "▼";
+  content: "?";
 }
 
 .data-table tbody td {
@@ -3138,7 +3255,7 @@ button.gc-table-toggle:focus-visible {
   background: var(--success);
 }
 
-/* Intrusion Prevention · IPS switch table: left-align toggles; blue “on” state */
+/* Intrusion Prevention ? IPS switch table: left-align toggles; blue ?on? state */
 .gc-ips-switch-page #gc-ips-cfg-table th[data-gc-col="__ips_status"],
 .gc-ips-switch-page #gc-ips-cfg-table td[data-gc-col="__ips_status"] {
   text-align: left;
@@ -3189,7 +3306,7 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   transform: translateX(16px);
 }
 
-/* Designer · Controls: toggle-onoff uses accent blue when on (data-table toggles stay success green) */
+/* Designer ? Controls: toggle-onoff uses accent blue when on (data-table toggles stay success green) */
 #gc-designer-toggle-onoff.gc-table-toggle--on .gc-table-toggle__track {
   background: var(--accent);
 }
@@ -3244,7 +3361,7 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   background: #dc2626;
 }
 
-/* Do not set display:flex on <td> — it breaks the table grid so pill columns can overlap / misalign.
+/* Do not set display:flex on <td> ? it breaks the table grid so pill columns can overlap / misalign.
    Dynamic rows use .gc-cell-flex-pills (see gc-network-entity.js); static markup relies on child spacing below. */
 .data-table tbody td.gc-net-firewall-pills,
 .data-table tbody td.gc-hs-multi-pills {
@@ -3289,7 +3406,7 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   font-variant-numeric: tabular-nums;
 }
 
-/* Compact multi-value cells: preview pills + “+N more”, expand to modal */
+/* Compact multi-value cells: preview pills + ?+N more?, expand to modal */
 .gc-table-value-pill {
   display: inline-block;
   max-width: 14rem;
@@ -3369,7 +3486,7 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   word-break: break-word;
 }
 
-/* Zones: ApplianceAccess headers use \n in labels from API — stack text to save width */
+/* Zones: ApplianceAccess headers use \n in labels from API ? stack text to save width */
 #gc-net-zone-table thead th[data-gc-col^="ApplianceAccess."] {
   white-space: pre-line;
   text-align: center;
@@ -3672,7 +3789,7 @@ a.btn-icon {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-/* Author `display: flex` beats the UA [hidden] rule — hide explicitly when closed. */
+/* Author `display: flex` beats the UA [hidden] rule ? hide explicitly when closed. */
 .dashboard-page__sankey-select-panel[hidden] {
   display: none !important;
 }
@@ -3814,7 +3931,7 @@ a.btn-icon {
   }
 }
 
-/* ---------- Firewalls · Network (multi-select + tabs) ---------- */
+/* ---------- Firewalls ? Network (multi-select + tabs) ---------- */
 .gc-network-page .gc-network-panel {
   flex: 1;
   display: flex;
@@ -4037,6 +4154,10 @@ a.btn-icon {
   display: block;
 }
 
+.gc-if-status-inline__svg--connected {
+  color: #16a34a;
+}
+
 .gc-hw-pill-row {
   display: inline-flex;
   flex-wrap: wrap;
@@ -4117,7 +4238,7 @@ a.btn-icon {
   max-width: min(52rem, 100vw - 1rem);
 }
 
-/* Administration · Netflow flyout */
+/* Administration ? Netflow flyout */
 .gc-netflow-flyout__panel {
   min-width: min(20rem, calc(100vw - 2rem));
   max-width: min(1200px, calc(100vw - 16px));
@@ -4180,7 +4301,7 @@ a.btn-icon {
   outline-offset: 2px;
 }
 
-/* Administration · Netflow tab: more table width, compact columns */
+/* Administration ? Netflow tab: more table width, compact columns */
 .gc-system-admin-page.gc-network-page .gc-network-split:has(> .gc-net-filters-column aside.filters:not([hidden]):not(.filters--collapsed)) {
   grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
 }
@@ -4220,7 +4341,7 @@ a.btn-icon {
   width: auto;
 }
 
-/* HA flyout — “High availability configuration” layout (readonly) */
+/* HA flyout ? ?High availability configuration? layout (readonly) */
 .gc-ha-form {
   max-width: 46rem;
   padding-bottom: 0.5rem;
@@ -4589,7 +4710,7 @@ a.btn-icon {
   display: block;
 }
 
-/* Hosts & Services · TCP/UDP service port rows (same table shell as bridge members) */
+/* Hosts & Services ? TCP/UDP service port rows (same table shell as bridge members) */
 .gc-bridge-flyout__members-table .gc-hs-svc-src,
 .gc-bridge-flyout__members-table .gc-hs-svc-dst {
   width: 100%;
@@ -4877,7 +4998,7 @@ a.btn-icon {
   border-bottom: none;
 }
 
-/* Match table pills: don’t compress scope labels when the value column is wide */
+/* Match table pills: don?t compress scope labels when the value column is wide */
 .gc-net-zone-combine-modal .gc-net-zone-modal__fw-row .gc-zone-pill {
   flex-shrink: 0;
 }
@@ -5172,6 +5293,7 @@ a.btn-icon {
   bottom: 0;
   left: 0;
   display: flex;
+  flex-wrap: nowrap;
   align-items: stretch;
   max-width: min(480px, calc(100% - 8px));
   margin-left: 0;
@@ -5188,7 +5310,7 @@ a.btn-icon {
 }
 
 .gc-task-queue-bottom-tab__main {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   padding: 10px 14px;
@@ -5197,9 +5319,12 @@ a.btn-icon {
   font: inherit;
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.2;
   color: #1a1a1a;
   text-align: left;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .gc-task-queue-bottom-tab__main:hover {
@@ -5334,17 +5459,31 @@ a.btn-icon {
 }
 
 .gc-task-queue-dock__head-middle .toolbar__search-cluster {
-  margin-left: auto;
+  margin-left: 0;
   width: min(220px, 24vw);
   min-width: 120px;
+  flex-shrink: 0;
+}
+
+/* Push the action button cluster (Approve All, Approve Selected, Reject Selected)
+   to the right end of the toolbar, before the search field.
+   The first action button takes margin-left: auto so it consumes all
+   leftover space after the Filters button on the left. */
+.gc-task-queue-dock__head-middle .gc-task-queue-dock-approve-all {
+  margin-left: auto;
 }
 
 .gc-task-queue-dock__head-middle .task-queue-toolbar-btn {
   padding: 0.35rem 0.65rem;
   font-size: 12.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .gc-task-queue-dock__filters-toggle {
+  display: inline-flex;
+  width: auto;
+  flex: 0 0 auto;
   padding-inline: 10px;
   height: 32px;
 }
@@ -5402,6 +5541,44 @@ a.btn-icon {
   display: none;
 }
 
+/* Edge-to-edge table inside the dock iframe: zero the natural cell padding
+   on the outer side of the first and last columns so the table content sits
+   flush with the panel edges. Inner padding is preserved so the checkbox
+   and action buttons still have visible breathing room from their neighbors. */
+.gc-task-queue-embed-body .data-table thead th:first-child,
+.gc-task-queue-embed-body .data-table tbody td:first-child {
+  padding-left: 0;
+}
+
+.gc-task-queue-embed-body .data-table thead th:last-child,
+.gc-task-queue-embed-body .data-table tbody td:last-child {
+  padding-right: 0;
+}
+
+/* Center the checkbox in the first column so it doesn't jam against the
+   left edge once the cell padding is removed. */
+.gc-task-queue-embed-body .data-table .task-queue-col-cb,
+.gc-task-queue-embed-body .data-table tbody td.task-queue-col-cb {
+  text-align: center;
+}
+
+.gc-task-queue-embed-body .data-table .task-queue-col-cb input[type="checkbox"] {
+  margin: 0;
+}
+
+/* Right-align the actions column so the row buttons sit against the right
+   edge instead of leaving an empty gutter. */
+.gc-task-queue-embed-body .data-table .task-queue-col-actions,
+.gc-task-queue-embed-body .data-table tbody td.task-queue-col-actions {
+  text-align: right;
+}
+
+.gc-task-queue-embed-body .table-scroll,
+.gc-task-queue-embed-body .table-wrap {
+  margin: 0;
+  padding: 0;
+}
+
 .gc-task-queue-embed-lead {
   margin: 0 0 12px;
   font-size: 13px;
@@ -5409,7 +5586,7 @@ a.btn-icon {
   max-width: 72ch;
 }
 
-/* ---------- Network · Interface edit flyout (right sheet) ---------- */
+/* ---------- Network ? Interface edit flyout (right sheet) ---------- */
 .gc-if-flyout {
   position: fixed;
   top: var(--app-flyout-top-offset);
@@ -5547,7 +5724,7 @@ a.btn-icon {
   gap: 0;
 }
 
-/* Hosts & Services · IP host flyout (mocks/iphost *.png) */
+/* Hosts & Services ? IP host flyout (mocks/iphost *.png) */
 .gc-hs-ip-host-flyout__radio-row {
   display: flex;
   flex-wrap: nowrap;
@@ -5730,7 +5907,7 @@ a.btn-icon {
   word-break: break-word;
 }
 
-/* Shared flyout multiselect panel (display:flex only when open — see :not([hidden]) below). */
+/* Shared flyout multiselect panel (display:flex only when open ? see :not([hidden]) below). */
 .gc-hs-ip-host-flyout__hg-dropdown,
 .gc-hs-ip-host-flyout__fw-dropdown {
   z-index: 45;
@@ -5796,12 +5973,12 @@ a.btn-icon {
   min-height: 0;
 }
 
-/* Designer · Modals · object-edit-flyout: firewall scope stays above catalog fields */
+/* Designer ? Modals ? object-edit-flyout: firewall scope stays above catalog fields */
 .gc-designer-object-edit-fw-mount {
   margin: 0 0 0.75rem;
 }
 
-/* Designer · Modals · object-edit-flyout: payload catalog preview */
+/* Designer ? Modals ? object-edit-flyout: payload catalog preview */
 .gc-designer-object-edit-catalog-host {
   margin: 0 0 1rem;
 }
@@ -5957,7 +6134,7 @@ a.btn-icon {
   cursor: help;
 }
 
-/* Object-edit flyout · ip-list: row layout + gray circle remove */
+/* Object-edit flyout ? ip-list: row layout + gray circle remove */
 .gc-ip-list-field__item-row {
   display: flex;
   align-items: center;
@@ -6091,7 +6268,7 @@ a.btn-icon {
 }
 
 .gc-hs-flyout__footer {
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex-wrap: wrap;
 }
 
@@ -6920,6 +7097,10 @@ option.gc-pe-vpn-opt-weak {
 .gc-if-flyout__footer {
   display: flex;
   align-items: center;
+  /* Flyout footers left-align their action buttons (primary first, then
+     secondary). Modals follow the opposite convention per design-skill.md
+     sec.7. Variants below should not override this with flex-end. */
+  justify-content: flex-start;
   gap: 16px;
   flex-shrink: 0;
   margin-top: 0;
@@ -6947,7 +7128,7 @@ option.gc-pe-vpn-opt-weak {
   }
 }
 
-/* ---------- Firewalls · Inventory edit flyout ---------- */
+/* ---------- Firewalls ? Inventory edit flyout ---------- */
 .gc-fw-inv-flyout .gc-if-flyout__panel {
   width: min(520px, 100vw);
 }
@@ -6957,7 +7138,7 @@ option.gc-pe-vpn-opt-weak {
   width: min(760px, 100vw);
 }
 
-/* Configuration · assigned firewalls: form styling (avoid top-bar white-on-white trigger). */
+/* Configuration ? assigned firewalls: form styling (avoid top-bar white-on-white trigger). */
 .gc-cfg-member-ms {
   width: 100%;
   max-width: none;
@@ -7148,7 +7329,7 @@ option.gc-pe-vpn-opt-weak {
   margin-left: auto;
 }
 
-/* ---------- Intrusion Prevention · IPS policy flyout ---------- */
+/* ---------- Intrusion Prevention ? IPS policy flyout ---------- */
 .gc-ips-pol-flyout .gc-if-flyout__panel {
   width: min(520px, 100vw);
 }
@@ -7316,7 +7497,7 @@ option.gc-pe-vpn-opt-weak {
 .gc-ips-pol-subflyout__footer {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
@@ -7348,7 +7529,7 @@ option.gc-pe-vpn-opt-weak {
   outline-offset: -2px;
 }
 
-/* ---------- Protect · Web filter policy flyout (layout + rules table) ---------- */
+/* ---------- Protect ? Web filter policy flyout (layout + rules table) ---------- */
 .gc-wfp-flyout .gc-if-flyout__panel {
   width: min(680px, 100vw);
 }
@@ -7757,7 +7938,7 @@ option.gc-pe-vpn-opt-weak {
   margin-bottom: 14px;
 }
 
-/* Intrusion Prevention · custom signature flyout + Snort-style rule editor */
+/* Intrusion Prevention ? custom signature flyout + Snort-style rule editor */
 .gc-ips-sig-flyout .gc-if-flyout__panel {
   width: min(560px, 100vw);
 }
@@ -7772,7 +7953,7 @@ option.gc-pe-vpn-opt-weak {
   line-height: 1.45;
 }
 
-/* Intrusion Prevention · Trusted MAC flyout */
+/* Intrusion Prevention ? Trusted MAC flyout */
 .gc-ips-tmac-flyout .gc-if-flyout__panel {
   width: min(520px, 100vw);
 }
@@ -7835,7 +8016,7 @@ option.gc-pe-vpn-opt-weak {
   right: 0;
 }
 
-/* IPS Configure · DoS / Spoof flyouts (mocks: DoS Settings, Spoof Protection settings) */
+/* IPS Configure ? DoS / Spoof flyouts (mocks: DoS Settings, Spoof Protection settings) */
 .gc-ips-cfg-flyout__fw {
   margin: 0;
   font-size: 0.875rem;
@@ -8252,7 +8433,7 @@ option.gc-pe-vpn-opt-weak {
   max-width: none;
 }
 
-/* ---------- Inventory · sync column pills & sync facet hint ---------- */
+/* ---------- Inventory ? sync column pills & sync facet hint ---------- */
 .gc-fw-sync-pills {
   display: flex;
   flex-wrap: wrap;
@@ -8262,7 +8443,7 @@ option.gc-pe-vpn-opt-weak {
   max-width: 22rem;
 }
 
-/* Inventory · Tags column: single line in cell; overflow → +N pill (see firewalls.html layout) */
+/* Inventory ? Tags column: single line in cell; overflow ? +N pill (see firewalls.html layout) */
 .gc-fw-user-tags {
   vertical-align: middle;
   max-width: 28rem;
@@ -8530,8 +8711,8 @@ body.gc-task-queue-embed-body {
 body.gc-task-queue-embed-body>.layout.task-queue-page {
   height: 100%;
   min-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+  padding: 0;
+  gap: 0;
 }
 
 body.gc-task-queue-embed-body>.layout.task-queue-page>.panel.grow {
@@ -8579,12 +8760,20 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
 }
 
 .task-queue-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   font-size: 0.85rem;
   padding: 0.45rem 0.75rem;
   border-radius: 6px;
   font-family: inherit;
   cursor: pointer;
   font-weight: 500;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  line-height: 1.2;
 }
 
 .task-queue-toolbar-btn--approve {
@@ -8614,6 +8803,27 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
 .task-queue-toolbar-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Lock disabled toolbar buttons to their resting colors on hover so the label
+   never becomes invisible (e.g. blue text on blue background) regardless of
+   any other ".btn:hover" rule that might leak through the cascade. */
+.task-queue-toolbar-btn--approve:disabled,
+.task-queue-toolbar-btn--approve:disabled:hover,
+.task-queue-toolbar-btn--approve:disabled:focus,
+.task-queue-toolbar-btn--approve:disabled:focus-visible {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.task-queue-toolbar-btn--reject:disabled,
+.task-queue-toolbar-btn--reject:disabled:hover,
+.task-queue-toolbar-btn--reject:disabled:focus,
+.task-queue-toolbar-btn--reject:disabled:focus-visible {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .task-queue-actions-cell {
@@ -8656,6 +8866,35 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
   background: color-mix(in srgb, var(--danger) 20%, var(--surface));
   border-color: var(--danger);
   color: #8b0000;
+}
+
+/* Per-row Compare icon button -- discoverability shortcut for the diff modal
+   that the row-click also opens. Sits between Approve and Reject, styled as
+   a quiet ghost icon button so it doesn't compete with the decision actions. */
+.task-queue-row-action-btn--compare {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.task-queue-row-action-btn--compare .gc-icon {
+  font-size: 1rem;
+}
+
+.task-queue-row-action-btn--compare:hover:not(:disabled) {
+  background: var(--surface-active);
+  border-color: var(--accent-btn);
+  color: var(--accent-btn);
+}
+
+.task-queue-row-action-btn--compare:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 1px;
 }
 
 .task-queue-row-action-btn:disabled {
@@ -8891,7 +9130,7 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
 .task-queue-compare-modal {
   position: fixed;
   inset: 0;
-  /* Must sit above .gc-task-queue-dock / bottom tab (315–320) and network flyouts (340); below auth overlay (5000). */
+  /* Must sit above .gc-task-queue-dock / bottom tab (315?320) and network flyouts (340); below auth overlay (5000). */
   z-index: 2500;
   isolation: isolate;
   display: flex;
@@ -9616,7 +9855,7 @@ html:has(body.gc-page-ssh-terminal) .app-main {
   color: #b91c1c;
 }
 
-/* Network · Interfaces table: IPAM match / conflict before Address (CIDR) */
+/* Network ? Interfaces table: IPAM match / conflict before Address (CIDR) */
 .gc-if-ipam-cidr-icon {
   display: inline-flex;
   vertical-align: middle;
@@ -9714,14 +9953,14 @@ html:has(body.gc-page-ssh-terminal) .app-main {
   max-width: 1180px;
 }
 
-/* Designer · Tables: data-table preview should span the full app main column (not the
+/* Designer ? Tables: data-table preview should span the full app main column (not the
    default designer content cap). Intro copy stays bounded via .gc-designer__lead. */
 .gc-designer[data-gc-designer-tables="1"] {
   max-width: none;
   width: 100%;
 }
 
-/* Designer · Data Controls: use full main column width for the catalog table */
+/* Designer ? Data Controls: use full main column width for the catalog table */
 .gc-designer[data-gc-designer-data-controls="1"] {
   max-width: none;
   width: 100%;
@@ -10384,7 +10623,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   align-items: flex-start;
 }
 
-/* Designer · Controls: searchable custom dropdowns */
+/* Designer ? Controls: searchable custom dropdowns */
 .gc-designer-dd {
   display: flex;
   flex-direction: column;
@@ -10417,12 +10656,12 @@ body.gc-designer-entity-nav__facet-overlay-open {
   display: none !important;
 }
 
-/* Designer · Tables: keep searchable multiselect panels above the preview grid / filters */
+/* Designer ? Tables: keep searchable multiselect panels above the preview grid / filters */
 .gc-designer-table-props .gc-designer-dd__panel:not([hidden]) {
   z-index: 120;
 }
 
-/* Designer · Tables: preview uses .split like Network — remove full-bleed top border and page
+/* Designer ? Tables: preview uses .split like Network ? remove full-bleed top border and page
    gutters so the table card matches the grid width (no wider rule above a narrower table). */
 .gc-designer .gc-network-panel:has([data-gc-designer-control-id="data-table"]) {
   width: 100%;
@@ -10482,7 +10721,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   box-sizing: border-box;
 }
 
-/* Designer · Tables: stack the whole props section above the preview <section> so later DOM
+/* Designer ? Tables: stack the whole props section above the preview <section> so later DOM
    (table/split) does not paint or receive pointer events on top of dropdowns. */
 .gc-designer[data-gc-designer-tables="1"] .gc-designer-tables-props-section {
   position: relative;
@@ -10493,7 +10732,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   position: relative;
 }
 
-/* Designer · Tables: multiselect triggers stay interactive and read like enabled comboboxes. */
+/* Designer ? Tables: multiselect triggers stay interactive and read like enabled comboboxes. */
 .gc-designer-table-dd.gc-designer-dd .gc-designer-dd__trigger {
   pointer-events: auto;
   cursor: pointer;
@@ -10593,7 +10832,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   max-height: 180px;
 }
 
-/* Portaled to body while open (see bindTablesFilterTagEditor) — escapes secondary-filters scroll clip.
+/* Portaled to body while open (see bindTablesFilterTagEditor) ? escapes secondary-filters scroll clip.
    Position and inset come from inline style in JS. */
 .gc-designer-tags__suggest.gc-designer-tags__suggest--fixed-layer {
   overflow-y: auto;
@@ -10633,7 +10872,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   opacity: 1;
 }
 
-/* Designer · Tables: preview options (toolbar + row chrome toggles) */
+/* Designer ? Tables: preview options (toolbar + row chrome toggles) */
 .gc-designer-tables-behavior {
   margin-top: 16px;
 }
@@ -10649,7 +10888,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   margin: 0;
 }
 
-/* Designer · Tables: design mode switch in title row (Designer role only) */
+/* Designer ? Tables: design mode switch in title row (Designer role only) */
 .gc-designer-tables-design-mode-wrap {
   display: flex;
   align-items: center;
@@ -10706,7 +10945,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
 }
 
 .gc-designer-tables-props-flyout__footer {
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px 16px;
   flex-wrap: wrap;
@@ -10725,10 +10964,9 @@ body.gc-designer-entity-nav__facet-overlay-open {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-left: auto;
 }
 
-/* Designer · Data Controls */
+/* Designer ? Data Controls */
 .gc-designer-data-controls__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -10863,7 +11101,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   flex-shrink: 0;
 }
 
-/* Locked hint: avoid `opacity` < 1 here — it creates a stacking context so field/logic
+/* Locked hint: avoid `opacity` < 1 here ? it creates a stacking context so field/logic
    cards translated toward the Display cards column paint underneath the right panel. */
 .gc-designer-data-controls-layout--map-locked .gc-designer-data-controls-layout__canvas-wrap {
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.45);
@@ -12258,7 +12496,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
 }
 
 /* Preview toolbar: respect [hidden] on Add/Delete when toggled from designer properties
-   (author flex/display rules can beat the UA [hidden] rule — same pattern as dashboard sankey panel). */
+   (author flex/display rules can beat the UA [hidden] rule ? same pattern as dashboard sankey panel). */
 .gc-designer-data-table #gc-designer-tables-add[hidden],
 .gc-designer-data-table #gc-designer-tables-delete-selected[hidden],
 .gc-designer-data-table #gc-fw-v2-obj-add[hidden],
@@ -12544,7 +12782,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   flex-shrink: 0;
 }
 
-/* Designer · Controls: tag combobox (pills + inline ghost + suggest) */
+/* Designer ? Controls: tag combobox (pills + inline ghost + suggest) */
 .gc-designer-tags {
   width: 100%;
   max-width: 42rem;
@@ -12680,7 +12918,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   cursor: pointer;
   border-radius: 999px;
   opacity: 0;
-  /* Invisible × must not receive clicks (they were removing tags when clicking near pills / input). */
+  /* Invisible ? must not receive clicks (they were removing tags when clicking near pills / input). */
   pointer-events: none;
   transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
@@ -12874,7 +13112,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   flex: 0 0 auto;
   align-self: flex-start;
   border: 1px solid var(--border);
-  /* Radius >> half height → end caps render as semicircles (radius = 50% of bar height) */
+  /* Radius >> half height ? end caps render as semicircles (radius = 50% of bar height) */
   border-radius: 9999px;
   overflow: hidden;
   background: var(--surface);
@@ -12966,10 +13204,10 @@ body.gc-designer-entity-nav__facet-overlay-open {
 }
 
 /* Page-level designer flyouts render in .gc-app-shell-modals (sibling of .app-shell in base.html)
-   so they are not descendants of .app-content — avoids clipping when body.gc-designer-modal-open
+   so they are not descendants of .app-content ? avoids clipping when body.gc-designer-modal-open
    sets overflow-x: hidden on .app-content and when .app-shell overflow stacks oddly with fixed layers. */
 
-/* Designer · Modals: optional overlay slot; flyout-right modals use fixed positioning (same shell
+/* Designer ? Modals: optional overlay slot; flyout-right modals use fixed positioning (same shell
    as .gc-if-flyout) so sheet transforms never widen the flex column or shift the top bar. */
 .gc-designer-modal-overlay-slot {
   position: absolute;
@@ -12992,7 +13230,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   box-sizing: border-box;
 }
 
-/* Match Network · Interfaces flyout: viewport-fixed sheet stack below the top bar. */
+/* Match Network ? Interfaces flyout: viewport-fixed sheet stack below the top bar. */
 .gc-designer-modal.gc-designer-modal--flyout-right:not([hidden]) {
   position: fixed;
   top: var(--app-flyout-top-offset);
@@ -13002,7 +13240,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   z-index: 340;
 }
 
-/* Designer · centered dialogs (Info / Confirm / Approve samples) */
+/* Designer ? centered dialogs (Info / Confirm / Approve samples) */
 .gc-designer-modal.gc-designer-modal--dialog-center:not([hidden]) {
   position: fixed;
   top: var(--app-flyout-top-offset);
@@ -13151,7 +13389,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14);
 }
 
-/* View: right sheet — mirrors Network · Interfaces flyout shell */
+/* View: right sheet ? mirrors Network ? Interfaces flyout shell */
 .gc-designer-modal--flyout-right .gc-designer-modal__panel {
   left: auto;
   top: 0;
@@ -13193,12 +13431,12 @@ body.gc-designer-entity-nav__facet-overlay-open {
   display: none;
 }
 
-/* Designer · View flyout: stacked secondary sheet (under primary z-order) */
+/* Designer ? View flyout: stacked secondary sheet (under primary z-order) */
 .gc-designer-modal--flyout-right {
   /* Narrow strip of primary visible when stacked (~2cm at 96dpi; px keeps it consistent). */
   --gc-designer-flyout-peek: clamp(40px, 1.9cm, 56px);
   --gc-designer-flyout-dur: 0.42s;
-  /* No end-value > 1 — avoids overshoot that reads as “too far left” then snap back. */
+  /* No end-value > 1 ? avoids overshoot that reads as ?too far left? then snap back. */
   --gc-designer-flyout-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
   overflow: hidden;
 }
@@ -13211,7 +13449,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   overflow: hidden;
 }
 
-/* Same affordance as .gc-if-flyout__resize — drag left edge to change width. */
+/* Same affordance as .gc-if-flyout__resize ? drag left edge to change width. */
 .gc-designer-view-flyout__resize {
   position: absolute;
   left: 0;
@@ -13235,7 +13473,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   pointer-events: none;
 }
 
-/* Only transform animates — width/right snap would leave a full-width secondary at translateX(0)
+/* Only transform animates ? width/right snap would leave a full-width secondary at translateX(0)
    mid-close and shove the primary visually to the left. */
 .gc-designer-modal--flyout-right .gc-designer-view-flyout__panel {
   pointer-events: auto;
@@ -13260,7 +13498,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   cursor: pointer;
 }
 
-/* Edit stacked sheet: peek is not a dismiss target — keep default cursor. */
+/* Edit stacked sheet: peek is not a dismiss target ? keep default cursor. */
 #gc-designer-flyout-edit-modal.is-view-flyout-stacked .gc-designer-view-flyout__panel--primary {
   cursor: default;
 }
@@ -13281,7 +13519,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
 }
 
 /* Collapse: only the primary transforms (slides back flush to the right). Secondary stays in
-   the stacked slot and fades under the primary so it never slides out past the primary’s edge. */
+   the stacked slot and fades under the primary so it never slides out past the primary?s edge. */
 .gc-designer-modal--flyout-right.is-view-flyout-stacked.is-view-flyout-collapsing .gc-designer-view-flyout__panel--primary {
   transform: translateX(0);
   cursor: default;
@@ -13297,7 +13535,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
     transform 0s linear;
 }
 
-/* Author display:flex on .gc-designer-modal__panel can beat UA [hidden] — force teardown. */
+/* Author display:flex on .gc-designer-modal__panel can beat UA [hidden] ? force teardown. */
 #gc-designer-flyout-view-secondary[hidden],
 #gc-designer-flyout-edit-secondary[hidden] {
   display: none !important;
@@ -13392,7 +13630,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   overflow: auto;
 }
 
-/* Designer · Info / Confirm / Approve: icon left, message right, both vertically centered in the pane */
+/* Designer ? Info / Confirm / Approve: icon left, message right, both vertically centered in the pane */
 .gc-designer-modal--dialog-center .gc-designer-modal__body.gc-designer-dialog__body {
   flex-direction: row;
   align-items: center;
@@ -13416,6 +13654,11 @@ body.gc-designer-entity-nav__facet-overlay-open {
 }
 
 .gc-designer-modal--flyout-right .gc-designer-modal__footer {
+  /* Flyout variant of the designer modal: left-align the action cluster
+     to match the rest of the flyout system (.gc-if-flyout__footer). The
+     base .gc-designer-modal__footer above stays right-aligned for true
+     modal usage per design-skill.md sec.7. */
+  justify-content: flex-start;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
 }
 
@@ -13526,3 +13769,992 @@ body.gc-designer-modal-open .app-content {
     background-position: -100% 0;
   }
 }
+
+/* -- Hosts & Services ? Bulk Add modal ----------------------------------- */
+
+/* Aligned with design-skill.md sec.7 Modal pattern:
+   bg #ffffff, border-radius 12px (xl), shadow xl, z-index 1050, max-width 640px */
+.gc-hs-bulk-add-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  box-sizing: border-box;
+}
+
+.gc-hs-bulk-add-modal[hidden] {
+  display: none !important;
+}
+
+.gc-hs-bulk-add-modal:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+/* Backdrop is a sibling of the panel inside .gc-hs-bulk-add-modal (which already
+   sits at z-index 1050). The panel must paint ABOVE the backdrop or the whole
+   popup looks dimmed/disabled. Keep backdrop at 0 and lift the panel above it. */
+.gc-hs-bulk-add-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.40);
+}
+
+.gc-hs-bulk-add-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  font-family: inherit;
+}
+
+/* Header -- design-skill.md sec.7: 16px semibold + close top-right */
+.gc-hs-bulk-add-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px var(--space-md) 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.gc-hs-bulk-add-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.gc-hs-bulk-add-modal__title-icon {
+  color: var(--accent-btn);
+  flex-shrink: 0;
+}
+
+.gc-hs-bulk-add-modal__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.gc-hs-bulk-add-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) ease-in-out,
+              color var(--motion-fast) ease-in-out;
+}
+
+.gc-hs-bulk-add-modal__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+.gc-hs-bulk-add-modal__close:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 2px;
+}
+
+/* Body */
+.gc-hs-bulk-add-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gc-hs-bulk-add-modal__fw-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gc-hs-bulk-add-modal__fw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gc-hs-bulk-add-modal__fw-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.gc-hs-bulk-add-modal__fw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--row-alt, var(--surface));
+}
+
+.gc-hs-bulk-add-modal__fw-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.gc-hs-bulk-add-modal__fw-item:hover {
+  background: rgba(0, 91, 200, 0.07);
+}
+
+.gc-hs-bulk-add-modal__fw-item input[type="checkbox"] {
+  flex-shrink: 0;
+  accent-color: #005BC8;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.gc-hs-bulk-add-modal__fw-name {
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.gc-hs-bulk-add-modal__fw-host {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.gc-hs-bulk-add-modal__fw-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 6px 4px;
+}
+
+/* Field labels -- small uppercase caption */
+.gc-hs-bulk-add-modal__field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.gc-hs-bulk-add-modal__req {
+  color: var(--danger);
+  margin-left: 2px;
+}
+
+.gc-hs-bulk-add-modal__field-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+
+.gc-hs-bulk-add-modal__target-value {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.gc-hs-bulk-add-modal__textarea-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Inputs -- design-skill.md sec.7 Form inputs:
+   font-size 13px, radius 6 (md), focus ring rgba(0,91,200,0.13) */
+.gc-hs-bulk-add-modal__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  min-height: 160px;
+  transition: border-color var(--motion-fast) ease-in-out,
+              box-shadow var(--motion-fast) ease-in-out;
+}
+
+.gc-hs-bulk-add-modal__textarea:focus {
+  outline: none;
+  border-color: var(--accent-btn);
+  box-shadow: 0 0 0 2px rgba(0, 91, 200, 0.13);
+}
+
+/* Format hint box -- accent tint */
+.gc-hs-bulk-add-modal__format-box {
+  padding: 10px 12px;
+  background: var(--accent-tint);
+  border: 1px solid rgba(0, 73, 189, 0.18);
+  border-radius: var(--radius-md);
+}
+
+.gc-hs-bulk-add-modal__format-box-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.gc-hs-bulk-add-modal__format-pre {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.gc-hs-bulk-add-modal__format-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Summary strip -- semantic colors aligned with design-skill.md sec.3 status palette */
+.gc-hs-bulk-add-modal__summary {
+  padding: 10px var(--space-md);
+  background: var(--surface-hover);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.gc-hs-bulk-add-modal__summary-valid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--success);
+}
+
+.gc-hs-bulk-add-modal__summary-valid svg {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.gc-hs-bulk-add-modal__summary-invalid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--danger);
+}
+
+.gc-hs-bulk-add-modal__summary-invalid > div:first-child,
+.gc-hs-bulk-add-modal__summary-invalid > .gc-hs-bulk-add-modal__summary-invalid-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gc-hs-bulk-add-modal__summary-invalid svg {
+  flex-shrink: 0;
+  color: var(--danger);
+}
+
+.gc-hs-bulk-add-modal__invalid-lines {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+  color: var(--danger);
+  max-height: 64px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.gc-hs-bulk-add-modal__invalid-item {
+  display: block;
+}
+
+.gc-hs-bulk-add-modal__invalid-reason {
+  color: var(--error);
+}
+
+.gc-hs-bulk-add-modal__invalid-more {
+  display: block;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.gc-hs-bulk-add-modal__summary-dupe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--error);
+}
+
+.gc-hs-bulk-add-modal__summary-dupe svg {
+  flex-shrink: 0;
+  color: var(--error);
+}
+
+/* Footer -- right-aligned actions per design-skill.md sec.7 */
+.gc-hs-bulk-add-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: 12px var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover);
+  flex-shrink: 0;
+}
+
+/* Bulk-add toolbar button */
+.gc-net-entity-toolbar-bulk-add {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+
+/* -- Hosts & Services ? "select a firewall first" toast ------------------- */
+
+/* Toast -- design-skill.md sec.7 Toasts/notifications:
+   bottom-right, radius 8, padding 10 16, font 13, shadow lg, solid semantic bg */
+.gc-hs-no-fw-banner {
+  position: fixed;
+  bottom: var(--space-md);
+  right: var(--space-md);
+  z-index: 1070;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-md);
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: gc-hs-toast-in var(--motion-normal) ease-in-out both;
+}
+
+.gc-hs-no-fw-banner[hidden] {
+  display: none !important;
+}
+
+@keyframes gc-hs-toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+
+/* -- Hosts & Services flyout ? slide-in animation ------------------------- */
+
+@keyframes gc-hs-flyout-panel-in {
+  from { transform: translateX(100%); opacity: 0.6; }
+  to   { transform: translateX(0);    opacity: 1;   }
+}
+
+#gc-hs-edit-flyout:not([hidden]) .gc-if-flyout__panel {
+  animation: gc-hs-flyout-panel-in 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+
+/* =========================================================================
+   Hosts & Services -- design-skill.md polish layer
+   Aligns the H&S Firewalls and Configurations pages with the Sophos
+   design tokens defined in design-skill.md (sec.3 colors, sec.5
+   spacing/radius/shadow/motion, sec.7 component patterns).
+   ========================================================================= */
+
+/* Page-scoped Inter font (design-skill.md sec.4) */
+.gc-hosts-services-page,
+.gc-hosts-services-page input,
+.gc-hosts-services-page textarea,
+.gc-hosts-services-page select,
+.gc-hosts-services-page button {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Tabs -- softer surface, accent bottom border (design-skill.md sec.7 sidebar/tabs) */
+.gc-hosts-services-page .gc-tabs {
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border);
+}
+
+.gc-hosts-services-page .gc-tabs__tab {
+  transition: color var(--motion-fast) ease-in-out,
+              background-color var(--motion-fast) ease-in-out,
+              border-color var(--motion-fast) ease-in-out;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.gc-hosts-services-page .gc-tabs__tab:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.gc-hosts-services-page .gc-tabs__tab.is-active {
+  color: var(--accent);
+  background: var(--surface);
+  border-bottom-color: var(--accent);
+}
+
+.gc-hosts-services-page .gc-tabs__tab:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 2px;
+}
+
+/* Drawer flyout -- design-skill.md sec.7 Drawers:
+   width 420-480px, bg #ffffff, shadow 2xl, border-left 1px solid #e5e7eb, z-index 1050 */
+#gc-hs-edit-flyout .gc-if-flyout__panel {
+  width: min(480px, 100vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-2xl);
+}
+
+#gc-hs-edit-flyout .gc-if-flyout__header {
+  padding: 14px var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+#gc-hs-edit-flyout .gc-if-flyout__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+#gc-hs-edit-flyout .gc-if-flyout__form-body {
+  padding: var(--space-md) 18px;
+  gap: 12px;
+}
+
+.gc-hs-flyout__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+.gc-hs-flyout__hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
+.gc-hs-flyout__footer {
+  padding: 12px var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover);
+  gap: var(--space-sm);
+}
+
+/* Combine modal -- section card per design-skill.md sec.7 */
+.gc-hosts-services-page .gc-net-zone-combine-modal__panel,
+#gc-cfg-hs-combine-modal .gc-net-zone-combine-modal__panel,
+#gc-hs-combine-modal .gc-net-zone-combine-modal__panel {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+#gc-cfg-hs-combine-modal .gc-net-zone-combine-modal__header,
+#gc-hs-combine-modal .gc-net-zone-combine-modal__header {
+  padding: 14px var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+#gc-cfg-hs-combine-modal .gc-net-zone-combine-modal__title,
+#gc-hs-combine-modal .gc-net-zone-combine-modal__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+#gc-cfg-hs-combine-modal .gc-net-zone-combine-modal__footer,
+#gc-hs-combine-modal .gc-net-zone-combine-modal__footer {
+  padding: 12px var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover);
+  gap: var(--space-sm);
+}
+
+/* Bulk-add toolbar button -- match icon-only toolbar buttons in design-skill.md sec.7 */
+.gc-net-entity-toolbar-bulk-add {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: var(--radius-md);
+  transition: background-color var(--motion-fast) ease-in-out,
+              color var(--motion-fast) ease-in-out;
+}
+
+.gc-net-entity-toolbar-bulk-add:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 2px;
+}
+
+/* Disabled affordance -- design-skill.md sec.7 Disabled state */
+.gc-hosts-services-page button[disabled],
+.gc-hosts-services-page .btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Reduced motion compliance for H&S flyout/toast (design-skill.md sec.8) */
+@media (prefers-reduced-motion: reduce) {
+  #gc-hs-edit-flyout:not([hidden]) .gc-if-flyout__panel,
+  .gc-hs-no-fw-banner {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+
+/* =========================================================================
+   Google Material Symbols (Filled) -- single icon system, project-wide.
+   Use anywhere via:  <span class="gc-icon">close</span>
+   Size variants:     gc-icon--xs (16) sm (18) md (20 default) lg (24) xl (28)
+   Style modifiers:   gc-icon--bold  gc-icon--accent  gc-icon--muted ...
+   `gc-icon--filled` is kept as a no-op alias for backwards compatibility ? the
+   default already renders FILL=1.
+   ========================================================================= */
+
+.material-symbols-outlined,
+.material-symbols-rounded,
+.material-symbols-sharp,
+.gc-icon {
+  font-family: "Material Symbols Outlined", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  user-select: none;
+  flex-shrink: 0;
+  vertical-align: middle;
+  /* Variable axes: filled (FILL 1), wght 400, GRAD 0, opsz 20 */
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+/* Size variants -- all filled */
+.gc-icon--xs { font-size: 16px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
+.gc-icon--sm { font-size: 18px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
+.gc-icon--md { font-size: 20px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
+.gc-icon--lg { font-size: 24px; font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+.gc-icon--xl { font-size: 28px; font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+/* Backwards-compat alias -- the default is already filled. Kept so legacy
+   markup (and the `_icons.html` macro) continues to work without change. */
+.gc-icon--filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
+
+/* Weight modifier (still filled) */
+.gc-icon--bold { font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 20; }
+
+/* Color helpers */
+.gc-icon--accent  { color: var(--accent); }
+.gc-icon--muted   { color: var(--text-muted); }
+.gc-icon--success { color: var(--success); }
+.gc-icon--danger  { color: var(--danger); }
+.gc-icon--warn    { color: var(--error); }
+.gc-icon--inverse { color: var(--text-inverse); }
+
+/* When used inside a button alongside text, give it a small right-margin */
+.btn .gc-icon + *:not(.gc-icon),
+button .gc-icon + *:not(.gc-icon) {
+  margin-left: 6px;
+}
+
+/* Icon-only buttons should size icon to button's font-size by default */
+.btn-icon .gc-icon,
+.icon-btn .gc-icon {
+  font-size: inherit;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Custom dialog (alert / confirm) ? replaces window.alert / window.confirm */
+/* See static/gc-dialog.js. Matches design-skill.md sec.7 (Modals).         */
+/* ----------------------------------------------------------------------- */
+.gc-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 5200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  isolation: isolate;
+}
+
+.gc-dialog[hidden] {
+  display: none !important;
+}
+
+.gc-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.4);
+  animation: gc-dialog-fade 150ms ease-out;
+}
+
+.gc-dialog__panel {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 30rem);
+  max-height: min(85vh, 32rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 18px 20px 16px;
+  font-family: inherit;
+  animation: gc-dialog-pop 180ms cubic-bezier(0.2, 0.85, 0.4, 1.05);
+}
+
+@keyframes gc-dialog-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes gc-dialog-pop {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.gc-dialog__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.gc-dialog__close:hover {
+  background: var(--surface-active);
+  color: var(--text);
+}
+
+.gc-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 32px;
+  margin-bottom: 8px;
+}
+
+.gc-dialog__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.gc-dialog[data-gc-dialog-tone="success"] .gc-dialog__icon {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.gc-dialog[data-gc-dialog-tone="warning"] .gc-dialog__icon {
+  background: #FFF4E5;
+  color: #FF8F00;
+}
+
+.gc-dialog[data-gc-dialog-tone="danger"] .gc-dialog__icon {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.gc-dialog__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gc-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 4px 0 16px;
+}
+
+.gc-dialog__message {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.gc-dialog__input {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  outline: none;
+  transition: border-color var(--motion-fast, 120ms) ease,
+    box-shadow var(--motion-fast, 120ms) ease;
+}
+
+.gc-dialog__input[hidden] {
+  display: none;
+}
+
+.gc-dialog__input:focus {
+  border-color: var(--accent-btn, var(--accent));
+  box-shadow: 0 0 0 3px rgba(0, 117, 255, 0.18);
+}
+
+.gc-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gc-dialog__btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background-color var(--motion-fast), color var(--motion-fast),
+              border-color var(--motion-fast);
+  min-width: 72px;
+}
+
+.gc-dialog__btn[hidden] {
+  display: none !important;
+}
+
+.gc-dialog__btn--primary {
+  background: var(--accent-btn);
+  color: var(--text-inverse);
+}
+
+.gc-dialog__btn--primary:hover {
+  background: var(--accent-btn-hover);
+}
+
+.gc-dialog__btn--secondary {
+  background: var(--surface-active);
+  color: var(--accent-btn);
+  border-color: transparent;
+}
+
+.gc-dialog__btn--secondary:hover {
+  background: var(--border-light);
+}
+
+.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary {
+  background: var(--danger);
+}
+
+.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary:hover {
+  background: #b53400;
+}
+
+.gc-dialog__btn:focus-visible {
+  outline: 2px solid var(--accent-btn);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Toast notifications (success / error / warning / info)                  */
+/* See static/gc-dialog.js + design-skill.md sec.7 (Toasts).               */
+/* ----------------------------------------------------------------------- */
+.gc-toast-stack {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 5300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(92vw, 24rem);
+}
+
+.gc-toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-inverse);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  font-weight: 500;
+  font-family: inherit;
+  animation: gc-toast-slide-in 220ms cubic-bezier(0.2, 0.85, 0.4, 1.05);
+  min-width: 0;
+}
+
+.gc-toast--leaving {
+  animation: gc-toast-slide-out 200ms ease-in forwards;
+}
+
+@keyframes gc-toast-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gc-toast-slide-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(20px); }
+}
+
+.gc-toast--success { background: #00A651; }
+.gc-toast--error   { background: #DA3E00; }
+.gc-toast--warning { background: #FF8F00; color: #1f1300; }
+.gc-toast--info    { background: var(--accent); }
+
+.gc-toast__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.gc-toast__text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.gc-toast__close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--motion-fast), background-color var(--motion-fast);
+}
+
+.gc-toast__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.gc-toast--warning .gc-toast__close:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc-dialog__backdrop,
+  .gc-dialog__panel,
+  .gc-toast,
+  .gc-toast--leaving {
+    animation: none !important;
+  }
+}
+

@@ -5301,6 +5301,8 @@ def api_configurations_apply_hs_creates_batch(
 
 
 # Hosts & Services tab entity_type values (firewall_config_entries.entity_type).
+# Also extended with the Routing / Authentication / Administration entities
+# that share the HS-style enqueue / apply / merge pipeline.
 HOSTS_SERVICES_ENTITY_TYPES: frozenset[str] = frozenset(
     {
         "ip_host",
@@ -5311,6 +5313,11 @@ HOSTS_SERVICES_ENTITY_TYPES: frozenset[str] = frozenset(
         "country_group",
         "service",
         "service_group",
+        "unicast_route",
+        "gateway",
+        "gateway_host",
+        "clientless_user",
+        "acl_rule",
     }
 )
 
@@ -5782,6 +5789,7 @@ def firewalls_system_administration_page(
                     "api_task_queue_enqueue_netflow_configuration_clear_batch"
                 )
             ),
+            **_hs_table_url_context(request),
         },
     )
 
@@ -5830,6 +5838,7 @@ def firewalls_configure_authentication_page(
             "url_api_auth_user_group_options": str(
                 request.url_for("api_firewalls_auth_user_group_options")
             ),
+            **_hs_table_url_context(request),
         },
     )
 
@@ -5884,6 +5893,144 @@ def firewalls_system_profiles_page(
             "url_api_task_queue_enqueue_profile_entity_deletes_batch": str(
                 request.url_for("api_task_queue_enqueue_profile_entity_deletes_batch")
             ),
+        },
+    )
+
+
+def _hs_table_url_context(request: Request) -> dict[str, str]:
+    """URLs shared by every HS-style page (firewall scope)."""
+    return {
+        "url_api_hosts_services_table": str(
+            request.url_for("api_firewalls_hosts_services_table")
+        ),
+        "url_api_task_queue_enqueue_hs_creates_batch": str(
+            request.url_for("api_task_queue_enqueue_hs_creates_batch")
+        ),
+        "url_api_task_queue_enqueue_hs_updates_batch": str(
+            request.url_for("api_task_queue_enqueue_hs_updates_batch")
+        ),
+        "url_api_task_queue_enqueue_hs_deletes_batch": str(
+            request.url_for("api_task_queue_enqueue_hs_deletes_batch")
+        ),
+        "url_api_hosts_services_cached_names_aggregate": str(
+            request.url_for("api_hosts_services_cached_names_aggregate")
+        ),
+    }
+
+
+def _hs_table_url_context_configuration(request: Request) -> dict[str, str]:
+    """URLs shared by every HS-style page (configuration / combined scope)."""
+    return {
+        "url_api_configurations_hosts_services_table": str(
+            request.url_for("api_configurations_hosts_services_table")
+        ),
+        "url_api_configurations_apply_hs_creates_batch": str(
+            request.url_for("api_configurations_apply_hs_creates_batch")
+        ),
+        "url_api_configurations_apply_hs_updates_batch": str(
+            request.url_for("api_configurations_apply_hs_updates_batch")
+        ),
+        "url_api_configurations_apply_hs_deletes_batch": str(
+            request.url_for("api_configurations_apply_hs_deletes_batch")
+        ),
+    }
+
+
+@app.get("/firewalls/routing", response_class=HTMLResponse, name="firewalls_routing_page")
+def firewalls_routing_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Routing page (per firewall): Unicast Routes, Gateways, Custom Gateways tabs."""
+    nav_ctx = template_nav_firewall_context(request, sdb, db)
+    return templates.TemplateResponse(
+        request,
+        "firewalls_routing.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **nav_ctx,
+            **_hs_table_url_context(request),
+        },
+    )
+
+
+@app.get(
+    "/configurations/routing",
+    response_class=HTMLResponse,
+    name="configurations_routing_page",
+)
+def configurations_routing_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Routing page (combined / configuration scope)."""
+    nav_ctx = template_nav_firewall_context(request, sdb, db)
+    return templates.TemplateResponse(
+        request,
+        "configurations_routing.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **nav_ctx,
+            "top_nav_active": "firewalls",
+            **_hs_table_url_context_configuration(request),
+        },
+    )
+
+
+@app.get(
+    "/configurations/authentication",
+    response_class=HTMLResponse,
+    name="configurations_authentication_page",
+)
+def configurations_authentication_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Authentication page (combined / configuration scope) — Clientless Users tab."""
+    nav_ctx = template_nav_firewall_context(request, sdb, db)
+    return templates.TemplateResponse(
+        request,
+        "configurations_authentication.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **nav_ctx,
+            "top_nav_active": "firewalls",
+            **_hs_table_url_context_configuration(request),
+        },
+    )
+
+
+@app.get(
+    "/configurations/administration",
+    response_class=HTMLResponse,
+    name="configurations_administration_page",
+)
+def configurations_administration_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Administration page (combined / configuration scope) — Local Service ACL tab."""
+    nav_ctx = template_nav_firewall_context(request, sdb, db)
+    return templates.TemplateResponse(
+        request,
+        "configurations_administration.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **nav_ctx,
+            "top_nav_active": "firewalls",
+            **_hs_table_url_context_configuration(request),
         },
     )
 

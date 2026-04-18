@@ -23,7 +23,7 @@
     if (typeof globalThis.gcGlobalBannerShowResult === "function") {
       globalThis.gcGlobalBannerShowResult(ok, msg);
     } else {
-      alert(msg);
+      window.gcAlert(msg);
     }
   }
 
@@ -899,14 +899,14 @@
         if (els.rulesDeleteBtn.disabled) return;
         let n = getSelectedRuleIndices().length;
         if (n < 1) return;
-        if (
-          !globalThis.confirm(
-            "Remove " + n + " selected rule" + (n === 1 ? "" : "s") + " from this policy?",
-          )
-        ) {
-          return;
-        }
-        deleteSelectedRules();
+        let rmMsg = "Remove " + n + " selected rule" + (n === 1 ? "" : "s") + " from this policy?";
+        let cf = window.gcConfirm
+          ? window.gcConfirm(rmMsg, { tone: "danger", confirmLabel: "Remove" })
+          : Promise.resolve(globalThis.confirm(rmMsg));
+        cf.then(function (ok) {
+          if (!ok) return;
+          deleteSelectedRules();
+        });
       });
     }
 

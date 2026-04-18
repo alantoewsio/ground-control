@@ -288,8 +288,9 @@
   /** Default source port range for new TCP/UDP detail rows (matches hs_flyout_merge). */
   let TCPUDP_SRC_DEFAULT = "1:65535";
 
-  let SVC_TCPUDP_TRASH_SVG =
-    '<svg class="gc-bridge-flyout__member-trash-svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4v-2h-3.5l-1-1h-5l-1 1H5v2h14zM8 9h8v10H8V9z"/></svg>';
+  let SVC_TCPUDP_TRASH_SVG = (window.gcIcon
+    ? window.gcIcon("delete", { size: "xs", cls: "gc-bridge-flyout__member-trash-svg" })
+    : "");
 
   function buildTcpUdpDetailsTableShell() {
     return (

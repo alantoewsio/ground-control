@@ -10,7 +10,7 @@
       </aside>
 {% endmacro %}
 
-{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true, secondary_btn_class="btn btn--secondary gc-net-entity-toolbar-secondary", primary_btn_hidden=false, secondary_btn_hidden=false, head_end_slot_id=none, table_title_element_id=none) %}
+{% macro net_entity_table_wrap(prefix, title, search_aria, show_combine=false, primary_btn_id=none, primary_btn_label=none, combine_title=none, secondary_btn_id=none, secondary_btn_label=none, show_add_dropdown=false, show_entity_quick_filters=false, toolbar_page_sync=true, pre_search_btn_a_id=none, pre_search_btn_a_label=none, pre_search_btn_b_id=none, pre_search_btn_b_label=none, show_combine_sync_selected=true, secondary_btn_class="btn btn--secondary gc-net-entity-toolbar-secondary", primary_btn_hidden=false, secondary_btn_hidden=false, head_end_slot_id=none, table_title_element_id=none, bulk_add_btn_id=none, bulk_add_btn_label=none) %}
         <div class="table-wrap gc-net-if-table-wrap">
           {% if head_end_slot_id %}
           <div class="firewalls-page__head firewalls-page__head--split">
@@ -36,9 +36,7 @@
                       aria-label="Filters"
                       title="Filters"
                     >
-                      <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm filters__icon" aria-hidden="true">filter_alt</span>
                       <span class="filters__title-label">Filters</span>
                     </button>
                     {% if show_entity_quick_filters %}
@@ -82,6 +80,16 @@
                   </div>
                 </div>
                 <div class="toolbar__fw-toolbar-end">
+                  {#
+                    Toolbar action order (left → right):
+                      1. Other secondary actions: Combined View, Sync selected, secondary (e.g. Delete selected)
+                      2. Bulk Add
+                      3. Primary  ->  Add  (or Add Interface dropdown variant)
+                      4. Search cluster: pre-search btns, page-sync, search field, columns   ← rightmost
+                    The search cluster is always pinned to the right edge across every page
+                    that uses this macro. Add sits immediately to the left of the search,
+                    with Bulk Add to the left of Add.
+                  #}
                   {% if show_combine %}
                   {% set _combine_hint = combine_title if combine_title is not none and combine_title else "Combined view merges rows that share the same zone name. When access settings differ, the switch turns yellow — click to compare firewalls, or Shift+click to show separate rows." %}
                   <div class="gc-net-zone-toolbar-combine" id="{{ prefix }}-toolbar-combine">
@@ -117,15 +125,58 @@
                     </button>
                   </div>
                   {% endif %}
+                  {% if secondary_btn_id and secondary_btn_label %}
+                  <button type="button" class="{{ secondary_btn_class }}" id="{{ secondary_btn_id }}" disabled{% if secondary_btn_hidden %} hidden{% endif %}>
+                    {{ secondary_btn_label }}
+                  </button>
+                  {% endif %}
+                  {# Bulk Add and Add sit immediately to the left of the search cluster.
+                     The search cluster always stays pinned to the right edge below. #}
+                  {% if bulk_add_btn_id and bulk_add_btn_label %}
+                  <button type="button" class="btn btn--secondary gc-net-entity-toolbar-bulk-add" id="{{ bulk_add_btn_id }}" disabled title="Select one or more firewalls in the top bar to bulk add">
+                    <span class="gc-icon gc-icon--xs" aria-hidden="true" style="margin-right:5px;vertical-align:-2px;flex-shrink:0;font-size:14px">add</span>
+                    {{ bulk_add_btn_label }}
+                  </button>
+                  {% endif %}
                   {% if primary_btn_id and primary_btn_label %}
                   <button type="button" class="btn primary gc-net-entity-toolbar-primary" id="{{ primary_btn_id }}"{% if primary_btn_hidden %} hidden{% endif %}>
                     {{ primary_btn_label }}
                   </button>
                   {% endif %}
-                  {% if secondary_btn_id and secondary_btn_label %}
-                  <button type="button" class="{{ secondary_btn_class }}" id="{{ secondary_btn_id }}" disabled{% if secondary_btn_hidden %} hidden{% endif %}>
-                    {{ secondary_btn_label }}
-                  </button>
+                  {% if show_add_dropdown %}
+                  <div class="gc-toolbar-add-dropdown" id="{{ prefix }}-add-dropdown-wrap">
+                    <button
+                      type="button"
+                      class="btn primary gc-toolbar-add-dropdown__trigger"
+                      id="{{ prefix }}-add-dropdown-trigger"
+                      aria-haspopup="true"
+                      aria-expanded="false"
+                      aria-controls="{{ prefix }}-add-dropdown-menu"
+                    >
+                      Add Interface
+                      <span class="gc-toolbar-add-dropdown__chev" aria-hidden="true">▾</span>
+                    </button>
+                    <div
+                      id="{{ prefix }}-add-dropdown-menu"
+                      class="gc-toolbar-add-dropdown__menu"
+                      role="menu"
+                      hidden
+                      aria-labelledby="{{ prefix }}-add-dropdown-trigger"
+                    >
+                      <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="bridge">
+                        Bridge
+                      </button>
+                      <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="lag">
+                        LAG
+                      </button>
+                      <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="vlan">
+                        VLAN
+                      </button>
+                      <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="alias">
+                        Alias
+                      </button>
+                    </div>
+                  </div>
                   {% endif %}
                   <div class="toolbar__search-cluster">
                     {% if pre_search_btn_a_id and pre_search_btn_a_label %}
@@ -148,41 +199,6 @@
                       {{ pre_search_btn_b_label }}
                     </button>
                     {% endif %}
-                    {% if show_add_dropdown %}
-                    <div class="gc-toolbar-add-dropdown" id="{{ prefix }}-add-dropdown-wrap">
-                      <button
-                        type="button"
-                        class="btn primary gc-toolbar-add-dropdown__trigger"
-                        id="{{ prefix }}-add-dropdown-trigger"
-                        aria-haspopup="true"
-                        aria-expanded="false"
-                        aria-controls="{{ prefix }}-add-dropdown-menu"
-                      >
-                        Add Interface
-                        <span class="gc-toolbar-add-dropdown__chev" aria-hidden="true">▾</span>
-                      </button>
-                      <div
-                        id="{{ prefix }}-add-dropdown-menu"
-                        class="gc-toolbar-add-dropdown__menu"
-                        role="menu"
-                        hidden
-                        aria-labelledby="{{ prefix }}-add-dropdown-trigger"
-                      >
-                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="bridge">
-                          Bridge
-                        </button>
-                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="lag">
-                          LAG
-                        </button>
-                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="vlan">
-                          VLAN
-                        </button>
-                        <button type="button" class="gc-toolbar-add-dropdown__item" role="menuitem" data-gc-add-kind="alias">
-                          Alias
-                        </button>
-                      </div>
-                    </div>
-                    {% endif %}
                     {% if toolbar_page_sync %}
                     <button
                       type="button"
@@ -191,21 +207,11 @@
                       title="Sync cached objects for visible rows (selected firewalls only)"
                       aria-label="Sync configuration cache for visible rows on this page"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">sync</span>
                     </button>
                     {% endif %}
                     <div class="search-field">
-                      <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm search-field__icon" aria-hidden="true">search</span>
                       <input
                         type="search"
                         id="{{ prefix }}-search"
@@ -226,12 +232,7 @@
                       title="Columns"
                       aria-label="Choose table columns"
                     >
-                      <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--md toolbar__cols-icon-svg" aria-hidden="true">settings</span>
                     </span>
                   </div>
                 </div>

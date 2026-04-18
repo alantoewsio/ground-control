@@ -1783,15 +1783,23 @@
         typeof globalThis.gcDesignerDcLayoutIsDirty === "function" &&
         globalThis.gcDesignerDcLayoutIsDirty()
       ) {
-        var ok = globalThis.confirm(
+        var msg =
           "You have unsaved layout changes for " +
-            prev +
-            ". Switch object types anyway? Those changes will be lost unless you save the layout first.",
-        );
-        if (!ok) {
-          revertTypeSelectTo(prev);
-          return;
-        }
+          prev +
+          ". Switch object types anyway? Those changes will be lost unless you save the layout first.";
+        var cf = window.gcConfirm
+          ? window.gcConfirm(msg)
+          : Promise.resolve(globalThis.confirm(msg));
+        cf.then(function (ok) {
+          if (!ok) {
+            revertTypeSelectTo(prev);
+            return;
+          }
+          writeStoredUiValue(STORAGE_KEY_ENTITY, cur);
+          loadFields(cur);
+          emitCatalogChanged();
+        });
+        return;
       }
       writeStoredUiValue(STORAGE_KEY_ENTITY, cur);
       loadFields(cur);

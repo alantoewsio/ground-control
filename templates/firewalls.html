@@ -249,9 +249,7 @@
                       aria-label="Filters"
                       title="Filters"
                     >
-                      <svg class="filters__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm filters__icon" aria-hidden="true">filter_alt</span>
                       <span class="filters__title-label">Filters</span>
                     </button>
                     <div class="filters__head-trail">
@@ -285,12 +283,7 @@
                   </div>
                   <div class="toolbar__search-cluster">
                     <div class="search-field">
-                      <svg class="search-field__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm search-field__icon" aria-hidden="true">search</span>
                       <input
                         type="search"
                         id="gc-fw-search"
@@ -311,12 +304,7 @@
                       title="Columns"
                       aria-label="Choose table columns"
                     >
-                      <svg class="toolbar__cols-icon-svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--md toolbar__cols-icon-svg" aria-hidden="true">settings</span>
                     </span>
                   </div>
                 </div>
@@ -472,12 +460,7 @@
                       title="Open WebAdmin{% if request_is_https_session(request) %} (proxied via Ground Control){% else %} (HTTPS to this host and API port){% endif %}"
                       aria-label="Open WebAdmin in new tab"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">public</span>
                     </a>
                     <a
                       href="{{ ssh_browser_url(request, fw) }}"
@@ -487,12 +470,7 @@
                       title="Browser SSH (port 22; sign in interactively in the terminal)"
                       aria-label="Open browser SSH in new tab"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M4 5a2 2 0 012-2h12a2 2 0 012 2v4H4V5zm0 6h16v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8zm3.5 2.5l2 2-2 2 1.06 1.06L11.56 14 8.56 11l-1.06 1.06zm4.5 4.5h5v1.5h-5V14z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">terminal</span>
                     </a>
                     <a
                       href="{{ request.url_for('firewall_monitor_page', firewall_id=fw.id) }}"
@@ -500,12 +478,7 @@
                       title="Monitor history"
                       aria-label="Monitor history"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M3 17h2v-7H3v7zm4 0h2V7H7v10zm4 0h2v-4h-2v4zm4 0h2v-8h-2v8zm4 0h2V3h-2v14z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">bar_chart</span>
                     </a>
                     <button
                       type="button"
@@ -516,12 +489,7 @@
                       data-gc-cv-scope-id="{{ fw.id }}"
                       data-gc-cv-label="{{ ((fw.name or fw.host) or '') | e }}"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">search</span>
                     </button>
                     <button
                       type="button"
@@ -531,12 +499,7 @@
                       title="Sync cached objects (types chosen in edit panel)"
                       aria-label="Sync firewall configuration cache"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M12 6V3L8 7l4 4V8c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">sync</span>
                     </button>
                     <button
                       type="button"
@@ -546,12 +509,7 @@
                       title="Test API connection (runs even when inventory shows offline). After success or an authentication error, reachability is rechecked for the online indicator."
                       aria-label="Test API connection"
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M19.11,11.92C19.13,11.71 19.14,11.5 19.14,11.29C19.14,7.86 17.71,4.14 16.28,4.14C14.85,4.14 13.42,5.57 12,5.57C10.57,5.57 9.14,4.14 7.71,4.14C6.28,4.14 4.86,7.79 4.86,11.29C4.86,11.5 4.86,11.71 4.88,11.92C7.22,12.45 9.6,12.72 12,12.71C14.45,12.71 16.83,12.44 19.11,11.92M3.45,18.18C9,19.85 14.96,19.86 20.54,18.18C20.96,18.04 21.33,17.77 21.59,17.41C21.85,17.05 22,16.61 22,16.17C22,15.72 21.86,15.29 21.61,14.92C21.35,14.56 21,14.29 20.56,14.14C17.86,15 15,15.45 12,15.45C9,15.45 6.13,15 3.43,14.14C3,14.29 2.65,14.57 2.39,14.93C2.14,15.29 2,15.72 2,16.17C2,17.11 2.61,17.9 3.45,18.18Z"
-                        />
-                      </svg>
+                      <span class="gc-icon gc-icon--sm" aria-hidden="true">science</span>
                     </button>
                     <span class="test-result" data-result-for="{{ fw.id }}" hidden></span>
                   </td>
@@ -2813,8 +2771,10 @@
         var noTypes = "Open the firewall panel and enable at least one sync type.";
         if (typeof window.gcGlobalBannerShowResult === "function") {
           window.gcGlobalBannerShowResult(false, noTypes);
+        } else if (typeof window.gcAlert === "function") {
+          window.gcAlert(noTypes);
         } else {
-          alert(noTypes);
+          globalThis.alert(noTypes);
         }
         return;
       }
@@ -2946,7 +2906,7 @@
         e.preventDefault();
         var idField = document.getElementById("edit-fw-id");
         if (!idField || !String(idField.value || "").trim()) {
-          alert("Missing firewall id. Close and open the panel again.");
+          window.gcAlert("Missing firewall id. Close and open the panel again.");
           return;
         }
         var fd = new FormData(editForm);
@@ -2983,11 +2943,11 @@
               var j2 = JSON.parse(res.text);
               if (j2.detail) msg = typeof j2.detail === "string" ? j2.detail : JSON.stringify(j2.detail);
             } catch (err2) {}
-            alert("Could not save changes (" + res.status + "). " + (msg || "").slice(0, 400));
+            window.gcAlert("Could not save changes (" + res.status + "). " + (msg || "").slice(0, 400));
           })
           .catch(function () {
             if (submitBtn) submitBtn.disabled = false;
-            alert("Could not save changes (network error).");
+            window.gcAlert("Could not save changes (network error).");
           });
       });
     }
@@ -3195,12 +3155,12 @@
             if (r.ok) location.reload();
             else {
               delConfirm.disabled = false;
-              alert("Delete failed");
+              window.gcAlert("Delete failed");
             }
           })
           .catch(function () {
             delConfirm.disabled = false;
-            alert("Delete failed");
+            window.gcAlert("Delete failed");
           });
       });
     }
@@ -3242,7 +3202,7 @@
         }
         var tags = batchTagRoot ? gcTagEditorGetTags(batchTagRoot) : [];
         if (!tags.length) {
-          alert("Add at least one tag.");
+          window.gcAlert("Add at least one tag.");
           return;
         }
         setTagsApply.disabled = true;
@@ -3262,15 +3222,15 @@
               .json()
               .then(function (j) {
                 var d = j && j.detail ? j.detail : "Could not set tags.";
-                alert(typeof d === "string" ? d : JSON.stringify(d));
+                window.gcAlert(typeof d === "string" ? d : JSON.stringify(d));
               })
               .catch(function () {
-                alert("Could not set tags.");
+                window.gcAlert("Could not set tags.");
               });
           })
           .catch(function () {
             setTagsApply.disabled = false;
-            alert("Could not set tags.");
+            window.gcAlert("Could not set tags.");
           });
       });
     }

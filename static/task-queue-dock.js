@@ -519,18 +519,21 @@
     function runApproveAll() {
       let c = typeof globalThis.gcTaskQueueBadgeCount === "number" ? globalThis.gcTaskQueueBadgeCount : 0;
       if (c < 1) return;
-      if (
-        !confirm(
-          "Approve every task pending approval or failed with an error and sync to its firewall, in queue order? This may take a while.",
-        )
-      ) {
-        return;
-      }
-      approveBtns.forEach(function (b) {
-        b.disabled = true;
-      });
-      bannerProgress("Approving all tasks and syncing to firewalls…");
-      fetch(SEND_ALL_URL, {
+      let confirmFn =
+        typeof window.gcConfirm === "function"
+          ? window.gcConfirm
+          : function (m) {
+              return Promise.resolve(globalThis.confirm(m));
+            };
+      confirmFn(
+        "Approve every task pending approval or failed with an error and sync to its firewall, in queue order? This may take a while.",
+      ).then(function (ok) {
+        if (!ok) return;
+        approveBtns.forEach(function (b) {
+          b.disabled = true;
+        });
+        bannerProgress("Approving all tasks and syncing to firewalls…");
+        fetch(SEND_ALL_URL, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -588,6 +591,7 @@
           });
           if (globalThis.gcRefreshTaskQueueBadge) globalThis.gcRefreshTaskQueueBadge();
         });
+      });
     }
 
     approveBtns.forEach(function (btn) {
