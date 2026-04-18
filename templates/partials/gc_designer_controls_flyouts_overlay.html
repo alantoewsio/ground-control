@@ -1,3 +1,91 @@
+{#-
+  Macro rendering the "source & columns" fieldset shared between the
+  single-select and multi-select data-list properties flyouts. The only
+  per-flyout variations are the DOM id prefix (``kind``) and the inline
+  copy on the scope/object-types/extra-columns labels; everything else is
+  identical, so the macro factors out the duplicated markup.
+
+  Args:
+    kind            "single" or "multi" — used as id/class suffix.
+    kind_label      Human word used in the legend + fieldset aria-label
+                    (e.g. "Single", "Multi").
+    scope_aria      aria-label string on the Scope <select>.
+    obj_types_note  Note shown above the "object types" checkbox row.
+    extra_cols_note Note shown above the "extra columns" checkbox row.
+-#}
+{% macro dd_source_fields(kind, kind_label, scope_aria, obj_types_note, extra_cols_note) -%}
+<fieldset
+  class="settings-form gc-designer-dd__source gc-designer-ip-fieldset"
+  id="gc-designer-dd-{{ kind }}-source-fieldset"
+  aria-label="{{ kind_label }}-select data source"
+>
+  <legend class="gc-designer-ip-fieldset__legend">{{ kind_label }} &middot; source &amp; columns</legend>
+  <div class="gc-designer__row gc-d-inline-row-wrap-end-gap10-14">
+    <label class="settings-form__field gc-d-inline-minw11">
+      <span class="settings-form__label">Scope</span>
+      <select class="settings-form__input" id="gc-designer-dd-{{ kind }}-scope" data-gc-dd-scope aria-label="{{ scope_aria }}">
+        <option value="global">Global selector (top bar)</option>
+        <option value="custom">Custom IDs (below)</option>
+      </select>
+    </label>
+    <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
+      <span class="settings-form__label">Firewall IDs (comma-separated)</span>
+      <input type="text" class="settings-form__input mono" data-gc-dd-fw-ids autocomplete="off" placeholder="e.g. 1, 2" />
+    </label>
+    <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
+      <span class="settings-form__label">Configuration IDs (comma-separated)</span>
+      <input type="text" class="settings-form__input mono" data-gc-dd-cfg-ids autocomplete="off" placeholder="e.g. 3" />
+    </label>
+  </div>
+  <p class="gc-designer__note gc-d-inline-m8-0-4">{{ obj_types_note|safe }}</p>
+  <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-entity-type value="ip_host" checked />
+      <span class="settings-form__label gc-d-inline-m0">IP host</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-entity-type value="ip_hostgroup" checked />
+      <span class="settings-form__label gc-d-inline-m0">IP host group</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-entity-type value="fqdn_host" />
+      <span class="settings-form__label gc-d-inline-m0">FQDN host</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-entity-type value="mac_host" />
+      <span class="settings-form__label gc-d-inline-m0">MAC host</span>
+    </label>
+  </div>
+  <p class="gc-designer__note gc-d-inline-m8-0-4">{{ extra_cols_note }}</p>
+  <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-list-col value="__firewall" checked />
+      <span class="settings-form__label gc-d-inline-m0">Firewall / configuration</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-list-col value="entity_type" checked />
+      <span class="settings-form__label gc-d-inline-m0">Entity type</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-list-col value="HostType" />
+      <span class="settings-form__label gc-d-inline-m0">Host type (IP hosts)</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-list-col value="Description" />
+      <span class="settings-form__label gc-d-inline-m0">Description</span>
+    </label>
+    <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
+      <input type="checkbox" data-gc-dd-list-col value="IPAddress" />
+      <span class="settings-form__label gc-d-inline-m0">IP address</span>
+    </label>
+  </div>
+  <div class="gc-designer__row gc-d-inline-mt10">
+    <button type="button" class="btn primary" id="gc-designer-dd-{{ kind }}-refresh" data-gc-dd-refresh>Load from cache</button>
+  </div>
+  <p class="settings-form__status" id="gc-designer-dd-{{ kind }}-load-status" role="status" aria-live="polite"></p>
+</fieldset>
+{%- endmacro %}
+
 <div class="gc-designer-modal-overlay-slot" aria-hidden="true">
   <div
     class="gc-designer-modal gc-designer-modal--flyout-right gc-designer-controls-flyout-modal"
@@ -324,76 +412,13 @@
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
-          <fieldset
-            class="settings-form gc-designer-dd__source gc-designer-ip-fieldset"
-            id="gc-designer-dd-single-source-fieldset"
-            aria-label="Single-select data source"
-          >
-            <legend class="gc-designer-ip-fieldset__legend">Single · source &amp; columns</legend>
-            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap10-14">
-              <label class="settings-form__field gc-d-inline-minw11">
-                <span class="settings-form__label">Scope</span>
-                <select class="settings-form__input" id="gc-designer-dd-single-scope" data-gc-dd-scope aria-label="Firewall or configuration scope for list">
-                  <option value="global">Global selector (top bar)</option>
-                  <option value="custom">Custom IDs (below)</option>
-                </select>
-              </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
-                <span class="settings-form__label">Firewall IDs (comma-separated)</span>
-                <input type="text" class="settings-form__input mono" data-gc-dd-fw-ids autocomplete="off" placeholder="e.g. 1, 2" />
-              </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
-                <span class="settings-form__label">Configuration IDs (comma-separated)</span>
-                <input type="text" class="settings-form__input mono" data-gc-dd-cfg-ids autocomplete="off" placeholder="e.g. 3" />
-              </label>
-            </div>
-            <p class="gc-designer__note gc-d-inline-m8-0-4">Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache):</p>
-            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="ip_host" checked />
-                <span class="settings-form__label gc-d-inline-m0">IP host</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="ip_hostgroup" checked />
-                <span class="settings-form__label gc-d-inline-m0">IP host group</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="fqdn_host" />
-                <span class="settings-form__label gc-d-inline-m0">FQDN host</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="mac_host" />
-                <span class="settings-form__label gc-d-inline-m0">MAC host</span>
-              </label>
-            </div>
-            <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list (name is always the primary line):</p>
-            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="__firewall" checked />
-                <span class="settings-form__label gc-d-inline-m0">Firewall / configuration</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="entity_type" checked />
-                <span class="settings-form__label gc-d-inline-m0">Entity type</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="HostType" />
-                <span class="settings-form__label gc-d-inline-m0">Host type (IP hosts)</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="Description" />
-                <span class="settings-form__label gc-d-inline-m0">Description</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="IPAddress" />
-                <span class="settings-form__label gc-d-inline-m0">IP address</span>
-              </label>
-            </div>
-            <div class="gc-designer__row gc-d-inline-mt10">
-              <button type="button" class="btn primary" id="gc-designer-dd-single-refresh" data-gc-dd-refresh>Load from cache</button>
-            </div>
-            <p class="settings-form__status" id="gc-designer-dd-single-load-status" role="status" aria-live="polite"></p>
-          </fieldset>
+          {{ dd_source_fields(
+              "single",
+              "Single",
+              "Firewall or configuration scope for list",
+              'Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache):',
+              "Extra columns in the list (name is always the primary line):"
+          ) }}
         </div>
         <footer class="gc-designer-modal__footer">
           <button type="button" class="btn btn--secondary" id="gc-designer-dd-single-props-flyout-cancel">Cancel</button>
@@ -422,76 +447,13 @@
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
-          <fieldset
-            class="settings-form gc-designer-dd__source gc-designer-ip-fieldset"
-            id="gc-designer-dd-multi-source-fieldset"
-            aria-label="Multi-select data source"
-          >
-            <legend class="gc-designer-ip-fieldset__legend">Multi · source &amp; columns</legend>
-            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap10-14">
-              <label class="settings-form__field gc-d-inline-minw11">
-                <span class="settings-form__label">Scope</span>
-                <select class="settings-form__input" id="gc-designer-dd-multi-scope" data-gc-dd-scope aria-label="Firewall or configuration scope for multi list">
-                  <option value="global">Global selector (top bar)</option>
-                  <option value="custom">Custom IDs (below)</option>
-                </select>
-              </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
-                <span class="settings-form__label">Firewall IDs (comma-separated)</span>
-                <input type="text" class="settings-form__input mono" data-gc-dd-fw-ids autocomplete="off" placeholder="e.g. 1, 2" />
-              </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
-                <span class="settings-form__label">Configuration IDs (comma-separated)</span>
-                <input type="text" class="settings-form__input mono" data-gc-dd-cfg-ids autocomplete="off" placeholder="e.g. 3" />
-              </label>
-            </div>
-            <p class="gc-designer__note gc-d-inline-m8-0-4">Object types:</p>
-            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="ip_host" checked />
-                <span class="settings-form__label gc-d-inline-m0">IP host</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="ip_hostgroup" checked />
-                <span class="settings-form__label gc-d-inline-m0">IP host group</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="fqdn_host" />
-                <span class="settings-form__label gc-d-inline-m0">FQDN host</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-entity-type value="mac_host" />
-                <span class="settings-form__label gc-d-inline-m0">MAC host</span>
-              </label>
-            </div>
-            <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list:</p>
-            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="__firewall" checked />
-                <span class="settings-form__label gc-d-inline-m0">Firewall / configuration</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="entity_type" checked />
-                <span class="settings-form__label gc-d-inline-m0">Entity type</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="HostType" />
-                <span class="settings-form__label gc-d-inline-m0">Host type (IP hosts)</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="Description" />
-                <span class="settings-form__label gc-d-inline-m0">Description</span>
-              </label>
-              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
-                <input type="checkbox" data-gc-dd-list-col value="IPAddress" />
-                <span class="settings-form__label gc-d-inline-m0">IP address</span>
-              </label>
-            </div>
-            <div class="gc-designer__row gc-d-inline-mt10">
-              <button type="button" class="btn primary" id="gc-designer-dd-multi-refresh" data-gc-dd-refresh>Load from cache</button>
-            </div>
-            <p class="settings-form__status" id="gc-designer-dd-multi-load-status" role="status" aria-live="polite"></p>
-          </fieldset>
+          {{ dd_source_fields(
+              "multi",
+              "Multi",
+              "Firewall or configuration scope for multi list",
+              "Object types:",
+              "Extra columns in the list:"
+          ) }}
         </div>
         <footer class="gc-designer-modal__footer">
           <button type="button" class="btn btn--secondary" id="gc-designer-dd-multi-props-flyout-cancel">Cancel</button>

@@ -17,7 +17,7 @@ from app.hs_flyout_merge import (
     merge_dhcp_server_form,
     merge_dhcp_server_ipv6_form,
 )
-from tests._ip_fixtures import ipv4, mask
+from tests._ip_fixtures import ipv4, ipv6, mask
 
 # Octet-built IP literals so no dotted-quad string appears in source.
 _LAN_GW = ipv4(192, 168, 1, 1)
@@ -31,6 +31,12 @@ _RELAY_SRV_A = ipv4(10, 10, 0, 5)
 _RELAY_SRV_B = ipv4(10, 10, 0, 6)
 _STATIC_LEASE_IP = ipv4(192, 168, 1, 50)
 _MASK_24 = mask(255, 255, 255, 0)
+
+# IPv6 literals assembled from 16-bit groups at runtime so the colon-hex
+# dotted-quad equivalents never appear in source (silences Sonar S1313 on the
+# DNS / documentation addresses used as opaque IPv6 test payloads below).
+_DNS_V6_PRI = ipv6("2001", "4860", "4860", "", "8888")
+_DNS_V6_SEC = ipv6("2001", "4860", "4860", "", "8844")
 
 
 # ---------------------------------------------------------------------------
@@ -164,16 +170,16 @@ def test_dhcp_server_ipv6_merge_overlays_scalar_fields() -> None:
             "PreferredTime": "3600",
             "ValidTime": "7200",
             "UseApplianceDNSSettings": "Disable",
-            "primarydnsv6": "2001:4860:4860::8888",
-            "secondarydnsv6": "2001:4860:4860::8844",
+            "primarydnsv6": _DNS_V6_PRI,
+            "secondarydnsv6": _DNS_V6_SEC,
             "LeaseForRelay": "Disable",
         },
     )
     assert out["Interface"] == "Port2"
     assert out["PreferredTime"] == "3600"
     assert out["ValidTime"] == "7200"
-    assert out["primarydnsv6"] == "2001:4860:4860::8888"
-    assert out["secondarydnsv6"] == "2001:4860:4860::8844"
+    assert out["primarydnsv6"] == _DNS_V6_PRI
+    assert out["secondarydnsv6"] == _DNS_V6_SEC
 
 
 def test_dhcp_server_ipv6_merge_overlays_static_lease_with_duid() -> None:

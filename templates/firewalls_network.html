@@ -446,6 +446,7 @@
 <script src="/static/gc-combine-flyout-conflicts.js"></script>
 <script src="/static/gc-net-zone-flyout.js"></script>
 <script src="/static/gc-dhcp-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-dhcp-page.js?v={{ app_about.app_version }}"></script>
 <script src="/static/gc-hs-bulk-add.js"></script>
 <script>
   window.gcDhcpEntityTarget = "firewall";
@@ -1049,203 +1050,63 @@
       },
     });
 
-    var DHCP_TAB_DEFS = [
-      {
-        key: "ipv4",
-        prefix: "gc-net-dhcp-ipv4",
-        apiEntity: "dhcp_server",
-        aria: "IPv4 DHCP server",
-        countS: "IPv4 DHCP server",
-        countP: "IPv4 DHCP servers",
-        humanAdd: "IPv4 DHCP server",
-        emptyCacheHint: "Run sync from Inventory and include \u00abDHCP servers (IPv4)\u00bb (dhcp_server).",
+    var tableDhcpV4, tableDhcpV6, tableDhcpRelay;
+    var activeDhcpSubtab = "ipv4";
+    var DHCP_SUBTAB_LS_FW = "ground-control-net-dhcp-subtab";
+    try {
+      var _savedSub = localStorage.getItem(DHCP_SUBTAB_LS_FW);
+      if (_savedSub === "ipv4" || _savedSub === "ipv6" || _savedSub === "relay") activeDhcpSubtab = _savedSub;
+    } catch (e) {}
+
+    gcDhcpPageInit({
+      prefix: "gc-net-dhcp",
+      subAttr: "data-gc-net-dhcp-subtab",
+      subtablistId: "gc-net-dhcp-subtablist",
+      subLsKey: DHCP_SUBTAB_LS_FW,
+      lsKeyPrefix: "ground-control-net-dhcp-",
+      target: "firewall",
+      emptySelectionMessage: "Select one or more firewalls or configurations in the top bar.",
+      entriesUpdatedEvent: "gc-task-queue-updated",
+      getDeleteUrl: function () { return window.gcHsEnqueueDeletesBatchUrl; },
+      deleteConfirmMsg: function (n, countP) {
+        return "Queue " + n + " delete task" + (n === 1 ? "" : "s") + " for the selected " + countP + "?";
       },
-      {
-        key: "ipv6",
-        prefix: "gc-net-dhcp-ipv6",
-        apiEntity: "dhcp_server_ipv6",
-        aria: "IPv6 DHCP server",
-        countS: "IPv6 DHCP server",
-        countP: "IPv6 DHCP servers",
-        humanAdd: "IPv6 DHCP server",
-        emptyCacheHint: "Run sync from Inventory and include \u00abDHCP servers (IPv6)\u00bb (dhcp_server_ipv6).",
+      buildEmptyCache: function (countP) {
+        var hint = "Run sync from Inventory and include the matching DHCP type.";
+        return "No " + countP + " in the cache. " + hint;
       },
-      {
-        key: "relay",
-        prefix: "gc-net-dhcp-relay",
-        apiEntity: "dhcp_relay",
-        aria: "DHCP relay",
-        countS: "DHCP relay",
-        countP: "DHCP relays",
-        humanAdd: "DHCP relay",
-        emptyCacheHint: "Run sync from Inventory and include \u00abDHCP relays\u00bb (dhcp_relay).",
+      buildFetchUrl: function (t, ctx) {
+        var ids = (ctx && ctx.firewallIds) || [];
+        var url = URLS.hsTable + "?" + ctx.idsQueryParam + "=" + encodeURIComponent(ids.join(","));
+        if (ctx.idsQueryParam !== "configuration_ids" && ctx.configurationIds && ctx.configurationIds.length) {
+          url += "&configuration_ids=" + encodeURIComponent(ctx.configurationIds.join(","));
+        }
+        url += "&entity_type=" + encodeURIComponent(t.apiEntity);
+        var combineEl = document.getElementById(t.prefix + "-combine");
+        var combinedOn = !combineEl || combineEl.checked;
+        url += "&combine=" + (combinedOn ? "true" : "false");
+        return url;
       },
-    ];
-
-    function buildDhcpFetchUrl(t, ctx) {
-      var ids = (ctx && ctx.firewallIds) || [];
-      var url = URLS.hsTable + "?" + ctx.idsQueryParam + "=" + encodeURIComponent(ids.join(","));
-      if (ctx.idsQueryParam !== "configuration_ids" && ctx.configurationIds && ctx.configurationIds.length) {
-        url += "&configuration_ids=" + encodeURIComponent(ctx.configurationIds.join(","));
-      }
-      url += "&entity_type=" + encodeURIComponent(t.apiEntity);
-      var combineEl = document.getElementById(t.prefix + "-combine");
-      var combinedOn = !combineEl || combineEl.checked;
-      url += "&combine=" + (combinedOn ? "true" : "false");
-      return url;
-    }
-
-    function makeDhcpTable(t) {
-      return gcCreateNetworkEntityTable({
-        prefix: t.prefix,
-        apiUrl: URLS.hsTable,
-        apiEntityType: t.apiEntity,
-        emptySelectionMessage: "Select one or more firewalls or configurations in the top bar.",
-        lsKey: "ground-control-net-dhcp-" + t.key + "-columns-v1",
-        dataRowClass: t.prefix + "-data-row",
-        colPickerAttr: "data-" + t.prefix + "-col",
-        pageSyncFallbackEntities: [t.apiEntity],
-        rowClickable: true,
-        rowAriaEntitySingular: t.aria,
-        bulkRowSelect: true,
-        combineQuery: { param: "combine" },
-        onRowClick: function (tr) {
-          if (window.gcDhcpFlyout && window.gcDhcpFlyout.openEditFromTr) {
-            window.gcDhcpFlyout.openEditFromTr(tr);
-          }
-        },
-        fetchTablePayload: function (ctx) {
-          var url = buildDhcpFetchUrl(t, ctx);
-          return fetch(url, {
-            credentials: "same-origin",
-            headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
-          }).then(function (r) { return r.json(); });
-        },
-        labels: {
-          countSingular: t.countS,
-          countPlural: t.countP,
-          emptyCache: "No " + t.countP + " in the cache. " + t.emptyCacheHint,
-          emptyFilter: "No " + t.countP + " match the current search or filters.",
-          loadError: "Could not load " + t.countP + ".",
-        },
-      });
-    }
-
-    var tableDhcpV4 = makeDhcpTable(DHCP_TAB_DEFS[0]);
-    var tableDhcpV6 = makeDhcpTable(DHCP_TAB_DEFS[1]);
-    var tableDhcpRelay = makeDhcpTable(DHCP_TAB_DEFS[2]);
-    var dhcpTablesByKey = {
-      ipv4: tableDhcpV4,
-      ipv6: tableDhcpV6,
-      relay: tableDhcpRelay,
-    };
-
-    var DHCP_SUBTAB_LS = "ground-control-net-dhcp-subtab";
-    function readSavedDhcpSubtab() {
-      try {
-        var raw = localStorage.getItem(DHCP_SUBTAB_LS);
-        if (raw === "ipv4" || raw === "ipv6" || raw === "relay") return raw;
-      } catch (e) {}
-      return "ipv4";
-    }
-    var activeDhcpSubtab = readSavedDhcpSubtab();
-    var dhcpSubTabs = document.querySelectorAll("#gc-net-dhcp-subtablist .gc-tabs__tab[data-gc-net-dhcp-subtab]");
-    var dhcpSubPanels = {
-      ipv4: document.getElementById("gc-net-dhcp-panel-ipv4"),
-      ipv6: document.getElementById("gc-net-dhcp-panel-ipv6"),
-      relay: document.getElementById("gc-net-dhcp-panel-relay"),
-    };
-    function syncDhcpSubButtons() {
-      dhcpSubTabs.forEach(function (b) {
-        var on = b.getAttribute("data-gc-net-dhcp-subtab") === activeDhcpSubtab;
-        b.classList.toggle("is-active", on);
-        b.setAttribute("aria-selected", on ? "true" : "false");
-      });
-    }
-    function applyDhcpSubPanels() {
-      Object.keys(dhcpSubPanels).forEach(function (k) {
-        var p = dhcpSubPanels[k];
-        if (!p) return;
-        var show = k === activeDhcpSubtab;
-        p.classList.toggle("is-active", show);
-        p.hidden = !show;
-      });
-    }
-    dhcpSubTabs.forEach(function (b) {
-      b.addEventListener("click", function () {
-        activeDhcpSubtab = b.getAttribute("data-gc-net-dhcp-subtab");
-        syncDhcpSubButtons();
-        applyDhcpSubPanels();
-        syncFilterAsidesVisibility();
-        try { localStorage.setItem(DHCP_SUBTAB_LS, activeDhcpSubtab); } catch (e) {}
-      });
-    });
-    syncDhcpSubButtons();
-    applyDhcpSubPanels();
-
-    if (window.gcDhcpFlyout && typeof window.gcDhcpFlyout.init === "function") {
-      window.gcDhcpFlyout.init();
-    }
-
-    DHCP_TAB_DEFS.forEach(function (t) {
-      var addBtn = document.getElementById(t.prefix + "-add");
-      if (addBtn) {
-        addBtn.addEventListener("click", function () {
-          var sel = (typeof window.gcGetSelectedFirewallIds === "function")
-            ? window.gcGetSelectedFirewallIds() : [];
-          if (!sel || !sel.length) {
-            window.gcAlert("Select one or more firewalls in the top bar to add objects.");
-            return;
-          }
-          if (window.gcDhcpFlyout && window.gcDhcpFlyout.openAdd) {
-            window.gcDhcpFlyout.openAdd(t.apiEntity, null);
-          }
-        });
-      }
-      var bulkBtn = document.getElementById(t.prefix + "-bulk-add");
-      if (bulkBtn && window.gcHsBulkAdd && window.gcHsBulkAdd.openForEntity) {
-        bulkBtn.addEventListener("click", function () {
-          window.gcHsBulkAdd.openForEntity(t.apiEntity, { target: "firewall" });
-        });
-      }
-      var delBtn = document.getElementById(t.prefix + "-delete-selected");
-      if (delBtn) {
-        delBtn.addEventListener("click", function () {
-          var tbl = dhcpTablesByKey[t.key];
-          if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
-          var ids = tbl.getDeleteConfigEntryIdsFromSelection();
-          if (!ids.length) { window.gcAlert("Select one or more rows to delete."); return; }
-          var n = ids.length;
-          var msg = "Queue " + n + " delete task" + (n === 1 ? "" : "s") + " for the selected " + t.countP + "?";
-          var cf = window.gcConfirm ? window.gcConfirm(msg) : Promise.resolve(globalThis.confirm(msg));
-          cf.then(function (ok) {
-            if (!ok) return;
-            var url = window.gcHsEnqueueDeletesBatchUrl;
-            if (!url) { window.gcAlert("Delete URL not configured."); return; }
-            delBtn.disabled = true;
-            fetch(url, {
-              method: "POST",
-              credentials: "same-origin",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ config_entry_ids: ids }),
-            }).then(function (r) {
-              return r.json().then(function (j) { return { ok: r.ok, j: j }; });
-            }).then(function (x) {
-              delBtn.disabled = false;
-              if (!x.ok) {
-                var em = (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
-                window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
-                return;
-              }
-              try { document.dispatchEvent(new CustomEvent("gc-task-queue-updated")); } catch (e) {}
-              if (tbl.refresh) tbl.refresh();
-            }).catch(function () {
-              delBtn.disabled = false;
-              window.gcAlert("Network error.");
-            });
-          });
-        });
-      }
+      makeTable: function (opts) {
+        opts.apiUrl = URLS.hsTable;
+        return gcCreateNetworkEntityTable(opts);
+      },
+      getSelectedParentIds: function () {
+        return (typeof window.gcGetSelectedFirewallIds === "function")
+          ? window.gcGetSelectedFirewallIds() : [];
+      },
+      syncFilterAsides: function () {
+        try {
+          var v = localStorage.getItem(DHCP_SUBTAB_LS_FW);
+          if (v) activeDhcpSubtab = v;
+        } catch (e) {}
+        if (typeof syncFilterAsidesVisibility === "function") syncFilterAsidesVisibility();
+      },
+      onTablesCreated: function (ts) {
+        tableDhcpV4 = ts.ipv4;
+        tableDhcpV6 = ts.ipv6;
+        tableDhcpRelay = ts.relay;
+      },
     });
 
     (function bindZoneAddBtn() {
