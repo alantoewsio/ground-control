@@ -1,19 +1,19 @@
 {#-
   Macro rendering the "source & columns" fieldset shared between the
   single-select and multi-select data-list properties flyouts. The only
-  per-flyout variations are the DOM id prefix (``kind``) and the inline
-  copy on the scope/object-types/extra-columns labels; everything else is
-  identical, so the macro factors out the duplicated markup.
+  per-flyout variations are the DOM id prefix (``kind``), the scope-select
+  aria-label, and the small copy differences on the two note paragraphs;
+  everything else is identical, so the macro factors out the duplicated
+  markup.
 
   Args:
-    kind            "single" or "multi" — used as id/class suffix.
-    kind_label      Human word used in the legend + fieldset aria-label
-                    (e.g. "Single", "Multi").
-    scope_aria      aria-label string on the Scope <select>.
-    obj_types_note  Note shown above the "object types" checkbox row.
-    extra_cols_note Note shown above the "extra columns" checkbox row.
+    kind           "single" or "multi" - used as id/class suffix and to
+                   pick the slightly different note copy below.
+    kind_label     Human word used in the legend + fieldset aria-label
+                   (e.g. "Single", "Multi").
+    scope_aria     aria-label string on the Scope <select>.
 -#}
-{% macro dd_source_fields(kind, kind_label, scope_aria, obj_types_note, extra_cols_note) -%}
+{% macro dd_source_fields(kind, kind_label, scope_aria) -%}
 <fieldset
   class="settings-form gc-designer-dd__source gc-designer-ip-fieldset"
   id="gc-designer-dd-{{ kind }}-source-fieldset"
@@ -37,7 +37,11 @@
       <input type="text" class="settings-form__input mono" data-gc-dd-cfg-ids autocomplete="off" placeholder="e.g. 3" />
     </label>
   </div>
-  <p class="gc-designer__note gc-d-inline-m8-0-4">{{ obj_types_note|safe }}</p>
+  {% if kind == "single" -%}
+  <p class="gc-designer__note gc-d-inline-m8-0-4">Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache):</p>
+  {%- else -%}
+  <p class="gc-designer__note gc-d-inline-m8-0-4">Object types:</p>
+  {%- endif %}
   <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
     <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
       <input type="checkbox" data-gc-dd-entity-type value="ip_host" checked />
@@ -56,7 +60,11 @@
       <span class="settings-form__label gc-d-inline-m0">MAC host</span>
     </label>
   </div>
-  <p class="gc-designer__note gc-d-inline-m8-0-4">{{ extra_cols_note }}</p>
+  {% if kind == "single" -%}
+  <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list (name is always the primary line):</p>
+  {%- else -%}
+  <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list:</p>
+  {%- endif %}
   <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
     <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
       <input type="checkbox" data-gc-dd-list-col value="__firewall" checked />
@@ -412,13 +420,7 @@
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
-          {{ dd_source_fields(
-              "single",
-              "Single",
-              "Firewall or configuration scope for list",
-              'Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache):',
-              "Extra columns in the list (name is always the primary line):"
-          ) }}
+          {{ dd_source_fields("single", "Single", "Firewall or configuration scope for list") }}
         </div>
         <footer class="gc-designer-modal__footer">
           <button type="button" class="btn btn--secondary" id="gc-designer-dd-single-props-flyout-cancel">Cancel</button>
@@ -447,13 +449,7 @@
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
-          {{ dd_source_fields(
-              "multi",
-              "Multi",
-              "Firewall or configuration scope for multi list",
-              "Object types:",
-              "Extra columns in the list:"
-          ) }}
+          {{ dd_source_fields("multi", "Multi", "Firewall or configuration scope for multi list") }}
         </div>
         <footer class="gc-designer-modal__footer">
           <button type="button" class="btn btn--secondary" id="gc-designer-dd-multi-props-flyout-cancel">Cancel</button>
