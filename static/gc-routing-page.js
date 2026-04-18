@@ -52,9 +52,22 @@
    * @param {Function=} cfg.afterFetchUrl      optional URL transform per request.
    */
   function gcRoutingPageInit(cfg) {
+    /**
+     * Tab model
+     * ---------
+     * The page has THREE top-level tabs ("Unicast routes", "Gateways",
+     * "Custom gateways"). Inside the "Unicast routes" top tab there are
+     * TWO sub-tabs ("IPv4" and "IPv6") that share the same backend
+     * endpoint and only differ by client-side IPFamily filtering.
+     *
+     * TAB_DEFS describes every leaf (i.e. table). Each leaf carries a
+     * topKey pointing at its containing top tab; for top tabs that have
+     * no sub-tabs, the leaf key and the top key are identical.
+     */
     var TAB_DEFS = [
       {
         key: "unicast_route_v4",
+        topKey: "unicast_route",
         prefix: cfg.prefix + "-unicast-route-v4",
         apiEntity: "unicast_route",
         family: "IPv4",
@@ -64,6 +77,7 @@
       },
       {
         key: "unicast_route_v6",
+        topKey: "unicast_route",
         prefix: cfg.prefix + "-unicast-route-v6",
         apiEntity: "unicast_route",
         family: "IPv6",
@@ -73,6 +87,7 @@
       },
       {
         key: "gateway",
+        topKey: "gateway",
         prefix: cfg.prefix + "-gateway",
         apiEntity: "gateway",
         aria: "gateway",
@@ -81,6 +96,7 @@
       },
       {
         key: "gateway_host",
+        topKey: "gateway_host",
         prefix: cfg.prefix + "-gateway-host",
         apiEntity: "gateway_host",
         aria: "custom gateway",
@@ -89,42 +105,111 @@
       },
     ];
 
-    function readSavedTab() {
-      try {
-        var raw = localStorage.getItem(cfg.lsKey);
-        if (raw && TAB_DEFS.some(function (t) { return t.key === raw; })) return raw;
-      } catch (e) { /* ignore storage failures */ }
-      return TAB_DEFS[0].key;
+    var TOP_TABS = [
+      { key: "unicast_route", defaultLeaf: "unicast_route_v4" },
+      { key: "gateway", defaultLeaf: "gateway" },
+      { key: "gateway_host", defaultLeaf: "gateway_host" },
+    ];
+
+    function leavesFor(topKey) {
+      return TAB_DEFS.filter(function (t) { return t.topKey === topKey; });
+    }
+    function leafByKey(key) {
+      for (var i = 0; i < TAB_DEFS.length; i += 1) {
+        if (TAB_DEFS[i].key === key) return TAB_DEFS[i];
+      }
+      return null;
+    }
+    function topByKey(key) {
+      for (var i = 0; i < TOP_TABS.length; i += 1) {
+        if (TOP_TABS[i].key === key) return TOP_TABS[i];
+      }
+      return null;
     }
 
-    var activeKey = readSavedTab();
+    var TOP_LS = cfg.lsKey;
+    var LEAF_LS_PREFIX = cfg.lsKey + "-leaf-";
+
+    function readSavedTopKey() {
+      try {
+        var raw = localStorage.getItem(TOP_LS);
+        if (raw) {
+          // Direct match against a top key.
+          if (TOP_TABS.some(function (t) { return t.key === raw; })) return raw;
+          // Backward compat: an older build saved a leaf key here.
+          var leaf = leafByKey(raw);
+          if (leaf) return leaf.topKey;
+        }
+      } catch (e) { /* ignore storage failures */ }
+      return TOP_TABS[0].key;
+    }
+    function readSavedLeafKey(topKey) {
+      try {
+        var raw = localStorage.getItem(LEAF_LS_PREFIX + topKey);
+        if (raw && leavesFor(topKey).some(function (t) { return t.key === raw; })) return raw;
+      } catch (e) { /* ignore storage failures */ }
+      var top = topByKey(topKey);
+      return top ? top.defaultLeaf : (leavesFor(topKey)[0] || {}).key;
+    }
+
+    var activeTopKey = readSavedTopKey();
+    var activeLeafKey = readSavedLeafKey(activeTopKey);
+
     var mainTablist = document.getElementById(cfg.tablistId);
     var dataSelector = ":scope > .gc-tabs__tab[" + cfg.tabDataAttr + "]";
     var mainTabs = mainTablist ? mainTablist.querySelectorAll(dataSelector) : [];
     var mainPanels = {};
-    TAB_DEFS.forEach(function (t) {
+    TOP_TABS.forEach(function (t) {
       var slug = t.key.replace(/_/g, "-");
       mainPanels[t.key] = document.getElementById(cfg.prefix + "-panel-" + slug);
+    });
+
+    var subTabDataAttr = cfg.tabDataAttr.replace(/-tab$/, "-subtab");
+    var subTablist = document.getElementById(cfg.prefix + "-unicast-route-subtablist");
+    var subDataSelector = ":scope > .gc-tabs__tab[" + subTabDataAttr + "]";
+    var subTabs = subTablist ? subTablist.querySelectorAll(subDataSelector) : [];
+    var leafPanels = {};
+    TAB_DEFS.forEach(function (t) {
+      var slug = t.key.replace(/_/g, "-");
+      leafPanels[t.key] = document.getElementById(cfg.prefix + "-panel-" + slug);
     });
 
     function syncFilterAsidesVisibility() {
       TAB_DEFS.forEach(function (t) {
         var el = document.getElementById(t.prefix + "-filters-aside");
-        if (el) el.hidden = t.key !== activeKey;
+        if (el) el.hidden = t.key !== activeLeafKey;
       });
     }
     function applyMainTabPanels() {
-      TAB_DEFS.forEach(function (t) {
+      TOP_TABS.forEach(function (t) {
         var p = mainPanels[t.key];
         if (!p) return;
-        var show = t.key === activeKey;
+        var show = t.key === activeTopKey;
+        p.classList.toggle("is-active", show);
+        p.hidden = !show;
+      });
+    }
+    function applySubTabPanels() {
+      // Only the unicast_route top tab has sub-panels; for the other top tabs
+      // the leaf panel IS the main panel and is already toggled above.
+      leavesFor("unicast_route").forEach(function (t) {
+        var p = leafPanels[t.key];
+        if (!p) return;
+        var show = t.key === activeLeafKey;
         p.classList.toggle("is-active", show);
         p.hidden = !show;
       });
     }
     function syncMainTabButtons() {
       mainTabs.forEach(function (btn) {
-        var on = btn.getAttribute(cfg.tabDataAttr) === activeKey;
+        var on = btn.getAttribute(cfg.tabDataAttr) === activeTopKey;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    }
+    function syncSubTabButtons() {
+      subTabs.forEach(function (btn) {
+        var on = btn.getAttribute(subTabDataAttr) === activeLeafKey;
         btn.classList.toggle("is-active", on);
         btn.setAttribute("aria-selected", on ? "true" : "false");
       });
@@ -152,11 +237,19 @@
         url += "&configuration_ids=" + encodeURIComponent(ctx.configurationIds.join(","));
       }
       url += "&entity_type=" + encodeURIComponent(t.apiEntity);
-      var combineEl = document.getElementById(t.prefix + "-combine-toggle");
+      var combineEl = document.getElementById(t.prefix + "-combine");
       var combinedOn = !combineEl || combineEl.checked;
       url += "&combine=" + (combinedOn ? "true" : "false");
       return typeof cfg.afterFetchUrl === "function" ? cfg.afterFetchUrl(url, t, ctx) : url;
     }
+
+    // Numeric columns whose values happen to look like booleans ("0"/"1")
+    // and would otherwise be auto-rendered as on/off toggle pills. Listing
+    // them here keeps the cell as plain text. Keyed by entity type so we
+    // only suppress the toggle on the relevant table.
+    var NUMERIC_TEXT_COLS_BY_ENTITY = {
+      unicast_route: ["Distance", "AdministrativeDistance"],
+    };
 
     TAB_DEFS.forEach(function (t) {
       var tableCfg = {
@@ -166,6 +259,7 @@
         apiEntityType: t.apiEntity,
         lsKey: cfg.lsColsPrefix + t.key + "-v1",
         dataRowClass: t.prefix + "-data-row",
+        noBoolToggleColIds: NUMERIC_TEXT_COLS_BY_ENTITY[t.apiEntity] || [],
         rowClickable: true,
         rowAriaEntitySingular: t.aria,
         bulkRowSelect: true,
@@ -203,13 +297,35 @@
       tables[t.key] = gcCreateNetworkEntityTable(tableCfg);
     });
 
+    function activateTopKey(key) {
+      if (!topByKey(key)) return;
+      activeTopKey = key;
+      activeLeafKey = readSavedLeafKey(key);
+      syncMainTabButtons();
+      applyMainTabPanels();
+      syncSubTabButtons();
+      applySubTabPanels();
+      syncFilterAsidesVisibility();
+      try { localStorage.setItem(TOP_LS, activeTopKey); } catch (e) { /* ignore */ }
+    }
+    function activateLeafKey(key) {
+      var leaf = leafByKey(key);
+      if (!leaf || leaf.topKey !== activeTopKey) return;
+      activeLeafKey = key;
+      syncSubTabButtons();
+      applySubTabPanels();
+      syncFilterAsidesVisibility();
+      try { localStorage.setItem(LEAF_LS_PREFIX + activeTopKey, activeLeafKey); } catch (e) { /* ignore */ }
+    }
+
     mainTabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
-        activeKey = tab.getAttribute(cfg.tabDataAttr);
-        syncMainTabButtons();
-        applyMainTabPanels();
-        syncFilterAsidesVisibility();
-        try { localStorage.setItem(cfg.lsKey, activeKey); } catch (e) { /* ignore */ }
+        activateTopKey(tab.getAttribute(cfg.tabDataAttr));
+      });
+    });
+    subTabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        activateLeafKey(tab.getAttribute(subTabDataAttr));
       });
     });
 
@@ -278,6 +394,8 @@
 
     syncMainTabButtons();
     applyMainTabPanels();
+    syncSubTabButtons();
+    applySubTabPanels();
     syncFilterAsidesVisibility();
     refreshAllTables();
   }

@@ -56,6 +56,23 @@
   --accent-btn: #005BC8;
   --accent-btn-hover: #004A9F;
 
+  /* Button system ? Figma spec (design-skill.md sec.7).
+     Three variants (primary / secondary / tertiary) share one focus ring
+     (#008BFF, 2px outline) and one radius (5px). All buttons in the app
+     should consume these tokens; do NOT hand-roll button colours. */
+  --btn-radius: 5px;
+  --focus-ring: #008BFF;
+  --btn-primary-bg: #005BC8;
+  --btn-primary-hover-bg: #006AD1;
+  --btn-primary-fg: #ffffff;
+  --btn-secondary-bg: #F0F2F4;
+  --btn-secondary-hover-bg: #E5E7EA;
+  --btn-secondary-fg: #005BC8;
+  --btn-tertiary-hover-bg: #F0F2F4;
+  --btn-tertiary-fg: #005BC8;
+  --btn-disabled-bg: #C2C5CA;
+  --btn-disabled-fg: #A3A6AB;
+
   /* Secondary green accent (design-skill.md sec.3) */
   --secondary: #00A651;
   --secondary-hover: #008A43;
@@ -97,6 +114,20 @@
   --error-bg: #FFF4E5;
   --info: #1e40af;
   --info-bg: #eff6ff;
+
+  /* Badge palette ? paired bg + text per semantic level. Used by the global
+     .badge component (design-skill.md sec.7). All badges in the app should
+     use these tokens; do not introduce new ad-hoc colours. */
+  --badge-neutral-bg: #F0F2F4;
+  --badge-neutral-text: #696A6B;
+  --badge-info-bg: #E5EFFA;
+  --badge-info-text: #005BC8;
+  --badge-success-bg: #E5F3E8;
+  --badge-success-text: #00851D;
+  --badge-warning-bg: #FFF4E5;
+  --badge-warning-text: #FF8F00;
+  --badge-danger-bg: #FBECE5;
+  --badge-danger-text: #DA3E00;
 
   /* Elevation / shadow scale (design-skill.md sec.5) */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -1901,6 +1932,68 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   min-width: min(720px, 100%);
 }
 
+/* ---------- Badge component (global) ----------
+   Single source of truth for status / label badges across the app:
+   task queue status, action labels, sync state, dirty markers,
+   inventory state pills, etc. Spec (design-skill.md sec.7):
+     typography  Inter 700 / 12px / 16px line-height
+     box         min-width 56px, height 20px, radius 3px,
+                 padding 2px 7px, gap 10px (for icon + text)
+     palette     5 semantic levels via --badge-*-bg / --badge-*-text tokens
+   Use the modifiers ? do NOT hand-roll colours per usage. Tiny circular
+   count indicators (e.g. .task-queue-nav-badge "3") are a separate
+   primitive and do not use this class. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-width: 56px;
+  height: 20px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  /* Defaults to the neutral variant when no modifier is present. */
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+}
+
+.badge--neutral {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+}
+
+.badge--info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+}
+
+.badge--success {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+}
+
+.badge--warning,
+.badge--warn {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+}
+
+.badge--danger,
+.badge--critical {
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+}
+
 .panel h2 {
   margin: 0 0 1rem;
   font-size: 1rem;
@@ -2014,7 +2107,7 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   background: var(--surface);
   color: var(--text);
   padding: 0.45rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--btn-radius);
   cursor: pointer;
   font-size: 0.85rem;
   font-family: inherit;
@@ -2030,30 +2123,39 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   color: var(--accent);
 }
 
-/* Primary button -- design-skill.md sec.7
-   bg #005BC8 hover #004A9F ? text #ffffff ? radius 6 ? weight 500 */
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* Primary button ? Figma button-icons-usage-light / design-skill.md sec.7.
+   bg #005BC8  hover #006AD1  focus ring #008BFF (2px outline)
+   text #ffffff   radius 5px   weight 500 */
 .btn.primary {
-  background: var(--accent-btn);
-  border-color: var(--accent-btn);
-  color: var(--text-inverse);
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   font-weight: 500;
   transition: background-color var(--motion-fast) ease-in-out,
               border-color var(--motion-fast) ease-in-out;
 }
 
-.btn.primary:hover {
-  background: var(--accent-btn-hover);
-  border-color: var(--accent-btn-hover);
-  color: var(--text-inverse);
+.btn.primary:hover:where(:not(:disabled):not([disabled])) {
+  background: var(--btn-primary-hover-bg);
+  border-color: var(--btn-primary-hover-bg);
+  color: var(--btn-primary-fg);
 }
 
 .btn.primary:focus-visible {
-  outline: 2px solid var(--accent-btn);
-  outline-offset: 2px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
 }
 
 .btn.primary[disabled],
 .btn.primary:disabled {
+  background: var(--btn-disabled-bg);
+  border-color: var(--btn-disabled-bg);
+  color: var(--btn-primary-fg);
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -2129,12 +2231,14 @@ tbody tr:nth-child(even) {
   pointer-events: none;
 }
 
-/* Secondary / ghost button -- design-skill.md sec.7
-   bg #f3f4f6 hover #e5e7eb ? text #005BC8 ? border transparent ? radius 6 */
+/* Secondary / ghost button ? Figma button-icons-usage-light / design-skill.md sec.7.
+   bg #F0F2F4  hover #E5E7EA  focus ring #008BFF (2px outline)
+   text #005BC8   border transparent   radius 5px */
 .btn--secondary {
-  background: var(--surface-active);
-  color: var(--accent-btn);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-fg);
   border-color: transparent;
+  border-radius: var(--btn-radius);
   font-family: inherit;
   font-weight: 500;
   transition: background-color var(--motion-fast) ease-in-out,
@@ -2142,19 +2246,21 @@ tbody tr:nth-child(even) {
               border-color var(--motion-fast) ease-in-out;
 }
 
-.btn--secondary:hover {
-  background: #e5e7eb;
+.btn--secondary:hover:where(:not(:disabled):not([disabled])) {
+  background: var(--btn-secondary-hover-bg);
   border-color: transparent;
-  color: var(--accent-btn-hover);
+  color: var(--btn-secondary-fg);
 }
 
 .btn--secondary:focus-visible {
-  outline: 2px solid var(--accent-btn);
-  outline-offset: 2px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
 }
 
 .btn--secondary[disabled],
 .btn--secondary:disabled {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-disabled-fg);
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -2288,8 +2394,11 @@ main.layout.gc-fw-v2-object-layout {
   font-size: 0.9rem;
 }
 
+/* Card title ("Interfaces", "IP hosts", etc.) sits flush with the tab strip and
+   toolbar above/below it. Horizontal padding = var(--page-gutter) so the h2 left
+   edge aligns with the first tab button and the table-scroll edge (design-skill.md sec.5). */
 .firewalls-page__head {
-  padding: 12px calc(var(--page-gutter) + var(--table-cell-pad-x-dense)) 4px;
+  padding: 12px var(--page-gutter) 4px;
   flex-shrink: 0;
 }
 
@@ -2349,30 +2458,129 @@ main.layout.gc-fw-v2-object-layout {
   cursor: pointer;
 }
 
+/* Icon button ? Figma button-icons-usage-light / design-skill.md sec.7.
+   Base spec: 32?32, padding 6, gap 10, icon 20?20, radius 5.
+   Default ("Secondary") variant: gray fill #F0F2F4, blue icon #005BC8, no border.
+   Use .btn-icon--primary for the filled blue variant and .btn-icon--tertiary
+   for the ghost (transparent) variant. Use .btn-icon--inline for the 24?24
+   size (padding 2) used in compact inline affordances. */
+/* Icon button ? Figma button-icons-usage-light / design-skill.md sec.7.
+   Spec: 32?32, padding 6, gap 10, icon 20?20, radius 5.
+   Default ("Secondary") variant: gray fill #F0F2F4, blue icon #005BC8.
+   Modifiers:
+     .btn-icon--primary    blue-filled call-to-action
+     .btn-icon--tertiary   ghost (transparent default, gray hover)
+     .btn-icon--inline     24?24 size (padding 2) ? composes with any variant
+
+   States covered: Default / Hover / Focus / Active / Disabled / Disabled-hover.
+   Disabled accepts EITHER the native `disabled` attribute OR `aria-disabled="true"`.
+   Use aria-disabled when you need a "Disabled onHover shows reason" tooltip:
+   native <button disabled> blocks pointer events on Chromium so the `title`
+   attribute never renders ? aria-disabled keeps pointer-events live so the
+   browser shows the tooltip. See design-skill.md sec.7. */
+
+/* Hover/active are skipped on disabled OR aria-disabled; .gc-disabled is a
+   shared-codebase opt-in already used elsewhere (e.g. dirty-state guards). */
 .btn-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
+  gap: 10px;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--btn-radius);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-fg);
   cursor: pointer;
   vertical-align: middle;
+  transition: background-color var(--motion-fast) ease-in-out,
+              color var(--motion-fast) ease-in-out;
 }
 
-.btn-icon:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(0, 102, 204, 0.06);
+.btn-icon:hover:where(:not(:disabled):not([disabled]):not([aria-disabled="true"])) {
+  background: var(--btn-secondary-hover-bg);
+  color: var(--btn-secondary-fg);
 }
 
 .btn-icon:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.25);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+  box-shadow: none;
+}
+
+.btn-icon:active:where(:not(:disabled):not([disabled]):not([aria-disabled="true"])) {
+  background: var(--btn-secondary-bg);
+}
+
+.btn-icon[disabled],
+.btn-icon:disabled,
+.btn-icon[aria-disabled="true"] {
+  opacity: 0.5;
+  color: var(--btn-disabled-fg);
+  cursor: not-allowed;
+}
+
+/* aria-disabled keeps pointer events live so the native `title` tooltip
+   fires on hover (the "Disabled onHover shows reason" Figma annotation).
+   The hover state is intentionally NOT triggered ? only the tooltip shows. */
+.btn-icon[aria-disabled="true"] {
+  pointer-events: auto;
+}
+
+/* Primary icon button ? blue fill, white icon. */
+.btn-icon--primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+}
+
+.btn-icon--primary:hover:where(:not(:disabled):not([disabled]):not([aria-disabled="true"])) {
+  background: var(--btn-primary-hover-bg);
+  color: var(--btn-primary-fg);
+}
+
+.btn-icon--primary:active:where(:not(:disabled):not([disabled]):not([aria-disabled="true"])) {
+  background: var(--btn-primary-bg);
+}
+
+.btn-icon--primary[disabled],
+.btn-icon--primary:disabled,
+.btn-icon--primary[aria-disabled="true"] {
+  background: var(--btn-disabled-bg);
+  color: var(--btn-primary-fg);
+  opacity: 0.5;
+}
+
+/* Tertiary icon button ? transparent default, gray hover, blue icon throughout. */
+.btn-icon--tertiary {
+  background: transparent;
+  color: var(--btn-tertiary-fg);
+}
+
+.btn-icon--tertiary:hover:where(:not(:disabled):not([disabled]):not([aria-disabled="true"])) {
+  background: var(--btn-tertiary-hover-bg);
+  color: var(--btn-tertiary-fg);
+}
+
+.btn-icon--tertiary:active:where(:not(:disabled):not([disabled]):not([aria-disabled="true"])) {
+  background: var(--btn-tertiary-hover-bg);
+}
+
+.btn-icon--tertiary[disabled],
+.btn-icon--tertiary:disabled,
+.btn-icon--tertiary[aria-disabled="true"] {
+  background: transparent;
+  color: var(--btn-disabled-fg);
+  opacity: 0.5;
+}
+
+/* Inline size ? 24?24 with 2px padding. Pairs with any variant modifier. */
+.btn-icon--inline {
+  width: 24px;
+  height: 24px;
+  padding: 2px;
 }
 
 .btn.destructive {
@@ -2548,8 +2756,11 @@ main.layout.gc-fw-v2-object-layout {
   overflow-y: auto;
 }
 
+/* Filters toggle glyph ? clickable control, so icon takes the Secondary
+   icon-button colour (Sophos blue) per design-skill.md sec.7. Not muted:
+   the filter_alt glyph IS the affordance, it needs to read as interactive. */
 .filters__icon {
-  opacity: 0.7;
+  color: var(--btn-secondary-fg);
   flex-shrink: 0;
 }
 
@@ -2753,14 +2964,20 @@ main.layout.gc-fw-v2-object-layout {
   border-color: var(--border);
 }
 
-.content-pane>.table-wrap>.toolbar {
+/* Toolbar / table-scroll horizontal gutter. Applied to .table-wrap children in both
+   layouts that have .content-pane as a direct ancestor AND ones where the table-wrap
+   sits inside a .gc-tab-panel, so the tab strip, card title, toolbar, and table edge
+   all share one x-coordinate (design-skill.md sec.5, card-chrome alignment). */
+.content-pane>.table-wrap>.toolbar,
+.gc-tab-panel>.table-wrap>.toolbar {
   padding-top: calc(var(--toolbar-pad-block) + 4px);
   padding-bottom: calc(var(--toolbar-pad-block) + 6px);
-  padding-left: calc(var(--page-gutter) + var(--table-cell-pad-x-dense));
-  padding-right: calc(var(--page-gutter) + var(--table-cell-pad-x-dense));
+  padding-left: var(--page-gutter);
+  padding-right: var(--page-gutter);
 }
 
-.content-pane>.table-wrap>.table-scroll {
+.content-pane>.table-wrap>.table-scroll,
+.gc-tab-panel>.table-wrap>.table-scroll {
   flex: 1 1 auto;
   min-height: 0;
   padding-inline: var(--page-gutter);
@@ -2835,6 +3052,10 @@ main.layout.gc-fw-v2-object-layout {
   flex-shrink: 0;
 }
 
+/* Columns picker trigger ? clickable control. Aligns with the Tertiary
+   icon-button spec (transparent default, gray-100 hover, Sophos blue glyph)
+   from design-skill.md sec.7 so it reads as interactive and matches the
+   row-action .btn-icon blues on the same toolbar. */
 .toolbar__cols-icon {
   display: inline-flex;
   align-items: center;
@@ -2843,30 +3064,27 @@ main.layout.gc-fw-v2-object-layout {
   padding: 4px;
   margin: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--btn-radius);
   background: transparent;
-  color: var(--text-header);
+  color: var(--btn-tertiary-fg);
   cursor: pointer;
   line-height: 0;
   outline: none;
 }
 
 .toolbar__cols-icon:hover {
-  color: var(--text);
-  background: rgba(0, 0, 0, 0.05);
+  color: var(--btn-tertiary-fg);
+  background: var(--btn-tertiary-hover-bg);
 }
 
 .toolbar__cols-icon:focus-visible {
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+  box-shadow: none;
 }
 
 .toolbar__cols-icon-svg {
   display: block;
-  opacity: 0.72;
-}
-
-.toolbar__cols-icon:hover .toolbar__cols-icon-svg {
-  opacity: 1;
 }
 
 .fw-cols-modal {
@@ -3017,9 +3235,14 @@ main.layout.gc-fw-v2-object-layout {
   border-top: 1px solid var(--border-light);
 }
 
+/* No outer border/radius: the table sits inside a framing card (.gc-network-panel,
+   .firewalls-page, dashboard .panel, etc.) OR floats on --app-bg (#F0F2F4) where the
+   white table background (see .firewalls-page .table-wrap) provides implicit
+   visual separation. Stacking another border here caused double-border nesting.
+   See design-skill.md sec.5 (card-chrome alignment). */
 .table-wrap {
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
+  border: 0;
+  border-radius: 0;
   /* visible so thead position:sticky can track .app-main scroll; inner .table-scroll clips overflow */
   overflow: visible;
 }
@@ -3041,8 +3264,11 @@ main.layout.gc-fw-v2-object-layout {
   border-top: none;
 }
 
-/* Same tabs: .gc-tab-panel already applies horizontal page gutter; .content-pane must not
-   add a second gutter (matches Network ? ? pattern: gc-network-panel__content padding 0). */
+/* Inventory/Configurations tabs: .gc-tab-panel no longer applies horizontal gutter
+   (card-chrome alignment rule ? see .gc-tab-panel definition). The gutter comes from
+   the table-wrap's children (head, toolbar, scroll). .content-pane must therefore
+   stay flush (padding-inline 0) so the chrome aligns with the .gc-tabs strip above.
+   This matches the Network page pattern (.gc-network-panel__content padding 0). */
 .firewalls-page .gc-fw-inventory-tab-panels>.gc-tab-panel .split>.content-pane {
   padding-inline: 0;
 }
@@ -3509,9 +3735,18 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   word-break: break-word;
 }
 
+/* Anchor-flavoured icon buttons (e.g. WebAdmin link, SSH link, history link
+   in the firewalls row-actions column) behave exactly like .btn-icon: they
+   must pick up the Secondary-variant Sophos-blue glyph colour, not the
+   table's dark text colour. Previously `color: inherit` here overrode the
+   .btn-icon class rule on specificity grounds (a + class = 0,1,1 beats
+   class = 0,1,0), which made row-action anchors render dark while sibling
+   <button> row-actions rendered blue. See design-skill.md sec.7. Contexts
+   that genuinely need a different glyph colour (e.g. the top-bar firewall
+   shortcut) must set `color` on a more specific selector ? already done
+   for .top-bar .gc-net-fw-selected__actions a.btn-icon above. */
 a.btn-icon {
   text-decoration: none;
-  color: inherit;
   box-sizing: border-box;
 }
 
@@ -3569,6 +3804,18 @@ a.btn-icon {
   margin-bottom: 1.25rem;
 }
 
+/* Dashboard cards unify at 5px radius (product decision ? tighter corners than the
+   global .panel 10px default). Covers stat tiles, widget panels, latency cards,
+   the sankey filter panel, and any ad-hoc .panel used inside .dashboard-page.
+   Placed here so it beats the .panel and .dashboard-page__widget rules by
+   specificity (.dashboard-page descendant selector). See design-skill.md sec.5. */
+.dashboard-page .panel,
+.dashboard-page__stat,
+.dashboard-page__widget,
+.dashboard-page__latency-card {
+  border-radius: 5px;
+}
+
 .dashboard-page__stat {
   padding: 1rem 1.15rem;
 }
@@ -3614,7 +3861,6 @@ a.btn-icon {
 .dashboard-page__widget {
   margin-bottom: 0;
   min-width: 0;
-  border-radius: 14px;
 }
 
 .dashboard-page__widget-header {
@@ -4243,8 +4489,17 @@ a.btn-icon {
 
 /* Administration ? Netflow flyout */
 .gc-netflow-flyout__panel {
-  min-width: min(20rem, calc(100vw - 2rem));
-  max-width: min(1200px, calc(100vw - 16px));
+  min-width: min(36rem, calc(100vw - 2rem));
+  max-width: min(880px, calc(100vw - 16px));
+}
+
+/* Firewall context line shown just under the title in the scroll area. Sits
+   above the hint so users can see which firewall they're configuring without
+   the header band having to grow to fit two lines. */
+.gc-netflow-flyout__fw {
+  margin: 0 0 6px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
 .gc-netflow-flyout__hint {
@@ -4253,55 +4508,146 @@ a.btn-icon {
   line-height: 1.45;
 }
 
+/* "Collectors" section: small heading + Add server button on the right,
+   matching the visual rhythm used by other flyouts (header / action row). */
+.gc-netflow-servers__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.gc-netflow-servers__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-header, #111);
+  letter-spacing: -0.005em;
+}
+
+.gc-netflow-servers__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 10px;
+  font-size: 0.8125rem;
+}
+
+.gc-netflow-servers__add .gc-icon {
+  font-size: 16px;
+}
+
+.gc-netflow-servers__empty {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
 .gc-netflow-servers-wrap {
-  border: 1px solid var(--gc-border, #e2e8f0);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 8px;
-  padding: 0.75rem;
-  background: var(--gc-surface-2, #f8fafc);
+  padding: 4px 6px;
+  background: var(--surface, #fff);
 }
 
 .gc-netflow-servers-table {
   margin: 0;
-  background: #fff;
+  background: transparent;
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .gc-netflow-servers-table th,
 .gc-netflow-servers-table td {
   vertical-align: middle;
+  padding: 8px 6px;
+  background: transparent;
+  border: 0;
 }
 
+.gc-netflow-servers-table thead th {
+  padding-top: 6px;
+  padding-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gc-netflow-servers-table tbody tr + tr td {
+  padding-top: 4px;
+}
+
+/* Distinct column widths so port and actions don't claim the visual weight
+   of name / host. Name and host share the remaining flex space evenly. */
+/* Server names are short labels, hosts (FQDNs) need the most room, port is
+   fixed-width numeric, actions is just an icon. Without explicit widths,
+   table-layout:fixed splits Name/Host evenly and the host placeholder gets
+   clipped on narrower panel widths. */
+.gc-netflow-servers-table__name { width: 28%; min-width: 7rem; }
+.gc-netflow-servers-table__host { width: auto; }
+.gc-netflow-servers-table__port {
+  width: 5.25rem;
+  text-align: left;
+}
 .gc-netflow-servers-table__actions {
   width: 2rem;
   text-align: center;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+/* Inputs inside the rows ? full-width within their cell, consistent height
+   with the rest of the flyout's text inputs. */
+.gc-netflow-servers-table input.gc-if-flyout__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  font-size: 13px;
 }
 
 .gc-netflow-row-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.75rem;
+  height: 1.75rem;
   padding: 0;
   margin: 0 auto;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   box-shadow: none;
   background: transparent;
-  color: #475569;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
+  color: var(--text-muted, #64748b);
   cursor: pointer;
+}
+
+.gc-netflow-row-remove .gc-icon {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .gc-netflow-row-remove:hover {
   background: rgba(15, 23, 42, 0.06);
-  color: #334155;
+  color: var(--danger, #b91c1c);
 }
 
 .gc-netflow-row-remove:focus-visible {
   outline: 2px solid var(--gc-accent, #2563eb);
   outline-offset: 2px;
+}
+
+/* See repeated note above (`.gc-designer-object-selector-list__row[hidden]`):
+   author-class display rules tie with `[hidden]` on specificity, so the empty
+   hint and add-server button must opt back into the hidden semantic. */
+.gc-netflow-servers__empty[hidden],
+.gc-netflow-servers__add[hidden],
+.gc-netflow-servers__head[hidden] {
+  display: none !important;
 }
 
 /* Administration ? Netflow tab: more table width, compact columns */
@@ -5283,9 +5629,13 @@ a.btn-icon {
   min-width: 0;
 }
 
+/* Tab panels have ONLY vertical padding. Horizontal gutter is owned by the chrome
+   inside (.firewalls-page__head, .toolbar, .table-scroll all use var(--page-gutter)),
+   which keeps them vertically aligned with the .gc-tabs strip above
+   (design-skill.md sec.5, card-chrome alignment). */
 .gc-tab-panel {
   min-height: 12rem;
-  padding: 1.25rem var(--page-gutter) 2rem;
+  padding: 1.25rem 0 2rem;
   box-sizing: border-box;
 }
 
@@ -7102,14 +7452,19 @@ option.gc-pe-vpn-opt-weak {
   align-items: center;
   /* Flyout footers left-align their action buttons (primary first, then
      secondary). Modals follow the opposite convention per design-skill.md
-     sec.7. Variants below should not override this with flex-end. */
+     sec.7. Variants below should not override this with flex-end. The base
+     padding / gap / background here intentionally match the Hosts & Services
+     Add flyout (the "elegant" reference) so every flyout in the app feels
+     identical at the bottom edge. Per-feature variants must NOT redeclare
+     padding / gap / background ? only justify-content tweaks (e.g. wrap of
+     firewall chips) or `margin-left: auto` on a single destructive button. */
   justify-content: flex-start;
-  gap: 16px;
+  gap: var(--space-sm);
   flex-shrink: 0;
   margin-top: 0;
-  padding: 16px 18px;
-  border-top: 1px solid var(--border-light);
-  background: var(--surface);
+  padding: 12px var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover);
 }
 
 .data-table tbody tr.gc-net-entity-row--clickable {
@@ -7323,11 +7678,10 @@ option.gc-pe-vpn-opt-weak {
   overflow: hidden;
 }
 
-.gc-fw-inv-flyout .gc-if-flyout__footer.gc-fw-inv-flyout__footer {
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
+/* Inventory flyout used to add 20px side padding here; removed so the
+   footer matches the rest of the flyouts (Hosts & Services Add reference).
+   The `.link-btn` "destructive on the far right" pattern is per
+   design-skill.md sec.7. */
 .gc-fw-inv-flyout__footer .link-btn {
   margin-left: auto;
 }
@@ -7479,7 +7833,6 @@ option.gc-pe-vpn-opt-weak {
 
 .gc-ips-pol-flyout__footer {
   flex-shrink: 0;
-  border-top: 1px solid var(--border-light);
 }
 
 .gc-ips-pol-subflyout__head {
@@ -7502,9 +7855,10 @@ option.gc-pe-vpn-opt-weak {
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-light);
+  gap: var(--space-sm);
+  padding: 12px var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover);
   flex-shrink: 0;
 }
 
@@ -7609,7 +7963,6 @@ option.gc-pe-vpn-opt-weak {
 
 .gc-wfp-flyout .gc-if-flyout__footer {
   flex-shrink: 0;
-  border-top: 1px solid var(--border-light);
 }
 
 .gc-wfp-rules-section-head {
@@ -8422,6 +8775,62 @@ option.gc-pe-vpn-opt-weak {
   margin: 0 0 0.5rem;
 }
 
+/* Search input above the Sync object-types list. Sits between the bulk
+   buttons and the scrollable list. */
+.gc-fw-edit-sync-object-selector-search {
+  position: relative;
+  margin: 0 0 0.5rem;
+}
+
+.gc-fw-edit-sync-object-selector-search__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 28px 6px 10px;
+  font: inherit;
+  line-height: 1.4;
+  color: inherit;
+  background: var(--gc-input-bg, #fff);
+  border: 1px solid var(--gc-border, #cfd4dc);
+  border-radius: 6px;
+}
+
+.gc-fw-edit-sync-object-selector-search__input:focus {
+  outline: 2px solid var(--gc-focus, #0b66c3);
+  outline-offset: 1px;
+  border-color: var(--gc-focus, #0b66c3);
+}
+
+.gc-fw-edit-sync-object-selector-search__clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--gc-muted, #5d6470);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.gc-fw-edit-sync-object-selector-search__clear:hover,
+.gc-fw-edit-sync-object-selector-search__clear:focus {
+  background: var(--gc-hover, rgba(0, 0, 0, 0.06));
+  color: inherit;
+  outline: none;
+}
+
+.gc-fw-edit-sync-object-selector-search__empty {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+}
+
 .gc-fw-sync-toggles {
   flex: 1 1 auto;
   min-height: 0;
@@ -8911,62 +9320,85 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
   font-size: 0.85rem;
 }
 
+/* Inherits the global .badge spec (Inter 700 / 12px, 20px tall, 3px radius,
+   --badge-*-bg/text tokens). Each data-status maps to a semantic variant. */
 .task-queue-status-badge {
-  display: inline-block;
-  padding: 0.2rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-width: 56px;
+  height: 20px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-align: center;
   text-transform: capitalize;
-  line-height: 1.3;
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  color: var(--text-muted);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
 }
 
 .task-queue-status-badge[data-status="pending"] {
-  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
-  color: var(--text-muted);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
 }
 
 .task-queue-status-badge[data-status="sending"] {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  color: var(--accent-dim);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .task-queue-status-badge[data-status="error"] {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: var(--danger);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 .task-queue-status-badge[data-status="completed"],
 .task-queue-status-badge[data-status="success"],
 .task-queue-status-badge[data-status="done"] {
-  background: color-mix(in srgb, var(--success) 18%, transparent);
-  color: var(--success);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
+/* Inherits the global .badge spec ? see .task-queue-status-badge above. */
 .task-queue-action-pill {
-  display: inline-block;
-  padding: 0.2rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-width: 56px;
+  height: 20px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-align: center;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
 }
 
 .task-queue-action-pill[data-record-action="add"] {
-  background: color-mix(in srgb, var(--success) 18%, transparent);
-  color: var(--success);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .task-queue-action-pill[data-record-action="edit"] {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  color: var(--accent-dim);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .task-queue-action-pill[data-record-action="delete"] {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: var(--danger);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 .task-queue-row {
@@ -10427,6 +10859,15 @@ body.gc-designer-entity-nav__facet-overlay-open {
 
 .gc-designer-object-selector-list__row:hover {
   background: var(--surface-muted, #f8fafc);
+}
+
+/* Class selectors above (display: flex / block) tie with the UA `[hidden]`
+   attribute selector on specificity, so the author rule wins and `hidden`
+   becomes a no-op. Re-assert the hidden semantic so JS-driven filters
+   (e.g. the Sync object-types search) can hide rows / group headers. */
+.gc-designer-object-selector-list__row[hidden],
+.gc-designer-object-selector-list__group[hidden] {
+  display: none !important;
 }
 
 .gc-designer-object-selector-list__cb {
@@ -14073,6 +14514,18 @@ body.gc-designer-modal-open .app-content {
   flex-shrink: 0;
 }
 
+/* The class rules below set `display: flex`, which has the same specificity
+   as the UA `[hidden] { display: none }` rule. Author CSS wins on a tie, so
+   the `hidden` attribute toggled by gc-hs-bulk-add.js becomes a no-op and
+   the valid/invalid/duplicate badges (and their wrapper) leak through even
+   when their counts are zero. Re-assert the hidden semantic explicitly. */
+.gc-hs-bulk-add-modal__summary[hidden],
+.gc-hs-bulk-add-modal__summary-valid[hidden],
+.gc-hs-bulk-add-modal__summary-invalid[hidden],
+.gc-hs-bulk-add-modal__summary-dupe[hidden] {
+  display: none !important;
+}
+
 .gc-hs-bulk-add-modal__summary-valid {
   display: flex;
   align-items: center;
@@ -14301,12 +14754,10 @@ body.gc-designer-modal-open .app-content {
   margin: 0 0 12px;
 }
 
-.gc-hs-flyout__footer {
-  padding: 12px var(--space-md);
-  border-top: 1px solid var(--border);
-  background: var(--surface-hover);
-  gap: var(--space-sm);
-}
+/* Padding / border / background / gap now come from the canonical
+   .gc-if-flyout__footer base; this variant only needs to keep its
+   firewall-chip wrap behaviour (declared in the earlier .gc-hs-flyout__footer
+   rule). Intentionally left empty as a marker so per-page audits stay easy. */
 
 /* Combine modal -- section card per design-skill.md sec.7 */
 .gc-hosts-services-page .gc-net-zone-combine-modal__panel,

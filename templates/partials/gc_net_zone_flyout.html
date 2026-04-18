@@ -116,9 +116,9 @@
           </div>
         </div>
       </div>
-      <footer class="gc-if-flyout__footer">
-        <button type="submit" class="btn primary" id="gc-zone-flyout-save" disabled>Save</button>
-        <button type="button" class="link-btn" id="gc-zone-flyout-cancel">Cancel</button>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-zone-flyout-save" disabled>{{ save_label | default('Save') }}</button>
+        <button type="button" class="btn btn--secondary" id="gc-zone-flyout-cancel">Close</button>
       </footer>
     </form>
   </div>

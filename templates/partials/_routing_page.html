@@ -27,12 +27,13 @@
   {{ net_filters_aside(prefix ~ "-gateway-host", true) }}
 {%- endmacro %}
 
+{# data_attr is the *top* tab data attribute (e.g. "data-gc-rt-tab"). The
+   sub-tab data attribute is derived from it by swapping the trailing "-tab"
+   for "-subtab" so callers don't have to pass two values. #}
 {% macro routing_tablist(prefix, tablist_id, data_attr) -%}
 <div class="gc-tabs" role="tablist" aria-label="Routing views" id="{{ tablist_id }}">
   <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
-    id="{{ prefix }}-tab-unicast-route-v4" {{ data_attr }}="unicast_route_v4">Unicast IPv4 routes</button>
-  <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
-    id="{{ prefix }}-tab-unicast-route-v6" {{ data_attr }}="unicast_route_v6">Unicast IPv6 routes</button>
+    id="{{ prefix }}-tab-unicast-route" {{ data_attr }}="unicast_route">Unicast routes</button>
   <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
     id="{{ prefix }}-tab-gateway" {{ data_attr }}="gateway">Gateways</button>
   <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
@@ -41,20 +42,37 @@
 {%- endmacro %}
 
 {% macro routing_tab_panels(prefix, v4_subtitle, v6_subtitle, gateway_subtitle, custom_subtitle, toolbar_page_sync) -%}
+{# e.g. prefix "gc-rt" -> "data-gc-rt-subtab"; "gc-cfg-rt" -> "data-gc-cfg-rt-subtab" #}
+{% set sub_attr = "data-" ~ prefix ~ "-subtab" %}
 <div class="gc-tab-panels">
-  <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="{{ prefix }}-tab-unicast-route-v4"
-    id="{{ prefix }}-panel-unicast-route-v4">
-    {{ net_entity_table_wrap(prefix ~ "-unicast-route-v4", "Unicast IPv4 routes", "Search IPv4 unicast routes", true,
-      prefix ~ "-unicast-route-v4-add", "Add IPv4 unicast route",
-      v4_subtitle,
-      prefix ~ "-unicast-route-v4-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
-  </div>
-  <div class="gc-tab-panel" role="tabpanel" aria-labelledby="{{ prefix }}-tab-unicast-route-v6"
-    id="{{ prefix }}-panel-unicast-route-v6" hidden>
-    {{ net_entity_table_wrap(prefix ~ "-unicast-route-v6", "Unicast IPv6 routes", "Search IPv6 unicast routes", true,
-      prefix ~ "-unicast-route-v6-add", "Add IPv6 unicast route",
-      v6_subtitle,
-      prefix ~ "-unicast-route-v6-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+  <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="{{ prefix }}-tab-unicast-route"
+    id="{{ prefix }}-panel-unicast-route">
+    <div class="gc-tabs gc-tabs--sub" role="tablist" aria-label="IP family"
+      id="{{ prefix }}-unicast-route-subtablist"
+      style="margin-bottom:0.5rem;font-size:0.875rem">
+      <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
+        id="{{ prefix }}-subtab-unicast-route-v4"
+        {{ sub_attr }}="unicast_route_v4">IPv4</button>
+      <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
+        id="{{ prefix }}-subtab-unicast-route-v6"
+        {{ sub_attr }}="unicast_route_v6">IPv6</button>
+    </div>
+    <div class="gc-tab-panels">
+      <div class="gc-tab-panel is-active" role="tabpanel"
+        aria-labelledby="{{ prefix }}-subtab-unicast-route-v4" id="{{ prefix }}-panel-unicast-route-v4">
+        {{ net_entity_table_wrap(prefix ~ "-unicast-route-v4", "Unicast IPv4 routes", "Search IPv4 unicast routes", true,
+          prefix ~ "-unicast-route-v4-add", "Add IPv4 unicast route",
+          v4_subtitle,
+          prefix ~ "-unicast-route-v4-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+      </div>
+      <div class="gc-tab-panel" role="tabpanel"
+        aria-labelledby="{{ prefix }}-subtab-unicast-route-v6" id="{{ prefix }}-panel-unicast-route-v6" hidden>
+        {{ net_entity_table_wrap(prefix ~ "-unicast-route-v6", "Unicast IPv6 routes", "Search IPv6 unicast routes", true,
+          prefix ~ "-unicast-route-v6-add", "Add IPv6 unicast route",
+          v6_subtitle,
+          prefix ~ "-unicast-route-v6-delete-selected", "Delete selected", toolbar_page_sync=toolbar_page_sync) }}
+      </div>
+    </div>
   </div>
   <div class="gc-tab-panel" role="tabpanel" aria-labelledby="{{ prefix }}-tab-gateway"
     id="{{ prefix }}-panel-gateway" hidden>

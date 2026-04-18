@@ -16,35 +16,58 @@
     ></div>
     <div class="gc-if-flyout__panel-form">
       <header class="gc-if-flyout__header">
-        <p id="gc-netflow-flyout-fw" class="gc-ips-cfg-flyout__fw muted"></p>
+        <h2 id="gc-netflow-flyout-title" class="gc-if-flyout__title">Netflow configuration</h2>
+        <button
+          type="button"
+          class="gc-fw-inv-flyout__close"
+          id="gc-netflow-flyout-close"
+          aria-label="Close"
+          title="Close"
+        >&times;</button>
       </header>
       <div class="gc-if-flyout__scroll">
         <form id="gc-netflow-flyout-form" class="gc-netflow-flyout__form" autocomplete="off" novalidate>
-          <h2 id="gc-netflow-flyout-title" class="gc-if-flyout__title">Netflow configuration</h2>
+          <p id="gc-netflow-flyout-fw" class="muted gc-netflow-flyout__fw"></p>
           <p class="muted gc-netflow-flyout__hint">
             Changes are queued to the task dock and sent as <strong>Configure Netflow</strong>. Sync
             <strong>Netflow configuration</strong> from Inventory so rows appear here.
           </p>
-          <div class="gc-netflow-servers-wrap">
-            <table class="data-table data-table--dense gc-netflow-servers-table" aria-label="Servers">
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">IP or domain</th>
-                  <th scope="col">Port</th>
-                  <th scope="col" class="gc-netflow-servers-table__actions" aria-label="Remove row"></th>
-                </tr>
-              </thead>
-              <tbody id="gc-netflow-flyout-tbody"></tbody>
-            </table>
-          </div>
+          <section class="gc-netflow-servers">
+            <div class="gc-netflow-servers__head">
+              <h3 class="gc-netflow-servers__title">Collectors</h3>
+              <button
+                type="button"
+                class="btn btn--secondary gc-netflow-servers__add"
+                id="gc-netflow-flyout-add-server"
+              >
+                <span class="gc-icon gc-icon--xs" aria-hidden="true">add</span>
+                Add server
+              </button>
+            </div>
+            <p class="muted gc-netflow-servers__empty" id="gc-netflow-flyout-empty" hidden>
+              No collectors configured yet. Add one below.
+            </p>
+            <div class="gc-netflow-servers-wrap">
+              <table class="data-table data-table--dense gc-netflow-servers-table" aria-label="Servers">
+                <thead>
+                  <tr>
+                    <th scope="col" class="gc-netflow-servers-table__name">Name</th>
+                    <th scope="col" class="gc-netflow-servers-table__host">IP or domain</th>
+                    <th scope="col" class="gc-netflow-servers-table__port">Port</th>
+                    <th scope="col" class="gc-netflow-servers-table__actions" aria-label="Remove row"></th>
+                  </tr>
+                </thead>
+                <tbody id="gc-netflow-flyout-tbody"></tbody>
+              </table>
+            </div>
+          </section>
         </form>
       </div>
-      <footer class="gc-if-flyout__footer">
-        <button type="button" class="btn btn--secondary" id="gc-netflow-flyout-cancel">Cancel</button>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
         <button type="submit" form="gc-netflow-flyout-form" class="btn primary" id="gc-netflow-flyout-save">
-          Queue save
+          Save to task queue
         </button>
+        <button type="button" class="btn btn--secondary" id="gc-netflow-flyout-cancel">Close</button>
       </footer>
     </div>
   </div>

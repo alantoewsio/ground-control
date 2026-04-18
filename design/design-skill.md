@@ -193,12 +193,62 @@ xs   4px    sm   8px    md   16px
 lg   24px   xl   32px   2xl  48px   3xl  64px
 ```
 
+### Card-chrome alignment (page tabs + table/toolbar below)
+Every page that stacks a tab strip on top of a table/card MUST align the two
+vertically along the same left x-coordinate. This prevents the "nested" look
+where the tab strip looks flush but the title/toolbar/table below appears
+indented further inside.
+
+Rule: inside a "page card" (`.content-pane`, `.gc-network-panel`, or
+`.firewalls-page` tab-panel), all direct chrome elements share one gutter —
+`var(--page-gutter)` (24px):
+
+| Element                              | Horizontal padding                 |
+| ------------------------------------ | ---------------------------------- |
+| `.gc-tabs`                           | `0 var(--page-gutter)`             |
+| `.gc-tab-panel` (container)          | `0` (vertical padding only)        |
+| `.firewalls-page__head` (card title) | `var(--page-gutter)`               |
+| `.toolbar` (inside a table-wrap)     | `var(--page-gutter)`               |
+| `.table-scroll` (inside a table-wrap)| `var(--page-gutter)`               |
+
+Do NOT add an extra `+ var(--table-cell-pad-x-dense)` to title or toolbar
+padding to "align with column content" — the cell's own `<td>` / `<th>`
+padding already handles that, and stacking the two offsets breaks alignment
+with the tab strip above. Do NOT duplicate the page gutter on both
+`.gc-tab-panel` AND its inner `.table-wrap` children (that doubling was the
+root cause of the pre-fix nested appearance).
+
+When introducing a new page, verify with the browser inspector that the left
+edges of (a) the first tab button, (b) the card `<h2>` title, (c) the
+toolbar's first control, and (d) the table-scroll gridline all sit at the
+same x inside the card.
+
 ### Border radius scale
 ```
 none  0       sm   2px    md   4px
 lg    8px     xl   12px   2xl  16px   full  9999px
 ```
 > Cards and section panels use `xl` (12px). Form inputs use `md` or `lg`. Pills and badges use `full`.
+
+**Dashboard exception** — all panels on `.dashboard-page` (stat tiles,
+widget panels, latency cards, any ad-hoc `.panel`) use a tighter **5px**
+radius for a denser monitoring-console feel. Implemented in `style.css` via
+`.dashboard-page .panel, .dashboard-page__stat, .dashboard-page__widget,
+.dashboard-page__latency-card { border-radius: 5px }`.
+
+### Table framing (no double borders)
+The `.table-wrap` container has **no outer border and no border-radius**.
+The visual frame around a table is provided by one of:
+- the enclosing card — `.gc-network-panel`, `.firewalls-page`, a dashboard
+  `.panel`, `.gc-designer__section`, etc. (they own the border/radius/shadow);
+- the `--app-bg` (`#F0F2F4`) contrast — pages where the table-wrap has a
+  white background (e.g. `.firewalls-page .table-wrap`) float on the light
+  app background, which supplies implicit separation without needing a line.
+
+Do NOT re-add `border: 1px solid …` or `border-radius: 6px` to `.table-wrap`
+(that causes the inner table to be double-framed inside an already-framed
+card). If a standalone table needs a frame, wrap it in a card element
+instead of styling `.table-wrap` directly.
 
 ### Elevation / shadow scale
 ```
@@ -280,127 +330,192 @@ tooltip       1070
 
 ## 7. Component Patterns
 
-### Icons (Google Material Symbols — Filled)
-**One icon system, one fill style, used everywhere** — toolbars, sidebar, buttons, empty states, table cells, sidebar entity types, modals.
+### Icons (`.gc-icon` — single project-wide system)
 
-**Loading the font** (in `index.html` or top-level CSS):
-```html
-<link
-  rel="stylesheet"
-  href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..700,1,0&display=block"
-/>
-```
-- Variant: **Rounded** (preferred) or **Outlined** — but `FILL=1` is **mandatory** for the project's filled look.
-- Loading with `display=block` avoids the FOIT flash of unstyled icon glyphs.
-- For offline / air-gapped builds, self-host the variable font file and declare `@font-face` in `fonts.css`.
+**One icon system, one fill style, used everywhere** — toolbars, sidebar,
+buttons, empty states, table cells, sidebar entity types, modals, badges.
+The canonical class is **`.gc-icon`**. There is no other icon library in the
+project; do not introduce one.
 
-**Base CSS** (in `index.css`):
+**Font + axes (locked)**
+- Family: **Material Symbols Outlined** (variable font). The Outlined cut is
+  the project's choice — the FILL axis is what makes it visually "filled".
+- Variable axes: `FILL 1, wght 400, GRAD 0, opsz 20` at default. `wght` ramps
+  to 500 at `lg`/`xl` sizes, 600 with `.gc-icon--bold`. **`FILL=1` is
+  mandatory** — never render outlined glyphs.
+- Loaded once at the top of `static/style.css` with `display=block` to avoid
+  the FOIT flash of raw glyph names.
+
 ```css
-.material-symbols-rounded,
-.material-symbols-outlined {
-  font-family: 'Material Symbols Rounded', 'Material Symbols Outlined';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 20px;          /* default UI size */
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..600,0..1,-25..200&display=block");
+```
+
+For offline / air-gapped builds, self-host the variable font file and declare
+`@font-face` (still pinning Outlined + the FILL=1 axis baseline).
+
+**The `.gc-icon` class** (defined in `static/style.css`)
+```css
+.gc-icon {
+  font-family: "Material Symbols Outlined", sans-serif;
+  font-size: 20px;                    /* md = default */
   line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
   display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-smoothing: antialiased;
-  -webkit-font-feature-settings: 'liga';
-  font-feature-settings: 'liga';
-  font-variation-settings:
-    'FILL' 1,               /* always filled */
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
+  vertical-align: middle;
+  flex-shrink: 0;
   user-select: none;
+  font-feature-settings: 'liga';      /* glyph names render as ligatures */
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 ```
 
-**Usage in JSX** — the icon name is the literal text content of the span:
-```jsx
-// ✅ Correct — filled material icon
-<span className="material-symbols-rounded">settings</span>
+**Size scale** — every size has a helper class. Don't set `font-size` inline
+unless you need a one-off hero size that isn't on the scale.
 
-// ✅ With size + color via inline style or Tailwind
-<span
-  className="material-symbols-rounded"
-  style={{ fontSize: 18, color: theme.colors.primary.main }}
->
-  search
-</span>
+| Modifier         | Size  | Use                                                     |
+| ---------------- | ----- | ------------------------------------------------------- |
+| `.gc-icon--xs`   | 16 px | inline meta in table cells, badges                      |
+| `.gc-icon--sm`   | 18 px | dense toolbars, button-adjacent text                    |
+| `.gc-icon--md`   | 20 px | **default** — sidebar items, standard UI, icon-buttons  |
+| `.gc-icon--lg`   | 24 px | section headers, prominent actions, modal titles        |
+| `.gc-icon--xl`   | 28 px | empty-state, hero, service-card                         |
 
-// ❌ Avoid — do not import lucide-react or any other icon library
-import { Settings } from 'lucide-react'
+For service-card hero glyphs that need 32–44 px, use inline `font-size` on
+the icon span (rare; do not add new helper classes).
+
+**Colour rules — flow from the container**
+
+Icons inherit `currentColor`. **Set the colour on the parent component, never
+on the icon itself.** This is what makes the badge / button system work
+without per-icon overrides:
+
+- Inside `.btn-icon--primary` → icon is white (`--btn-primary-fg`)
+- Inside `.btn-icon` (Secondary default) → icon is Sophos blue (`--btn-secondary-fg`)
+- Inside `.badge--success` → icon is green (`--badge-success-text`)
+- Inside `[disabled]` / `[aria-disabled="true"]` → icon picks up the muted
+  colour from the disabled state automatically (no extra class needed)
+
+When you do need to override for a one-off (e.g. a danger icon inside a
+neutral row), use a colour helper rather than inline CSS:
+
+| Helper                 | Colour                                |
+| ---------------------- | ------------------------------------- |
+| `.gc-icon--accent`     | `var(--accent)` (link/active blue)    |
+| `.gc-icon--muted`      | `var(--text-muted)`                   |
+| `.gc-icon--success`    | `var(--success)` (#00851D)            |
+| `.gc-icon--danger`     | `var(--danger)` (#DA3E00)             |
+| `.gc-icon--warn`       | `var(--error)` (#FF8F00)              |
+| `.gc-icon--inverse`    | `var(--text-inverse)` (#fff)          |
+
+**Weight modifier**
+- `.gc-icon--bold` → `wght 600` (still filled). Use sparingly for a single
+  icon that needs to read heavier than its neighbours.
+
+**Canonical entry points — never hand-roll the `<span>`**
+
+The class system has three matching entry points so the markup is
+identical wherever it's emitted from:
+
+```jinja
+{# Jinja templates — preferred entry point #}
+{% from "partials/_icons.html" import icon %}
+{{ icon("close") }}
+{{ icon("delete", size="sm", cls="gc-icon--danger") }}
+{{ icon("check_circle", size="lg", aria_label="Saved") }}
 ```
 
-**Size scale** (match the spacing/typography rhythm):
-```
-14px  inline meta (table cells, badges)
-16px  small toolbar / dense lists
-18px  default button-adjacent icon
-20px  sidebar item, standard UI       ← default
-24px  section header, prominent action
-28px  empty-state, hero
-32-44px  service-card hero icon (44×44 container)
+```js
+// JavaScript — for dynamic markup (counterpart to the Jinja macro)
+gcIcon("close")                                     // -> HTML string
+gcIcon("delete", { size: "sm", cls: "gc-icon--danger" })
+gcIconEl("check_circle", { ariaLabel: "Saved" })    // -> HTMLSpanElement
 ```
 
-**Colour rules**:
-- Inherit `currentColor` by default — do not hardcode icon colors. Set `color` on the parent and the icon follows.
-- Active sidebar item: `color: theme.colors.primary.main` (`#0049BD`).
-- Destructive action: `color: theme.colors.action.deny` (`#ef4444`).
-- Disabled: `color: theme.colors.text.disabled` (`#9ca3af`).
+```html
+<!-- Raw HTML, only when neither macro is available -->
+<span class="gc-icon gc-icon--md" aria-hidden="true">settings</span>
+```
 
-**Common icon name reference** (Google Material Symbols, filled):
-| Use | Icon name |
-|-----|-----------|
-| Search | `search` |
-| Settings | `settings` |
-| Add / new | `add` |
-| Edit | `edit` |
-| Delete | `delete` |
-| Save | `save` |
-| Close | `close` |
-| Expand more | `expand_more` |
-| Expand less | `expand_less` |
-| Chevron right | `chevron_right` |
-| Menu / hamburger | `menu` |
-| Filter | `filter_alt` |
-| Sort | `sort` |
-| Download / export | `download` |
-| Upload / import | `upload` |
-| Copy | `content_copy` |
-| Refresh | `refresh` |
-| Info | `info` |
-| Warning | `warning` |
-| Error | `error` |
-| Success / check | `check_circle` |
-| User | `person` |
-| Logout | `logout` |
-| Language | `language` |
-| Help | `help` |
-| Visibility on / off | `visibility` / `visibility_off` |
-| Sidebar collapse | `dock_to_right` / `dock_to_left` |
+The macros automatically:
+- emit `aria-hidden="true"` for **decorative** icons (no label given)
+- emit `role="img" aria-label="…"` for **meaningful** icons (label given)
 
-**Entity-type icons** (used in sidebar + entity rows; one icon per schema):
-| Entity | Icon name |
-|--------|-----------|
-| country | `public` |
-| webFilterPolicy | `policy` |
-| schedule | `schedule` |
-| zone | `lan` |
-| network | `hub` |
-| application | `apps` |
-| webFilter | `filter_list` |
-| intrusionPrev | `shield` |
-| virusScanning | `security` |
-| default | `category` |
+This is the project's accessibility contract — do not write raw `<span>`
+markup that breaks it.
 
-> Browse and pick more icons at [fonts.google.com/icons](https://fonts.google.com/icons) — set **Style: Rounded** and **Fill: ON** before copying the name.
+**Icons inside buttons (auto-sized by the button)**
+
+`.btn-icon .gc-icon` (and `.icon-btn .gc-icon`) inherits `font-size` from the
+button container. So inside the 32 × 32 icon-button (padding 6) the glyph
+naturally sizes to its 20 × 20 inner box — no size modifier required:
+
+```html
+<!-- icon size is driven by the button, not the gc-icon class -->
+<button class="btn-icon" aria-label="More">
+  <span class="gc-icon">more_vert</span>
+</button>
+```
+
+**Common icon-name reference** (Material Symbols Outlined, FILL=1)
+
+| Use                  | Glyph name                           |
+| -------------------- | ------------------------------------ |
+| Search               | `search`                             |
+| Settings             | `settings`                           |
+| Add / new            | `add`                                |
+| Edit                 | `edit`                               |
+| Delete               | `delete`                             |
+| Save                 | `save`                               |
+| Close                | `close`                              |
+| Expand more / less   | `expand_more` / `expand_less`        |
+| Chevron right        | `chevron_right`                      |
+| Menu / hamburger     | `menu`                               |
+| More (overflow)      | `more_vert`                          |
+| Filter               | `filter_alt`                         |
+| Sort                 | `sort`                               |
+| Download / export    | `download`                           |
+| Upload / import      | `upload`                             |
+| Copy                 | `content_copy`                       |
+| Refresh              | `refresh`                            |
+| Info                 | `info`                               |
+| Warning              | `warning`                            |
+| Error                | `error`                              |
+| Success / check      | `check_circle`                       |
+| User                 | `person`                             |
+| Logout               | `logout`                             |
+| Language             | `language`                           |
+| Help                 | `help`                               |
+| Visibility on / off  | `visibility` / `visibility_off`      |
+| Sidebar dock         | `dock_to_right` / `dock_to_left`     |
+
+**Entity-type icons** (sidebar + entity rows — one glyph per schema):
+
+| Entity            | Glyph name     |
+| ----------------- | -------------- |
+| country           | `public`       |
+| webFilterPolicy   | `policy`       |
+| schedule          | `schedule`     |
+| zone              | `lan`          |
+| network           | `hub`          |
+| application       | `apps`         |
+| webFilter         | `filter_list`  |
+| intrusionPrev     | `shield`       |
+| virusScanning     | `security`     |
+| default           | `category`     |
+
+> Browse and pick more glyphs at [fonts.google.com/icons](https://fonts.google.com/icons)
+> — set **Style: Outlined** and **Fill: ON** before copying the name.
+
+**Quick checklist when adding a new icon to the app**
+1. Use the `icon(...)` Jinja macro (or `gcIcon(...)` in JS). Never paste raw
+   `<svg>` or import an icon library.
+2. Pick the smallest size that's legible — default to `md` (20 px); use `xs`
+   in dense table cells, `lg`/`xl` only for headers/empty states.
+3. Don't set the colour on the icon. Set it on the container component
+   (button variant, badge variant, status text) and let `currentColor` do its
+   job. Reach for a `.gc-icon--*` colour helper only for genuine one-offs.
+4. If the icon is meaningful (the only thing labelling a control), pass
+   `aria_label="…"`. Otherwise leave it decorative — the macro auto-hides it
+   from screen readers.
 
 ### Header
 ```
@@ -411,33 +526,115 @@ right: action buttons + language switcher
 border-bottom: 1px solid #004A9F
 ```
 
-### Buttons
+### Buttons (Figma: button-icons-usage-light)
 
-**Primary**
+The button system is three variants (**Primary / Secondary / Tertiary**) × five
+states (**Default / Hover / Focus / Active / Disabled**) sharing one focus ring
+and one radius. **All buttons — text and icon — consume the `--btn-*` tokens.
+Do not hand-roll colours at the call site.**
+
+**Shared tokens** (`:root`)
 ```
-bg: #005BC8    hover: #004A9F
-text: #ffffff   border-radius: 6px
-padding: 6px 14px   font-size: 13-14px   font-weight: 500
-transition: background-color 150ms ease-in-out
+--btn-radius            : 5px
+--focus-ring            : #008BFF   (2px outline, offset 0, all variants)
+--btn-primary-bg        : #005BC8
+--btn-primary-hover-bg  : #006AD1
+--btn-primary-fg        : #ffffff
+--btn-secondary-bg      : #F0F2F4
+--btn-secondary-hover-bg: #E5E7EA
+--btn-secondary-fg      : #005BC8
+--btn-tertiary-hover-bg : #F0F2F4
+--btn-tertiary-fg       : #005BC8
+--btn-disabled-bg       : #C2C5CA
+--btn-disabled-fg       : #A3A6AB
 ```
 
-**Secondary / ghost**
+**Text buttons** — `.btn.primary`, `.btn--secondary`
 ```
-bg: #f3f4f6    hover: #e5e7eb
-text: #005BC8   border: transparent
-same radius/padding as primary
-```
-
-**Disabled state**
-```
-opacity: 0.5   cursor: not-allowed
+padding      : 6px 14px         font-size  : 13–14px    font-weight: 500
+radius       : 5px              transition : background-color 150ms
+focus        : outline 2px solid #008BFF, offset 0
 ```
 
-**Icon-only toolbar buttons**
+**Icon buttons** — `.btn-icon` + optional variant/size modifiers
 ```
-padding: 6px 8px   min-width: 32px   border-radius: 6px
-hover bg: rgba(0,0,0,0.06)
+box          : 32 × 32  (width + height)     padding  : 6px
+icon         : 20 × 20                        gap      : 10px (icon + label)
+radius       : 5px                            display  : inline-flex, centered
+focus        : outline 2px solid #008BFF, offset 0
 ```
+
+**Per-variant × per-state matrix** (the full Figma grid)
+
+Every icon button supports six states: **Default / Hover / Focus / Active /
+Disabled / Disabled-onHover** (the last shows a native `title` tooltip
+explaining *why* it's disabled — see "Disabled with reason" below).
+
+| State                | Primary                             | Secondary (default)                  | Tertiary (ghost)                       |
+| -------------------- | ----------------------------------- | ------------------------------------ | -------------------------------------- |
+| Default              | bg #005BC8 / icon #FFFFFF           | bg #F0F2F4 / icon #005BC8            | bg transparent / icon #005BC8          |
+| Hover                | bg #006AD1 / icon #FFFFFF           | bg #E5E7EA / icon #005BC8            | bg #F0F2F4 / icon #005BC8              |
+| Focus                | + outline 2px #008BFF (offset 0)    | + outline 2px #008BFF (offset 0)     | + outline 2px #008BFF (offset 0)       |
+| Active               | bg #005BC8                          | bg #F0F2F4                           | bg #F0F2F4                             |
+| Disabled             | bg #C2C5CA, opacity 0.5, icon #FFF  | bg #F0F2F4, opacity 0.5, icon #A3A6AB | transparent, opacity 0.5, icon #A3A6AB |
+| Disabled-onHover     | identical to Disabled + `title` tooltip on hover (no hover style applied) |||
+
+Focus is identical across all three variants: a 2 px solid `#008BFF` outline
+at offset 0 — a ring, not a border, so it doesn't push layout.
+
+**Class usage**
+```html
+<!-- Text buttons -->
+<button class="btn primary">Save</button>
+<button class="btn btn--secondary">Cancel</button>
+
+<!-- Icon buttons (32 × 32) -->
+<button class="btn-icon" aria-label="More">…</button>                  <!-- secondary (default) -->
+<button class="btn-icon btn-icon--primary" aria-label="Add">…</button>
+<button class="btn-icon btn-icon--tertiary" aria-label="Edit">…</button>
+
+<!-- Tertiary Inline (24 × 24) — pairs with any variant -->
+<button class="btn-icon btn-icon--inline btn-icon--tertiary" aria-label="Next">…</button>
+```
+
+**Tertiary Inline size** (24 × 24): for in-row affordances (next / expand /
+remove). Same 5 px radius, same #008BFF focus ring; only `width`,`height` and
+`padding` change (24 × 24, padding 2 px). Icon stays 20 × 20.
+
+**Why `.btn-icon` defaults to Secondary**: it's the most common icon-button
+style in dense toolbars and table cells. Opt into Primary (call-to-action)
+or Tertiary (ghost on an already-tinted surface) explicitly with the modifier.
+
+**Disabled with reason — the `aria-disabled` + `title` pattern**
+
+Native `<button disabled>` blocks pointer events on Chromium, so a `title`
+attribute on a disabled button *never* fires a tooltip. To honour the Figma
+"Disabled-onHover shows reason" state, use **`aria-disabled="true"`** instead
+of the native `disabled` attribute when the button needs to explain itself,
+and provide a short `title`:
+
+```html
+<!-- Pattern A: hard-disabled (no reason needed) -->
+<button class="btn-icon btn-icon--primary" disabled aria-label="Add">…</button>
+
+<!-- Pattern B: disabled WITH reason — hover shows the native title tooltip -->
+<button class="btn-icon btn-icon--primary"
+        aria-disabled="true"
+        title="Select at least one row to enable Export"
+        aria-label="Export">…</button>
+```
+
+The CSS styles `[aria-disabled="true"]` identically to `:disabled` (opacity
+0.5, muted icon colour, `cursor: not-allowed`) **and** keeps `pointer-events`
+live so the browser can render the `title` tooltip on hover. Hover-state
+colours are intentionally *not* applied — the only difference between
+"Disabled" and "Disabled-onHover" is the tooltip surfacing, never a colour
+change.
+
+**Click-handling rule**: any button using `aria-disabled="true"` MUST early-
+return in its click handler (e.g. `if (el.getAttribute('aria-disabled') ===
+'true') return;`). Unlike the native `disabled` attribute, ARIA does not
+suppress the click — it only declares the state semantically.
 
 ### Form inputs
 ```js
@@ -464,14 +661,65 @@ boxShadow: '0 0 0 2px rgba(0,91,200,0.13)'
 borderColor: '#ef4444'
 ```
 
-### Badges / pills
+### Badges (global `.badge` component)
+
+Single source of truth for status / label badges across the app (task-queue
+status, action labels, sync state, dirty markers, inventory state, etc.). Use
+the `.badge` class with one semantic modifier — never hand-roll colours.
+
+**Markup**
+```html
+<span class="badge badge--success">Active</span>
+<span class="badge badge--info">Syncing</span>
+<span class="badge badge--warning">Pending</span>
+<span class="badge badge--danger">Error</span>
+<span class="badge badge--neutral">Draft</span>
 ```
-enabled:   bg #dcfce7  text #166534  (green-100 / green-800)
-disabled:  bg #f3f4f6  text #374151
-tag:       bg #dbeafe  text #1e40af  (blue-50 / blue-700)
-border-radius: 9999px (full)
-padding: 2px 8px   font-size: 11-12px   font-weight: 500
+
+**Typography** (locked — do not override per usage)
 ```
+font-family : Inter (inherited from :root)
+font-weight : 700
+font-size   : 12px
+line-height : 16px
+letter-spacing: 0
+```
+
+**Layout / box**
+```
+display       : inline-flex (centered)
+min-width     : 56px        height : 20px
+padding       : 2px 7px     gap    : 10px (icon + text)
+border-radius : 3px         opacity: 1
+white-space   : nowrap
+```
+Width is a `min-width` so longer labels (`Completed`, `In progress`) don't
+clip. The 56 px floor keeps single-word badges visually consistent in dense
+table cells.
+
+**Colour palette** (paired bg + text per level, exposed as tokens)
+```
+neutral  bg #F0F2F4  text #696A6B   --badge-neutral-bg / --badge-neutral-text
+info     bg #E5EFFA  text #005BC8   --badge-info-bg    / --badge-info-text
+success  bg #E5F3E8  text #00851D   --badge-success-bg / --badge-success-text
+warning  bg #FFF4E5  text #FF8F00   --badge-warning-bg / --badge-warning-text
+danger   bg #FBECE5  text #DA3E00   --badge-danger-bg  / --badge-danger-text
+```
+`.badge--warn` aliases `.badge--warning`; `.badge--critical` aliases
+`.badge--danger`.
+
+**When NOT to use**
+- Tiny circular **count** indicators (e.g. sidebar `(3)` pending bubble,
+  `.task-queue-nav-badge`, `.gc-firewall-pill-status` 1 rem dot) are a
+  separate primitive and intentionally do not use `.badge`.
+- Removable input chips / tag chips (e.g. `.gc-designer-tags__pill`) are a
+  separate primitive (`x` close affordance, drag handles, etc.).
+
+**Migration note**
+Legacy classes that map onto this spec — `.task-queue-status-badge`,
+`.task-queue-action-pill` — already consume the `--badge-*` tokens and the
+locked typography/box values. New status indicators should use `.badge`
+directly rather than adding new bespoke classes.
 
 ### Cards / section panels
 ```css
@@ -526,13 +774,16 @@ z-index: 1050
 header: 16px semibold + close button top-right (close = "×" icon)
 body:   scrollable, padding 16-20px, form fields stacked
 footer: LEFT-aligned actions (primary first, then secondary / Cancel)
-        sticky to the bottom, border-top 1px solid var(--border-light),
-        background var(--surface), padding 16px 18px, gap 16px
+        sticky to the bottom, border-top 1px solid var(--border),
+        background var(--surface-hover), padding 12px var(--space-md),
+        gap var(--space-sm)
 ```
 Implementation classes: `.gc-if-flyout__panel`, `.gc-if-flyout__footer`
 (base) and per-feature variants (`.gc-hs-flyout__footer`,
 `.gc-ips-pol-subflyout__footer`, …) which **must not** override the
-`justify-content: flex-start` set on the base.
+`justify-content: flex-start`, padding, gap, border or background set on the
+base. The canonical reference is the Hosts & Services Add flyout — every
+other flyout's footer should look identical at the bottom edge.
 
 > **Why left-aligned (vs right-aligned modals?)** Flyouts open from the
 > right edge, so the natural reading flow places the primary action where

@@ -716,6 +716,30 @@
                 <button type="button" class="btn btn--secondary" id="gc-fw-edit-sync-select-all">Select all</button>
                 <button type="button" class="btn btn--secondary" id="gc-fw-edit-sync-clear-selection">Clear selection</button>
               </div>
+              <div class="gc-fw-edit-sync-object-selector-search">
+                <input
+                  type="search"
+                  id="gc-fw-edit-sync-object-selector-search"
+                  class="gc-fw-edit-sync-object-selector-search__input"
+                  placeholder="Search object types"
+                  autocomplete="off"
+                  aria-label="Search object types"
+                  aria-controls="gc-fw-edit-sync-object-selector-list"
+                />
+                <button
+                  type="button"
+                  id="gc-fw-edit-sync-object-selector-search-clear"
+                  class="gc-fw-edit-sync-object-selector-search__clear"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  hidden
+                >&times;</button>
+              </div>
+              <p
+                id="gc-fw-edit-sync-object-selector-search-empty"
+                class="muted gc-fw-edit-sync-object-selector-search__empty"
+                hidden
+              >No object types match your search.</p>
               <div
                 id="gc-fw-edit-sync-object-selector-list"
                 class="gc-designer-object-selector-list gc-fw-sync-toggles"
@@ -730,7 +754,7 @@
       <footer class="gc-if-flyout__footer gc-fw-inv-flyout__footer">
         <button type="submit" class="btn primary">Save changes</button>
         <button type="button" class="btn btn--secondary" id="gc-fw-flyout-sync-btn">Sync now</button>
-        <button type="button" class="link-btn" id="cancel-edit-firewall">Cancel</button>
+        <button type="button" class="btn btn--secondary" id="cancel-edit-firewall">Close</button>
       </footer>
     </form>
   </div>
@@ -2472,9 +2496,62 @@
     function refreshFwEditSyncObjectSelectorList() {
       var root = document.getElementById("gc-fw-edit-sync-object-selector-list");
       if (!root || typeof window.gcDesignerHydrateObjectSelectorList !== "function") return;
+      // Seed the selector with every id from the sync catalog so newly
+      // registered entity types (e.g. unicast_route, gateway, gateway_host,
+      // clientless_user, acl_rule) can be enabled BEFORE any sync has produced
+      // cached rows for them. Without this seed the selector only lists types
+      // that already exist in the cache, which is a chicken-and-egg problem
+      // for never-synced types.
+      var seedTypes = (SYNC_CATALOG || []).map(function (x) { return x && x.id; }).filter(Boolean);
       window.gcDesignerHydrateObjectSelectorList(root, function () {
         applySyncPrefsToObjectSelectorList(root);
+        applyFwEditSyncObjectSelectorSearch();
+      }, { extraTypes: seedTypes });
+    }
+
+    // Filter the rendered object-selector list by the search input. Matches the
+    // visible label text and the underlying entity_type id (so users can
+    // search for either "Local Service ACL" or "acl_rule"). Group headers are
+    // hidden when none of their child rows match.
+    function applyFwEditSyncObjectSelectorSearch() {
+      var root = document.getElementById("gc-fw-edit-sync-object-selector-list");
+      var input = document.getElementById("gc-fw-edit-sync-object-selector-search");
+      var clearBtn = document.getElementById("gc-fw-edit-sync-object-selector-search-clear");
+      var emptyEl = document.getElementById("gc-fw-edit-sync-object-selector-search-empty");
+      if (!root) return;
+      var q = input ? String(input.value || "").trim().toLowerCase() : "";
+      if (clearBtn) clearBtn.hidden = q.length === 0;
+      var nodes = Array.prototype.slice.call(root.children);
+      var anyVisible = false;
+      var pendingGroup = null;
+      var pendingGroupHasMatch = false;
+      function flushGroup() {
+        if (pendingGroup) pendingGroup.hidden = !pendingGroupHasMatch;
+        pendingGroup = null;
+        pendingGroupHasMatch = false;
+      }
+      nodes.forEach(function (node) {
+        if (node.classList && node.classList.contains("gc-designer-object-selector-list__group")) {
+          flushGroup();
+          pendingGroup = node;
+          pendingGroupHasMatch = false;
+          return;
+        }
+        if (node.classList && node.classList.contains("gc-designer-object-selector-list__row")) {
+          var labEl = node.querySelector(".gc-designer-object-selector-list__label");
+          var cb = node.querySelector("input.gc-designer-object-selector-list__cb");
+          var labText = labEl ? String(labEl.textContent || "").trim().toLowerCase() : "";
+          var et = cb ? String(cb.value || "").trim().toLowerCase() : "";
+          var matched = q.length === 0 || labText.indexOf(q) !== -1 || et.indexOf(q) !== -1;
+          node.hidden = !matched;
+          if (matched) {
+            anyVisible = true;
+            pendingGroupHasMatch = true;
+          }
+        }
       });
+      flushGroup();
+      if (emptyEl) emptyEl.hidden = q.length === 0 || anyVisible;
     }
 
     function mountFwEditSyncObjectSelectorList() {
@@ -2488,12 +2565,17 @@
       });
       var selAll = document.getElementById("gc-fw-edit-sync-select-all");
       var clrSel = document.getElementById("gc-fw-edit-sync-clear-selection");
+      // Bulk toggles only act on rows the user can currently see, so when a
+      // search filter is active only the matching rows are flipped. This
+      // matches user expectations from similar facet pickers in the app.
       if (selAll && selAll.dataset.gcFwSyncBulkBound !== "1") {
         selAll.dataset.gcFwSyncBulkBound = "1";
         selAll.addEventListener("click", function () {
           var r = document.getElementById("gc-fw-edit-sync-object-selector-list");
           if (!r) return;
           r.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+            var row = cb.closest(".gc-designer-object-selector-list__row");
+            if (row && row.hidden) return;
             cb.checked = true;
           });
           persistObjectSelectorListStateToPrefs(r);
@@ -2505,9 +2587,33 @@
           var r = document.getElementById("gc-fw-edit-sync-object-selector-list");
           if (!r) return;
           r.querySelectorAll("input.gc-designer-object-selector-list__cb").forEach(function (cb) {
+            var row = cb.closest(".gc-designer-object-selector-list__row");
+            if (row && row.hidden) return;
             cb.checked = false;
           });
           persistObjectSelectorListStateToPrefs(r);
+        });
+      }
+      var searchInput = document.getElementById("gc-fw-edit-sync-object-selector-search");
+      if (searchInput && searchInput.dataset.gcFwSyncSearchBound !== "1") {
+        searchInput.dataset.gcFwSyncSearchBound = "1";
+        searchInput.addEventListener("input", applyFwEditSyncObjectSelectorSearch);
+        searchInput.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && searchInput.value) {
+            searchInput.value = "";
+            applyFwEditSyncObjectSelectorSearch();
+            e.preventDefault();
+          }
+        });
+      }
+      var searchClear = document.getElementById("gc-fw-edit-sync-object-selector-search-clear");
+      if (searchClear && searchClear.dataset.gcFwSyncSearchClearBound !== "1") {
+        searchClear.dataset.gcFwSyncSearchClearBound = "1";
+        searchClear.addEventListener("click", function () {
+          if (!searchInput) return;
+          searchInput.value = "";
+          applyFwEditSyncObjectSelectorSearch();
+          searchInput.focus();
         });
       }
       refreshFwEditSyncObjectSelectorList();

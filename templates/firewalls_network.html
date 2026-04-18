@@ -387,18 +387,20 @@
         </div>
         </div>
       </div>
-      <footer class="gc-if-flyout__footer">
-        <button type="submit" class="btn primary" id="gc-if-edit-save" disabled>Save</button>
-        <button type="button" class="link-btn" id="gc-if-edit-cancel">Cancel</button>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="submit" class="btn primary" id="gc-if-edit-save" disabled>Save to task queue</button>
+        <button type="button" class="btn btn--secondary" id="gc-if-edit-cancel">Close</button>
       </footer>
     </form>
   </div>
 </div>
+{% with save_label = "Save to task queue" %}
 {% include "partials/gc_net_vlan_flyout.html" %}
 {% include "partials/gc_net_bridge_pair_flyout.html" %}
 {% include "partials/gc_net_lag_flyout.html" %}
 {% include "partials/gc_net_alias_flyout.html" %}
 {% include "partials/gc_net_zone_flyout.html" %}
+{% endwith %}
 {% endblock %}
 {% block scripts %}
 <script>

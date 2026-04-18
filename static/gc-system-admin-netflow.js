@@ -92,19 +92,25 @@
     tr.className = "gc-netflow-server-row";
     var n0 = esc(initial.ServerName || initial.Name || "");
     var h0 = esc(initial.NetflowServer || "");
-    var p0 = esc(initial.NetflowServerPort || DEFAULT_PORT) || DEFAULT_PORT;
+    // Only persist a port value when one was provided; otherwise leave the
+    // field blank and lean on the placeholder so empty trailing rows don't
+    // look like real entries with port 2055 already filled in.
+    var hasPort = initial.NetflowServerPort != null && String(initial.NetflowServerPort).trim() !== "";
+    var p0 = hasPort ? esc(initial.NetflowServerPort) : "";
     tr.innerHTML =
-      '<td><input type="text" class="gc-if-flyout__input" data-gc-netflow-field="name" value="' +
+      '<td class="gc-netflow-servers-table__name"><input type="text" class="gc-if-flyout__input" data-gc-netflow-field="name" value="' +
       n0 +
-      '" autocomplete="off" aria-label="Server name" /></td>' +
-      '<td><input type="text" class="gc-if-flyout__input mono" data-gc-netflow-field="host" value="' +
+      '" placeholder="Name" autocomplete="off" aria-label="Server name" /></td>' +
+      '<td class="gc-netflow-servers-table__host"><input type="text" class="gc-if-flyout__input mono" data-gc-netflow-field="host" value="' +
       h0 +
-      '" autocomplete="off" aria-label="Server IP or domain" /></td>' +
-      '<td><input type="text" class="gc-if-flyout__input mono" data-gc-netflow-field="port" value="' +
+      '" placeholder="IP or FQDN" autocomplete="off" aria-label="Server IP or domain" /></td>' +
+      '<td class="gc-netflow-servers-table__port"><input type="text" class="gc-if-flyout__input mono" data-gc-netflow-field="port" value="' +
       p0 +
-      '" inputmode="numeric" autocomplete="off" aria-label="Server port" /></td>' +
+      '" placeholder="' + DEFAULT_PORT + '" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Server port" /></td>' +
       '<td class="gc-netflow-servers-table__actions">' +
-      '<button type="button" class="gc-netflow-row-remove" aria-label="Remove row" title="Remove row">\u2212</button>' +
+      '<button type="button" class="gc-netflow-row-remove" aria-label="Remove row" title="Remove row">' +
+      '<span class="gc-icon gc-icon--xs" aria-hidden="true">delete</span>' +
+      "</button>" +
       "</td>";
 
     var rm = tr.querySelector(".gc-netflow-row-remove");
@@ -112,6 +118,7 @@
       rm.addEventListener("click", function () {
         tr.remove();
         ensureTrailingBlank();
+        syncEmptyHint();
       });
     }
     tr.querySelectorAll("input").forEach(function (inp) {
@@ -136,6 +143,22 @@
 
   function onFlyoutTbodyInput() {
     ensureTrailingBlank();
+    syncEmptyHint();
+  }
+
+  // Hide the "No collectors yet" hint as soon as the user has typed any
+  // server-defining data (a name or host); otherwise show it. The trailing
+  // blank row is intentionally ignored. Save remains enabled even when empty
+  // because clearing all collectors is a legitimate action that users can
+  // queue through this flyout.
+  function syncEmptyHint() {
+    var hint = document.getElementById("gc-netflow-flyout-empty");
+    if (!hint || !flyoutTbody) return;
+    var any = false;
+    flyoutTbody.querySelectorAll("tr.gc-netflow-server-row").forEach(function (tr) {
+      if (rowHasUserData(tr)) any = true;
+    });
+    hint.hidden = any;
   }
 
   function renderFlyoutServers(servers) {
@@ -146,6 +169,7 @@
       flyoutTbody.appendChild(createServerRow(s || {}));
     });
     flyoutTbody.appendChild(createServerRow({}));
+    syncEmptyHint();
   }
 
   function collectServersFromFlyout() {
@@ -220,6 +244,32 @@
     if (btn && !btn._gcNetflowBound) {
       btn._gcNetflowBound = true;
       btn.addEventListener("click", closeFlyout);
+    }
+    var closeBtn = document.getElementById("gc-netflow-flyout-close");
+    if (closeBtn && !closeBtn._gcNetflowBound) {
+      closeBtn._gcNetflowBound = true;
+      closeBtn.addEventListener("click", closeFlyout);
+    }
+    var addBtn = document.getElementById("gc-netflow-flyout-add-server");
+    if (addBtn && !addBtn._gcNetflowBound) {
+      addBtn._gcNetflowBound = true;
+      addBtn.addEventListener("click", function () {
+        if (!flyoutTbody) return;
+        // Drop the existing trailing blank row (if any) and append a fresh
+        // blank that gets immediate keyboard focus, so power users can stack
+        // entries without reaching for the mouse.
+        var rows = flyoutTbody.querySelectorAll("tr.gc-netflow-server-row");
+        var last = rows.length ? rows[rows.length - 1] : null;
+        if (last && !rowHasUserData(last)) last.remove();
+        var fresh = createServerRow({});
+        flyoutTbody.appendChild(fresh);
+        ensureTrailingBlank();
+        syncEmptyHint();
+        var nameInp = fresh.querySelector('input[data-gc-netflow-field="name"]');
+        if (nameInp) {
+          try { nameInp.focus(); } catch (e3) {}
+        }
+      });
     }
     var bd = flyoutRoot.querySelector(".gc-if-flyout__backdrop");
     if (bd && !bd._gcNetflowBound) {
