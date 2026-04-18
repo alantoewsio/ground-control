@@ -454,7 +454,7 @@
           if (pill) {
             pill.classList.toggle("gc-firewall-pill-status--online", on);
             pill.classList.toggle("gc-firewall-pill-status--offline", !on);
-            pill.textContent = on ? "\u2713" : "-";
+            pill.textContent = on ? "check_circle" : "cancel";
             pill.setAttribute("aria-label", on ? "Firewall online" : "Firewall offline");
           }
           for (let i = 0; i < firewallInventory.length; i++) {
@@ -822,12 +822,12 @@
       let online = !!(fw && fw.online);
       let statusEl = document.createElement("span");
       statusEl.className =
-        "gc-firewall-pill-status " +
+        "gc-icon gc-icon--xs gc-firewall-pill-status " +
         (online ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline");
       statusEl.setAttribute("role", "img");
       statusEl.setAttribute("aria-label", online ? "Firewall online" : "Firewall offline");
       statusEl.setAttribute("data-gc-nav-fw-status", String(id));
-      statusEl.textContent = online ? "\u2713" : "-";
+      statusEl.textContent = online ? "check_circle" : "cancel";
       let nameEl = document.createElement("span");
       nameEl.className = "gc-net-fw-selected__name mono";
       nameEl.textContent = label;

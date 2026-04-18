@@ -28,105 +28,124 @@
 {% block content %}
 <main class="layout single">
   <section class="firewalls-page">
-    <dialog class="modal" id="add-firewall-modal" aria-labelledby="add-firewall-title">
-      <form method="post" action="{{ url_firewall_create }}" class="form modal-form" id="add-firewall-form">
-        <h3 id="add-firewall-title" class="modal-title">Add firewall</h3>
-        <label>
-          <span>Name <span class="muted">(optional)</span></span>
-          <input type="text" name="name" autocomplete="off" placeholder="e.g. NYC primary" />
-        </label>
-        <label>
-          <span>Description <span class="muted">(optional)</span></span>
-          <textarea name="description" rows="3" placeholder="Notes about this firewall"></textarea>
-        </label>
-        <label>
-          <span>Host</span>
-          <input type="text" name="host" required autocomplete="off" placeholder="10.0.0.1 or hostname" />
-        </label>
-        <label>
-          <span>Port</span>
-          <input type="number" name="port" value="4444" min="1" max="65535" required />
-        </label>
-        <label>
-          <span>API request timeout (seconds)</span>
-          <input
-            type="number"
-            name="api_request_timeout_seconds"
-            value="120"
-            min="5"
-            max="600"
-            required
-            title="HTTP read timeout for Sophos XML API (task queue, sync, test connection)"
-          />
-        </label>
-        <label>
-          <span>Username</span>
-          <input type="text" name="username" required autocomplete="username" />
-        </label>
-        <label>
-          <span>Password</span>
-          <input type="password" name="password" required autocomplete="new-password" />
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" name="verify_ssl" checked />
-          <span>Verify TLS certificate</span>
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" name="monitor_enabled" id="add-fw-monitor-enabled" checked />
-          <span>Monitor</span>
-        </label>
-        <p class="muted" style="margin: -0.25rem 0 0 1.75rem; font-size: 0.875rem">
-          When enabled, the scheduler probes this firewall&rsquo;s web admin port on a repeating interval and logs latency or errors.
-        </p>
-        <label class="add-fw-monitor-interval-row" for="add-fw-monitor-interval">
-          <span>Monitoring interval (minutes)</span>
-          <input
-            type="number"
-            id="add-fw-monitor-interval"
-            name="monitor_interval_minutes"
-            min="1"
-            max="1440"
-            value="5"
-            required
-          />
-        </label>
-        <div class="gc-tag-editor gc-tag-editor--modal" data-gc-tag-editor>
-          <span class="gc-if-flyout__label">Tags <span class="muted">(optional)</span></span>
-          <div class="gc-tag-editor__chips" data-gc-tag-chips aria-live="polite"></div>
-          <div class="gc-tag-editor__combo">
-            <div class="gc-tag-editor__row">
-              <input
-                type="text"
-                class="gc-tag-editor__input gc-if-flyout__input"
-                data-gc-tag-input
-                maxlength="64"
-                placeholder="Search tags or type a new one"
-                autocomplete="off"
-                aria-label="Add tag"
-                aria-autocomplete="list"
-                aria-controls="gc-tag-suggest-list-add"
-                aria-expanded="false"
-              />
-              <button type="button" class="btn btn--secondary" data-gc-tag-add>Add</button>
-            </div>
-            <div class="gc-tag-editor__suggest-wrap" data-gc-tag-suggest-wrap hidden>
-              <ul
-                id="gc-tag-suggest-list-add"
-                class="gc-tag-editor__suggest"
-                role="listbox"
-                aria-label="Tags used on other firewalls"
-                data-gc-tag-suggest-list
-              ></ul>
+    <div id="gc-fw-add-flyout" class="gc-if-flyout gc-fw-inv-flyout" hidden aria-hidden="true">
+      <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+      <div
+        class="gc-if-flyout__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gc-fw-add-flyout-title"
+        tabindex="-1"
+      >
+        <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
+        <header class="gc-if-flyout__header">
+          <h2 id="gc-fw-add-flyout-title" class="gc-if-flyout__title">Add firewall</h2>
+          <button type="button" class="gc-fw-inv-flyout__close" id="gc-fw-add-flyout-close" aria-label="Close" title="Close">
+            ×
+          </button>
+        </header>
+        <form method="post" action="{{ url_firewall_create }}" class="gc-if-flyout__panel-form" id="add-firewall-form" novalidate>
+          <div class="gc-if-flyout__scroll">
+            <div class="gc-if-flyout__form-body is-active">
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-name">Name <span class="muted">(optional)</span></label>
+                <input type="text" id="add-fw-name" name="name" class="gc-if-flyout__input" autocomplete="off" placeholder="e.g. NYC primary" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-description">Description <span class="muted">(optional)</span></label>
+                <textarea id="add-fw-description" name="description" class="gc-if-flyout__input" rows="3" placeholder="Notes about this firewall"></textarea>
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-host">Host</label>
+                <input type="text" id="add-fw-host" name="host" class="gc-if-flyout__input mono" required autocomplete="off" placeholder="10.0.0.1 or hostname" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-port">Port</label>
+                <input type="number" id="add-fw-port" name="port" class="gc-if-flyout__input mono" value="4444" min="1" max="65535" required />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-api-timeout">API request timeout (seconds)</label>
+                <input
+                  type="number"
+                  id="add-fw-api-timeout"
+                  name="api_request_timeout_seconds"
+                  class="gc-if-flyout__input mono"
+                  value="120"
+                  min="5"
+                  max="600"
+                  required
+                  title="HTTP read timeout for Sophos XML API (task queue, sync, test connection)"
+                />
+              </div>
+              <p class="gc-fw-inv-flyout__hint muted">Used for sync, task queue pushes, and test connection. Minimum 5s, maximum 600s.</p>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-username">Username</label>
+                <input type="text" id="add-fw-username" name="username" class="gc-if-flyout__input" required autocomplete="username" />
+              </div>
+              <div class="gc-if-flyout__field">
+                <label class="gc-if-flyout__label" for="add-fw-password">Password</label>
+                <input type="password" id="add-fw-password" name="password" class="gc-if-flyout__input" required autocomplete="new-password" />
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+                <label class="gc-if-flyout__toggle-label">
+                  <input type="checkbox" name="verify_ssl" checked />
+                  <span>Verify TLS certificate</span>
+                </label>
+              </div>
+              <div class="gc-if-flyout__field gc-if-flyout__field--toggle">
+                <label class="gc-if-flyout__toggle-label">
+                  <input type="checkbox" name="monitor_enabled" id="add-fw-monitor-enabled" checked />
+                  <span>Monitor</span>
+                </label>
+              </div>
+              <p class="gc-fw-inv-flyout__hint muted">When enabled, the scheduler probes this firewall&rsquo;s web admin port on a repeating interval and logs latency or errors.</p>
+              <div class="gc-if-flyout__field add-fw-monitor-interval-row" id="add-fw-monitor-interval-wrap">
+                <label class="gc-if-flyout__label" for="add-fw-monitor-interval">Monitoring interval (minutes)</label>
+                <input
+                  type="number"
+                  id="add-fw-monitor-interval"
+                  name="monitor_interval_minutes"
+                  class="gc-if-flyout__input mono"
+                  min="1"
+                  max="1440"
+                  value="5"
+                  required
+                />
+              </div>
+              <div class="gc-designer-tags" id="gc-fw-add-tag-editor" data-gc-designer-tag-editor>
+                <span class="gc-if-flyout__label" id="gc-fw-add-tags-l">Tags <span class="muted">(optional)</span></span>
+                <input type="hidden" class="gc-designer-tags__hidden" name="tags_json" id="gc-fw-add-tags-json" value="[]" />
+                <div class="gc-designer-tags__combo">
+                  <div class="gc-designer-tags__field" role="group" aria-labelledby="gc-fw-add-tags-l">
+                    <div class="gc-designer-tags__chips" aria-live="polite"></div>
+                    <div class="gc-designer-tags__input-shell">
+                      <div class="gc-designer-tags__mirror" aria-hidden="true">
+                        <span class="gc-designer-tags__typed-mirror"></span><span class="gc-designer-tags__ghost"></span>
+                      </div>
+                      <input
+                        type="text"
+                        class="gc-designer-tags__input mono gc-if-flyout__input"
+                        id="gc-fw-add-tags-input"
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-autocomplete="list"
+                        aria-expanded="false"
+                        placeholder="Add tag…"
+                      />
+                    </div>
+                  </div>
+                  <ul class="gc-designer-tags__suggest" role="listbox" hidden aria-label="Tag suggestions"></ul>
+                </div>
+              </div>
             </div>
           </div>
-          <input type="hidden" name="tags_json" data-gc-tag-hidden value="[]" />
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn" id="cancel-add-firewall">Cancel</button>
-          <button type="submit" class="btn primary">Save</button>
-        </div>
-      </form>
-    </dialog>
+          <footer class="gc-if-flyout__footer gc-fw-inv-flyout__footer">
+            <button type="submit" class="btn primary">Save</button>
+            <button type="button" class="btn btn--secondary" id="cancel-add-firewall">Cancel</button>
+          </footer>
+        </form>
+      </div>
+    </div>
 
     <dialog class="modal gc-delete-confirm-dialog" id="gc-fw-delete-dialog" aria-labelledby="gc-fw-delete-dialog-title">
       <div class="form modal-form">
@@ -392,9 +411,9 @@
                   >
                     <span class="gc-fw-sync-err-wrap"{% if not sync_err %} hidden{% endif %}>
                       <span
-                        class="gc-fw-sync-err-icon"
-                        {% if sync_err %}aria-label="Last configuration sync failed: {{ sync_err | e }}"{% else %}aria-hidden="true"{% endif %}
-                        >!</span>
+                        class="gc-icon gc-icon--sm gc-fw-sync-err-icon"
+                        {% if sync_err %}role="img" aria-label="Last configuration sync failed: {{ sync_err | e }}"{% else %}aria-hidden="true"{% endif %}
+                        >error</span>
                     </span>
                   </td>
                   <td data-gc-col="name" class="gc-net-firewall-pills">
@@ -402,9 +421,7 @@
                     {% if fw_label != "—" %}
                     {% set fw_online = fw_online_map.get(fw.id, false) %}
                     <span class="gc-zone-pill gc-firewall-pill">
-                      <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if fw_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if fw_online else 'offline' }}">
-                        {% if fw_online %}&check;{% else %}-{% endif %}
-                      </span>
+                      <span class="gc-icon gc-icon--xs gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if fw_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if fw_online else 'offline' }}">{% if fw_online %}check_circle{% else %}cancel{% endif %}</span>
                       {{ fw_label }}
                     </span>
                     {% else %}
@@ -1228,9 +1245,18 @@
       gcFwEditTagEditorApi = gcFwEditTagEditorRoot._gcDesignerTagApi || null;
     }
 
-    var addTagRoot = document.querySelector("#add-firewall-form [data-gc-tag-editor]");
+    var gcFwAddTagEditorRoot = document.getElementById("gc-fw-add-tag-editor");
+    var gcFwAddTagEditorApi = null;
+    if (gcFwAddTagEditorRoot && typeof window.gcDesignerTagEditorInit === "function") {
+      window.gcDesignerTagEditorInit(gcFwAddTagEditorRoot, {
+        tagPool: FIREWALL_TAG_SUGGESTIONS,
+        maxTagLen: GC_TAG_MAX_LEN,
+        maxTagCount: GC_TAG_MAX_COUNT,
+      });
+      gcFwAddTagEditorApi = gcFwAddTagEditorRoot._gcDesignerTagApi || null;
+    }
+
     var batchTagRoot = document.querySelector("#gc-fw-tags-dialog [data-gc-fw-batch-tag-editor]");
-    if (addTagRoot) gcTagEditorBind(addTagRoot);
     if (batchTagRoot) gcTagEditorBind(batchTagRoot);
 
     var filtersDrawerEl = document.getElementById("gc-fw-filters-drawer");
@@ -2263,6 +2289,9 @@
         setColPanelOpen(false);
         colsTrigger && colsTrigger.focus();
       }
+      if (e.key === "Escape" && addFlyout && !addFlyout.hidden) {
+        closeAddFlyout();
+      }
       if (e.key === "Escape" && editFlyout && !editFlyout.hidden) {
         closeEditFlyout();
       }
@@ -2273,11 +2302,21 @@
     window.addEventListener("resize", repositionColsIfOpen);
     window.addEventListener("scroll", repositionColsIfOpen, true);
 
-    var addModal = document.getElementById("add-firewall-modal");
+    var addFlyout = document.getElementById("gc-fw-add-flyout");
+    var addFlyoutClose = document.getElementById("gc-fw-add-flyout-close");
+    var addFlyoutBackdrop = addFlyout && addFlyout.querySelector(".gc-if-flyout__backdrop");
+    var addFlyoutPanel = addFlyout && addFlyout.querySelector(".gc-if-flyout__panel");
     var addForm = document.getElementById("add-firewall-form");
     var openBtn = document.getElementById("open-add-firewall");
     var cancelBtn = document.getElementById("cancel-add-firewall");
-    if (openBtn && addModal) {
+
+    function closeAddFlyout() {
+      if (!addFlyout) return;
+      addFlyout.hidden = true;
+      addFlyout.setAttribute("aria-hidden", "true");
+    }
+
+    if (openBtn && addFlyout) {
       openBtn.addEventListener("click", function () {
         if (addForm) addForm.reset();
         var v = addForm && addForm.querySelector('input[name="verify_ssl"]');
@@ -2289,20 +2328,31 @@
         syncAddMonitorIntervalUi();
         var p = addForm && addForm.querySelector('input[name="port"]');
         if (p) p.value = "4444";
-        var addTagEd = addForm && addForm.querySelector("[data-gc-tag-editor]");
-        if (addTagEd) gcTagEditorSetTags(addTagEd, []);
-        addModal.showModal();
+        if (gcFwAddTagEditorApi) {
+          gcFwAddTagEditorApi.setTags([]);
+          if (typeof window.gcDesignerTagEditorMarkSaved === "function" && gcFwAddTagEditorRoot) {
+            window.gcDesignerTagEditorMarkSaved(gcFwAddTagEditorRoot, gcFwAddTagEditorApi.getTags());
+          }
+        }
+        addFlyout.hidden = false;
+        addFlyout.setAttribute("aria-hidden", "false");
+        if (addFlyoutPanel) {
+          try {
+            addFlyoutPanel.focus();
+          } catch (e2) {}
+        }
       });
     }
-    if (cancelBtn && addModal) {
+    if (cancelBtn && addFlyout) {
       cancelBtn.addEventListener("click", function () {
-        addModal.close();
+        closeAddFlyout();
       });
     }
-    if (addModal) {
-      addModal.addEventListener("click", function (e) {
-        if (e.target === addModal) addModal.close();
-      });
+    if (addFlyoutClose) {
+      addFlyoutClose.addEventListener("click", closeAddFlyout);
+    }
+    if (addFlyoutBackdrop) {
+      addFlyoutBackdrop.addEventListener("click", closeAddFlyout);
     }
 
     function syncEditMonitorIntervalUi() {
@@ -2447,6 +2497,7 @@
         document.addEventListener("mouseup", onUp);
       });
     }
+    if (addFlyout) bindFwFlyoutResize(addFlyout);
     if (editFlyout) bindFwFlyoutResize(editFlyout);
 
     var editMonCb = document.getElementById("edit-fw-monitor_enabled");
@@ -3107,7 +3158,7 @@
               if (pill) {
                 pill.classList.toggle("gc-firewall-pill-status--online", body.inventory_online);
                 pill.classList.toggle("gc-firewall-pill-status--offline", !body.inventory_online);
-                pill.textContent = body.inventory_online ? "\u2713" : "-";
+                pill.textContent = body.inventory_online ? "check_circle" : "cancel";
                 pill.setAttribute(
                   "aria-label",
                   "Firewall " + (body.inventory_online ? "online" : "offline"),

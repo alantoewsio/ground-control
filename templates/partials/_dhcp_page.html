@@ -1,0 +1,102 @@
+{# ---------------------------------------------------------------------------
+   Shared DHCP-tab markup macros (Network page · Firewalls + Configurations).
+
+   The DHCP tab inside the Network page is structured as three sub-tabs:
+   IPv4 servers, IPv6 servers and Relays.  Each sub-tab is an HS-style entity
+   table (Add / Edit / Delete / Bulk add) backed by the generic
+   ``/api/firewalls/hosts-services/table?entity_type=dhcp_server[_ipv6|_relay]``
+   endpoint.
+
+   Args used across macros:
+     prefix         id prefix used by all elements ("gc-net-dhcp" or
+                    "gc-cfg-net-dhcp")
+     sub_attr       data-attribute name on each sub-tab button
+                    (e.g. ``data-gc-net-dhcp-subtab``)
+     save_label     label for the flyout Save button
+                    ("Save to task queue" / "Save")
+   --------------------------------------------------------------------------- #}
+{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+
+{% macro dhcp_filter_asides(prefix) -%}
+  {{ net_filters_aside(prefix ~ "-ipv4", true) }}
+  {{ net_filters_aside(prefix ~ "-ipv6", true) }}
+  {{ net_filters_aside(prefix ~ "-relay", true) }}
+{%- endmacro %}
+
+{% macro dhcp_subtablist(prefix, sub_attr) -%}
+<div class="gc-tabs gc-tabs--sub" role="tablist" aria-label="DHCP type"
+  id="{{ prefix }}-subtablist"
+  style="margin-bottom:0.5rem;font-size:0.875rem">
+  <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
+    id="{{ prefix }}-subtab-ipv4" {{ sub_attr }}="ipv4">IPv4 servers</button>
+  <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
+    id="{{ prefix }}-subtab-ipv6" {{ sub_attr }}="ipv6">IPv6 servers</button>
+  <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false"
+    id="{{ prefix }}-subtab-relay" {{ sub_attr }}="relay">Relays</button>
+</div>
+{%- endmacro %}
+
+{% macro dhcp_subtab_panels(prefix, ipv4_subtitle, ipv6_subtitle, relay_subtitle, toolbar_page_sync) -%}
+<div class="gc-tab-panels">
+  <div class="gc-tab-panel is-active" role="tabpanel"
+    aria-labelledby="{{ prefix }}-subtab-ipv4" id="{{ prefix }}-panel-ipv4">
+    {{ net_entity_table_wrap(prefix ~ "-ipv4", "DHCP servers (IPv4)", "Search IPv4 DHCP servers", true,
+      prefix ~ "-ipv4-add", "Add IPv4 DHCP server",
+      ipv4_subtitle,
+      prefix ~ "-ipv4-delete-selected", "Delete selected",
+      toolbar_page_sync=toolbar_page_sync,
+      bulk_add_btn_id=prefix ~ "-ipv4-bulk-add", bulk_add_btn_label="Bulk add") }}
+  </div>
+  <div class="gc-tab-panel" role="tabpanel"
+    aria-labelledby="{{ prefix }}-subtab-ipv6" id="{{ prefix }}-panel-ipv6" hidden>
+    {{ net_entity_table_wrap(prefix ~ "-ipv6", "DHCP servers (IPv6)", "Search IPv6 DHCP servers", true,
+      prefix ~ "-ipv6-add", "Add IPv6 DHCP server",
+      ipv6_subtitle,
+      prefix ~ "-ipv6-delete-selected", "Delete selected",
+      toolbar_page_sync=toolbar_page_sync,
+      bulk_add_btn_id=prefix ~ "-ipv6-bulk-add", bulk_add_btn_label="Bulk add") }}
+  </div>
+  <div class="gc-tab-panel" role="tabpanel"
+    aria-labelledby="{{ prefix }}-subtab-relay" id="{{ prefix }}-panel-relay" hidden>
+    {{ net_entity_table_wrap(prefix ~ "-relay", "DHCP relays", "Search DHCP relays", true,
+      prefix ~ "-relay-add", "Add DHCP relay",
+      relay_subtitle,
+      prefix ~ "-relay-delete-selected", "Delete selected",
+      toolbar_page_sync=toolbar_page_sync,
+      bulk_add_btn_id=prefix ~ "-relay-bulk-add", bulk_add_btn_label="Bulk add") }}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro dhcp_cols_modals(prefix) -%}
+{{ net_cols_modal(prefix ~ "-ipv4") }}
+{{ net_cols_modal(prefix ~ "-ipv6") }}
+{{ net_cols_modal(prefix ~ "-relay") }}
+{%- endmacro %}
+
+{% macro dhcp_edit_flyout(save_label) -%}
+<div id="gc-dhcp-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
+  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="gc-if-flyout__panel" role="dialog" aria-modal="true"
+    aria-labelledby="gc-dhcp-flyout-title" tabindex="-1">
+    <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
+    <header class="gc-if-flyout__header">
+      <h2 id="gc-dhcp-flyout-title" class="gc-if-flyout__title">DHCP object</h2>
+      <button type="button" class="gc-fw-inv-flyout__close" id="gc-dhcp-flyout-close"
+        aria-label="Close" title="Close">&times;</button>
+    </header>
+    <div class="gc-if-flyout__panel-form">
+      <div class="gc-if-flyout__scroll">
+        <div class="gc-if-flyout__form-body">
+          <p id="gc-dhcp-flyout-meta" class="muted gc-hs-flyout__meta"></p>
+          <div id="gc-dhcp-flyout-fields"></div>
+        </div>
+      </div>
+      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
+        <button type="button" class="btn primary" id="gc-dhcp-flyout-save" hidden>{{ save_label }}</button>
+        <button type="button" class="btn btn--secondary" id="gc-dhcp-flyout-done">Close</button>
+      </footer>
+    </div>
+  </div>
+</div>
+{%- endmacro %}

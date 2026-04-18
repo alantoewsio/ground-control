@@ -2344,7 +2344,7 @@
     root._gcDdCachedRows = merged;
     if (!merged.length) {
       list.innerHTML =
-        '<li class="gc-designer-dd__empty" role="presentation" style="cursor:default;color:var(--text-muted,#64748b)">No cached rows for this scope.</li>';
+        '<li class="gc-designer-dd__empty gc-d-inline-dd-empty" role="presentation">No cached rows for this scope.</li>';
     } else {
       var html = "";
       for (var mi = 0; mi < merged.length; mi++) {

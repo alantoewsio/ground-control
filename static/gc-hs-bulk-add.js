@@ -379,6 +379,107 @@
       },
     },
 
+    dhcp_server: {
+      title: "DHCP servers (IPv4)",
+      format: [
+        "Format:  name, interface, start_ip-end_ip, subnet_mask, gateway [, lease_seconds]",
+        "",
+        "Examples:",
+        "  LAN-DHCP,Port1,192.168.1.100-192.168.1.200,255.255.255.0,192.168.1.1,86400",
+        "  Guest-DHCP,Port2,10.0.0.50-10.0.0.150,255.255.255.0,10.0.0.1",
+      ].join("\n"),
+      hint: "Name, interface, IP lease range (start-end), subnet mask and gateway are required. Default lease time defaults to 86400.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 5) return null;
+        var name = f[0], iface = f[1], range = f[2], mask = f[3], gw = f[4];
+        if (!name || !iface || !range || !mask || !gw) return null;
+        var parts = String(range).split("-");
+        if (parts.length !== 2) return { _error: "IP lease must be START-END" };
+        var s = parts[0].trim(), e = parts[1].trim();
+        if (!isValidIP(s) || !isValidIP(e)) return { _error: "Invalid IP in lease range: " + range };
+        var form = {
+          name: name,
+          Name: name,
+          Interface: iface,
+          ip_lease: [s + "-" + e],
+          SubnetMask: mask,
+          Gateway: gw,
+          DefaultLeaseTime: f[5] || "86400",
+          MaxLeaseTime: f[5] || "86400",
+        };
+        return form;
+      },
+    },
+
+    dhcp_server_ipv6: {
+      title: "DHCP servers (IPv6)",
+      format: [
+        "Format:  name, interface, start_ipv6-end_ipv6 [, preferred_time] [, valid_time]",
+        "",
+        "Examples:",
+        "  V6-LAN,Port1,2001:db8::100-2001:db8::200,3600,7200",
+        "  V6-Guest,Port2,fd00::10-fd00::ff",
+      ].join("\n"),
+      hint: "Name, interface and IPv6 lease range (start-end) are required. Times default to 3600/7200.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 3) return null;
+        var name = f[0], iface = f[1], range = f[2];
+        if (!name || !iface || !range) return null;
+        var parts = String(range).split("-");
+        if (parts.length !== 2) return { _error: "IPv6 lease must be START-END" };
+        var s = parts[0].trim(), e = parts[1].trim();
+        if (s.indexOf(":") === -1 || e.indexOf(":") === -1) return { _error: "Lease range must be IPv6: " + range };
+        var form = {
+          name: name,
+          Name: name,
+          Interface: iface,
+          ip_lease: [s + "-" + e],
+          PreferredTime: f[3] || "3600",
+          ValidTime: f[4] || "7200",
+        };
+        return form;
+      },
+    },
+
+    dhcp_relay: {
+      title: "DHCP relays",
+      format: [
+        "Format:  name, interface, server_ip1+server_ip2+... [, ip_family] [, relay_through_ipsec]",
+        "         ip_family: IPv4 | IPv6 (default IPv4)",
+        "         relay_through_ipsec: Enable | Disable (default Disable)",
+        "",
+        "Examples:",
+        "  Relay-LAN,Port1,10.10.0.5,IPv4,Disable",
+        "  Relay-Guest,Port2,10.20.0.5+10.20.0.6",
+      ].join("\n"),
+      hint: "Name, interface and at least one DHCP server IP are required.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 3) return null;
+        var name = f[0], iface = f[1], srv = f[2];
+        if (!name || !iface || !srv) return null;
+        var ips = srv.split("+").map(function (s) { return s.trim(); }).filter(Boolean);
+        if (!ips.length) return { _error: "At least one server IP is required" };
+        for (var i = 0; i < ips.length; i++) {
+          if (!isValidIP(ips[i])) return { _error: "Invalid server IP: " + ips[i] };
+        }
+        var family = f[3] || "IPv4";
+        if (family !== "IPv4" && family !== "IPv6") return { _error: "ip_family must be IPv4 or IPv6" };
+        var rti = f[4] || "Disable";
+        if (rti !== "Enable" && rti !== "Disable") return { _error: "relay_through_ipsec must be Enable or Disable" };
+        return {
+          name: name,
+          Name: name,
+          IPFamily: family,
+          Interface: iface,
+          RelaythroughIPSec: rti,
+          dhcp_server_ip: ips,
+        };
+      },
+    },
+
     acl_rule: {
       title: "Local Service ACL rules",
       identityField: "RuleName",

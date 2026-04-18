@@ -491,11 +491,18 @@
     return h % 360;
   }
 
+  function normalizedFwLabelModalHs(name) {
+    var s = String(name == null ? "" : name).trim();
+    return s.replace(/^(?:check_circle|cancel|✓|×)\s+/i, "");
+  }
+
   function fwPillModalHs(name) {
-    var hue = zoneHueModalHs(name);
-    return (
-      '<span class="gc-zone-pill" style="--gc-zone-h:' + hue + '">' + escModalHs(name) + "</span>"
-    );
+    var label = normalizedFwLabelModalHs(name);
+    if (typeof window.gcFirewallScopePillHtml === "function") {
+      return window.gcFirewallScopePillHtml(label);
+    }
+    var hue = zoneHueModalHs(label);
+    return '<span class="gc-zone-pill" style="--gc-zone-h:' + hue + '">' + escModalHs(label) + "</span>";
   }
 
   function buildHsCombineModalHtml(data) {

@@ -42,6 +42,8 @@ ENTITY_LAG = "lag"
 ENTITY_ALIAS = "alias"
 ENTITY_ZONE = "zone"
 ENTITY_DHCP_SERVER = "dhcp_server"
+ENTITY_DHCP_SERVER_IPV6 = "dhcp_server_ipv6"
+ENTITY_DHCP_RELAY = "dhcp_relay"
 
 # Unified Network · Interfaces tab (interface, VLAN, bridge pair, LAG, alias).
 ENTITY_TYPES_INTERFACES_TAB: frozenset[str] = frozenset(
@@ -301,6 +303,20 @@ _SYNC_ENTITY_SPECS: tuple[SyncEntitySpec, ...] = (
         "DHCP servers (IPv4)",
         "DHCPServer",
         _spec_tag("DHCPServer"),
+    ),
+    # ``Response/DHCPServerIpv6`` per xml-api-docs/Configure/Network/DHCPServerIpv6.md
+    SyncEntitySpec(
+        ENTITY_DHCP_SERVER_IPV6,
+        "DHCP servers (IPv6)",
+        "DHCPServerIpv6",
+        _spec_tag("DHCPServerIpv6"),
+    ),
+    # ``Response/DHCPRelay`` per xml-api-docs/Configure/Network/DHCPRelay.md
+    SyncEntitySpec(
+        ENTITY_DHCP_RELAY,
+        "DHCP relays",
+        "DHCPRelay",
+        _spec_tag("DHCPRelay"),
     ),
     SyncEntitySpec("acl_rule", "ACL rules", "LocalServiceACL", _spec_get("get_acl_rule"), ("RuleName",)),
     # Routing
@@ -596,6 +612,8 @@ _SOFT_FAIL_SYNC_IDS: frozenset[str] = frozenset(
         ENTITY_HA_CONFIGURE,
         ENTITY_NETFLOW_CONFIGURATION,
         ENTITY_DHCP_SERVER,
+        ENTITY_DHCP_SERVER_IPV6,
+        ENTITY_DHCP_RELAY,
     }
 )
 

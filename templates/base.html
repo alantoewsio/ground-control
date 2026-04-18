@@ -419,6 +419,7 @@
             </div>
           </div>
           <script src="/static/gc-icons.js"></script>
+          <script src="/static/gc-tooltip.js"></script>
           <script src="/static/gc-dialog.js"></script>
           <script src="/static/gc-global-banner.js"></script>
           {% if gc_error_banner %}
@@ -1861,6 +1862,55 @@
           } catch (e) {}
         });
         sync();
+      })();
+    </script>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var scrollActiveClass = "gc-scroll-active";
+        var clearTimer = null;
+        var activeMs = 700;
+
+        function markScrolling() {
+          root.classList.add(scrollActiveClass);
+          if (clearTimer) clearTimeout(clearTimer);
+          clearTimer = setTimeout(function () {
+            root.classList.remove(scrollActiveClass);
+          }, activeMs);
+        }
+
+        window.addEventListener("scroll", markScrolling, {
+          passive: true,
+          capture: true,
+        });
+        window.addEventListener("wheel", markScrolling, {
+          passive: true,
+          capture: true,
+        });
+        window.addEventListener("touchmove", markScrolling, {
+          passive: true,
+          capture: true,
+        });
+        window.addEventListener(
+          "keydown",
+          function (ev) {
+            var k = ev && ev.key ? String(ev.key) : "";
+            if (
+              k === "ArrowUp" ||
+              k === "ArrowDown" ||
+              k === "ArrowLeft" ||
+              k === "ArrowRight" ||
+              k === "PageUp" ||
+              k === "PageDown" ||
+              k === "Home" ||
+              k === "End" ||
+              k === " "
+            ) {
+              markScrolling();
+            }
+          },
+          true
+        );
       })();
     </script>
     <script src="/static/gc-table-facets.js"></script>

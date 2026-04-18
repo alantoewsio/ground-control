@@ -672,10 +672,10 @@
       var on = !!inSync;
       return (
         '<span class="gc-zone-pill gc-cfg-member-state-pill">' +
-        '<span class="gc-firewall-pill-status ' +
+        '<span class="gc-icon gc-icon--xs gc-firewall-pill-status ' +
         (on ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline") +
         '" aria-hidden="true">' +
-        (on ? "✓" : "×") +
+        (on ? "check_circle" : "cancel") +
         "</span>" +
         (on ? "In sync" : "Out of sync") +
         "</span>"
@@ -721,10 +721,10 @@
                 escapeAttr(label) +
                 '">' +
                 '<td><span class="gc-zone-pill gc-firewall-pill">' +
-                '<span class="gc-firewall-pill-status ' +
+                '<span class="gc-icon gc-icon--xs gc-firewall-pill-status ' +
                 (online ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline") +
                 '" aria-hidden="true">' +
-                (online ? "✓" : "×") +
+                (online ? "check_circle" : "cancel") +
                 "</span>" +
                 '<span class="mono">' +
                 escapeHtml(label) +

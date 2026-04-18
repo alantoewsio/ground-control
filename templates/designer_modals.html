@@ -85,7 +85,7 @@
       <h3 id="gc-designer-modals-flyout-titles-legend" class="gc-designer-ip-fieldset__legend">
         Flyout title properties
       </h3>
-      <p class="muted" style="margin-top: 0">
+      <p class="muted gc-d-inline-mt0">
         Primary sheet headings prepend <strong>Add</strong> (<span class="mono">view-flyout</span>) or
         <strong>Edit</strong> (<span class="mono">edit-flyout</span>) to your text (space-separated when non-empty).
         Leave blank for Add or Edit only. Use <strong>Save flyout properties</strong> to persist titles, object-edit
@@ -151,7 +151,7 @@
           <span class="mono">/api/firewalls/config-cache/distinct-entity-types</span>).</span
         >
       </label>
-      <div class="settings-form__actions" style="align-items: center; gap: 0.75rem; flex-wrap: wrap">
+      <div class="settings-form__actions gc-d-inline-actions-center-gap075-wrap">
         <button type="button" class="btn primary" id="gc-designer-modals-flyout-titles-save">Save flyout properties</button>
         <span class="muted" id="gc-designer-modals-flyout-titles-save-status" aria-live="polite"></span>
       </div>
@@ -187,7 +187,7 @@
       under the demo names the pattern for reuse elsewhere.
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row" style="flex-direction: column; align-items: flex-start; gap: 1.25rem">
+      <div class="gc-designer__row gc-d-inline-col-start-gap125">
         <button type="button" class="btn primary" id="gc-designer-modals-selector-props-open">
           Configure selector options
         </button>
@@ -266,7 +266,7 @@
           <h2 id="gc-designer-flyout-view-secondary-title" class="gc-designer-modal__title">More</h2>
           <button type="button" class="gc-designer-modal__close" id="gc-designer-flyout-view-secondary-close"
             aria-label="Close secondary panel">
-            ×
+            <span class="gc-icon gc-icon--md" aria-hidden="true">close</span>
           </button>
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
@@ -287,7 +287,9 @@
         <div class="gc-designer-view-flyout__resize gc-designer-view-flyout__resize--primary" aria-hidden="true"></div>
         <header class="gc-designer-modal__header">
           <h2 id="gc-designer-flyout-view-title" class="gc-designer-modal__title">Add</h2>
-          <button type="button" class="gc-designer-modal__close" aria-label="Close">×</button>
+          <button type="button" class="gc-designer-modal__close" aria-label="Close">
+            <span class="gc-icon gc-icon--md" aria-hidden="true">close</span>
+          </button>
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
@@ -433,7 +435,7 @@
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
-          <div class="settings-form__field" style="width: 100%">
+          <div class="settings-form__field gc-d-inline-wfull">
             <span class="settings-form__label" id="gc-designer-modals-selector-items-rows-l">Segment labels</span>
             <div
               id="gc-designer-modals-selector-items-rows"
@@ -441,11 +443,11 @@
               role="group"
               aria-labelledby="gc-designer-modals-selector-items-rows-l"
             ></div>
-            <button type="button" class="btn btn--secondary" id="gc-designer-modals-selector-items-add-row" style="margin-top: 10px">
+            <button type="button" class="btn btn--secondary gc-d-inline-mt10" id="gc-designer-modals-selector-items-add-row">
               Add value
             </button>
           </div>
-          <p class="settings-form__hint muted" style="margin-top: 0.75rem">
+          <p class="settings-form__hint muted gc-d-inline-mt075">
             <strong>Save</strong> rebuilds the segment buttons and keeps the prior selection when its label still exists;
             otherwise the first segment is active. Removing every row defaults to <strong>On</strong> and
             <strong>Off</strong>.

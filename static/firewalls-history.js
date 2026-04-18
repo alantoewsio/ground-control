@@ -255,12 +255,12 @@
         let online = !!row.firewall_online;
         return (
           '<span class="gc-zone-pill gc-firewall-pill">' +
-          '<span class="gc-firewall-pill-status gc-firewall-pill-status--' +
+          '<span class="gc-icon gc-icon--xs gc-firewall-pill-status gc-firewall-pill-status--' +
           (online ? "online" : "offline") +
           '" role="img" aria-label="Firewall ' +
           (online ? "online" : "offline") +
           '">' +
-          (online ? "✓" : "-") +
+          (online ? "check_circle" : "cancel") +
           "</span>" +
           '<span class="mono">' +
           escapeHtml(label) +

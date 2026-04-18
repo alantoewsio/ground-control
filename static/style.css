@@ -137,10 +137,25 @@
   --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.25);
   --shadow: var(--shadow-sm);
 
+  /* Card system ? Figma global card spec (design-skill.md sec.7).
+     Single source of truth for every "card" surface in the app: generic
+     .panel containers, dashboard widgets/stats/latency, section panels,
+     etc. White fill on the --app-bg gray, soft shadow for separation,
+     no border (the shadow is the framing). All card components MUST
+     consume these tokens; do NOT hand-roll radius/bg/shadow per surface. */
+  --card-radius: 5px;
+  --card-bg: #FFFFFF;
+  --card-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.1);   /* = #0000001A */
+
   /* Motion (design-skill.md sec.5) */
   --motion-fast: 150ms;
   --motion-normal: 200ms;
   --motion-slow: 300ms;
+
+  /* Global scrollbar tokens (modern, thin, on-scroll reveal) */
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: rgba(44, 45, 46, 0.36);
+  --scrollbar-thumb-hover: rgba(44, 45, 46, 0.56);
 
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
@@ -165,6 +180,45 @@ body {
   background: var(--app-bg);
   font-size: 14px;
   line-height: 1.45;
+}
+
+/* Global modern scrollbars:
+   - Thin by default
+   - Hidden until active scroll (driven by html.gc-scroll-active in base.html)
+   - Works on both Firefox and Chromium/WebKit engines */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+html.gc-scroll-active * {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+  background: transparent;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 160ms ease;
+}
+
+html.gc-scroll-active *::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+}
+
+html.gc-scroll-active *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 /* ---------- App shell (Sophos-style top bar + left nav) ---------- */
@@ -1918,13 +1972,21 @@ a.gc-net-fw-selected__inventory-link:focus-visible {
   width: 100%;
 }
 
-.panel {
-  background: var(--surface-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+/* Card primitive ? global Figma card spec (design-skill.md sec.7).
+   .panel is the canonical class; .card is a semantic synonym for new
+   markup. Both render identical chrome: 5px radius, white fill on the
+   --app-bg gray, soft shadow for separation, NO border (shadow is the
+   frame). Dashboard widgets, stats, latency cards etc. compose on top
+   of this and inherit everything; do not re-declare radius/bg/border
+   per surface. */
+.panel,
+.card {
+  background: var(--card-bg);
+  border: 0;
+  border-radius: var(--card-radius);
   padding: 1.25rem 1.5rem;
   min-width: min(340px, 100%);
-  box-shadow: var(--shadow);
+  box-shadow: var(--card-shadow);
 }
 
 .panel.grow {
@@ -3304,19 +3366,20 @@ main.layout.gc-fw-v2-object-layout {
 }
 
 .firewalls-page .gc-fw-sync-err-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.05rem;
-  height: 1.05rem;
-  border-radius: 50%;
-  background: #c62828;
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.65rem;
+  /* Sync-error indicator: red filled circle with a white `!` inside.
+
+     The Material Symbols `error` glyph at FILL=1 IS itself a solid circle
+     with a `!`-shaped cutout. We colour the glyph red so the circle reads
+     red, and the `!` cutout lets the row's white background show through
+     as the white `!`. No background/border-radius/container styling
+     needed ? the glyph provides the entire visual.
+
+     Font family / ligature / FILL=1 cascade from `.gc-icon`. We only set
+     the colour, and let `.gc-icon--sm` size the glyph (18px).            */
+  color: var(--danger);
   line-height: 1;
+  vertical-align: middle;
   cursor: help;
-  user-select: none;
 }
 
 .table-footer {
@@ -3567,27 +3630,43 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   gap: 0.35rem;
 }
 
+.gc-zone-pill.gc-firewall-pill {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid transparent;
+}
+
+.gc-zone-pill.gc-firewall-pill:has(.gc-firewall-pill-status--online) {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+}
+
+.gc-zone-pill.gc-firewall-pill:has(.gc-firewall-pill-status--offline) {
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+}
+
 .gc-firewall-pill-status {
+  /* Status dot inside `.gc-firewall-pill`. Font (Material Symbols Outlined,
+     FILL=1) cascades from `.gc-icon`; we only constrain the box and override
+     `.gc-icon`'s 20px default down to 1rem so the glyph fits the pill.     */
   width: 1rem;
   height: 1rem;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 1rem;
   line-height: 1;
   flex: 0 0 auto;
+  background: transparent;
 }
 
 .gc-firewall-pill-status--online {
-  color: #fff;
-  background: #16a34a;
+  color: var(--badge-success-text);
 }
 
 .gc-firewall-pill-status--offline {
-  color: #fff;
-  background: #dc2626;
+  color: var(--badge-danger-text);
 }
 
 /* Do not set display:flex on <td> ? it breaks the table grid so pill columns can overlap / misalign.
@@ -3595,6 +3674,14 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
 .data-table tbody td.gc-net-firewall-pills,
 .data-table tbody td.gc-hs-multi-pills {
   vertical-align: top;
+}
+
+/* Firewalls inventory NAME column always renders a single firewall pill, so
+   center it vertically to line up with sibling cells (sync-error indicator,
+   description, host, etc.). The generic `vertical-align: top` rule above is
+   for multi-pill scope cells in network entity tables. */
+#gc-fw-table tbody td.gc-net-firewall-pills {
+  vertical-align: middle;
 }
 
 .data-table tbody td.gc-net-firewall-pills > .gc-cell-flex-pills,
@@ -3635,10 +3722,13 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   font-variant-numeric: tabular-nums;
 }
 
-/* Compact multi-value cells: preview pills + ?+N more?, expand to modal */
+/* Compact multi-value cells: preview pills + ?+N more?, expand to popover */
 .gc-table-value-pill {
   display: inline-block;
-  max-width: 14rem;
+  /* Cap pill width so a single long value never blows out the column, but allow
+     it to shrink to the cell width on narrow screens instead of cropping at a
+     fixed 14rem (which left awkward ellipsis even when more space was available). */
+  max-width: min(14rem, 100%);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3656,15 +3746,22 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   font-weight: 600;
   color: var(--text-muted);
   background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  /* +N more is short ("+12 more") ? don't let max-width truncation hide the count. */
+  max-width: none;
+  flex-shrink: 0;
 }
 
 .gc-table-cell-pills {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  max-height: 2.75rem;
-  overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
+  /* No max-height + overflow:hidden here on purpose. The "+N more" pill already
+     caps the visible count (max 2 values + +N more), so the container only
+     ever holds up to 3 pills. The previous 2.75rem cap clipped the second
+     wrapped row of pills on narrow columns; let the cell grow naturally. */
   vertical-align: middle;
 }
 
@@ -3685,6 +3782,60 @@ button.gc-table-toggle.gc-table-toggle--on .gc-table-toggle__thumb {
   transform: translate(-50%, -50%);
   width: min(420px, calc(100vw - 24px));
   max-height: min(520px, calc(100vh - 24px));
+}
+
+/* Anchored variant: opens as a popover next to the +N more pill instead of
+   centered. JS sets inline left/top via getBoundingClientRect, so reset the
+   centering transform and let the panel be a touch narrower for popover feel.
+   Z-index follows design-skill.md sec.5 (popover > modal). */
+.gc-table-list-modal.gc-table-list-modal--anchored {
+  z-index: 1060;
+}
+
+.gc-table-list-modal.gc-table-list-modal--anchored .gc-table-list-modal__panel {
+  left: 0;
+  top: 0;
+  right: auto;
+  transform: none;
+  width: min(320px, calc(100vw - 16px));
+  max-height: min(360px, calc(100vh - 24px));
+  /* Room for the arrow that points at the anchor pill. */
+  margin-top: 0;
+  overflow: visible;
+}
+
+/* Arrow: a rotated square on the top edge of the panel, horizontally offset
+   by --gc-popover-arrow-x (set by JS) so it lines up under the anchor's centre
+   even when the panel has been clamped to the viewport edge. */
+.gc-table-list-modal.gc-table-list-modal--anchored .gc-table-list-modal__panel::before {
+  content: "";
+  position: absolute;
+  left: var(--gc-popover-arrow-x, 50%);
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* Flipped: popover is above the anchor, arrow moves to the bottom edge. */
+.gc-table-list-modal.gc-table-list-modal--anchored.gc-table-list-modal--flip
+  .gc-table-list-modal__panel::before {
+  top: auto;
+  bottom: -5px;
+  border-top: 0;
+  border-left: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The list inside the popover still scrolls; keep the arrow visible above it. */
+.gc-table-list-modal.gc-table-list-modal--anchored .gc-table-list-modal__list {
+  max-height: min(260px, calc(100vh - 96px));
 }
 
 .gc-table-list-modal__list {
@@ -3804,17 +3955,11 @@ a.btn-icon {
   margin-bottom: 1.25rem;
 }
 
-/* Dashboard cards unify at 5px radius (product decision ? tighter corners than the
-   global .panel 10px default). Covers stat tiles, widget panels, latency cards,
-   the sankey filter panel, and any ad-hoc .panel used inside .dashboard-page.
-   Placed here so it beats the .panel and .dashboard-page__widget rules by
-   specificity (.dashboard-page descendant selector). See design-skill.md sec.5. */
-.dashboard-page .panel,
-.dashboard-page__stat,
-.dashboard-page__widget,
-.dashboard-page__latency-card {
-  border-radius: 5px;
-}
+/* Dashboard cards previously needed an explicit 5px override against the old
+   .panel 10px default. Now that the global card spec (--card-radius: 5px)
+   matches what dashboards always wanted, the override is redundant for the
+   shared chrome (radius/bg/shadow) and removed. Per-tile padding and layout
+   live in their own rules below. See design-skill.md sec.7 (Cards). */
 
 .dashboard-page__stat {
   padding: 1rem 1.15rem;
@@ -8886,12 +9031,13 @@ option.gc-pe-vpn-opt-weak {
   font: inherit;
   line-height: inherit;
   margin: 0;
-  background: color-mix(in srgb, var(--accent, #06c) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent, #06c) 32%, transparent);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border-color: transparent;
 }
 
 .gc-fw-user-tags__more:hover {
-  background: color-mix(in srgb, var(--accent, #06c) 26%, transparent);
+  background: color-mix(in srgb, var(--badge-info-bg) 84%, #ffffff);
 }
 
 .gc-fw-tags-view-dialog__list {
@@ -8921,8 +9067,8 @@ option.gc-pe-vpn-opt-weak {
   font-size: 0.75rem;
   font-weight: 500;
   vertical-align: middle;
-  background: color-mix(in srgb, var(--accent, #06c) 12%, transparent);
-  color: var(--text-header, #1a1a1a);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .gc-user-tag-pill {
@@ -8936,9 +9082,9 @@ option.gc-pe-vpn-opt-weak {
   font-size: 0.75rem;
   font-weight: 500;
   vertical-align: middle;
-  background: color-mix(in srgb, var(--text-muted, #666) 14%, transparent);
-  color: var(--text-header, #1a1a1a);
-  border: 1px solid color-mix(in srgb, var(--text-muted, #666) 22%, transparent);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid transparent;
 }
 
 .gc-tag-editor {
@@ -9496,14 +9642,14 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
 }
 
 .gc-hist-out-status--sent {
-  background: color-mix(in srgb, var(--success) 18%, transparent);
-  color: var(--success);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .gc-hist-out-status--removed {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid transparent;
 }
 
 .gc-hist-chg-action {
@@ -9517,21 +9663,21 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
 }
 
 .gc-hist-chg-action--added {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid transparent;
 }
 
 .gc-hist-chg-action--deleted {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid transparent;
 }
 
 .gc-hist-chg-action--changed {
-  background: color-mix(in srgb, #facc15 22%, transparent);
-  color: color-mix(in srgb, #facc15 40%, #4a2f00);
-  border: 1px solid color-mix(in srgb, #facc15 40%, transparent);
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid transparent;
 }
 
 .gc-hist-access-type {
@@ -9545,21 +9691,21 @@ body.gc-page-task-queue .layout.task-queue-page>.panel.grow>.task-queue-split {
 }
 
 .gc-hist-access-type--ssh {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid transparent;
 }
 
 .gc-hist-access-type--webadmin {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-  color: var(--success);
-  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid transparent;
 }
 
 .gc-hist-access-type--other {
-  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
-  color: var(--text-muted);
-  border: 1px solid color-mix(in srgb, var(--text-muted) 24%, transparent);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid transparent;
 }
 
 .task-queue-compare-modal {
@@ -10281,13 +10427,13 @@ html:has(body.gc-page-ssh-terminal) .app-main {
 }
 
 .gc-ipam-pill--discovered {
-  background: rgba(230, 126, 34, 0.2);
-  color: #b45309;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .gc-ipam-pill--conflict {
-  background: rgba(220, 38, 38, 0.16);
-  color: #b91c1c;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 /* Network ? Interfaces table: IPAM match / conflict before Address (CIDR) */
@@ -11065,6 +11211,222 @@ body.gc-designer-entity-nav__facet-overlay-open {
   flex-wrap: wrap;
   gap: 10px 14px;
   align-items: flex-start;
+}
+
+/* Designer inline-style replacements */
+.gc-d-inline-m0 {
+  margin: 0;
+}
+
+.gc-d-inline-mt0 {
+  margin-top: 0;
+}
+
+.gc-d-inline-mt075 {
+  margin-top: 0.75rem;
+}
+
+.gc-d-inline-mt10 {
+  margin-top: 10px;
+}
+
+.gc-d-inline-mt1r {
+  margin-top: 1rem;
+}
+
+.gc-d-inline-m8-0-4 {
+  margin: 8px 0 4px;
+}
+
+.gc-d-inline-m12-0-4 {
+  margin: 12px 0 4px;
+}
+
+.gc-d-inline-mb0 {
+  margin-bottom: 0;
+}
+
+.gc-d-inline-mb2 {
+  margin-bottom: 2px;
+}
+
+.gc-d-inline-wfull {
+  width: 100%;
+}
+
+.gc-d-inline-minw6 {
+  min-width: 6rem;
+}
+
+.gc-d-inline-minw7 {
+  min-width: 7rem;
+}
+
+.gc-d-inline-minw8 {
+  min-width: 8rem;
+}
+
+.gc-d-inline-minw9 {
+  min-width: 9rem;
+}
+
+.gc-d-inline-minw10-flex1 {
+  min-width: 10rem;
+  flex: 1;
+}
+
+.gc-d-inline-minw11 {
+  min-width: 11rem;
+}
+
+.gc-d-inline-minw12 {
+  min-width: 12rem;
+}
+
+.gc-d-inline-minw12-flex1 {
+  min-width: 12rem;
+  flex: 1;
+}
+
+.gc-d-inline-minw14-flex1 {
+  min-width: 14rem;
+  flex: 1;
+}
+
+.gc-d-inline-minw14-maxw40 {
+  min-width: 14rem;
+  max-width: 40rem;
+}
+
+.gc-d-inline-minw16-flex-center-gap8-wrap {
+  min-width: 16rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gc-d-inline-flex1-minw16 {
+  flex: 1;
+  min-width: 16rem;
+}
+
+.gc-d-inline-row-wrap-end-gap12-m0 {
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin: 0;
+}
+
+.gc-d-inline-row-wrap-end-gap12-m008 {
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin: 0 0 8px;
+}
+
+.gc-d-inline-row-wrap-end-gap12-16 {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+}
+
+.gc-d-inline-row-wrap-end-gap10-14 {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.gc-d-inline-row-wrap-end-gap12-20 {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.gc-d-inline-row-wrap-end-gap16-24 {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 24px;
+}
+
+.gc-d-inline-row-wrap-start-gap16-20-mt12 {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 20px;
+  margin-top: 12px;
+}
+
+.gc-d-inline-row-wrap-start-gap24-mt1r {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px;
+  margin-top: 1rem;
+}
+
+.gc-d-inline-row-wrap-gap8-16 {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.gc-d-inline-row-wrap-gap10-mt10 {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.gc-d-inline-col-start-gap125 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+}
+
+.gc-d-inline-actions-center-gap075-wrap {
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.gc-d-inline-flex-wrap-center-gap10-m0 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.gc-d-inline-flex-center-gap8 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gc-d-inline-flex-center-gap8-m0 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.gc-d-inline-flex-center-gap6-m0 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.gc-d-inline-m0-self-center {
+  margin: 0;
+  align-self: center;
+}
+
+.gc-d-inline-mt1r-maxw28 {
+  margin-top: 1rem;
+  max-width: 28rem;
+}
+
+.gc-d-inline-dd-empty {
+  cursor: default;
+  color: var(--text-muted, #64748b);
 }
 
 /* Designer ? Controls: searchable custom dropdowns */
@@ -12027,7 +12389,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   white-space: nowrap;
 }
 
-.gc-designer-data-controls__layout-toolbar .button,
+.gc-designer-data-controls__layout-toolbar .btn,
 .gc-designer-data-controls__layout-test-trigger {
   min-height: 1.75rem;
   padding-top: 0.2rem;
@@ -15234,6 +15596,74 @@ button .gc-icon + *:not(.gc-icon) {
   .gc-toast,
   .gc-toast--leaving {
     animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Styled tooltip ? design-skill.md sec. 7 / Figma tooltip spec.
+
+   The browser's native `title` tooltip is replaced at runtime by gc-tooltip.js
+   (it copies the attribute to `data-gc-tooltip` and renders a single portaled
+   .gc-tooltip node on document.body). z-index 1070 matches the tooltip layer
+   reserved in design-skill.md sec. 11. */
+.gc-tooltip {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  z-index: 1070;
+  max-width: 280px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: #3B3C3D;
+  color: #FFFFFF;
+  font-family: "Inter", sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  vertical-align: middle;
+  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  white-space: normal;
+  word-wrap: break-word;
+  transition: opacity 120ms ease-out;
+}
+
+.gc-tooltip[data-visible="true"] {
+  opacity: 1;
+}
+
+/* Arrow: a 6px rotated square positioned by `--gc-tooltip-arrow-x` so it stays
+   aligned with the target even after horizontal clamping at the viewport edge.
+   `data-placement` flips it above/below the tooltip body. */
+.gc-tooltip::before {
+  content: "";
+  position: absolute;
+  left: var(--gc-tooltip-arrow-x, 50%);
+  width: 6px;
+  height: 6px;
+  background: #3B3C3D;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.gc-tooltip[data-placement="top"]::before {
+  bottom: -4px;
+  border-top: 0;
+  border-left: 0;
+}
+
+.gc-tooltip[data-placement="bottom"]::before {
+  top: -4px;
+  border-bottom: 0;
+  border-right: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc-tooltip {
+    transition: none;
   }
 }
 

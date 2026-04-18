@@ -23,11 +23,11 @@
         <div class="gc-designer-modal__body">
           <fieldset class="settings-form gc-designer-ip-fieldset" id="gc-designer-ip-constraint-panel">
             <legend class="gc-designer-ip-fieldset__legend">Validation options</legend>
-            <p class="gc-designer__note" style="margin-top: 0">
+            <p class="gc-designer__note gc-d-inline-mt0">
               <strong>Save</strong> writes <code class="mono">data-gc-ip-*</code> on the demo inputs (after that, validation uses those attributes). Until you Save, the fields follow the settings below. <strong>IPv4 range</strong> applies only to the IPv4 field. Use separate CIDR fields for IPv4 and IPv6 containment. With <strong>CIDR /prefix min–max</strong>, enter values as <code class="mono">address/prefix</code>; prefix must fall in that range (per family: 0–32 or 0–128). <strong>Must be CIDR Network</strong> (constraint mode <strong>Network</strong>) requires a plain address that is already the network address for the <strong>Prefix length</strong> you set (host bits zero). <strong>Interface Address</strong> requires <code class="mono">host/prefix</code> in the field; on blur the value is normalized to the network address for that prefix (e.g. <code class="mono">10.1.2.3/16</code> → <code class="mono">10.1.0.0/16</code>).
             </p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; align-items: flex-end; gap: 12px 16px">
-              <label class="settings-form__field" style="min-width: 12rem">
+            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap12-16">
+              <label class="settings-form__field gc-d-inline-minw12">
                 <span class="settings-form__label">Constraint mode</span>
                 <select class="settings-form__input" id="gc-designer-ip-constraint-mode" aria-label="Constraint mode">
                   <option value="none">IP</option>
@@ -37,7 +37,7 @@
                   <option value="value-cidr">Interface Address</option>
                 </select>
               </label>
-              <label class="settings-form__field" style="min-width: 12rem; flex: 1">
+              <label class="settings-form__field gc-d-inline-minw12-flex1">
                 <span class="settings-form__label">Within CIDR (IPv4)</span>
                 <input
                   type="text"
@@ -48,7 +48,7 @@
                   aria-label="IPv4 CIDR subnet for containment"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 12rem; flex: 1">
+              <label class="settings-form__field gc-d-inline-minw12-flex1">
                 <span class="settings-form__label">Within CIDR (IPv6)</span>
                 <input
                   type="text"
@@ -59,7 +59,7 @@
                   aria-label="IPv6 CIDR subnet for containment"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 6rem">
+              <label class="settings-form__field gc-d-inline-minw6">
                 <span class="settings-form__label">CIDR /pfx min</span>
                 <input
                   type="number"
@@ -72,7 +72,7 @@
                   aria-label="Minimum prefix length for entered address or CIDR value"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 6rem">
+              <label class="settings-form__field gc-d-inline-minw6">
                 <span class="settings-form__label">CIDR /pfx max</span>
                 <input
                   type="number"
@@ -85,7 +85,7 @@
                   aria-label="Maximum prefix length for entered address or CIDR value"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 9rem">
+              <label class="settings-form__field gc-d-inline-minw9">
                 <span class="settings-form__label">Range low (IPv4)</span>
                 <input
                   type="text"
@@ -95,7 +95,7 @@
                   autocomplete="off"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 9rem">
+              <label class="settings-form__field gc-d-inline-minw9">
                 <span class="settings-form__label">Range high (IPv4)</span>
                 <input
                   type="text"
@@ -105,7 +105,7 @@
                   autocomplete="off"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 6rem">
+              <label class="settings-form__field gc-d-inline-minw6">
                 <span class="settings-form__label">Prefix length</span>
                 <input
                   type="number"
@@ -117,12 +117,12 @@
                   aria-label="Prefix length for network check or auto-correct"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 16rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+              <label class="settings-form__field gc-d-inline-minw16-flex-center-gap8-wrap">
                 <input type="checkbox" id="gc-designer-ip-autocorrect" checked />
-                <span class="settings-form__label" style="margin: 0">Auto-correct to network address on blur</span>
+                <span class="settings-form__label gc-d-inline-m0">Auto-correct to network address on blur</span>
               </label>
             </div>
-            <div class="gc-designer__row" style="margin-top: 10px; gap: 10px; flex-wrap: wrap">
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap10-mt10">
               <button type="button" class="btn btn--secondary" id="gc-designer-ip-test-valid">Test: valid samples</button>
               <button type="button" class="btn btn--secondary" id="gc-designer-ip-test-invalid">Test: invalid samples</button>
               <button type="button" class="btn btn--secondary" id="gc-designer-ip-clear-opts">Clear constraints</button>
@@ -161,8 +161,8 @@
         <div class="gc-designer-modal__body">
           <fieldset class="settings-form gc-designer-ip-fieldset" id="gc-designer-text-panel">
             <legend class="gc-designer-ip-fieldset__legend">Configure text field properties</legend>
-            <div class="gc-designer__row" style="flex-wrap: wrap; align-items: flex-end; gap: 12px 16px">
-              <label class="settings-form__field" style="min-width: 7rem">
+            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap12-16">
+              <label class="settings-form__field gc-d-inline-minw7">
                 <span class="settings-form__label">Min length (single)</span>
                 <input
                   type="number"
@@ -173,7 +173,7 @@
                   aria-label="Minimum length for single-line field"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 8rem">
+              <label class="settings-form__field gc-d-inline-minw8">
                 <span class="settings-form__label">Max length (single)</span>
                 <input
                   type="number"
@@ -184,7 +184,7 @@
                   aria-label="Maximum length for single-line field"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 8rem">
+              <label class="settings-form__field gc-d-inline-minw8">
                 <span class="settings-form__label">Max length (multi)</span>
                 <input
                   type="number"
@@ -195,7 +195,7 @@
                   aria-label="Maximum length for multi-line field"
                 />
               </label>
-              <label class="settings-form__field" style="min-width: 14rem; flex: 1">
+              <label class="settings-form__field gc-d-inline-minw14-flex1">
                 <span class="settings-form__label">Charset (single line, API name rules)</span>
                 <select class="settings-form__input" id="gc-designer-text-charset" aria-label="Character set profile from XML API docs">
                   <option value="">None — length limits only</option>
@@ -206,7 +206,7 @@
                 </select>
               </label>
             </div>
-            <p class="gc-designer__note" style="margin-top: 10px">
+            <p class="gc-designer__note gc-d-inline-mt10">
               <strong>Save</strong> applies min/max and charset to the demo fields below on the page.
             </p>
           </fieldset>
@@ -241,7 +241,7 @@
         </header>
         <div class="gc-designer-modal__divider" aria-hidden="true"></div>
         <div class="gc-designer-modal__body">
-          <div class="settings-form__field" style="width: 100%">
+          <div class="settings-form__field gc-d-inline-wfull">
             <span class="settings-form__label" id="gc-designer-selector-items-rows-l">Segment labels</span>
             <div
               id="gc-designer-selector-items-rows"
@@ -249,11 +249,11 @@
               role="group"
               aria-labelledby="gc-designer-selector-items-rows-l"
             ></div>
-            <button type="button" class="btn btn--secondary" id="gc-designer-selector-items-add-row" style="margin-top: 10px">
+            <button type="button" class="btn btn--secondary gc-d-inline-mt10" id="gc-designer-selector-items-add-row">
               Add value
             </button>
           </div>
-          <p class="settings-form__hint muted" style="margin-top: 0.75rem">
+          <p class="settings-form__hint muted gc-d-inline-mt075">
             <strong>Save</strong> rebuilds the segment buttons and keeps the prior selection when its label still exists;
             otherwise the first segment is active. Removing every row defaults to <strong>On</strong> and
             <strong>Off</strong>.
@@ -288,11 +288,11 @@
         <div class="gc-designer-modal__body">
           <fieldset class="settings-form gc-designer-ip-fieldset" id="gc-designer-dd-panel">
             <legend class="gc-designer-ip-fieldset__legend">Shared dropdown UI</legend>
-            <label class="settings-form__field" style="display: flex; align-items: center; gap: 8px">
+            <label class="settings-form__field gc-d-inline-flex-center-gap8">
               <input type="checkbox" id="gc-designer-dd-show-search" checked />
-              <span class="settings-form__label" style="margin: 0">Show search box inside open panels</span>
+              <span class="settings-form__label gc-d-inline-m0">Show search box inside open panels</span>
             </label>
-            <p class="gc-designer__note" style="margin-top: 10px">
+            <p class="gc-designer__note gc-d-inline-mt10">
               <strong>Save</strong> updates both single- and multi-select demos.
             </p>
           </fieldset>
@@ -330,66 +330,66 @@
             aria-label="Single-select data source"
           >
             <legend class="gc-designer-ip-fieldset__legend">Single · source &amp; columns</legend>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 10px 14px; align-items: flex-end">
-              <label class="settings-form__field" style="min-width: 11rem">
+            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap10-14">
+              <label class="settings-form__field gc-d-inline-minw11">
                 <span class="settings-form__label">Scope</span>
                 <select class="settings-form__input" id="gc-designer-dd-single-scope" data-gc-dd-scope aria-label="Firewall or configuration scope for list">
                   <option value="global">Global selector (top bar)</option>
                   <option value="custom">Custom IDs (below)</option>
                 </select>
               </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids" style="min-width: 10rem; flex: 1" data-gc-dd-custom-wrap hidden>
+              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
                 <span class="settings-form__label">Firewall IDs (comma-separated)</span>
                 <input type="text" class="settings-form__input mono" data-gc-dd-fw-ids autocomplete="off" placeholder="e.g. 1, 2" />
               </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids" style="min-width: 10rem; flex: 1" data-gc-dd-custom-wrap hidden>
+              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
                 <span class="settings-form__label">Configuration IDs (comma-separated)</span>
                 <input type="text" class="settings-form__input mono" data-gc-dd-cfg-ids autocomplete="off" placeholder="e.g. 3" />
               </label>
             </div>
-            <p class="gc-designer__note" style="margin: 8px 0 4px">Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache):</p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 8px 16px">
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+            <p class="gc-designer__note gc-d-inline-m8-0-4">Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache):</p>
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="ip_host" checked />
-                <span class="settings-form__label" style="margin: 0">IP host</span>
+                <span class="settings-form__label gc-d-inline-m0">IP host</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="ip_hostgroup" checked />
-                <span class="settings-form__label" style="margin: 0">IP host group</span>
+                <span class="settings-form__label gc-d-inline-m0">IP host group</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="fqdn_host" />
-                <span class="settings-form__label" style="margin: 0">FQDN host</span>
+                <span class="settings-form__label gc-d-inline-m0">FQDN host</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="mac_host" />
-                <span class="settings-form__label" style="margin: 0">MAC host</span>
+                <span class="settings-form__label gc-d-inline-m0">MAC host</span>
               </label>
             </div>
-            <p class="gc-designer__note" style="margin: 8px 0 4px">Extra columns in the list (name is always the primary line):</p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 8px 16px">
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+            <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list (name is always the primary line):</p>
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="__firewall" checked />
-                <span class="settings-form__label" style="margin: 0">Firewall / configuration</span>
+                <span class="settings-form__label gc-d-inline-m0">Firewall / configuration</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="entity_type" checked />
-                <span class="settings-form__label" style="margin: 0">Entity type</span>
+                <span class="settings-form__label gc-d-inline-m0">Entity type</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="HostType" />
-                <span class="settings-form__label" style="margin: 0">Host type (IP hosts)</span>
+                <span class="settings-form__label gc-d-inline-m0">Host type (IP hosts)</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="Description" />
-                <span class="settings-form__label" style="margin: 0">Description</span>
+                <span class="settings-form__label gc-d-inline-m0">Description</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="IPAddress" />
-                <span class="settings-form__label" style="margin: 0">IP address</span>
+                <span class="settings-form__label gc-d-inline-m0">IP address</span>
               </label>
             </div>
-            <div class="gc-designer__row" style="margin-top: 10px">
+            <div class="gc-designer__row gc-d-inline-mt10">
               <button type="button" class="btn primary" id="gc-designer-dd-single-refresh" data-gc-dd-refresh>Load from cache</button>
             </div>
             <p class="settings-form__status" id="gc-designer-dd-single-load-status" role="status" aria-live="polite"></p>
@@ -428,66 +428,66 @@
             aria-label="Multi-select data source"
           >
             <legend class="gc-designer-ip-fieldset__legend">Multi · source &amp; columns</legend>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 10px 14px; align-items: flex-end">
-              <label class="settings-form__field" style="min-width: 11rem">
+            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap10-14">
+              <label class="settings-form__field gc-d-inline-minw11">
                 <span class="settings-form__label">Scope</span>
                 <select class="settings-form__input" id="gc-designer-dd-multi-scope" data-gc-dd-scope aria-label="Firewall or configuration scope for multi list">
                   <option value="global">Global selector (top bar)</option>
                   <option value="custom">Custom IDs (below)</option>
                 </select>
               </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids" style="min-width: 10rem; flex: 1" data-gc-dd-custom-wrap hidden>
+              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
                 <span class="settings-form__label">Firewall IDs (comma-separated)</span>
                 <input type="text" class="settings-form__input mono" data-gc-dd-fw-ids autocomplete="off" placeholder="e.g. 1, 2" />
               </label>
-              <label class="settings-form__field gc-designer-dd__custom-ids" style="min-width: 10rem; flex: 1" data-gc-dd-custom-wrap hidden>
+              <label class="settings-form__field gc-designer-dd__custom-ids gc-d-inline-minw10-flex1" data-gc-dd-custom-wrap hidden>
                 <span class="settings-form__label">Configuration IDs (comma-separated)</span>
                 <input type="text" class="settings-form__input mono" data-gc-dd-cfg-ids autocomplete="off" placeholder="e.g. 3" />
               </label>
             </div>
-            <p class="gc-designer__note" style="margin: 8px 0 4px">Object types:</p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 8px 16px">
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+            <p class="gc-designer__note gc-d-inline-m8-0-4">Object types:</p>
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="ip_host" checked />
-                <span class="settings-form__label" style="margin: 0">IP host</span>
+                <span class="settings-form__label gc-d-inline-m0">IP host</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="ip_hostgroup" checked />
-                <span class="settings-form__label" style="margin: 0">IP host group</span>
+                <span class="settings-form__label gc-d-inline-m0">IP host group</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="fqdn_host" />
-                <span class="settings-form__label" style="margin: 0">FQDN host</span>
+                <span class="settings-form__label gc-d-inline-m0">FQDN host</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-entity-type value="mac_host" />
-                <span class="settings-form__label" style="margin: 0">MAC host</span>
+                <span class="settings-form__label gc-d-inline-m0">MAC host</span>
               </label>
             </div>
-            <p class="gc-designer__note" style="margin: 8px 0 4px">Extra columns in the list:</p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 8px 16px">
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+            <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list:</p>
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="__firewall" checked />
-                <span class="settings-form__label" style="margin: 0">Firewall / configuration</span>
+                <span class="settings-form__label gc-d-inline-m0">Firewall / configuration</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="entity_type" checked />
-                <span class="settings-form__label" style="margin: 0">Entity type</span>
+                <span class="settings-form__label gc-d-inline-m0">Entity type</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="HostType" />
-                <span class="settings-form__label" style="margin: 0">Host type (IP hosts)</span>
+                <span class="settings-form__label gc-d-inline-m0">Host type (IP hosts)</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="Description" />
-                <span class="settings-form__label" style="margin: 0">Description</span>
+                <span class="settings-form__label gc-d-inline-m0">Description</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-dd-list-col value="IPAddress" />
-                <span class="settings-form__label" style="margin: 0">IP address</span>
+                <span class="settings-form__label gc-d-inline-m0">IP address</span>
               </label>
             </div>
-            <div class="gc-designer__row" style="margin-top: 10px">
+            <div class="gc-designer__row gc-d-inline-mt10">
               <button type="button" class="btn primary" id="gc-designer-dd-multi-refresh" data-gc-dd-refresh>Load from cache</button>
             </div>
             <p class="settings-form__status" id="gc-designer-dd-multi-load-status" role="status" aria-live="polite"></p>
@@ -526,63 +526,63 @@
             aria-label="Member lookup configuration"
           >
             <legend class="gc-designer-ip-fieldset__legend">Selection mode &amp; object types</legend>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 12px 20px; align-items: flex-end">
-              <span class="settings-form__label" style="margin: 0; align-self: center">Mode</span>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 8px; margin: 0">
+            <div class="gc-designer__row gc-d-inline-row-wrap-end-gap12-20">
+              <span class="settings-form__label gc-d-inline-m0-self-center">Mode</span>
+              <label class="settings-form__field gc-d-inline-flex-center-gap8-m0">
                 <input type="radio" name="gc-designer-ml-mode" id="gc-designer-ml-mode-single" value="single" />
-                <span class="settings-form__label" style="margin: 0">Single select</span>
+                <span class="settings-form__label gc-d-inline-m0">Single select</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 8px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap8-m0">
                 <input type="radio" name="gc-designer-ml-mode" id="gc-designer-ml-mode-multi" value="multi" checked />
-                <span class="settings-form__label" style="margin: 0">Multi select</span>
+                <span class="settings-form__label gc-d-inline-m0">Multi select</span>
               </label>
             </div>
-            <p class="gc-designer__note" style="margin: 12px 0 4px">
+            <p class="gc-designer__note gc-d-inline-m12-0-4">
               Object types (cached <code class="mono">firewall_config_entries</code> / configuration cache). Scope is not
               configured here — it follows the Object edit flyout picker when nested in that modal, otherwise the top bar.
             </p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 8px 16px">
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-entity-type value="ip_host" checked />
-                <span class="settings-form__label" style="margin: 0">IP host</span>
+                <span class="settings-form__label gc-d-inline-m0">IP host</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-entity-type value="ip_hostgroup" checked />
-                <span class="settings-form__label" style="margin: 0">IP host group</span>
+                <span class="settings-form__label gc-d-inline-m0">IP host group</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-entity-type value="fqdn_host" />
-                <span class="settings-form__label" style="margin: 0">FQDN host</span>
+                <span class="settings-form__label gc-d-inline-m0">FQDN host</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-entity-type value="mac_host" />
-                <span class="settings-form__label" style="margin: 0">MAC host</span>
+                <span class="settings-form__label gc-d-inline-m0">MAC host</span>
               </label>
             </div>
-            <p class="gc-designer__note" style="margin: 8px 0 4px">Extra columns in the list (name is always primary):</p>
-            <div class="gc-designer__row" style="flex-wrap: wrap; gap: 8px 16px">
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+            <p class="gc-designer__note gc-d-inline-m8-0-4">Extra columns in the list (name is always primary):</p>
+            <div class="gc-designer__row gc-d-inline-row-wrap-gap8-16">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-list-col value="__firewall" checked />
-                <span class="settings-form__label" style="margin: 0">Firewall / configuration</span>
+                <span class="settings-form__label gc-d-inline-m0">Firewall / configuration</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-list-col value="entity_type" checked />
-                <span class="settings-form__label" style="margin: 0">Entity type</span>
+                <span class="settings-form__label gc-d-inline-m0">Entity type</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-list-col value="HostType" />
-                <span class="settings-form__label" style="margin: 0">Host type (IP hosts)</span>
+                <span class="settings-form__label gc-d-inline-m0">Host type (IP hosts)</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-list-col value="Description" />
-                <span class="settings-form__label" style="margin: 0">Description</span>
+                <span class="settings-form__label gc-d-inline-m0">Description</span>
               </label>
-              <label class="settings-form__field" style="display: flex; align-items: center; gap: 6px; margin: 0">
+              <label class="settings-form__field gc-d-inline-flex-center-gap6-m0">
                 <input type="checkbox" data-gc-ml-list-col value="IPAddress" />
-                <span class="settings-form__label" style="margin: 0">IP address</span>
+                <span class="settings-form__label gc-d-inline-m0">IP address</span>
               </label>
             </div>
-            <div class="gc-designer__row" style="margin-top: 10px">
+            <div class="gc-designer__row gc-d-inline-mt10">
               <button type="button" class="btn primary" id="gc-designer-member-lookup-refresh">Load from cache</button>
             </div>
             <p class="settings-form__status" id="gc-designer-member-lookup-load-status" role="status" aria-live="polite"></p>

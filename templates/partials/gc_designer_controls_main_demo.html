@@ -6,13 +6,13 @@
       Use <strong>Configure IP field properties</strong> (same sheet pattern as <span class="mono">edit-flyout</span> on Modals) to set validation options on both fields. Until you <strong>Save</strong> in that sheet, the demo inputs follow the in-sheet settings; Save writes <code class="mono">data-gc-ip-*</code> on the inputs. The <code class="mono">ip-address</code> control uses <code class="mono">IPFamily</code> (<code class="mono">IPv4</code> or <code class="mono">IPv6</code>) in catalog JSON; the demo toggles family with the select below. The label exposes <code class="mono">gcOpenIpFieldPropertiesFlyout()</code> to open the sheet from script.
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+      <div class="gc-designer__row gc-designer__sample gc-d-inline-row-wrap-end-gap12-m0">
         <button type="button" class="btn primary" id="gc-designer-ip-props-open">Configure IP field properties</button>
         <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
           >edit-flyout</span
         >
       </div>
-      <p class="settings-form__status" id="gc-designer-ip-opts-status" role="status" aria-live="polite" style="margin-top: 10px"></p>
+      <p class="settings-form__status gc-d-inline-mt10" id="gc-designer-ip-opts-status" role="status" aria-live="polite"></p>
       <span
         class="gc-designer__control-id gc-designer__control-id--block"
         title="Reference id for this control"
@@ -20,7 +20,7 @@
         >ip-constraint</span
       >
 
-      <form class="settings-form" id="gc-designer-controls-ip-form" autocomplete="off" onsubmit="return false;" style="margin-top: 1rem">
+      <form class="settings-form gc-d-inline-mt1r" id="gc-designer-controls-ip-form" autocomplete="off" onsubmit="return false;">
         <label class="settings-form__field">
           <span class="settings-form__label" for="gc-designer-ip-family">IP family</span>
           <select class="settings-form__input" id="gc-designer-ip-family" aria-label="IP family for demo and catalog snapshot">
@@ -97,7 +97,7 @@
       Use <strong>Configure text field properties</strong> for the sheet; <code class="mono">text-single</code> and <code class="mono">text-multiline</code> expose <code class="mono">gcOpenTextFieldPropertiesFlyout()</code>.
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+      <div class="gc-designer__row gc-designer__sample gc-d-inline-row-wrap-end-gap12-m0">
         <button type="button" class="btn primary" id="gc-designer-text-props-open">Configure text field properties</button>
         <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
           >edit-flyout</span
@@ -109,7 +109,7 @@
         data-gc-designer-control-id="text-config"
         >text-config</span
       >
-      <form class="settings-form" id="gc-designer-text-form" autocomplete="off" onsubmit="return false;" style="margin-top: 1rem">
+      <form class="settings-form gc-d-inline-mt1r" id="gc-designer-text-form" autocomplete="off" onsubmit="return false;">
         <label class="settings-form__field">
           <span class="settings-form__label">Single-line text</span>
           <input
@@ -157,7 +157,7 @@
       One continuous control: a single outer border and pill-shaped ends (end radius is half the bar height). Segments are flush with no gap; vertical dividers separate options. The active segment uses the <strong>primary</strong> style; inactive segments use the neutral <strong>secondary</strong> look.
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row" style="flex-direction: column; align-items: flex-start; gap: 1.25rem">
+      <div class="gc-designer__row gc-d-inline-col-start-gap125">
         <button type="button" class="btn primary" id="gc-designer-selector-props-open">Configure selector options</button>
         <div class="gc-designer__sample gc-designer__sample--controls">
           <span class="settings-form__label">Segments</span>
@@ -187,12 +187,12 @@
       <strong>On/off switch</strong> is a <code class="mono">button</code> with <code class="mono">role="switch"</code>, <code class="mono">aria-checked</code>, and the same track/thumb classes as boolean columns in data tables (this demo uses <strong>accent blue</strong> when on; default table toggles use success green). <strong>Toggle checkbox</strong> is a real <code class="mono">checkbox</code> with the toolbar combine pattern: label text, visually hidden input, and sliding thumb (accent when checked) — use it when the value must post with a form or participate in native checkbox semantics.
     </p>
     <div class="gc-designer__sandbox">
-      <form class="settings-form" id="gc-designer-toggles-form" autocomplete="off" onsubmit="return false;" style="margin-top: 0">
+      <form class="settings-form gc-d-inline-mt0" id="gc-designer-toggles-form" autocomplete="off" onsubmit="return false;">
         <div class="settings-form__field">
           <span class="settings-form__label" id="gc-designer-toggle-onoff-heading">On/off switch</span>
           <div
             class="gc-designer__row"
-            style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0"
+            class="gc-d-inline-flex-wrap-center-gap10-m0"
           >
             <button
               type="button"
@@ -213,7 +213,7 @@
             >toggle-onoff</span
           >
         </div>
-        <div class="settings-form__field" style="margin-top: 1rem">
+        <div class="settings-form__field gc-d-inline-mt1r">
           <label class="gc-toolbar-combine" id="gc-designer-toggle-checkbox-wrap">
             <span class="gc-toolbar-combine__text" id="gc-designer-toggle-checkbox-text">Toggle checkbox</span>
             <input
@@ -243,9 +243,9 @@
       <strong>Unsaved</strong> tags (not yet committed with <strong>Save</strong>) use black pills with white text. After save, each tag name gets a <strong>stable color</strong> (same name → same color in both editors).
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row" style="align-items: flex-end; flex-wrap: wrap; gap: 16px 24px">
-        <div class="gc-designer__sample gc-designer__sample--controls" style="flex: 1; min-width: 16rem">
-          <div class="settings-form__field" style="width: 100%">
+      <div class="gc-designer__row gc-d-inline-row-wrap-end-gap16-24">
+        <div class="gc-designer__sample gc-designer__sample--controls gc-d-inline-flex1-minw16">
+          <div class="settings-form__field gc-d-inline-wfull">
             <label class="settings-form__label" for="gc-designer-tags-input-a">Tag editor A</label>
             <div class="gc-designer-tags" id="gc-designer-tag-editor" data-gc-designer-tag-editor>
               <input type="hidden" class="gc-designer-tags__hidden" id="gc-designer-tags-hidden" value="[]" />
@@ -279,8 +279,8 @@
             >tag-editor</span
           >
         </div>
-        <div class="gc-designer__sample gc-designer__sample--controls" style="flex: 1; min-width: 16rem">
-          <div class="settings-form__field" style="width: 100%">
+        <div class="gc-designer__sample gc-designer__sample--controls gc-d-inline-flex1-minw16">
+          <div class="settings-form__field gc-d-inline-wfull">
             <label class="settings-form__label" for="gc-designer-tags-input-b">Tag editor B</label>
             <div class="gc-designer-tags" id="gc-designer-tag-editor-b" data-gc-designer-tag-editor>
               <input type="hidden" class="gc-designer-tags__hidden" id="gc-designer-tags-hidden-b" value="[]" />
@@ -314,8 +314,8 @@
             >tag-editor</span
           >
         </div>
-        <div class="gc-designer__sample gc-designer__sample--controls" style="margin-bottom: 2px">
-          <div class="settings-form__field" style="margin-bottom: 0">
+        <div class="gc-designer__sample gc-designer__sample--controls gc-d-inline-mb2">
+          <div class="settings-form__field gc-d-inline-mb0">
             <span class="settings-form__label">&nbsp;</span>
             <button type="button" class="btn primary" id="gc-designer-tags-save">Save tags</button>
           </div>
@@ -336,7 +336,7 @@
       Searchable single- and multi-select lists backed by cached Hosts &amp; Services objects. Each control has its own scope (top-bar selection vs custom firewall/configuration IDs), entity-type filters, optional list columns, and per-type icons. The filter box sits inside the open panel. Lists reload automatically when scope, custom IDs, entity types, or the top-bar firewall/configuration selection change. <strong>Load from cache</strong> repeats the fetch with current settings. Use the property buttons for shared UI, single-select source, and multi-select source; <code class="mono">dropdown-single</code> / <code class="mono">dropdown-multi</code> / <code class="mono">dropdown-shared</code> expose <code class="mono">gcOpenDropdownPropertiesFlyout()</code> (pass <code class="mono">"shared"</code>, <code class="mono">"single"</code>, or <code class="mono">"multi"</code>).
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+      <div class="gc-designer__row gc-designer__sample gc-d-inline-row-wrap-end-gap12-m0">
         <button type="button" class="btn primary" id="gc-designer-dd-shared-props-open">Configure shared dropdown UI</button>
         <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
           >edit-flyout</span
@@ -348,9 +348,9 @@
         data-gc-designer-control-id="dropdown-shared"
         >dropdown-shared</span
       >
-      <div class="gc-designer__row" style="margin-top: 1rem; align-items: flex-start; gap: 24px; flex-wrap: wrap">
+      <div class="gc-designer__row gc-d-inline-row-wrap-start-gap24-mt1r">
         <div class="gc-designer-dd" id="gc-designer-dd-single" data-gc-designer-dd>
-          <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0 0 8px">
+          <div class="gc-designer__row gc-designer__sample gc-d-inline-row-wrap-end-gap12-m008">
             <button type="button" class="btn primary" id="gc-designer-dd-single-props-open">Configure single-select properties</button>
             <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
               >edit-flyout</span
@@ -390,7 +390,7 @@
           >
         </div>
         <div class="gc-designer-dd gc-designer-dd--multi" id="gc-designer-dd-multi" data-gc-designer-dd>
-          <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0 0 8px">
+          <div class="gc-designer__row gc-designer__sample gc-d-inline-row-wrap-end-gap12-m008">
             <button type="button" class="btn primary" id="gc-designer-dd-multi-props-open">Configure multi-select properties</button>
             <span class="gc-designer__control-id" title="Reference id for this pattern" data-gc-designer-control-id="edit-flyout"
               >edit-flyout</span
@@ -451,7 +451,7 @@
       <code class="mono">member-lookup</code> exposes <code class="mono">gcOpenMemberLookupPropertiesFlyout()</code>.
     </p>
     <div class="gc-designer__sandbox">
-      <div class="gc-designer__row gc-designer__sample" style="flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0">
+      <div class="gc-designer__row gc-designer__sample gc-d-inline-row-wrap-end-gap12-m0">
         <button type="button" class="btn primary" id="gc-designer-ml-props-open">Configure member lookup</button>
         <span
           class="gc-designer__control-id"
@@ -471,7 +471,7 @@
         id="gc-designer-member-lookup"
         data-gc-designer-dd
         data-gc-designer-member-lookup="1"
-        style="margin-top: 1rem; max-width: 28rem"
+        class="gc-d-inline-mt1r-maxw28"
       >
         <span class="settings-form__label" id="gc-designer-member-lookup-l">Member lookup (cached names)</span>
         <div class="gc-designer-dd__shell">

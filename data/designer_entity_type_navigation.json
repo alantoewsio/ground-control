@@ -201,12 +201,30 @@
     },
     "dhcp_server": {
       "kind": "Objects",
-      "display_name": "DHCP Server",
+      "display_name": "DHCP Server (IPv4)",
       "nav_section": "CONFIGURE",
       "nav_order": "",
       "nav_page": "Network",
-      "tab": "DHCP Servers",
+      "tab": "DHCP",
       "nav_icon": "storage"
+    },
+    "dhcp_server_ipv6": {
+      "kind": "Objects",
+      "display_name": "DHCP Server (IPv6)",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "DHCP",
+      "nav_icon": "storage"
+    },
+    "dhcp_relay": {
+      "kind": "Objects",
+      "display_name": "DHCP Relay",
+      "nav_section": "CONFIGURE",
+      "nav_order": "",
+      "nav_page": "Network",
+      "tab": "DHCP",
+      "nav_icon": "swap_horiz"
     },
     "vpn_profile": {
       "kind": "Objects",

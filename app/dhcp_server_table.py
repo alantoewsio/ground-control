@@ -1,10 +1,38 @@
-"""Network · DHCP tab: table rows from cached ``DHCPServer`` XML payloads."""
+"""Network · DHCP tab: table rows from cached ``DHCPServer`` XML payloads.
+
+This module supports three DHCP entity types:
+
+* ``dhcp_server`` (IPv4)  — bespoke summary columns kept for IPAM back-compat.
+* ``dhcp_server_ipv6``    — generic HS-style flattened table (delegates to
+  :func:`app.hosts_services_table.build_hosts_services_table_rows`).
+* ``dhcp_relay``          — generic HS-style flattened table (delegates to
+  :func:`app.hosts_services_table.build_hosts_services_table_rows`).
+
+The HS-style ``api_firewalls_hosts_services_table?entity_type=…`` endpoint
+already dispatches to the generic flattener when the entity is in
+``HOSTS_SERVICES_ENTITY_TYPES``; the helpers below exist so other modules
+(IPAM, designer catalogs, future tests) can ask "is this a DHCP entity?" or
+build combined-view rows without going through the FastAPI layer.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
+from app.hosts_services_table import (
+    build_hosts_services_table_rows,
+    build_hs_table_rows_combined,
+)
 from app.interface_table import COL_ID_FIREWALL, flatten_payload
+
+DHCP_ENTITY_TYPES: frozenset[str] = frozenset(
+    {"dhcp_server", "dhcp_server_ipv6", "dhcp_relay"}
+)
+
+
+def is_dhcp_entity_type(entity_type: str) -> bool:
+    """True when ``entity_type`` is one of the three DHCP cache ids."""
+    return (entity_type or "").strip() in DHCP_ENTITY_TYPES
 
 COL_DHCP_NAME = "__name"
 COL_DHCP_INTERFACE = "__dhcp_interface"
@@ -173,3 +201,38 @@ def build_dhcp_server_table_rows(
         "columns_visible_by_default": DHCP_DEFAULT_VISIBLE,
         "rows": out_rows,
     }
+
+
+def build_dhcp_server_ipv6_table_rows(
+    parsed: list[tuple[Any, Any, dict[str, Any]]],
+) -> dict[str, Any]:
+    """Per-firewall flattened table for ``DHCPServerIpv6`` cache entries."""
+    return build_hosts_services_table_rows(parsed, entity_type="dhcp_server_ipv6")
+
+
+def build_dhcp_relay_table_rows(
+    parsed: list[tuple[Any, Any, dict[str, Any]]],
+) -> dict[str, Any]:
+    """Per-firewall flattened table for ``DHCPRelay`` cache entries."""
+    return build_hosts_services_table_rows(parsed, entity_type="dhcp_relay")
+
+
+def build_dhcp_table_rows_combined(
+    parsed: list[tuple[Any, Any, dict[str, Any]]],
+    *,
+    entity_type: str,
+    combine_by: str | None = None,
+) -> dict[str, Any]:
+    """Combined / configuration view for any DHCP entity type.
+
+    For ``dhcp_server`` (IPv4) the combined view also delegates to the generic
+    HS combiner so cross-firewall identity merge works the same as Routing /
+    LSACL.  The bespoke summary columns from :func:`build_dhcp_server_table_rows`
+    are only used by IPAM / the legacy single-firewall view.
+    """
+    et = (entity_type or "").strip()
+    if et not in DHCP_ENTITY_TYPES:
+        raise ValueError(f"Not a DHCP entity_type: {entity_type!r}")
+    return build_hs_table_rows_combined(
+        parsed, entity_type=et, combine_by=combine_by
+    )

@@ -1807,17 +1807,17 @@
 }
 
 .admin-chat-flyout__phone {
-  width: min(330px, calc(100% - 32px));
+  width: 100%;
   min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-self: center;
-  margin: 16px 0;
-  border: 1px solid #1f2937;
-  border-radius: 14px;
-  background: #eef4fb;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+  align-self: stretch;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   overflow: hidden;
 }
 

@@ -83,6 +83,9 @@ from app.firewall_connectivity import firewall_is_online
 from app.hs_flyout_merge import (
     merge_clientless_user_form,
     merge_country_group_form,
+    merge_dhcp_relay_form,
+    merge_dhcp_server_form,
+    merge_dhcp_server_ipv6_form,
     merge_fqdn_host_form,
     merge_fqdn_hostgroup_form,
     merge_gateway_form,
@@ -4068,6 +4071,9 @@ HS_TASK_ENTITY_TYPES = frozenset(
         "gateway",
         "gateway_host",
         "unicast_route",
+        "dhcp_server",
+        "dhcp_server_ipv6",
+        "dhcp_relay",
     }
 )
 
@@ -4093,6 +4099,11 @@ HS_XML_TAG: dict[str, str] = {
     # case lives in ``_process_hs_create_or_add`` (calls ``_submit_gateway_xml_add``).
     # Updates use the standard ``fw.update("Gateway", ..., lookup_key="Name")`` path.
     "gateway": "Gateway",
+    # DHCP entities push under the standard top-level XML element names per
+    # xml-api-docs/Configure/Network/{DHCPServer,DHCPServerIpv6,DHCPRelay}.md.
+    "dhcp_server": "DHCPServer",
+    "dhcp_server_ipv6": "DHCPServerIpv6",
+    "dhcp_relay": "DHCPRelay",
 }
 
 # Identity field per entity_type for the HS-style flyout/create flow.  Most
@@ -4150,6 +4161,12 @@ def merge_hs_flyout_form(
         return merge_clientless_user_form(base, form)
     if entity_type == "acl_rule":
         return merge_local_service_acl_form(base, form)
+    if entity_type == "dhcp_server":
+        return merge_dhcp_server_form(base, form)
+    if entity_type == "dhcp_server_ipv6":
+        return merge_dhcp_server_ipv6_form(base, form)
+    if entity_type == "dhcp_relay":
+        return merge_dhcp_relay_form(base, form)
     raise ValueError(f"Unsupported hosts/services entity type: {entity_type}")
 
 

@@ -86,12 +86,12 @@ function gcFirewallScopePillHtml(name) {
   let statusClass = online === true ? "gc-firewall-pill-status--online" : "gc-firewall-pill-status--offline";
   let statusLabel = online === true ? "online" : "offline";
   let statusHtml = onlineKnown
-    ? '<span class="gc-firewall-pill-status ' +
+    ? '<span class="gc-icon gc-icon--xs gc-firewall-pill-status ' +
       statusClass +
       '" role="img" aria-label="Firewall ' +
       statusLabel +
       '">' +
-      (online === true ? "&#10003;" : "-") +
+      (online === true ? "check_circle" : "cancel") +
       "</span>"
     : "";
   return (

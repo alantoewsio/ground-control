@@ -4433,6 +4433,19 @@ def configurations_network_page(
             "url_api_ipam_interface_pool_commit": str(
                 request.url_for("api_ipam_interface_pool_commit")
             ),
+            # HS-style endpoints reused by the DHCP sub-tabs (IPv4 / IPv6 / Relay).
+            "url_api_configurations_hosts_services_table": str(
+                request.url_for("api_configurations_hosts_services_table")
+            ),
+            "url_api_configurations_apply_hs_creates_batch": str(
+                request.url_for("api_configurations_apply_hs_creates_batch")
+            ),
+            "url_api_configurations_apply_hs_updates_batch": str(
+                request.url_for("api_configurations_apply_hs_updates_batch")
+            ),
+            "url_api_configurations_apply_hs_deletes_batch": str(
+                request.url_for("api_configurations_apply_hs_deletes_batch")
+            ),
         },
     )
 
@@ -5318,6 +5331,9 @@ HOSTS_SERVICES_ENTITY_TYPES: frozenset[str] = frozenset(
         "gateway_host",
         "clientless_user",
         "acl_rule",
+        "dhcp_server",
+        "dhcp_server_ipv6",
+        "dhcp_relay",
     }
 )
 
@@ -5578,6 +5594,19 @@ def firewalls_network_page(
             ),
             "url_api_ipam_interface_pool_commit": str(
                 request.url_for("api_ipam_interface_pool_commit")
+            ),
+            # HS-style endpoints reused by the DHCP sub-tabs (IPv4 / IPv6 / Relay).
+            "url_api_hosts_services_table": str(
+                request.url_for("api_firewalls_hosts_services_table")
+            ),
+            "url_api_task_queue_enqueue_hs_creates_batch": str(
+                request.url_for("api_task_queue_enqueue_hs_creates_batch")
+            ),
+            "url_api_task_queue_enqueue_hs_updates_batch": str(
+                request.url_for("api_task_queue_enqueue_hs_updates_batch")
+            ),
+            "url_api_task_queue_enqueue_hs_deletes_batch": str(
+                request.url_for("api_task_queue_enqueue_hs_deletes_batch")
             ),
         },
     )

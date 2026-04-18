@@ -104,7 +104,7 @@
           aria-label="Close"
           title="Close"
         >
-          ×
+          <span class="gc-icon gc-icon--md" aria-hidden="true">close</span>
         </button>
       </header>
       <div class="gc-designer-modal__divider" aria-hidden="true"></div>
@@ -130,7 +130,7 @@
                 placeholder="Shown above the preview grid"
               />
             </label>
-            <div class="settings-form__field" style="min-width: 14rem; max-width: 40rem">
+            <div class="settings-form__field gc-d-inline-minw14-maxw40">
               <div
                 class="gc-designer-dd gc-designer-dd--multi gc-designer-table-dd"
                 id="gc-designer-tables-entity-dd"
@@ -255,8 +255,8 @@
                 <button type="button" class="btn btn--secondary" id="gc-designer-tables-secondary-add">Add filter row</button>
               </div>
             </div>
-            <div class="gc-designer__row" style="flex-wrap: wrap; align-items: flex-start; gap: 16px 20px; margin-top: 12px">
-              <div class="settings-form__field" style="min-width: 14rem; flex: 1">
+            <div class="gc-designer__row gc-d-inline-row-wrap-start-gap16-20-mt12">
+              <div class="settings-form__field gc-d-inline-minw14-flex1">
                 <div
                   class="gc-designer-dd gc-designer-dd--multi gc-designer-table-dd"
                   id="gc-designer-tables-hide-dd"
@@ -296,7 +296,7 @@
                   </div>
                 </div>
               </div>
-              <label class="settings-form__field" style="min-width: 12rem; flex: 1">
+              <label class="settings-form__field gc-d-inline-minw12-flex1">
                 <span class="settings-form__label">Column order</span>
                 <textarea
                   class="settings-form__input mono"
@@ -306,7 +306,7 @@
                   aria-label="Column order"
                 ></textarea>
               </label>
-              <label class="settings-form__field" style="min-width: 12rem; flex: 1">
+              <label class="settings-form__field gc-d-inline-minw12-flex1">
                 <span class="settings-form__label">Column name overrides</span>
                 <textarea
                   class="settings-form__input mono"

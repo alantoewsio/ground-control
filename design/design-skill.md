@@ -228,19 +228,20 @@ same x inside the card.
 none  0       sm   2px    md   4px
 lg    8px     xl   12px   2xl  16px   full  9999px
 ```
-> Cards and section panels use `xl` (12px). Form inputs use `md` or `lg`. Pills and badges use `full`.
+> Form inputs use `md` or `lg`. Pills (legacy) use `full`. Badges use the
+> badge spec's own 3 px radius (sec.6). Buttons use `--btn-radius` (5 px,
+> sec.7).
 
-**Dashboard exception** — all panels on `.dashboard-page` (stat tiles,
-widget panels, latency cards, any ad-hoc `.panel`) use a tighter **5px**
-radius for a denser monitoring-console feel. Implemented in `style.css` via
-`.dashboard-page .panel, .dashboard-page__stat, .dashboard-page__widget,
-.dashboard-page__latency-card { border-radius: 5px }`.
+**Cards (global)** — every card surface uses **5 px** via `--card-radius`
+(see "Cards (global card spec)" below). The 12 px legacy figure for
+section panels is superseded; do not reintroduce it.
 
 ### Table framing (no double borders)
 The `.table-wrap` container has **no outer border and no border-radius**.
 The visual frame around a table is provided by one of:
 - the enclosing card — `.gc-network-panel`, `.firewalls-page`, a dashboard
-  `.panel`, `.gc-designer__section`, etc. (they own the border/radius/shadow);
+  `.panel`, `.gc-designer__section`, etc. (they own the radius + shadow
+  via the global card spec — see "Cards (global card spec)" below);
 - the `--app-bg` (`#F0F2F4`) contrast — pages where the table-wrap has a
   white background (e.g. `.firewalls-page .table-wrap`) float on the light
   app background, which supplies implicit separation without needing a line.
@@ -636,6 +637,46 @@ return in its click handler (e.g. `if (el.getAttribute('aria-disabled') ===
 'true') return;`). Unlike the native `disabled` attribute, ARIA does not
 suppress the click — it only declares the state semantically.
 
+### Tooltips (hover/focus)
+
+All hover tooltips share a single styled surface matching the Figma spec:
+background `#3B3C3D`, 1 px border, white Inter 12/16 Medium, shadow
+`0 4 4 0 rgba(0,0,0,0.25)`, z-index `1070` (the tooltip layer from sec. 11).
+
+**Authoring — keep writing `title="…"` as you always have.**
+The helper `static/gc-tooltip.js` runs once at DOMContentLoaded and installs a
+`MutationObserver` on `document.body`. For every element carrying a `title`
+attribute (initial load, dynamically inserted, or runtime `el.title = "…"`):
+
+1. The attribute value is copied to `data-gc-tooltip`.
+2. The `title` attribute is removed so the browser never surfaces its own
+   unstyled OS chrome.
+3. On hover (`pointerenter`) or keyboard focus (`focusin`), a single portaled
+   `<div class="gc-tooltip" role="tooltip">` is positioned against the target
+   (top placement, auto-flip to bottom at the viewport edge) and shown.
+4. `Escape`, blur, pointer-leave, scroll, and resize all dismiss it.
+
+```html
+<!-- Same authoring pattern — now rendered with the Figma styling -->
+<button class="btn-icon btn-icon--primary"
+        aria-disabled="true"
+        title="Select at least one row to enable Export"
+        aria-label="Export">…</button>
+```
+
+The `aria-disabled="true"` + `title` disabled-reason pattern above continues
+to work unchanged — `.btn-icon[aria-disabled="true"]` already keeps
+`pointer-events: auto`, so the portaled tooltip fires on hover exactly where
+the native one used to.
+
+**Opt-out**: add `data-gc-tooltip-native` to any element that must keep the
+browser's native tooltip (e.g. when rendering untrusted long text where the
+OS chrome's word-wrap is preferable). This is rarely needed.
+
+**Manual rescan**: code that injects DOM via `innerHTML` into nodes not yet
+attached to `document.body` can call `window.gcTooltip.refresh(root)` after
+attaching. The global observer catches all normal insertions automatically.
+
 ### Form inputs
 ```js
 const INPUT_STYLE = {
@@ -717,26 +758,74 @@ danger   bg #FBECE5  text #DA3E00   --badge-danger-bg  / --badge-danger-text
 
 **Migration note**
 Legacy classes that map onto this spec — `.task-queue-status-badge`,
-`.task-queue-action-pill` — already consume the `--badge-*` tokens and the
-locked typography/box values. New status indicators should use `.badge`
-directly rather than adding new bespoke classes.
+`.task-queue-action-pill`, `.gc-sync-pill`, `.gc-hist-out-status`,
+`.gc-hist-chg-action`, `.gc-hist-access-type`, `.gc-ipam-pill`,
+`.gc-firewall-pill-status` — consume the semantic `--badge-*` tokens for state
+colouring (success/info/warning/danger/neutral). New status indicators should
+use `.badge` directly rather than adding new bespoke classes.
 
-### Cards / section panels
+### Cards (global card spec)
+Single source of truth for every "card" surface in the app: generic
+`.panel` containers, dashboard widgets / stats / latency, section panels,
+service tiles. White fill on the `--app-bg` (`#F0F2F4`) gray, soft shadow
+for separation, **no border** — the shadow is the framing.
+
+**Tokens (`:root`, locked):**
 ```css
-.sophos-section-card {
-  background: #ffffff;
-  border: 1px solid rgba(0,0,0,0.1);
-  border-radius: 12px;                /* xl */
-  box-shadow: 0px 0px 6px 0px rgba(0,0,0,0.1);  /* md */
-  overflow: hidden;
+--card-radius: 5px;
+--card-bg:     #FFFFFF;
+--card-shadow: 0 0 6px 0 rgba(0,0,0,0.1);   /* = #0000001A */
+```
+
+**Primitive class — `.panel` (canonical) / `.card` (synonym for new markup):**
+```css
+.panel,
+.card {
+  background:    var(--card-bg);
+  border:        0;                  /* no border — shadow does the framing */
+  border-radius: var(--card-radius);
+  padding:       1.25rem 1.5rem;     /* may be tightened by modifiers */
+  min-width:     min(340px, 100%);
+  box-shadow:    var(--card-shadow);
 }
 ```
-Collapsible header:
+
+**Composition rules:**
+- Every card-shaped surface MUST compose with `.panel` (or `.card`) and
+  rely on it for chrome. Modifier classes (`.dashboard-page__widget`,
+  `.dashboard-page__stat`, `.dashboard-page__latency-card`,
+  `.dashboard-page__panel`, etc.) only adjust padding / margins / layout
+  — they MUST NOT redeclare `background`, `border`, `border-radius`, or
+  `box-shadow`. Dashboard markup pattern:
+  `<article class="dashboard-page__stat panel">…</article>`.
+- Do NOT hand-roll a card surface with bespoke `background: #fff +
+  border + shadow + radius`. If you need card chrome, use `.panel` /
+  `.card`. If a one-off needs a different visual, document it as a
+  named exception in this section before merging.
+- Headers / dividers inside cards stay subtle: keep using
+  `border-bottom: 1px solid var(--border-light)` for internal section
+  splits — that is internal chrome, not the outer frame.
+
+**Collapsible card header (when used):**
 ```
 padding: 12px 16px   font-size: 16px   font-weight: 600
-hover-bg: #f9fafb   transition: background-color 150ms
-chevron: Material Symbol `expand_more` / `expand_less` (filled), 18px, color #6b7280
+hover-bg: var(--surface-hover)   transition: background-color 150ms
+chevron: Material Symbol `expand_more` / `expand_less` (filled), 18px,
+         color var(--text-muted)
 ```
+
+**When NOT a card:**
+- Toolbars, inline form chrome, table-row containers, switches, chips,
+  code blocks, dropdown menus — these are NOT cards even if they have
+  rounded corners or a subtle shadow. They keep their own radii (8 / 10
+  px) and tokens. Cards are page-level / section-level surfaces that
+  group related content; if it does not group content, it is not a card.
+
+**Migration note (legacy `.sophos-section-card`):**
+The old `sophos-section-card` spec (12 px radius, 1 px border, white bg)
+is superseded by this card system. New section panels MUST use `.panel`
+/ `.card`. Any remaining `.sophos-section-card` usages should be
+migrated when touched.
 
 ### Tables (dense-data)
 ```
@@ -747,6 +836,67 @@ padding:     th 8px 12px   td 8px 12px
 sticky header: position sticky top 0 z-index 10
 column resize: drag handle, min-width enforced
 ```
+
+### Multi-value list cells (pill preview + anchored popover)
+A cell that holds 2+ distinct values (zones, hosts, schedules, networks, sync
+labels, group members, …) **never dumps the raw list into the cell**. It
+renders the first 2 values as pills plus a `+N more` pill, and clicking any
+pill in the cell opens a popover anchored to the clicked pill that lists every
+value (with optional search and per-item activation).
+
+Reference implementation: `gc-table-cells.js` exposes
+`gcTableNormalizeListCellItems()`, `gcTableListCellPreviewHtml()`,
+`gcTableBindListCell()`, plus `gcTableListModalOpen/Close` for direct callers.
+CSS lives in `style.css` under the `.gc-table-value-pill*` /
+`.gc-table-cell-pills` / `.gc-table-list-modal*` blocks.
+
+```
+container:        .gc-table-cell-pills           display: flex; flex-wrap: wrap; gap: 6px;
+                                                  align-items: center; max-width: 100%; min-width: 0
+                                                  (no max-height — see invariant below)
+value pill:       .gc-table-value-pill           inline-block, max-width: min(14rem, 100%),
+                                                  text-overflow: ellipsis, padding 0.15rem 0.55rem,
+                                                  border-radius: 999px, font 0.8125rem/500,
+                                                  bg color-mix(srgb, --text-muted 12%, transparent),
+                                                  title="<full text>" so hover reveals truncation
++N more pill:     .gc-table-value-pill--more     same shape but font-weight 600, no max-width,
+                                                  flex-shrink: 0, aria-label="Show all N values".
+                                                  NEVER set a native `title` on this pill — the
+                                                  browser tooltip would surface at the cursor in the
+                                                  wrong place; a popover opens on click.
+clickable cell:   td.gc-table-cell--list         cursor: pointer; vertical-align: top
+```
+
+The popover (one shared `#gc-table-list-modal` per page, lazily created):
+```
+shell:        .fw-cols-modal.gc-table-list-modal       position: fixed; inset: 0;
+                                                        backdrop transparent + pointer-events: auto
+                                                        (click-out closes)
+panel:        .gc-table-list-modal__panel              position: fixed
+  centered fallback (no anchor):  width min(420px, 100vw - 24px); centered via top/left 50% + transform
+  anchored variant (.--anchored): width min(320px, 100vw - 16px); inline left/top set by JS from
+                                  getBoundingClientRect; arrow ::before points at anchor centre
+                                  via --gc-popover-arrow-x; .--flip puts the arrow on the bottom
+                                  edge when the panel is placed above the anchor.
+z-index:      1050 default, 1060 when .--anchored (popover layer per sec.5).
+behaviour:    open on cell click / Enter / Space; close on backdrop click, close button,
+              Escape, or any ancestor scroll. Window resize repositions while open.
+```
+
+**Locked invariants for this pattern**
+
+- **No `max-height` + `overflow: hidden` on `.gc-table-cell-pills`.** The
+  `+N more` pill already caps the visible count (≤ 2 values + 1 more pill),
+  so the container never holds more than 3 pills. A height cap clipped the
+  second wrapped row on narrow columns; let the row grow naturally.
+- **Pill width caps to `min(14rem, 100%)`, not a flat `14rem`.** This lets
+  pills shrink with the column instead of always cropping at 14 rem.
+- **`+N more` is the click target for the popover.** Anchor placement uses
+  the clicked pill (`closest(.gc-table-value-pill--more)` → `…--pill` →
+  `.gc-zone-pill` → cell), not the cell, so the popover sits next to the
+  pill the user actually pressed. Keyboard activation falls back to the cell.
+- **Popover is centered on the anchor**, not left-aligned. Falls back to
+  edge-clamping with the arrow re-offset via `--gc-popover-arrow-x`.
 
 ### Service / landing cards
 - White surface with a purple radial glow **behind** the card that fades in on hover.
@@ -913,21 +1063,27 @@ const isMobile = window.matchMedia('(max-width: 767px)').matches
 
 ## 10. Scrollbar Style
 
-Apply globally — thin overlay-style that only appears on hover:
+Apply globally — thin, modern, and revealed while actively scrolling (Mac-like):
 ```css
 /* Firefox */
 * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-*:hover, *:focus-within { scrollbar-color: rgba(0,0,0,0.18) transparent; }
+html.gc-scroll-active * { scrollbar-color: rgba(44,45,46,0.36) transparent; }
 
-/* WebKit */
-::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+/* WebKit / Chromium */
+::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.12);
-  border-radius: 3px;
-  transition: background 0.2s ease;
+  background: transparent;                 /* hidden until scrolling */
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 160ms ease;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.28); }
+html.gc-scroll-active *::-webkit-scrollbar-thumb { background-color: rgba(44,45,46,0.36); }
+html.gc-scroll-active *::-webkit-scrollbar-thumb:hover { background-color: rgba(44,45,46,0.56); }
 ```
+
+A tiny global script toggles `html.gc-scroll-active` on scroll / wheel / touch / keyboard-scroll events and removes it after a short idle timeout (~700ms).
 
 ---
 

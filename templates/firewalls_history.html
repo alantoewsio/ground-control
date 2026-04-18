@@ -131,9 +131,7 @@
                       <td class="mono muted" data-gc-col="sync_run_id">{{ row.sync_run_id }}</td>
                       <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
                         <span class="gc-zone-pill gc-firewall-pill">
-                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
-                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
-                          </span>
+                          <span class="gc-icon gc-icon--xs gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">{% if row.firewall_online %}check_circle{% else %}cancel{% endif %}</span>
                           <span class="mono">{{ row.firewall_label }}</span>
                         </span>
                       </td>
@@ -273,9 +271,7 @@
                       <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
                         {% if row.firewall_id %}
                         <span class="gc-zone-pill gc-firewall-pill">
-                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
-                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
-                          </span>
+                          <span class="gc-icon gc-icon--xs gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">{% if row.firewall_online %}check_circle{% else %}cancel{% endif %}</span>
                           <span class="mono">{{ row.firewall_label }}</span>
                         </span>
                         {% else %}
@@ -408,9 +404,7 @@
                       <td class="mono muted" data-gc-col="id">{{ row.id }}</td>
                       <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
                         <span class="gc-zone-pill gc-firewall-pill">
-                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
-                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
-                          </span>
+                          <span class="gc-icon gc-icon--xs gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">{% if row.firewall_online %}check_circle{% else %}cancel{% endif %}</span>
                           <span class="mono">{{ row.firewall_label }}</span>
                         </span>
                       </td>
@@ -535,9 +529,7 @@
                       <td data-gc-col="firewall_label" class="gc-net-firewall-pills">
                         {% if row.firewall_id %}
                         <span class="gc-zone-pill gc-firewall-pill">
-                          <span class="gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">
-                            {% if row.firewall_online %}&check;{% else %}-{% endif %}
-                          </span>
+                          <span class="gc-icon gc-icon--xs gc-firewall-pill-status gc-firewall-pill-status--{{ 'online' if row.firewall_online else 'offline' }}" role="img" aria-label="Firewall {{ 'online' if row.firewall_online else 'offline' }}">{% if row.firewall_online %}check_circle{% else %}cancel{% endif %}</span>
                           <span class="mono">{{ row.firewall_label }}</span>
                         </span>
                         {% else %}

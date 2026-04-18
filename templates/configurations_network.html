@@ -1,6 +1,7 @@
 {% extends "configurations_base.html" %}
 {% set cfg_subnav_active = "network" %}
 {% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% from "partials/_dhcp_page.html" import dhcp_filter_asides, dhcp_subtablist, dhcp_subtab_panels, dhcp_cols_modals, dhcp_edit_flyout %}
 {% block title %}Network · Configuration · Ground Control{% endblock %}
 {% block page_title %}Network{% endblock %}
 {% block breadcrumbs %}
@@ -26,7 +27,7 @@
         {{ net_filters_aside("gc-cfg-net-if", false) }}
         {{ net_filters_aside("gc-cfg-net-vlan", true) }}
         {{ net_filters_aside("gc-cfg-net-zone", true) }}
-        {{ net_filters_aside("gc-cfg-net-dhcp", true) }}
+        {{ dhcp_filter_asides("gc-cfg-net-dhcp") }}
       </div>
       <div class="content-pane gc-network-panel__content">
         <div class="gc-tabs" role="tablist" aria-label="Network views" id="gc-cfg-network-main-tablist">
@@ -82,15 +83,11 @@
             }}
           </div>
           <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-cfg-tab-dhcp" id="gc-cfg-panel-dhcp" hidden>
-            {{
-              net_entity_table_wrap(
-                "gc-cfg-net-dhcp",
-                "DHCP servers",
-                "Search DHCP servers",
-                show_combine=false,
-                toolbar_page_sync=false,
-              )
-            }}
+            {% set dhcp_v4_subtitle_cfg = "Combined view merges rows that share the same DHCP server name across selected configurations." %}
+            {% set dhcp_v6_subtitle_cfg = dhcp_v4_subtitle_cfg %}
+            {% set dhcp_relay_subtitle_cfg = "Combined view merges rows that share the same relay name across selected configurations." %}
+            {{ dhcp_subtablist("gc-cfg-net-dhcp", "data-gc-cfg-net-dhcp-subtab") }}
+            {{ dhcp_subtab_panels("gc-cfg-net-dhcp", dhcp_v4_subtitle_cfg, dhcp_v6_subtitle_cfg, dhcp_relay_subtitle_cfg, false) }}
           </div>
         </div>
       </div>
@@ -101,7 +98,8 @@
 {{ net_cols_modal("gc-cfg-net-if") }}
 {{ net_cols_modal("gc-cfg-net-vlan") }}
 {{ net_cols_modal("gc-cfg-net-zone") }}
-{{ net_cols_modal("gc-cfg-net-dhcp") }}
+{{ dhcp_cols_modals("gc-cfg-net-dhcp") }}
+{{ dhcp_edit_flyout("Save") }}
 
 <div id="gc-cfg-net-zone-combine-modal" class="gc-net-zone-combine-modal" hidden aria-hidden="true">
   <div class="gc-net-zone-combine-modal__backdrop" tabindex="-1" aria-hidden="true"></div>
@@ -457,6 +455,15 @@
 <script src="/static/gc-hosts-services-flyout.js"></script>
 <script src="/static/gc-combine-flyout-conflicts.js"></script>
 <script src="/static/gc-net-zone-flyout.js"></script>
+<script src="/static/gc-dhcp-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-hs-bulk-add.js"></script>
+<script>
+  window.gcDhcpEntityTarget = "configuration";
+  window.gcHsTableUrl = {{ url_api_configurations_hosts_services_table | tojson }};
+  window.gcHsApplyCreatesBatchUrl = {{ url_api_configurations_apply_hs_creates_batch | tojson }};
+  window.gcHsApplyUpdatesBatchUrl = {{ url_api_configurations_apply_hs_updates_batch | tojson }};
+  window.gcHsApplyDeletesBatchUrl = {{ url_api_configurations_apply_hs_deletes_batch | tojson }};
+</script>
 <script>
   (function () {
     var URLS = {
@@ -464,6 +471,7 @@
       vlans: {{ url_api_configuration_network_vlans | tojson }},
       zones: {{ url_api_configuration_network_zones | tojson }},
       dhcp: {{ url_api_configuration_network_dhcp_servers | tojson }},
+      hsTable: window.gcHsTableUrl || "",
     };
 
     function selectedConfigurationIds() {
@@ -488,7 +496,9 @@
       if (tableIf) tableIf.refresh();
       if (tableVlan) tableVlan.refresh();
       if (tableZone) tableZone.refresh();
-      if (tableDhcp) tableDhcp.refresh();
+      if (typeof tableDhcpV4 !== "undefined" && tableDhcpV4 && tableDhcpV4.refresh) tableDhcpV4.refresh();
+      if (typeof tableDhcpV6 !== "undefined" && tableDhcpV6 && tableDhcpV6.refresh) tableDhcpV6.refresh();
+      if (typeof tableDhcpRelay !== "undefined" && tableDhcpRelay && tableDhcpRelay.refresh) tableDhcpRelay.refresh();
     }
 
     document.addEventListener("gc-firewall-selection-changed", function () {
@@ -505,7 +515,9 @@
       "gc-cfg-net-if-filters-aside",
       "gc-cfg-net-vlan-filters-aside",
       "gc-cfg-net-zone-filters-aside",
-      "gc-cfg-net-dhcp-filters-aside",
+      "gc-cfg-net-dhcp-ipv4-filters-aside",
+      "gc-cfg-net-dhcp-ipv6-filters-aside",
+      "gc-cfg-net-dhcp-relay-filters-aside",
     ];
 
     var NETWORK_MAIN_TAB_LS = "ground-control-cfg-network-main-tab";
@@ -526,7 +538,10 @@
       if (activeMainTab === "interfaces") showId = "gc-cfg-net-if-filters-aside";
       else if (activeMainTab === "vlan") showId = "gc-cfg-net-vlan-filters-aside";
       else if (activeMainTab === "zones") showId = "gc-cfg-net-zone-filters-aside";
-      else if (activeMainTab === "dhcp") showId = "gc-cfg-net-dhcp-filters-aside";
+      else if (activeMainTab === "dhcp") {
+        var sub = (typeof activeDhcpSubtab === "string") ? activeDhcpSubtab : "ipv4";
+        showId = "gc-cfg-net-dhcp-" + sub + "-filters-aside";
+      }
       else showId = "gc-cfg-net-if-filters-aside";
       FILTER_IDS.forEach(function (id) {
         var el = document.getElementById(id);
@@ -1037,25 +1052,200 @@
       }),
     );
 
-    var tableDhcp = gcCreateNetworkEntityTable(
-      Object.assign({}, tableOpts, {
-        prefix: "gc-cfg-net-dhcp",
-        apiUrl: URLS.dhcp,
-        lsKey: "ground-control-cfg-net-dhcp-columns-v1",
-        dataRowClass: "gc-cfg-net-dhcp-data-row",
-        colPickerAttr: "data-gc-cfg-net-dhcp-col",
-        pageSyncFallbackEntities: ["dhcp_server"],
-        rowClickable: false,
-        bulkRowSelect: false,
-        labels: {
-          countSingular: "DHCP server",
-          countPlural: "DHCP servers",
-          emptyCache: "No IPv4 DHCP servers on the selected configurations.",
-          emptyFilter: "No rows match the current search or filters.",
-          loadError: "Could not load DHCP servers.",
-        },
-      }),
+    var DHCP_TAB_DEFS = [
+      {
+        key: "ipv4",
+        prefix: "gc-cfg-net-dhcp-ipv4",
+        apiEntity: "dhcp_server",
+        aria: "IPv4 DHCP server",
+        countS: "IPv4 DHCP server",
+        countP: "IPv4 DHCP servers",
+        humanAdd: "IPv4 DHCP server",
+      },
+      {
+        key: "ipv6",
+        prefix: "gc-cfg-net-dhcp-ipv6",
+        apiEntity: "dhcp_server_ipv6",
+        aria: "IPv6 DHCP server",
+        countS: "IPv6 DHCP server",
+        countP: "IPv6 DHCP servers",
+        humanAdd: "IPv6 DHCP server",
+      },
+      {
+        key: "relay",
+        prefix: "gc-cfg-net-dhcp-relay",
+        apiEntity: "dhcp_relay",
+        aria: "DHCP relay",
+        countS: "DHCP relay",
+        countP: "DHCP relays",
+        humanAdd: "DHCP relay",
+      },
+    ];
+
+    function buildCfgDhcpFetchUrl(t, ctx) {
+      var ids = (ctx && ctx.configurationIds) || [];
+      var url = URLS.hsTable + "?configuration_ids=" + encodeURIComponent(ids.join(","));
+      url += "&entity_type=" + encodeURIComponent(t.apiEntity);
+      var combineEl = document.getElementById(t.prefix + "-combine");
+      var combinedOn = !combineEl || combineEl.checked;
+      url += "&combine=" + (combinedOn ? "true" : "false");
+      return url;
+    }
+
+    function makeCfgDhcpTable(t) {
+      return gcCreateNetworkEntityTable(
+        Object.assign({}, tableOpts, {
+          prefix: t.prefix,
+          apiUrl: URLS.hsTable,
+          apiEntityType: t.apiEntity,
+          lsKey: "ground-control-cfg-net-dhcp-" + t.key + "-columns-v1",
+          dataRowClass: t.prefix + "-data-row",
+          colPickerAttr: "data-" + t.prefix + "-col",
+          pageSyncFallbackEntities: [t.apiEntity],
+          rowClickable: true,
+          rowAriaEntitySingular: t.aria,
+          bulkRowSelect: true,
+          combineQuery: { param: "combine" },
+          onRowClick: function (tr) {
+            if (window.gcDhcpFlyout && window.gcDhcpFlyout.openEditFromTr) {
+              window.gcDhcpFlyout.openEditFromTr(tr);
+            }
+          },
+          fetchTablePayload: function (ctx) {
+            var url = buildCfgDhcpFetchUrl(t, ctx);
+            return fetch(url, {
+              credentials: "same-origin",
+              headers: { Accept: "application/json", "X-Requested-With": "Ground-Control" },
+            }).then(function (r) { return r.json(); });
+          },
+          labels: {
+            countSingular: t.countS,
+            countPlural: t.countP,
+            emptyCache: "No " + t.countP + " on the selected configurations.",
+            emptyFilter: "No " + t.countP + " match the current search or filters.",
+            loadError: "Could not load " + t.countP + ".",
+          },
+        }),
+      );
+    }
+
+    var tableDhcpV4 = makeCfgDhcpTable(DHCP_TAB_DEFS[0]);
+    var tableDhcpV6 = makeCfgDhcpTable(DHCP_TAB_DEFS[1]);
+    var tableDhcpRelay = makeCfgDhcpTable(DHCP_TAB_DEFS[2]);
+    var dhcpTablesByKey = {
+      ipv4: tableDhcpV4,
+      ipv6: tableDhcpV6,
+      relay: tableDhcpRelay,
+    };
+
+    var DHCP_SUBTAB_LS = "ground-control-cfg-net-dhcp-subtab";
+    function readSavedDhcpSubtab() {
+      try {
+        var raw = localStorage.getItem(DHCP_SUBTAB_LS);
+        if (raw === "ipv4" || raw === "ipv6" || raw === "relay") return raw;
+      } catch (e) {}
+      return "ipv4";
+    }
+    var activeDhcpSubtab = readSavedDhcpSubtab();
+    var dhcpSubTabs = document.querySelectorAll(
+      "#gc-cfg-net-dhcp-subtablist .gc-tabs__tab[data-gc-cfg-net-dhcp-subtab]"
     );
+    var dhcpSubPanels = {
+      ipv4: document.getElementById("gc-cfg-net-dhcp-panel-ipv4"),
+      ipv6: document.getElementById("gc-cfg-net-dhcp-panel-ipv6"),
+      relay: document.getElementById("gc-cfg-net-dhcp-panel-relay"),
+    };
+    function syncDhcpSubButtons() {
+      dhcpSubTabs.forEach(function (b) {
+        var on = b.getAttribute("data-gc-cfg-net-dhcp-subtab") === activeDhcpSubtab;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    }
+    function applyDhcpSubPanels() {
+      Object.keys(dhcpSubPanels).forEach(function (k) {
+        var p = dhcpSubPanels[k];
+        if (!p) return;
+        var show = k === activeDhcpSubtab;
+        p.classList.toggle("is-active", show);
+        p.hidden = !show;
+      });
+    }
+    dhcpSubTabs.forEach(function (b) {
+      b.addEventListener("click", function () {
+        activeDhcpSubtab = b.getAttribute("data-gc-cfg-net-dhcp-subtab");
+        syncDhcpSubButtons();
+        applyDhcpSubPanels();
+        syncFilterAsidesVisibility();
+        try { localStorage.setItem(DHCP_SUBTAB_LS, activeDhcpSubtab); } catch (e) {}
+      });
+    });
+    syncDhcpSubButtons();
+    applyDhcpSubPanels();
+
+    if (window.gcDhcpFlyout && typeof window.gcDhcpFlyout.init === "function") {
+      window.gcDhcpFlyout.init();
+    }
+
+    DHCP_TAB_DEFS.forEach(function (t) {
+      var addBtn = document.getElementById(t.prefix + "-add");
+      if (addBtn) {
+        addBtn.addEventListener("click", function () {
+          var sel = selectedConfigurationIds();
+          if (!sel || !sel.length) {
+            window.gcAlert("Select one or more configurations in the top bar to add objects.");
+            return;
+          }
+          if (window.gcDhcpFlyout && window.gcDhcpFlyout.openAdd) {
+            window.gcDhcpFlyout.openAdd(t.apiEntity, null);
+          }
+        });
+      }
+      var bulkBtn = document.getElementById(t.prefix + "-bulk-add");
+      if (bulkBtn && window.gcHsBulkAdd && window.gcHsBulkAdd.openForEntity) {
+        bulkBtn.addEventListener("click", function () {
+          window.gcHsBulkAdd.openForEntity(t.apiEntity, { target: "configuration" });
+        });
+      }
+      var delBtn = document.getElementById(t.prefix + "-delete-selected");
+      if (delBtn) {
+        delBtn.addEventListener("click", function () {
+          var tbl = dhcpTablesByKey[t.key];
+          if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
+          var ids = tbl.getDeleteConfigEntryIdsFromSelection();
+          if (!ids.length) { window.gcAlert("Select one or more rows to delete."); return; }
+          var n = ids.length;
+          var msg = "Apply " + n + " delete" + (n === 1 ? "" : "s") + " to the selected " + t.countP + "?";
+          var cf = window.gcConfirm ? window.gcConfirm(msg) : Promise.resolve(globalThis.confirm(msg));
+          cf.then(function (ok) {
+            if (!ok) return;
+            var url = window.gcHsApplyDeletesBatchUrl;
+            if (!url) { window.gcAlert("Delete URL not configured."); return; }
+            delBtn.disabled = true;
+            fetch(url, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ config_entry_ids: ids }),
+            }).then(function (r) {
+              return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+            }).then(function (x) {
+              delBtn.disabled = false;
+              if (!x.ok) {
+                var em = (x.j && (x.j.detail || x.j.message)) || "Could not apply delete.";
+                window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
+                return;
+              }
+              try { document.dispatchEvent(new CustomEvent("gc-configuration-entries-updated")); } catch (e) {}
+              if (tbl.refresh) tbl.refresh();
+            }).catch(function () {
+              delBtn.disabled = false;
+              window.gcAlert("Network error.");
+            });
+          });
+        });
+      }
+    });
 
     (function bindCfgZoneAddBtn() {
       var b = document.getElementById("gc-cfg-net-zone-add");

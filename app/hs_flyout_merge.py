@@ -663,3 +663,165 @@ def merge_local_service_acl_form(
         else:
             out["Services"] = {"Service": services}
     return out
+
+
+# ---------------------------------------------------------------------------
+# Network : DHCP Server (IPv4)  (XML root <DHCPServer>)
+# Network : DHCP Server (IPv6)  (XML root <DHCPServerIpv6>)
+# Network : DHCP Relay          (XML root <DHCPRelay>)
+# ---------------------------------------------------------------------------
+
+_DHCP_SERVER_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("Interface", ("interface",)),
+    ("UseInterfaceIPasGateway", ("use_interface_ip_as_gateway",)),
+    ("SubnetMask", ("subnet_mask",)),
+    ("DomainName", ("domain_name",)),
+    ("Gateway", ("gateway",)),
+    ("DefaultLeaseTime", ("default_lease_time",)),
+    ("MaxLeaseTime", ("max_lease_time",)),
+    ("ConflictDetection", ("conflict_detection",)),
+    ("UseApplianceDNSSettings", ("use_appliance_dns_settings",)),
+    ("PrimaryDNSServer", ("primary_dns_server",)),
+    ("SecondaryDNSServer", ("secondary_dns_server",)),
+    ("PrimaryWINSServer", ("primary_wins_server",)),
+    ("SecondaryWINSServer", ("secondary_wins_server",)),
+    ("BootServer", ("boot_server",)),
+    ("BootFile", ("boot_file",)),
+    ("LeaseForRelay", ("lease_for_relay",)),
+)
+
+_DHCP_STATIC_LEASE_V4_SUBFIELDS: tuple[str, ...] = ("HostName", "MACAddress", "IPAddress")
+_DHCP_STATIC_LEASE_V6_SUBFIELDS: tuple[str, ...] = ("HostName", "DUID", "IPAddress")
+_DHCP_OPTION_SUBFIELDS: tuple[str, ...] = (
+    "OptionName",
+    "OptionType",
+    "OptionCode",
+    "OptionValue",
+)
+
+
+def _normalize_keyed_row(
+    row: Mapping[str, Any], subfields: tuple[str, ...]
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for sf in subfields:
+        if sf in row and row[sf] is not None:
+            s = str(row[sf]).strip()
+            if s:
+                out[sf] = s
+    return out
+
+
+def _apply_iplease_block(out: dict[str, Any], form: Mapping[str, Any]) -> None:
+    """Overlay the ``<IPLease>`` block (list of ``<IP>start-end</IP>`` ranges)."""
+    ranges = _form_list_field(form, "ip_lease", "IPLease.IP")
+    if ranges is None:
+        return
+    if not ranges:
+        out["IPLease"] = None
+        return
+    if len(ranges) == 1:
+        out["IPLease"] = {"IP": ranges[0]}
+    else:
+        out["IPLease"] = {"IP": ranges}
+
+
+def _apply_static_lease_block(
+    out: dict[str, Any], form: Mapping[str, Any], *, subfields: tuple[str, ...]
+) -> None:
+    """Overlay ``<StaticLease><Lease>...</Lease>...</StaticLease>``."""
+    rows = _form_repeating_rows(form, "static_lease")
+    if rows is None:
+        rows = _form_repeating_rows(form, "StaticLease")
+    if rows is None:
+        return
+    cleaned = [_normalize_keyed_row(r, subfields) for r in rows]
+    cleaned = [r for r in cleaned if r]
+    if not cleaned:
+        out["StaticLease"] = None
+        return
+    out["StaticLease"] = {"Lease": cleaned[0] if len(cleaned) == 1 else cleaned}
+
+
+def _apply_dhcp_options_block(out: dict[str, Any], form: Mapping[str, Any]) -> None:
+    """Overlay ``<DHCPOption><Options>...</Options>...</DHCPOption>``."""
+    rows = _form_repeating_rows(form, "dhcp_options")
+    if rows is None:
+        rows = _form_repeating_rows(form, "DHCPOption")
+    if rows is None:
+        return
+    cleaned = [_normalize_keyed_row(r, _DHCP_OPTION_SUBFIELDS) for r in rows]
+    cleaned = [r for r in cleaned if r]
+    if not cleaned:
+        out["DHCPOption"] = None
+        return
+    out["DHCPOption"] = {"Options": cleaned[0] if len(cleaned) == 1 else cleaned}
+
+
+def merge_dhcp_server_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply IPv4 DHCP Server flyout edits onto a cached <DHCPServer> payload."""
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _DHCP_SERVER_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    _apply_iplease_block(out, form)
+    _apply_static_lease_block(out, form, subfields=_DHCP_STATIC_LEASE_V4_SUBFIELDS)
+    _apply_dhcp_options_block(out, form)
+    return out
+
+
+_DHCP_SERVER_IPV6_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("Interface", ("interface",)),
+    ("PreferredTime", ("preferred_time", "preferredtime")),
+    ("ValidTime", ("valid_time", "validtime")),
+    ("UseApplianceDNSSettings", ("use_appliance_dns_settings",)),
+    ("primarydnsv6", ("primary_dns_v6", "primarydnsv6")),
+    ("secondarydnsv6", ("secondary_dns_v6", "secondarydnsv6")),
+    ("LeaseForRelay", ("lease_for_relay",)),
+)
+
+
+def merge_dhcp_server_ipv6_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply IPv6 DHCP Server flyout edits onto a cached <DHCPServerIpv6> payload."""
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _DHCP_SERVER_IPV6_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    _apply_iplease_block(out, form)
+    _apply_static_lease_block(out, form, subfields=_DHCP_STATIC_LEASE_V6_SUBFIELDS)
+    _apply_dhcp_options_block(out, form)
+    return out
+
+
+_DHCP_RELAY_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("IPFamily", ("ip_family",)),
+    ("Interface", ("interface",)),
+    ("RelaythroughIPSec", ("relay_through_ipsec",)),
+)
+
+
+def merge_dhcp_relay_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply DHCP Relay flyout edits onto a cached <DHCPRelay> payload.
+
+    ``DHCPServerIP`` is a repeating top-level child (not wrapped in a parent
+    block), so we overlay it as a list directly.
+    """
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _DHCP_RELAY_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    server_ips = _form_list_field(form, "dhcp_server_ip", "DHCPServerIP")
+    if server_ips is not None:
+        if not server_ips:
+            out["DHCPServerIP"] = None
+        elif len(server_ips) == 1:
+            out["DHCPServerIP"] = server_ips[0]
+        else:
+            out["DHCPServerIP"] = server_ips
+    return out

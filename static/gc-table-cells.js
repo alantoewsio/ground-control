@@ -76,17 +76,19 @@
   }
 
   function defaultListPillHtml(text) {
-    return (
-      '<span class="gc-table-value-pill">' + escapeHtml(String(text == null ? "" : text)) + "</span>"
-    );
+    let safe = escapeHtml(String(text == null ? "" : text));
+    return '<span class="gc-table-value-pill" title="' + safe + '">' + safe + "</span>";
   }
 
   function morePillHtml(restCount) {
     let n = typeof restCount === "number" ? restCount : parseInt(restCount, 10);
     if (isNaN(n) || n < 1) n = 0;
+    let label = "+" + n + " more";
     return (
-      '<span class="gc-table-value-pill gc-table-value-pill--more" title="Show all values">' +
-      escapeHtml("+" + n + " more") +
+      '<span class="gc-table-value-pill gc-table-value-pill--more" aria-label="Show all ' +
+      escapeHtml(String(n + 2)) +
+      ' values">' +
+      escapeHtml(label) +
       "</span>"
     );
   }
@@ -111,6 +113,7 @@
   }
 
   let modalEl;
+  let modalPanelEl;
   let modalTitleEl;
   let modalSearchEl;
   let modalListEl;
@@ -118,6 +121,9 @@
   let modalBackdropEl;
   let lastModalTrigger;
   let modalKeydownBound;
+  let activeAnchorEl;
+  let resizeListener;
+  let scrollListener;
 
   function ensureModal() {
     if (modalEl) return modalEl;
@@ -137,6 +143,7 @@
       '<ul class="fw-cols-modal__list gc-table-list-modal__list" id="gc-table-list-modal-list"></ul>' +
       "</div>";
     document.body.appendChild(modalEl);
+    modalPanelEl = modalEl.querySelector(".gc-table-list-modal__panel");
     modalTitleEl = modalEl.querySelector("#gc-table-list-modal-title");
     modalSearchEl = modalEl.querySelector("#gc-table-list-modal-search");
     modalListEl = modalEl.querySelector("#gc-table-list-modal-list");
@@ -145,6 +152,26 @@
 
     function closeModal() {
       modalEl.setAttribute("hidden", "");
+      modalEl.classList.remove(
+        "gc-table-list-modal--anchored",
+        "gc-table-list-modal--flip",
+        "gc-table-list-modal--align-end",
+        "gc-table-list-modal--align-start",
+      );
+      if (modalPanelEl) {
+        modalPanelEl.style.left = "";
+        modalPanelEl.style.top = "";
+        modalPanelEl.style.removeProperty("--gc-popover-arrow-x");
+      }
+      activeAnchorEl = null;
+      if (resizeListener) {
+        window.removeEventListener("resize", resizeListener);
+        resizeListener = null;
+      }
+      if (scrollListener) {
+        window.removeEventListener("scroll", scrollListener, true);
+        scrollListener = null;
+      }
       if (lastModalTrigger && typeof lastModalTrigger.focus === "function") {
         try {
           lastModalTrigger.focus();
@@ -214,7 +241,96 @@
     });
   }
 
-  function openListValueModal(title, items, pillFn, listModalItemOptions) {
+  /**
+   * Place the panel next to `anchor`:
+   *  - vertically: below if there's room, otherwise above (flips the arrow).
+   *  - horizontally: centered on the anchor, clamped to the viewport; if the
+   *    centered position would overflow, slide toward the viewport edge and
+   *    mark the arrow offset with a CSS custom property so it still points
+   *    at the anchor center.
+   * Panel uses position: fixed on an ancestor (document.body) with no
+   * transformed ancestors, so getBoundingClientRect ↔ inline top/left align 1:1.
+   * Returns true iff the anchor was still in view.
+   */
+  function positionPanelToAnchor(anchor) {
+    if (!modalPanelEl || !anchor || typeof anchor.getBoundingClientRect !== "function") return false;
+    let gap = 8;
+    let edge = 8;
+    let vw = window.innerWidth || document.documentElement.clientWidth || 0;
+    let vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    let r = anchor.getBoundingClientRect();
+    let anchorVisible = r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw;
+    /* Reset inline placement before measuring so offsetWidth/Height reflect the
+       natural popover size (width from CSS, height from content). */
+    modalPanelEl.style.left = "0px";
+    modalPanelEl.style.top = "0px";
+    let pw = modalPanelEl.offsetWidth;
+    let ph = modalPanelEl.offsetHeight;
+    let spaceBelow = vh - r.bottom;
+    let spaceAbove = r.top;
+    let placeAbove = spaceBelow < ph + gap + edge && spaceAbove > spaceBelow;
+    let top = placeAbove ? r.top - ph - gap : r.bottom + gap;
+    if (!placeAbove && top + ph > vh - edge) top = Math.max(edge, vh - ph - edge);
+    if (placeAbove && top < edge) top = edge;
+    let anchorCenterX = r.left + r.width / 2;
+    let left = Math.round(anchorCenterX - pw / 2);
+    if (left + pw > vw - edge) left = vw - pw - edge;
+    if (left < edge) left = edge;
+    modalPanelEl.style.left = left + "px";
+    modalPanelEl.style.top = Math.round(top) + "px";
+    /* Arrow: CSS positions it via --gc-popover-arrow-x (px from panel's left edge),
+       so a wide popover that got clamped still visually points at the anchor. */
+    let arrowX = Math.max(12, Math.min(pw - 12, Math.round(anchorCenterX - left)));
+    modalPanelEl.style.setProperty("--gc-popover-arrow-x", arrowX + "px");
+    modalEl.classList.toggle("gc-table-list-modal--flip", placeAbove);
+    return anchorVisible;
+  }
+
+  function closeModalFromListeners() {
+    if (modalEl && !modalEl.hasAttribute("hidden")) {
+      modalEl.setAttribute("hidden", "");
+      modalEl.classList.remove(
+        "gc-table-list-modal--anchored",
+        "gc-table-list-modal--flip",
+      );
+      if (modalPanelEl) {
+        modalPanelEl.style.left = "";
+        modalPanelEl.style.top = "";
+        modalPanelEl.style.removeProperty("--gc-popover-arrow-x");
+      }
+    }
+    activeAnchorEl = null;
+    if (resizeListener) {
+      window.removeEventListener("resize", resizeListener);
+      resizeListener = null;
+    }
+    if (scrollListener) {
+      window.removeEventListener("scroll", scrollListener, true);
+      scrollListener = null;
+    }
+  }
+
+  function bindAnchorListeners() {
+    /* Resize: reposition so the popover stays attached to the anchor. */
+    if (!resizeListener) {
+      resizeListener = function () {
+        if (modalEl && !modalEl.hasAttribute("hidden") && activeAnchorEl) {
+          positionPanelToAnchor(activeAnchorEl);
+        }
+      };
+      window.addEventListener("resize", resizeListener);
+    }
+    /* Scroll (any ancestor, capture): close. Trying to re-track a scrolling
+       anchor is visually jittery and the anchor often leaves the viewport. */
+    if (!scrollListener) {
+      scrollListener = function () {
+        closeModalFromListeners();
+      };
+      window.addEventListener("scroll", scrollListener, true);
+    }
+  }
+
+  function openListValueModal(title, items, pillFn, listModalItemOptions, anchorEl) {
     ensureModal();
     lastModalTrigger = document.activeElement;
     let renderer = typeof pillFn === "function" ? pillFn : defaultListPillHtml;
@@ -228,7 +344,21 @@
     } else {
       modalSearchEl.setAttribute("hidden", "");
     }
+    activeAnchorEl = anchorEl && typeof anchorEl.getBoundingClientRect === "function" ? anchorEl : null;
+    if (activeAnchorEl) {
+      modalEl.classList.add("gc-table-list-modal--anchored");
+    } else {
+      modalEl.classList.remove("gc-table-list-modal--anchored");
+      if (modalPanelEl) {
+        modalPanelEl.style.left = "";
+        modalPanelEl.style.top = "";
+      }
+    }
     modalEl.removeAttribute("hidden");
+    if (activeAnchorEl) {
+      positionPanelToAnchor(activeAnchorEl);
+      bindAnchorListeners();
+    }
     if (showSearch) {
       setTimeout(function () {
         modalSearchEl.focus();
@@ -262,7 +392,21 @@
         e.preventDefault();
         e.stopPropagation();
       }
-      openListValueModal(pfx || columnTitle || "Values", items, pillFn, listModalItemOptions);
+      let anchor = td;
+      if (e && e.target && typeof e.target.closest === "function") {
+        anchor =
+          e.target.closest(".gc-table-value-pill--more") ||
+          e.target.closest(".gc-table-value-pill") ||
+          e.target.closest(".gc-zone-pill") ||
+          td;
+      }
+      openListValueModal(
+        pfx || columnTitle || "Values",
+        items,
+        pillFn,
+        listModalItemOptions,
+        anchor,
+      );
     }
 
     td.addEventListener("click", open);
@@ -277,9 +421,7 @@
   global.gcTableNormalizeListCellItems = gcTableNormalizeListCellItems;
   global.gcTableListCellPreviewHtml = gcTableListCellPreviewHtml;
   function closeListValueModal() {
-    if (modalEl) {
-      modalEl.setAttribute("hidden", "");
-    }
+    closeModalFromListeners();
     lastModalTrigger = null;
   }
 
