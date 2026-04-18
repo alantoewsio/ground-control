@@ -91,23 +91,39 @@
     return out;
   }
 
-  function selectInput(id, val, options) {
-    let opts = options.map(function (o) {
+  function selectInput(id, val, options, opts) {
+    opts = opts || {};
+    let html = options.map(function (o) {
       let v = typeof o === "string" ? o : o.value;
       let lab = typeof o === "string" ? o : (o.label || o.value);
       return '<option value="' + escapeHtml(v) + '"' + (String(val) === String(v) ? " selected" : "") + ">" + escapeHtml(lab) + "</option>";
     }).join("");
-    return '<select id="' + id + '" class="gc-if-flyout__input">' + opts + "</select>";
+    let extra = opts.disabled ? " disabled" : "";
+    return '<select id="' + id + '" class="gc-if-flyout__input"' + extra + ">" + html + "</select>";
   }
 
   function textInput(id, val, opts) {
     opts = opts || {};
+    let type = opts.type || "text";
     let attrs = "";
     if (opts.placeholder) attrs += ' placeholder="' + escapeHtml(opts.placeholder) + '"';
     if (opts.mono) attrs += ' class="gc-if-flyout__input mono"';
     else attrs += ' class="gc-if-flyout__input"';
     if (opts.disabled) attrs += " disabled";
-    return '<input id="' + id + '" type="text" value="' + escapeHtml(val == null ? "" : val) + '"' + attrs + " />";
+    if (opts.inputmode) attrs += ' inputmode="' + escapeHtml(opts.inputmode) + '"';
+    if (opts.min != null) attrs += ' min="' + escapeHtml(String(opts.min)) + '"';
+    if (opts.max != null) attrs += ' max="' + escapeHtml(String(opts.max)) + '"';
+    if (opts.step != null) attrs += ' step="' + escapeHtml(String(opts.step)) + '"';
+    return '<input id="' + id + '" type="' + escapeHtml(type) + '" value="' + escapeHtml(val == null ? "" : val) + '"' + attrs + " />";
+  }
+
+  function textareaInput(id, val, opts) {
+    opts = opts || {};
+    let attrs = ' class="gc-if-flyout__input"';
+    if (opts.placeholder) attrs += ' placeholder="' + escapeHtml(opts.placeholder) + '"';
+    if (opts.rows) attrs += ' rows="' + escapeHtml(String(opts.rows)) + '"';
+    if (opts.maxlength) attrs += ' maxlength="' + escapeHtml(String(opts.maxlength)) + '"';
+    return '<textarea id="' + id + '"' + attrs + ">" + escapeHtml(val == null ? "" : val) + "</textarea>";
   }
 
   function fieldRow(label, html, opts) {
@@ -119,29 +135,70 @@
 
   function buildUnicastRouteForm(row) {
     let f = (row && row.flat) || {};
+    let isAdd = currentMode === "add";
+    let family = pick(f, ["IPFamily"]) || (isAdd ? "IPv4" : "");
+    let status = pick(f, ["Status"]) || (isAdd ? "ON" : "");
     let dest = pick(f, ["DestinationIP", "Destination_IP", "Destination"]);
     let mask = pick(f, ["Netmask", "NetMask", "Mask"]);
     let gw = pick(f, ["Gateway", "GatewayIP"]);
-    let iface = pick(f, ["Interface", "Distance"]);
-    let dist = pick(f, ["Distance", "AdminDistance"]);
-    let nameEditable = currentMode === "add";
+    let iface = pick(f, ["Interface"]);
+    let dist = pick(f, ["Distance"]);
+    if (dist === "" && isAdd) dist = "0";
+    let admDist = pick(f, ["AdministrativeDistance", "AdminDistance"]);
+    if (admDist === "" && isAdd) admDist = "1";
+    let blackhole = pick(f, ["Blackhole"]) || (isAdd ? "Disable" : "");
+    let desc = pick(f, ["Description"]);
+    let nameEditable = isAdd;
+    let lockFamily = !!(currentRow && currentRow._lockFamily);
     let html = "";
+    let familyHidden = lockFamily ? '<input type="hidden" id="gc-rt-ur-family-hidden" value="' + escapeHtml(family) + '" />' : "";
+    html += fieldRow("IP family", selectInput("gc-rt-ur-family", family, [
+      { value: "IPv4", label: "IPv4" },
+      { value: "IPv6", label: "IPv6" },
+    ], { disabled: lockFamily }) + familyHidden, {
+      required: true,
+      hint: lockFamily ? "Address family is set by the parent tab and cannot be changed here." : null,
+    });
+    html += fieldRow("Status", selectInput("gc-rt-ur-status", status, [
+      { value: "ON", label: "On" },
+      { value: "OFF", label: "Off" },
+    ]), { required: true });
     html += fieldRow("Destination IP", textInput("gc-rt-ur-dest", dest, { mono: true, disabled: !nameEditable, placeholder: "10.0.0.0" }), { required: true });
-    html += fieldRow("Netmask", textInput("gc-rt-ur-mask", mask, { mono: true, placeholder: "255.255.255.0" }), { required: true });
+    html += fieldRow("Netmask / prefix", textInput("gc-rt-ur-mask", mask, { mono: true, placeholder: "255.255.255.0 or /64" }), { required: true });
     html += fieldRow("Gateway", textInput("gc-rt-ur-gw", gw, { mono: true, placeholder: "10.0.0.1" }), { required: true });
-    html += fieldRow("Interface", textInput("gc-rt-ur-iface", iface, { mono: true }), { hint: "Interface name (e.g. PortB)" });
-    html += fieldRow("Distance", textInput("gc-rt-ur-dist", dist, { placeholder: "0" }));
+    html += fieldRow("Interface", textInput("gc-rt-ur-iface", iface, { mono: true, placeholder: "Port1" }));
+    html += fieldRow("Distance", textInput("gc-rt-ur-dist", dist, {
+      type: "number", inputmode: "numeric", min: 0, max: 255, step: 1, placeholder: "0",
+    }), { hint: "Metric (0\u2013255). Lower wins when multiple routes match." });
+    html += fieldRow("Administrative distance", textInput("gc-rt-ur-admdist", admDist, {
+      type: "number", inputmode: "numeric", min: 0, max: 255, step: 1, placeholder: "1",
+    }), { hint: "Trust level for the route source (0\u2013255)." });
+    html += fieldRow("Blackhole", selectInput("gc-rt-ur-blackhole", blackhole, [
+      { value: "Disable", label: "Disable" },
+      { value: "Enable", label: "Enable" },
+    ]));
+    html += fieldRow("Description", textareaInput("gc-rt-ur-desc", desc, { rows: 3, maxlength: 255 }));
     return html;
   }
 
   function collectUnicastRouteForm() {
+    let val = function (id) {
+      let el = document.getElementById(id);
+      return el ? (el.value || "") : "";
+    };
+    let family = val("gc-rt-ur-family") || val("gc-rt-ur-family-hidden");
     return {
-      name: (document.getElementById("gc-rt-ur-dest") || {}).value || "",
-      DestinationIP: (document.getElementById("gc-rt-ur-dest") || {}).value || "",
-      Netmask: (document.getElementById("gc-rt-ur-mask") || {}).value || "",
-      Gateway: (document.getElementById("gc-rt-ur-gw") || {}).value || "",
-      Interface: (document.getElementById("gc-rt-ur-iface") || {}).value || "",
-      Distance: (document.getElementById("gc-rt-ur-dist") || {}).value || "",
+      name: val("gc-rt-ur-dest"),
+      IPFamily: family,
+      Status: val("gc-rt-ur-status"),
+      DestinationIP: val("gc-rt-ur-dest"),
+      Netmask: val("gc-rt-ur-mask"),
+      Gateway: val("gc-rt-ur-gw"),
+      Interface: val("gc-rt-ur-iface"),
+      Distance: val("gc-rt-ur-dist"),
+      AdministrativeDistance: val("gc-rt-ur-admdist"),
+      Blackhole: val("gc-rt-ur-blackhole"),
+      Description: val("gc-rt-ur-desc"),
     };
   }
 
@@ -357,12 +414,24 @@
     }
   }
 
-  function openAdd(et) {
+  function openAdd(et, presets) {
     if (!flyout) return;
     currentEntityType = et;
     currentMode = "add";
-    currentRow = { entity_type: et, flat: {}, hs_edit_targets: [] };
-    if (titleEl) titleEl.textContent = "Add " + humanTitle(et);
+    let flat = {};
+    let lockFamily = false;
+    if (presets && typeof presets === "object") {
+      Object.keys(presets).forEach(function (k) {
+        if (k === "_lockFamily") { lockFamily = !!presets[k]; return; }
+        flat[k] = presets[k];
+      });
+    }
+    currentRow = { entity_type: et, flat: flat, hs_edit_targets: [], _lockFamily: lockFamily };
+    let suffix = "";
+    if (et === "unicast_route" && flat.IPFamily) {
+      suffix = " (" + flat.IPFamily + ")";
+    }
+    if (titleEl) titleEl.textContent = "Add " + humanTitle(et) + suffix;
     if (metaEl) metaEl.hidden = true;
     if (saveBtn) { saveBtn.hidden = false; saveBtn.disabled = false; }
     if (fieldsRoot) fieldsRoot.innerHTML = buildFormFor(et, currentRow);

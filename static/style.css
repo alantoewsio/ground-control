@@ -83,7 +83,10 @@
   --surface-hover: #f9fafb;
   --surface-active: #f3f4f6;
   --muted: #6b7280;
-  --bg: #f8f9fa;
+  /* App page background ? sits behind white tables/cards so they pop visually.
+     Keep distinct from --surface (white) which is for cards/tables/dialogs. */
+  --app-bg: #F0F2F4;
+  --bg: #F0F2F4;
 
   /* Semantic / status colors (design-skill.md sec.3) */
   --success: #00851D;
@@ -128,7 +131,7 @@ body {
   height: 100%;
   overflow: hidden;
   color: var(--text);
-  background: var(--surface);
+  background: var(--app-bg);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -767,7 +770,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  background: var(--surface);
+  background: var(--app-bg);
 }
 
 .app-main {
@@ -779,7 +782,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  background: var(--surface);
+  background: var(--app-bg);
 }
 
 .app-content:has(.gc-task-queue-bottom-tab:not([hidden])) .app-main {
@@ -14511,7 +14514,10 @@ button .gc-icon + *:not(.gc-icon) {
   transition: background-color var(--motion-fast), color var(--motion-fast);
 }
 
-.gc-dialog__close:hover {
+.gc-dialog__close:hover,
+.gc-dialog__close:focus,
+.gc-dialog__close:focus-visible,
+.gc-dialog__close:active {
   background: var(--surface-active);
   color: var(--text);
 }
@@ -14627,31 +14633,53 @@ button .gc-icon + *:not(.gc-icon) {
   display: none !important;
 }
 
-.gc-dialog__btn--primary {
+.gc-dialog__btn--primary,
+.gc-dialog__btn--primary:link,
+.gc-dialog__btn--primary:visited {
   background: var(--accent-btn);
   color: var(--text-inverse);
+  border-color: var(--accent-btn);
 }
 
-.gc-dialog__btn--primary:hover {
+.gc-dialog__btn--primary:hover,
+.gc-dialog__btn--primary:focus,
+.gc-dialog__btn--primary:focus-visible,
+.gc-dialog__btn--primary:active {
   background: var(--accent-btn-hover);
+  color: var(--text-inverse);
+  border-color: var(--accent-btn-hover);
 }
 
-.gc-dialog__btn--secondary {
+.gc-dialog__btn--secondary,
+.gc-dialog__btn--secondary:link,
+.gc-dialog__btn--secondary:visited {
   background: var(--surface-active);
   color: var(--accent-btn);
   border-color: transparent;
 }
 
-.gc-dialog__btn--secondary:hover {
+.gc-dialog__btn--secondary:hover,
+.gc-dialog__btn--secondary:focus,
+.gc-dialog__btn--secondary:focus-visible,
+.gc-dialog__btn--secondary:active {
   background: var(--border-light);
+  color: var(--accent-btn);
+  border-color: transparent;
 }
 
 .gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary {
   background: var(--danger);
+  color: var(--text-inverse);
+  border-color: var(--danger);
 }
 
-.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary:hover {
+.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary:hover,
+.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary:focus,
+.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary:focus-visible,
+.gc-dialog[data-gc-dialog-tone="danger"][data-gc-dialog-mode="confirm"] .gc-dialog__btn--primary:active {
   background: #b53400;
+  color: var(--text-inverse);
+  border-color: #b53400;
 }
 
 .gc-dialog__btn:focus-visible {

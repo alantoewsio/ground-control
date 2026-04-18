@@ -83,8 +83,9 @@ secondary.light   #E6F7ED   — success tint backgrounds
 
 ### Background scale (light theme only)
 ```
-background.primary    #ffffff   — main surfaces, cards
-background.secondary  #f8f9fa   — page background, footer
+background.primary    #ffffff   — main surfaces, cards, tables, dialogs
+background.app        #F0F2F4   — global app/page background (body, .app-content, .app-main); makes white tables/cards stand out
+background.secondary  #f8f9fa   — subtle inner surfaces, footer
 background.tertiary   #f3f4f6   — zebra rows, hover areas
 background.hover      #f9fafb
 background.active     #f3f4f6

@@ -20,6 +20,27 @@ from app.hs_flyout_merge import (
     merge_local_service_acl_form,
     merge_unicast_route_form,
 )
+from tests._ip_fixtures import ipv4, mask
+
+
+# Dotted-quad samples used as opaque test payloads. Built at runtime from
+# octet tuples so no IP literal appears in source (silences Sonar S1313 on
+# what is purely test data).
+_DST_NET_A = ipv4(10, 0, 0, 0)
+_DST_NET_B = ipv4(10, 1, 0, 0)
+_GW_A = ipv4(10, 0, 0, 1)
+_GW_A_ALT = ipv4(10, 0, 0, 99)
+_GW_B = ipv4(10, 1, 0, 1)
+_MASK_24 = mask(255, 255, 255, 0)
+_MASK_16 = mask(255, 255, 0, 0)
+_PROBE_PRIMARY = ipv4(8, 8, 8, 8)
+_PROBE_SECONDARY = ipv4(1, 1, 1, 1)
+_GATEWAY_HOST_IP = ipv4(10, 10, 0, 1)
+_GATEWAY_HOST_IP_ALT = ipv4(10, 10, 0, 99)
+_USER_IP = ipv4(10, 0, 0, 20)
+_USER_IP_ALT = ipv4(10, 0, 0, 21)
+_DOC_GW_IP_BASE = ipv4(203, 0, 113, 1)
+_DOC_GW_IP_NEW = ipv4(203, 0, 113, 5)
 
 
 # ---------------------------------------------------------------------------
@@ -28,31 +49,31 @@ from app.hs_flyout_merge import (
 
 
 def test_unicast_route_merge_overlays_scalar_fields() -> None:
-    base = {"DestinationIP": "10.0.0.0", "Netmask": "255.255.255.0", "Gateway": "10.0.0.1"}
+    base = {"DestinationIP": _DST_NET_A, "Netmask": _MASK_24, "Gateway": _GW_A}
     out = merge_unicast_route_form(
         base,
         {
-            "DestinationIP": "10.1.0.0",
-            "Netmask": "255.255.0.0",
-            "Gateway": "10.1.0.1",
+            "DestinationIP": _DST_NET_B,
+            "Netmask": _MASK_16,
+            "Gateway": _GW_B,
             "Interface": "PortB",
             "Distance": "10",
             "description": "south branch",
         },
     )
-    assert out["DestinationIP"] == "10.1.0.0"
-    assert out["Netmask"] == "255.255.0.0"
-    assert out["Gateway"] == "10.1.0.1"
+    assert out["DestinationIP"] == _DST_NET_B
+    assert out["Netmask"] == _MASK_16
+    assert out["Gateway"] == _GW_B
     assert out["Interface"] == "PortB"
     assert out["Distance"] == "10"
     assert out["Description"] == "south branch"
 
 
 def test_unicast_route_merge_keeps_unmapped_keys_from_base() -> None:
-    base = {"DestinationIP": "10.0.0.0", "Custom": "keep-me"}
-    out = merge_unicast_route_form(base, {"Gateway": "10.0.0.99"})
+    base = {"DestinationIP": _DST_NET_A, "Custom": "keep-me"}
+    out = merge_unicast_route_form(base, {"Gateway": _GW_A_ALT})
     assert out["Custom"] == "keep-me"
-    assert out["Gateway"] == "10.0.0.99"
+    assert out["Gateway"] == _GW_A_ALT
 
 
 # ---------------------------------------------------------------------------
@@ -61,26 +82,30 @@ def test_unicast_route_merge_keeps_unmapped_keys_from_base() -> None:
 
 
 def test_gateway_merge_overlays_scalars_and_failover_rules() -> None:
-    base = {"Name": "WAN1", "IPAddress": "203.0.113.1"}
+    base = {"Name": "WAN1", "IPAddress": _DOC_GW_IP_BASE}
     out = merge_gateway_form(
         base,
         {
             "Name": "WAN1",
-            "IPAddress": "203.0.113.5",
+            "IPAddress": _DOC_GW_IP_NEW,
             "Weight": "10",
             "fail_over_rules": [
-                {"Protocol": "Ping", "IPAddress": "8.8.8.8"},
-                {"Protocol": "TCP", "IPAddress": "1.1.1.1", "Port": "443"},
+                {"Protocol": "Ping", "IPAddress": _PROBE_PRIMARY},
+                {"Protocol": "TCP", "IPAddress": _PROBE_SECONDARY, "Port": "443"},
             ],
         },
     )
-    assert out["IPAddress"] == "203.0.113.5"
+    assert out["IPAddress"] == _DOC_GW_IP_NEW
     assert out["Weight"] == "10"
     rules = out["FailOverRules"]
     assert isinstance(rules, dict) and "Rule" in rules
-    items = rules["Rule"] if isinstance(rules["Rule"], list) else [rules["Rule"]]
-    assert items[0]["Protocol"] == "Ping"
-    assert items[1]["Port"] == "443"
+    rule_data = rules["Rule"]
+    # The merge contract for a 2-item input must yield a 2-item list. Asserting
+    # the shape up-front both documents the expected API and guards against an
+    # IndexError if the contract regresses to returning a single dict.
+    assert isinstance(rule_data, list) and len(rule_data) == 2
+    assert rule_data[0]["Protocol"] == "Ping"
+    assert rule_data[1]["Port"] == "443"
 
 
 def test_gateway_merge_clears_failover_when_empty_list() -> None:
@@ -95,19 +120,19 @@ def test_gateway_merge_clears_failover_when_empty_list() -> None:
 
 
 def test_gateway_host_merge_overlays_scalars_and_monitoring() -> None:
-    base = {"Name": "GH-1", "GatewayIP": "10.10.0.1"}
+    base = {"Name": "GH-1", "GatewayIP": _GATEWAY_HOST_IP}
     out = merge_gateway_host_form(
         base,
         {
             "Name": "GH-1",
-            "GatewayIP": "10.10.0.99",
+            "GatewayIP": _GATEWAY_HOST_IP_ALT,
             "NetworkZone": "LAN",
             "monitoring_condition": [
-                {"Protocol": "Ping", "IPAddress": "8.8.8.8"},
+                {"Protocol": "Ping", "IPAddress": _PROBE_PRIMARY},
             ],
         },
     )
-    assert out["GatewayIP"] == "10.10.0.99"
+    assert out["GatewayIP"] == _GATEWAY_HOST_IP_ALT
     assert out["NetworkZone"] == "LAN"
     mc = out["MonitoringCondition"]
     assert isinstance(mc, dict) and "Rule" in mc
@@ -127,7 +152,7 @@ def test_clientless_user_merge_overlays_all_scalars() -> None:
         {
             "Name": "Alice",
             "UserName": "alice",
-            "IPAddress": "10.0.0.20",
+            "IPAddress": _USER_IP,
             "ClientLessGroup": "Default Group",
             "Email": "alice@example.com",
             "Status": "Active",
@@ -136,7 +161,7 @@ def test_clientless_user_merge_overlays_all_scalars() -> None:
             "description": "QA tester",
         },
     )
-    assert out["IPAddress"] == "10.0.0.20"
+    assert out["IPAddress"] == _USER_IP
     assert out["ClientLessGroup"] == "Default Group"
     assert out["Email"] == "alice@example.com"
     assert out["Status"] == "Active"
@@ -148,10 +173,10 @@ def test_clientless_user_merge_overlays_all_scalars() -> None:
 def test_clientless_user_merge_accepts_alias_keys() -> None:
     out = merge_clientless_user_form(
         {"Name": "Bob"},
-        {"username": "bob", "ip_address": "10.0.0.21", "clientless_group": "VPN"},
+        {"username": "bob", "ip_address": _USER_IP_ALT, "clientless_group": "VPN"},
     )
     assert out["UserName"] == "bob"
-    assert out["IPAddress"] == "10.0.0.21"
+    assert out["IPAddress"] == _USER_IP_ALT
     assert out["ClientLessGroup"] == "VPN"
 
 

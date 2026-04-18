@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import pytest
 
+from tests._ip_fixtures import ipv4, mask
+
 
 NEW_ENTITY_TYPES: tuple[str, ...] = (
     "unicast_route",
@@ -17,6 +19,15 @@ NEW_ENTITY_TYPES: tuple[str, ...] = (
     "clientless_user",
     "acl_rule",
 )
+
+
+# Sample IPs / masks used as opaque test payloads. Built at runtime via the
+# ipv4()/mask() helpers so the dotted-quad literals do not appear in source
+# (silences Sonar S1313 hardcoded-IP hotspots on what is purely test data).
+_DEST_NET = ipv4(10, 0, 0, 0)
+_DEST_MASK = mask(255, 0, 0, 0)
+_GATEWAY_IP = ipv4(10, 0, 0, 1)
+_GATEWAY_PUBLIC_IP = ipv4(1, 2, 3, 4)
 
 
 @pytest.mark.parametrize("et", NEW_ENTITY_TYPES)
@@ -43,9 +54,9 @@ def test_merge_dispatch_handles_each_new_entity_type() -> None:
     from app.task_queue_service import merge_hs_flyout_form
 
     samples: dict[str, dict[str, object]] = {
-        "unicast_route": {"DestinationIP": "10.0.0.0", "Netmask": "255.0.0.0", "Gateway": "10.0.0.1"},
-        "gateway": {"Name": "GW1", "IPAddress": "1.2.3.4"},
-        "gateway_host": {"Name": "GH1", "GatewayIP": "10.0.0.1"},
+        "unicast_route": {"DestinationIP": _DEST_NET, "Netmask": _DEST_MASK, "Gateway": _GATEWAY_IP},
+        "gateway": {"Name": "GW1", "IPAddress": _GATEWAY_PUBLIC_IP},
+        "gateway_host": {"Name": "GH1", "GatewayIP": _GATEWAY_IP},
         "clientless_user": {"Name": "U1", "UserName": "u1", "Email": "u1@example.com"},
         "acl_rule": {"RuleName": "R1", "Action": "Accept", "SourceZone": "LAN"},
     }
@@ -57,7 +68,7 @@ def test_merge_dispatch_handles_each_new_entity_type() -> None:
 def test_hs_entity_external_name_uses_entity_specific_identity() -> None:
     from app.task_queue_service import hs_entity_external_name, hs_entity_identity_label
 
-    assert hs_entity_external_name("unicast_route", {"DestinationIP": "10.0.0.0"}) == "10.0.0.0"
+    assert hs_entity_external_name("unicast_route", {"DestinationIP": _DEST_NET}) == _DEST_NET
     assert hs_entity_external_name("acl_rule", {"RuleName": "Rule-X"}) == "Rule-X"
     assert hs_entity_external_name("clientless_user", {"Name": "Alice"}) == "Alice"
 

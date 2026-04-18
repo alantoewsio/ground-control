@@ -4267,7 +4267,7 @@ def _submit_gateway_xml_add(fw: SophosFirewall, merged: dict[str, Any]) -> None:
     clean = _prune_none_values(body)
     if not isinstance(clean, dict):
         clean = {}
-    timeout_raw = clean.pop("GatewayFailoverTimeout", None) if isinstance(clean, dict) else None
+    timeout_raw = clean.pop("GatewayFailoverTimeout", None)
     timeout = str(timeout_raw).strip() if timeout_raw not in (None, "") else "60"
     envelope = {
         "GatewayConfiguration": {

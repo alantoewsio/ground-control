@@ -1,5 +1,5 @@
 {% extends "firewalls_base.html" %}
-{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% from "partials/_routing_page.html" import routing_filter_asides, routing_tablist, routing_tab_panels, routing_cols_modals, routing_edit_flyout, routing_no_selection_banner %}
 {% set fw_subnav_active = "routing" %}
 {% block title %}Routing &middot; Firewalls &middot; Ground Control{% endblock %}
 {% block page_title %}Routing{% endblock %}
@@ -20,90 +20,36 @@
 {% endblock %}
 
 {% block content %}
+{% set rt_prefix = "gc-rt" %}
+{% set rt_v4_subtitle = "Combined view merges rows that share the same destination IP. When other details differ across firewalls, the switch turns yellow &mdash; click to compare, or Shift+click to show one row per firewall." %}
+{% set rt_v6_subtitle = rt_v4_subtitle %}
+{% set rt_gateway_subtitle = "Combined view merges rows that share the same gateway name. When details differ across firewalls, the switch turns yellow." %}
+{% set rt_custom_subtitle = "Combined view merges rows that share the same name. When details differ across firewalls, the switch turns yellow." %}
+
 <main class="layout single gc-network-page gc-hosts-services-page">
   <section class="gc-network-panel">
     <div class="split gc-network-split">
       <div class="gc-net-filters-column">
-        {{ net_filters_aside("gc-rt-unicast-route", false) }}
-        {{ net_filters_aside("gc-rt-gateway", true) }}
-        {{ net_filters_aside("gc-rt-gateway-host", true) }}
+        {{ routing_filter_asides(rt_prefix) }}
       </div>
       <div class="content-pane gc-network-panel__content">
-        <div class="gc-tabs" role="tablist" aria-label="Routing views" id="gc-rt-main-tablist">
-          <button type="button" class="gc-tabs__tab is-active" role="tab" aria-selected="true"
-            id="gc-rt-tab-unicast-route" data-gc-rt-tab="unicast_route">Unicast routes</button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-rt-tab-gateway"
-            data-gc-rt-tab="gateway">Gateways</button>
-          <button type="button" class="gc-tabs__tab" role="tab" aria-selected="false" id="gc-rt-tab-gateway-host"
-            data-gc-rt-tab="gateway_host">Custom gateways</button>
-        </div>
-
-        <div class="gc-tab-panels">
-          <div class="gc-tab-panel is-active" role="tabpanel" aria-labelledby="gc-rt-tab-unicast-route"
-            id="gc-rt-panel-unicast-route">
-            {{ net_entity_table_wrap("gc-rt-unicast-route", "Unicast routes", "Search unicast routes", true,
-              "gc-rt-unicast-route-add", "Add unicast route",
-              "Combined view merges rows that share the same destination IP. When other details differ across firewalls, the switch turns yellow &mdash; click to compare, or Shift+click to show one row per firewall.",
-              "gc-rt-unicast-route-delete-selected", "Delete selected") }}
-          </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-rt-tab-gateway" id="gc-rt-panel-gateway" hidden>
-            {# Gateways are part of <GatewayConfiguration> on the firewall and cannot be added
-               independently via the XML API; only edit / delete is exposed here. #}
-            {{ net_entity_table_wrap("gc-rt-gateway", "Gateways", "Search gateways", true,
-              none, none,
-              "Combined view merges rows that share the same gateway name. When details differ across firewalls, the switch turns yellow.",
-              "gc-rt-gateway-delete-selected", "Delete selected") }}
-          </div>
-          <div class="gc-tab-panel" role="tabpanel" aria-labelledby="gc-rt-tab-gateway-host"
-            id="gc-rt-panel-gateway-host" hidden>
-            {{ net_entity_table_wrap("gc-rt-gateway-host", "Custom gateways", "Search custom gateways", true,
-              "gc-rt-gateway-host-add", "Add custom gateway",
-              "Combined view merges rows that share the same name. When details differ across firewalls, the switch turns yellow.",
-              "gc-rt-gateway-host-delete-selected", "Delete selected") }}
-          </div>
-        </div>
+        {{ routing_tablist(rt_prefix, rt_prefix ~ "-main-tablist", "data-gc-rt-tab") }}
+        {{ routing_tab_panels(rt_prefix, rt_v4_subtitle, rt_v6_subtitle, rt_gateway_subtitle, rt_custom_subtitle, true) }}
       </div>
     </div>
   </section>
 </main>
 
-{{ net_cols_modal("gc-rt-unicast-route") }}
-{{ net_cols_modal("gc-rt-gateway") }}
-{{ net_cols_modal("gc-rt-gateway-host") }}
-
-<div id="gc-rt-edit-flyout" class="gc-if-flyout" hidden aria-hidden="true">
-  <div class="gc-if-flyout__backdrop" tabindex="-1" aria-hidden="true"></div>
-  <div class="gc-if-flyout__panel" role="dialog" aria-modal="true" aria-labelledby="gc-rt-flyout-title" tabindex="-1">
-    <div class="gc-if-flyout__resize" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
-    <header class="gc-if-flyout__header">
-      <h2 id="gc-rt-flyout-title" class="gc-if-flyout__title">Routing object</h2>
-      <button type="button" class="gc-fw-inv-flyout__close" id="gc-rt-flyout-close" aria-label="Close" title="Close">&times;</button>
-    </header>
-    <div class="gc-if-flyout__panel-form">
-      <div class="gc-if-flyout__scroll">
-        <div class="gc-if-flyout__form-body">
-          <p id="gc-rt-flyout-meta" class="muted gc-hs-flyout__meta"></p>
-          <div id="gc-rt-flyout-fields"></div>
-        </div>
-      </div>
-      <footer class="gc-if-flyout__footer gc-hs-flyout__footer">
-        <button type="button" class="btn primary" id="gc-rt-flyout-save" hidden>Save to task queue</button>
-        <button type="button" class="btn btn--secondary" id="gc-rt-flyout-done">Close</button>
-      </footer>
-    </div>
-  </div>
-</div>
-
-<div id="gc-rt-no-fw-banner" class="gc-hs-no-fw-banner" hidden role="alert" aria-live="assertive">
-  <span class="gc-icon gc-icon--xs" aria-hidden="true" style="flex-shrink:0">info</span>
-  Select one or more firewalls in the top bar to add objects.
-</div>
+{{ routing_cols_modals(rt_prefix) }}
+{{ routing_edit_flyout("Save to task queue") }}
+{{ routing_no_selection_banner("firewalls") }}
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/gc-network-entity.js"></script>
 <script src="/static/gc-combine-flyout-conflicts.js"></script>
 <script src="/static/gc-routing-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-routing-page.js?v={{ app_about.app_version }}"></script>
 <script>
   window.gcRoutingEntityTarget = "firewall";
   window.gcHsEnqueueDeletesBatchUrl = {{ url_api_task_queue_enqueue_hs_deletes_batch | tojson }};
@@ -112,164 +58,30 @@
 </script>
 <script>
   (function () {
-    var API_BASE = {{ url_api_hosts_services_table | tojson }};
-
-    var TAB_DEFS = [
-      { key: "unicast_route", prefix: "gc-rt-unicast-route", aria: "unicast route", countS: "unicast route", countP: "unicast routes" },
-      { key: "gateway", prefix: "gc-rt-gateway", aria: "gateway", countS: "gateway", countP: "gateways" },
-      { key: "gateway_host", prefix: "gc-rt-gateway-host", aria: "custom gateway", countS: "custom gateway", countP: "custom gateways" },
-    ];
-
-    var RT_TAB_LS = "ground-control-routing-main-tab";
-
-    function readSavedTab() {
-      try {
-        var raw = localStorage.getItem(RT_TAB_LS);
-        if (raw && TAB_DEFS.some(function (t) { return t.key === raw; })) return raw;
-      } catch (e) { }
-      return TAB_DEFS[0].key;
-    }
-
-    var activeKey = readSavedTab();
-    var mainTablist = document.getElementById("gc-rt-main-tablist");
-    var mainTabs = mainTablist
-      ? mainTablist.querySelectorAll(":scope > .gc-tabs__tab[data-gc-rt-tab]")
-      : [];
-    var mainPanels = {};
-    TAB_DEFS.forEach(function (t) {
-      var slug = t.key.replace(/_/g, "-");
-      mainPanels[t.key] = document.getElementById("gc-rt-panel-" + slug);
+    gcRoutingPageInit({
+      prefix: "gc-rt",
+      tablistId: "gc-rt-main-tablist",
+      tabDataAttr: "data-gc-rt-tab",
+      lsKey: "ground-control-routing-main-tab",
+      lsColsPrefix: "ground-control-rt-cols-",
+      apiBase: {{ url_api_hosts_services_table | tojson }},
+      target: "firewall",
+      deleteUrl: window.gcHsEnqueueDeletesBatchUrl,
+      emptySelectionMsg: "Select one or more firewalls in the top bar.",
+      bannerId: "gc-rt-no-fw-banner",
+      refreshEvents: ["gc-firewall-selection-changed", "gc-task-queue-updated"],
+      entriesUpdatedEvent: "gc-task-queue-updated",
+      getSelectedIds: function () {
+        return window.gcGetSelectedFirewallIds && typeof window.gcGetSelectedFirewallIds === "function"
+          ? window.gcGetSelectedFirewallIds() : [];
+      },
+      buildEmptyCache: function (countPlural) {
+        return "No " + countPlural + " in the cache for the selected firewalls. Enable the matching type under Inventory \u2192 Edit firewall \u2192 Sync from firewall, then run sync.";
+      },
+      deleteConfirmMsg: function (n, countPlural) {
+        return "Queue " + n + " delete task" + (n === 1 ? "" : "s") + " for the selected " + countPlural + "?";
+      },
     });
-
-    function syncFilterAsidesVisibility() {
-      TAB_DEFS.forEach(function (t) {
-        var el = document.getElementById(t.prefix + "-filters-aside");
-        if (el) el.hidden = t.key !== activeKey;
-      });
-    }
-    function applyMainTabPanels() {
-      TAB_DEFS.forEach(function (t) {
-        var p = mainPanels[t.key];
-        if (!p) return;
-        var show = t.key === activeKey;
-        p.classList.toggle("is-active", show);
-        p.hidden = !show;
-      });
-    }
-    function syncMainTabButtons() {
-      mainTabs.forEach(function (btn) {
-        var on = btn.getAttribute("data-gc-rt-tab") === activeKey;
-        btn.classList.toggle("is-active", on);
-        btn.setAttribute("aria-selected", on ? "true" : "false");
-      });
-    }
-
-    var tables = {};
-    function refreshAllTables() {
-      TAB_DEFS.forEach(function (t) { if (tables[t.key]) tables[t.key].refresh(); });
-    }
-    document.addEventListener("gc-firewall-selection-changed", refreshAllTables);
-    document.addEventListener("gc-task-queue-updated", refreshAllTables);
-    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
-      window.gcRegisterConfigCacheTableRefresher(function () { refreshAllTables(); });
-    }
-
-    TAB_DEFS.forEach(function (t) {
-      tables[t.key] = gcCreateNetworkEntityTable({
-        prefix: t.prefix,
-        apiUrl: API_BASE,
-        emptySelectionMessage: "Select one or more firewalls in the top bar.",
-        apiEntityType: t.key,
-        lsKey: "ground-control-rt-cols-" + t.key + "-v1",
-        dataRowClass: t.prefix + "-data-row",
-        rowClickable: true,
-        rowAriaEntitySingular: t.aria,
-        bulkRowSelect: true,
-        combineQuery: { param: "combine" },
-        onRowClick: function (tr) {
-          if (window.gcRoutingFlyoutOpenFromTr) window.gcRoutingFlyoutOpenFromTr(tr);
-        },
-        labels: {
-          countSingular: t.countS,
-          countPlural: t.countP,
-          emptyCache: "No " + t.countP + " in the cache for the selected firewalls. Enable the matching type under Inventory \u2192 Edit firewall \u2192 Sync from firewall, then run sync.",
-          emptyFilter: "No " + t.countP + " match the current search or filters.",
-          loadError: "Could not load " + t.countP + ".",
-        },
-      });
-    });
-
-    mainTabs.forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        activeKey = tab.getAttribute("data-gc-rt-tab");
-        syncMainTabButtons();
-        applyMainTabPanels();
-        syncFilterAsidesVisibility();
-        try { localStorage.setItem(RT_TAB_LS, activeKey); } catch (e) { }
-      });
-    });
-
-    if (window.gcRoutingFlyoutInit) window.gcRoutingFlyoutInit();
-
-    function gcRtTopBarFirewallIds() {
-      return window.gcGetSelectedFirewallIds && typeof window.gcGetSelectedFirewallIds === "function"
-        ? window.gcGetSelectedFirewallIds()
-        : [];
-    }
-    window.gcRoutingTopBarFirewallIds = gcRtTopBarFirewallIds;
-
-    function gcRtShowNoFwBanner() {
-      var el = document.getElementById("gc-rt-no-fw-banner");
-      if (!el) return;
-      el.hidden = false;
-      clearTimeout(el._gcRtHideTimer);
-      el._gcRtHideTimer = setTimeout(function () { el.hidden = true; }, 4000);
-    }
-
-    TAB_DEFS.forEach(function (t) {
-      var addBtn = document.getElementById(t.prefix + "-add");
-      if (addBtn) {
-        addBtn.addEventListener("click", function () {
-          if (gcRtTopBarFirewallIds().length < 1) { gcRtShowNoFwBanner(); return; }
-          if (window.gcRoutingFlyoutOpenAddForEntity) window.gcRoutingFlyoutOpenAddForEntity(t.key);
-        });
-      }
-      var delBtn = document.getElementById(t.prefix + "-delete-selected");
-      if (delBtn) {
-        delBtn.addEventListener("click", function () {
-          var tbl = tables[t.key];
-          if (!tbl || typeof tbl.getDeleteConfigEntryIdsFromSelection !== "function") return;
-          var ids = tbl.getDeleteConfigEntryIdsFromSelection();
-          if (!ids.length) { window.gcAlert("Select one or more rows to delete."); return; }
-          var n = ids.length;
-          var msg = "Queue " + n + " delete task" + (n === 1 ? "" : "s") + " for the selected " + t.countP + "?";
-          (window.gcConfirm ? window.gcConfirm(msg) : Promise.resolve(globalThis.confirm(msg))).then(function (ok) {
-            if (!ok) return;
-            delBtn.disabled = true;
-            fetch(window.gcHsEnqueueDeletesBatchUrl, {
-              method: "POST", credentials: "same-origin",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ config_entry_ids: ids })
-            }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-              .then(function (x) {
-                delBtn.disabled = false;
-                if (!x.ok) {
-                  var em = (x.j && (x.j.detail || x.j.message)) || "Could not enqueue delete tasks.";
-                  window.gcAlert(typeof em === "string" ? em : JSON.stringify(em));
-                  return;
-                }
-                document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-                if (tbl.refresh) tbl.refresh();
-              }).catch(function () { delBtn.disabled = false; window.gcAlert("Network error."); });
-          });
-        });
-      }
-    });
-
-    syncMainTabButtons();
-    applyMainTabPanels();
-    syncFilterAsidesVisibility();
-    refreshAllTables();
   })();
 </script>
 {% endblock %}
