@@ -45,6 +45,15 @@
       <span class="app-nav__label">Hosts &amp; Services</span>
     </a>
     <a
+      href="/configurations/protect/firewall"
+      class="app-nav__item{% if cfg_subnav_active == 'protect_firewall' %} is-active{% endif %}"
+    >
+      <span class="app-nav__icon" aria-hidden="true">
+        <span class="gc-icon gc-icon--xs" aria-hidden="true">rule</span>
+      </span>
+      <span class="app-nav__label">Firewall</span>
+    </a>
+    <a
       href="/configurations/routing"
       class="app-nav__item{% if cfg_subnav_active == 'routing' %} is-active{% endif %}"
     >

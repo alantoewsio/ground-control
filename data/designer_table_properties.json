@@ -357,6 +357,36 @@
       "opt_combine_view": true,
       "combine_by_column": "",
       "column_visibility": null
+    },
+    "fw_v2_o_protect_firewall_firewall-rules": {
+      "title": "Preview table",
+      "design_mode": true,
+      "entity_types": [
+        "firewall_rule",
+        "rule_group"
+      ],
+      "secondary_filters": [
+        {
+          "prop": "NetworkPolicy.Action",
+          "op": "=",
+          "scalar": ""
+        },
+        {
+          "prop": "NetworkPolicy.ApplicationBaseQoSPolicy",
+          "op": "=",
+          "scalar": ""
+        }
+      ],
+      "hidden_column_ids": [],
+      "column_order": "",
+      "column_overrides": "",
+      "opt_row_selectors": true,
+      "opt_add_btn": true,
+      "opt_delete_btn": true,
+      "opt_read_only": false,
+      "opt_combine_view": true,
+      "combine_by_column": "",
+      "column_visibility": null
     }
   }
 }

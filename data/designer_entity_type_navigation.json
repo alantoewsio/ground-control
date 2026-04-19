@@ -10,6 +10,15 @@
       "tab": "Firewall Rules",
       "nav_icon": "rule"
     },
+    "nat_rule": {
+      "kind": "Objects",
+      "display_name": "NAT rule",
+      "nav_section": "PROTECT",
+      "nav_order": "",
+      "nav_page": "Firewall",
+      "tab": "NAT Rules",
+      "nav_icon": "swap_horiz"
+    },
     "rule_group": {
       "kind": "Objects",
       "display_name": "Firewall rule group",

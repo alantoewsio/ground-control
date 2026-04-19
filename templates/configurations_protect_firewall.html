@@ -1,0 +1,98 @@
+{% extends "configurations_base.html" %}
+{% set cfg_subnav_active = "protect_firewall" %}
+{% from "partials/_protect_firewall_page.html" import
+    protect_fw_filter_asides,
+    protect_fw_top_tabs,
+    protect_fw_top_panels,
+    protect_fw_cols_modals,
+    protect_fw_edit_flyouts %}
+{% block title %}Firewall &middot; Configuration &middot; Ground Control{% endblock %}
+{% block page_title %}Firewall{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls?tab=configurations">Configuration</a></li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Firewall</li>
+  </ol>
+</nav>
+{% endblock %}
+{% block page_subtitle %}
+<p class="page-header__subtitle">
+  Firewall rules and NAT rules from the selected configurations. Edits apply directly to the
+  configuration cache &mdash; not the task queue. Position-based reorder is not exposed at
+  configuration scope; use the per-firewall <a href="/firewalls/protect/firewall">Protect &middot; Firewall</a>
+  page to reorder rules on a specific firewall.
+</p>
+{% endblock %}
+
+{% block content %}
+<main class="layout single gc-network-page gc-fw-rules-page gc-protect-firewall-page">
+  <section class="gc-network-panel">
+    <div class="split gc-network-split">
+      <div class="gc-net-filters-column">
+        {{ protect_fw_filter_asides("gc-cfg-fw") }}
+      </div>
+      <div class="content-pane gc-network-panel__content">
+        {{ protect_fw_top_tabs("gc-cfg-fw", "data-gc-pf-top") }}
+        {{ protect_fw_top_panels("gc-cfg-fw", "data-gc-pf-sub", false, true) }}
+      </div>
+    </div>
+  </section>
+</main>
+
+{{ protect_fw_cols_modals("gc-cfg-fw") }}
+{{ protect_fw_edit_flyouts("Save") }}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-rule-flyout-shell.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-firewall-rule-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-nat-rule-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-protect-firewall-page.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-hs-bulk-add.js"></script>
+<script>
+  window.gcProtectFirewallEntityTarget = "configuration";
+  window.gcFirewallRuleEntityTarget = "configuration";
+  window.gcNatRuleEntityTarget = "configuration";
+  window.gcHsApplyCreatesBatchUrl = {{ url_api_configurations_apply_hs_creates_batch | tojson }};
+  window.gcHsApplyUpdatesBatchUrl = {{ url_api_configurations_apply_hs_updates_batch | tojson }};
+  window.gcHsApplyDeletesBatchUrl = {{ url_api_configurations_apply_hs_deletes_batch | tojson }};
+</script>
+<script>
+  (function () {
+    var URL_HS_TABLE = {{ url_api_configurations_hosts_services_table | tojson }};
+    var URLS = {
+      // Both leaves use the same generic HS endpoint at cfg scope; the page
+      // helper appends ``entity_type=`` per leaf via apiEntityType when
+      // ``useGenericHsEndpoint`` is true.
+      firewallRulesTable: URL_HS_TABLE,
+      natRulesTable: URL_HS_TABLE,
+      // No reorder endpoints at cfg scope — position is per-firewall.
+      applyDeletes: window.gcHsApplyDeletesBatchUrl,
+    };
+
+    function getSelectedConfigurationIds() {
+      var f = window.gcGetSelectedConfigurationIds;
+      var arr = typeof f === "function" ? f() : [];
+      return Array.isArray(arr) ? arr : [];
+    }
+
+    if (typeof window.gcFirewallRuleFlyout === "object") window.gcFirewallRuleFlyout.init();
+    if (typeof window.gcNatRuleFlyout === "object") window.gcNatRuleFlyout.init();
+
+    window.gcProtectFirewallPageInit({
+      prefix: "gc-cfg-fw",
+      target: "configuration",
+      urls: URLS,
+      reorderEnabled: false,
+      useGenericHsEndpoint: true,
+      getSelectedFirewallIds: function () { return []; },
+      getSelectedConfigurationIds: getSelectedConfigurationIds,
+      topLsKey: "ground-control-cfg-protect-top-tab",
+      subLsKeyPrefix: "ground-control-cfg-protect-sub-tab-",
+    });
+  })();
+</script>
+{% endblock %}

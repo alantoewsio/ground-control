@@ -1,6 +1,12 @@
 {% extends "firewalls_base.html" %}
 {% set fw_subnav_active = "protect_firewall" %}
-{% from "partials/net_entity_table_macros.html" import net_filters_aside, net_entity_table_wrap, net_cols_modal %}
+{% from "partials/_protect_firewall_page.html" import
+    protect_fw_filter_asides,
+    protect_fw_top_tabs,
+    protect_fw_top_panels,
+    protect_fw_cols_modals,
+    protect_fw_edit_flyouts,
+    protect_fw_reorder_dock %}
 {% block title %}Firewall · Firewalls · Ground Control{% endblock %}
 {% block page_title %}Firewall{% endblock %}
 {% block breadcrumbs %}
@@ -14,8 +20,9 @@
 {% endblock %}
 {% block page_subtitle %}
 <p class="page-header__subtitle">
-  Firewall rules from the configuration cache. With no firewalls selected in the top bar, all registered firewalls are
-  queried. Enable <strong>Firewall rules</strong> sync in Inventory to populate the cache.
+  Firewall and NAT rules from the configuration cache. With no firewalls selected in the
+  top bar, all registered firewalls are queried. Enable <strong>Firewall rules</strong>
+  and <strong>NAT rules</strong> sync in Inventory to populate the cache.
 </p>
 {% endblock %}
 
@@ -24,86 +31,49 @@
   <section class="gc-network-panel">
     <div class="split gc-network-split">
       <div class="gc-net-filters-column">
-        {{ net_filters_aside("gc-fw-rules", false) }}
+        {{ protect_fw_filter_asides("gc-fw") }}
       </div>
       <div class="content-pane gc-network-panel__content">
-        <div class="gc-tabs" role="tablist" aria-label="Firewall protection views" id="gc-protect-firewall-tablist">
-          <button
-            type="button"
-            class="gc-tabs__tab is-active"
-            role="tab"
-            aria-selected="true"
-            id="gc-tab-fw-rules"
-            data-gc-tab="rules"
-          >
-            Firewall rules
-          </button>
-        </div>
-
-        <div class="gc-tab-panels">
-          <div
-            class="gc-tab-panel is-active"
-            role="tabpanel"
-            aria-labelledby="gc-tab-fw-rules"
-            id="gc-panel-fw-rules"
-          >
-            {{ net_entity_table_wrap("gc-fw-rules", "Firewall rules", "Search firewall rules") }}
-          </div>
-        </div>
+        {{ protect_fw_top_tabs("gc-fw", "data-gc-pf-top") }}
+        {{ protect_fw_top_panels("gc-fw", "data-gc-pf-sub", true, true) }}
       </div>
     </div>
   </section>
 </main>
-<div class="gc-fw-rules-apply-dock" id="gc-fw-rules-apply-dock" hidden>
-  <div class="gc-fw-rules-apply-dock__inner">
-    <span class="gc-fw-rules-apply-dock__status" id="gc-fw-rules-apply-status">
-      Reordered rows are highlighted until synced.
-    </span>
-    <div class="gc-fw-rules-apply-dock__actions">
-      <button type="button" class="btn btn--secondary" id="gc-fw-rules-cancel-btn" disabled>Cancel</button>
-      <button type="button" class="btn primary" id="gc-fw-rules-apply-btn" disabled>Apply</button>
-    </div>
-  </div>
-</div>
 
-{{ net_cols_modal("gc-fw-rules") }}
+{{ protect_fw_reorder_dock("gc-fw") }}
+{{ protect_fw_cols_modals("gc-fw") }}
+{{ protect_fw_edit_flyouts("Save to task queue") }}
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/gc-network-entity.js"></script>
+<script src="/static/gc-rule-flyout-shell.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-firewall-rule-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-nat-rule-flyout.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-protect-firewall-page.js?v={{ app_about.app_version }}"></script>
+<script src="/static/gc-hs-bulk-add.js"></script>
+<script>
+  window.gcProtectFirewallEntityTarget = "firewall";
+  window.gcHsTableUrl = {{ url_api_hosts_services_table | tojson }};
+  window.gcHsEnqueueCreatesBatchUrl = {{ url_api_task_queue_enqueue_hs_creates_batch | tojson }};
+  window.gcHsEnqueueUpdatesBatchUrl = {{ url_api_task_queue_enqueue_hs_updates_batch | tojson }};
+  window.gcHsEnqueueDeletesBatchUrl = {{ url_api_task_queue_enqueue_hs_deletes_batch | tojson }};
+</script>
 <script>
   (function () {
-    var URL_RULES = {{ url_api_firewall_rules_table | tojson }};
-    var ENQUEUE_REORDER_BATCH_URL = {{ url_api_task_queue_enqueue_firewall_rule_reorder_batch | tojson }};
-    var reorderBusy = false;
-    var dragActive = false;
-    var dragFromIndex = -1;
-    var baselineOrderByFirewall = {};
-    var pendingOrderByFirewall = {};
-    var pendingDirtyIdsByFirewall = {};
-    var awaitingSyncByFirewall = {};
-    var applyDock = document.getElementById("gc-fw-rules-apply-dock");
-    var applyStatus = document.getElementById("gc-fw-rules-apply-status");
-    var applyBtn = document.getElementById("gc-fw-rules-apply-btn");
-    var cancelBtn = document.getElementById("gc-fw-rules-cancel-btn");
+    var URLS = {
+      firewallRulesTable: {{ url_api_firewall_rules_table | tojson }},
+      natRulesTable: {{ url_api_nat_rules_table | tojson }},
+      enqueueFwRuleReorder: {{ url_api_task_queue_enqueue_firewall_rule_reorder_batch | tojson }},
+      enqueueNatRuleReorder: {{ url_api_task_queue_enqueue_nat_rule_reorder_batch | tojson }},
+      enqueueDeletes: window.gcHsEnqueueDeletesBatchUrl,
+    };
 
-    function bannerResult(ok, msg) {
-      if (typeof window.gcGlobalBannerShowResult === "function") {
-        window.gcGlobalBannerShowResult(ok, msg);
-      } else if (typeof window.gcAlert === "function") {
-        window.gcAlert(msg);
-      } else {
-        globalThis.alert(msg);
-      }
-    }
-
-    function dispatchTaskQueueUpdated() {
-      try {
-        document.dispatchEvent(new CustomEvent("gc-task-queue-updated"));
-      } catch (e0) {}
-    }
-
-    function firewallScopeIdsForFirewallCache() {
+    function getSelectedFirewallIds() {
+      // Mirrors the previous behaviour: when nothing is checked in the top
+      // bar we fall back to "all registered firewalls" so the table shows
+      // something useful by default.
       var base =
         typeof window.gcGetSelectedFirewallIds === "function"
           ? window.gcGetSelectedFirewallIds()
@@ -120,408 +90,29 @@
         seen[n] = true;
         out.push(n);
       });
-      out.sort(function (a, b) {
-        return a - b;
-      });
+      out.sort(function (a, b) { return a - b; });
       return out;
     }
 
-    function selectedSingleFirewallId() {
-      var ids = firewallScopeIdsForFirewallCache();
-      return ids.length === 1 ? ids[0] : 0;
+    function getSelectedConfigurationIds() {
+      var f = window.gcGetSelectedConfigurationIds;
+      var arr = typeof f === "function" ? f() : [];
+      return Array.isArray(arr) ? arr : [];
     }
 
-    function arraysEqual(a, b) {
-      if (!Array.isArray(a) || !Array.isArray(b)) return false;
-      if (a.length !== b.length) return false;
-      for (var i = 0; i < a.length; i++) {
-        if (Number(a[i]) !== Number(b[i])) return false;
-      }
-      return true;
-    }
+    if (typeof window.gcFirewallRuleFlyout === "object") window.gcFirewallRuleFlyout.init();
+    if (typeof window.gcNatRuleFlyout === "object") window.gcNatRuleFlyout.init();
 
-    function computeDirtyIds(baselineIds, currentIds) {
-      var dirty = {};
-      var idxById = {};
-      (baselineIds || []).forEach(function (id, idx) {
-        idxById[Number(id)] = idx;
-      });
-      (currentIds || []).forEach(function (id, idx) {
-        var n = Number(id);
-        var bidx = idxById[n];
-        if (bidx == null || bidx !== idx) dirty[n] = true;
-      });
-      return Object.keys(dirty)
-        .map(function (x) {
-          return Number(x);
-        })
-        .filter(function (x) {
-          return !!x;
-        });
-    }
-
-    function getDomRuleRows() {
-      return Array.prototype.slice.call(document.querySelectorAll("#gc-fw-rules-tbody tr.gc-fw-rules-data-row"));
-    }
-
-    function getDomRuleOrderIds() {
-      var ids = [];
-      getDomRuleRows().forEach(function (tr) {
-        var row = tr._gcNetRow;
-        var rid = row && row.config_entry_id != null ? parseInt(String(row.config_entry_id), 10) : 0;
-        if (!isNaN(rid) && rid > 0) ids.push(rid);
-      });
-      return ids;
-    }
-
-    function reorderDomRowsToIds(orderIds) {
-      var tbody = document.getElementById("gc-fw-rules-tbody");
-      if (!tbody || !Array.isArray(orderIds) || !orderIds.length) return;
-      var rowById = {};
-      getDomRuleRows().forEach(function (tr) {
-        var row = tr._gcNetRow;
-        var rid = row && row.config_entry_id != null ? parseInt(String(row.config_entry_id), 10) : 0;
-        if (!isNaN(rid) && rid > 0) rowById[rid] = tr;
-      });
-      orderIds.forEach(function (rid) {
-        var tr = rowById[Number(rid)];
-        if (tr) tbody.appendChild(tr);
-      });
-    }
-
-    function enforceSingleFirewallPositionSortMode() {
-      var tbl = document.getElementById("gc-fw-rules-table");
-      if (!tbl) return;
-      var single = selectedSingleFirewallId() > 0;
-      var ths = tbl.querySelectorAll("thead th");
-      ths.forEach(function (th) {
-        if (single) th.setAttribute("data-gc-no-sort", "1");
-        else th.removeAttribute("data-gc-no-sort");
-      });
-    }
-
-    function refreshDisplayedRulePositions() {
-      var rows = document.querySelectorAll("#gc-fw-rules-tbody tr.gc-fw-rules-data-row");
-      rows.forEach(function (tr, idx) {
-        var td = tr.querySelector('td[data-gc-col="__position"]');
-        if (!td) return;
-        var label = td.querySelector(".gc-fw-rule-pos-label");
-        if (label) label.textContent = String(idx + 1);
-      });
-    }
-
-    function applyPendingRowHighlightForFirewall(fwId) {
-      var dirtyIds = {};
-      (pendingDirtyIdsByFirewall[fwId] || []).forEach(function (id) {
-        dirtyIds[Number(id)] = true;
-      });
-      var awaitState = awaitingSyncByFirewall[fwId];
-      if (awaitState && Array.isArray(awaitState.dirty_ids)) {
-        awaitState.dirty_ids.forEach(function (id) {
-          dirtyIds[Number(id)] = true;
-        });
-      }
-      getDomRuleRows().forEach(function (tr) {
-        var row = tr._gcNetRow;
-        var rid = row && row.config_entry_id != null ? parseInt(String(row.config_entry_id), 10) : 0;
-        tr.classList.toggle("gc-fw-rule-row--pending", !!dirtyIds[rid]);
-      });
-    }
-
-    function updateApplyDockChrome() {
-      if (!applyDock || !applyBtn || !applyStatus || !cancelBtn) return;
-      var fwId = selectedSingleFirewallId();
-      if (!fwId) {
-        applyDock.hidden = true;
-        applyBtn.disabled = true;
-        cancelBtn.disabled = true;
-        return;
-      }
-      applyDock.hidden = false;
-      var pending = pendingOrderByFirewall[fwId];
-      var dirtyCount = (pendingDirtyIdsByFirewall[fwId] || []).length;
-      var awaiting = awaitingSyncByFirewall[fwId];
-      if (awaiting) {
-        applyBtn.disabled = true;
-        cancelBtn.disabled = true;
-        applyStatus.textContent =
-          "Queued. Highlights clear after task send and firewall rule cache sync.";
-        return;
-      }
-      if (!pending || dirtyCount < 1) {
-        applyBtn.disabled = true;
-        cancelBtn.disabled = true;
-        applyStatus.textContent =
-          "Drag rules to reorder. Reordered rows are highlighted until synced.";
-        return;
-      }
-      applyBtn.disabled = reorderBusy;
-      cancelBtn.disabled = reorderBusy;
-      applyStatus.textContent =
-        dirtyCount === 1
-          ? "1 reordered rule pending. Click Apply to queue reorder updates."
-          : dirtyCount + " reordered rules pending. Click Apply to queue reorder updates.";
-    }
-
-    function setPendingFromCurrentDom() {
-      var fwId = selectedSingleFirewallId();
-      if (!fwId) return;
-      var current = getDomRuleOrderIds();
-      var baseline = baselineOrderByFirewall[fwId] || current.slice();
-      pendingOrderByFirewall[fwId] = current.slice();
-      pendingDirtyIdsByFirewall[fwId] = computeDirtyIds(baseline, current);
-      if (pendingDirtyIdsByFirewall[fwId].length < 1) {
-        delete pendingOrderByFirewall[fwId];
-      }
-      applyPendingRowHighlightForFirewall(fwId);
-      updateApplyDockChrome();
-    }
-
-    function bindSingleFirewallRuleDragRows() {
-      var fwId = selectedSingleFirewallId();
-      var tbody = document.getElementById("gc-fw-rules-tbody");
-      if (!tbody) return;
-      var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr.gc-fw-rules-data-row"));
-
-      rows.forEach(function (tr) {
-        var td = tr.querySelector('td[data-gc-col="__position"]');
-        if (!td) return;
-        var old = td.querySelector(".gc-fw-rule-pos-wrap");
-        if (old) old.remove();
-        var n = (td.textContent || "").trim();
-        td.textContent = "";
-        if (!fwId) {
-          td.textContent = n;
-          tr.removeAttribute("draggable");
-          return;
-        }
-        var wrap = document.createElement("span");
-        wrap.className = "gc-fw-rule-pos-wrap";
-        var handle = document.createElement("span");
-        handle.className = "gc-fw-rule-grab-handle";
-        handle.textContent = "⋮⋮";
-        handle.setAttribute("draggable", "true");
-        handle.setAttribute("title", "Drag to reorder");
-        handle.setAttribute("aria-label", "Drag to reorder rule");
-        var num = document.createElement("span");
-        num.className = "gc-fw-rule-pos-label";
-        num.textContent = n;
-        wrap.appendChild(handle);
-        wrap.appendChild(num);
-        td.appendChild(wrap);
-
-        handle.addEventListener("dragstart", function (e) {
-          dragActive = true;
-          dragFromIndex = rows.indexOf(tr);
-          tr.classList.add("gc-fw-rule-row--dragging");
-          try {
-            e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("text/plain", String(dragFromIndex));
-          } catch (e1) {}
-        });
-        handle.addEventListener("dragend", function () {
-          dragActive = false;
-          dragFromIndex = -1;
-          tr.classList.remove("gc-fw-rule-row--dragging");
-          rows.forEach(function (r) {
-            r.classList.remove("gc-fw-rule-row--dragging");
-          });
-        });
-        tr.addEventListener("dragover", function (e) {
-          if (!dragActive) return;
-          e.preventDefault();
-          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-        });
-        tr.addEventListener("drop", function (e) {
-          if (!dragActive) return;
-          e.preventDefault();
-          e.stopPropagation();
-          var from = dragFromIndex;
-          var to = rows.indexOf(tr);
-          if (from < 0 || to < 0 || from === to) return;
-          var moving = rows[from];
-          if (!moving) return;
-          if (to > from) tbody.insertBefore(moving, rows[to].nextSibling);
-          else tbody.insertBefore(moving, rows[to]);
-          rows = Array.prototype.slice.call(tbody.querySelectorAll("tr.gc-fw-rules-data-row"));
-          refreshDisplayedRulePositions();
-          setPendingFromCurrentDom();
-        });
-      });
-    }
-
-    function handlePostSyncMatchClear(fwId, idsFromApi) {
-      var awaiting = awaitingSyncByFirewall[fwId];
-      if (!awaiting || !Array.isArray(awaiting.order_ids)) return;
-      if (!arraysEqual(awaiting.order_ids, idsFromApi)) return;
-      delete awaitingSyncByFirewall[fwId];
-      delete pendingDirtyIdsByFirewall[fwId];
-      delete pendingOrderByFirewall[fwId];
-      baselineOrderByFirewall[fwId] = idsFromApi.slice();
-      bannerResult(true, "Firewall rule reorder is now synced. Highlights cleared.");
-    }
-
-    function afterRulesRender(data) {
-      enforceSingleFirewallPositionSortMode();
-      var fwId = selectedSingleFirewallId();
-      if (fwId) {
-        var idsFromApi = Array.isArray(data && data.rows)
-          ? data.rows
-              .map(function (r) {
-                var n = r && r.config_entry_id != null ? parseInt(String(r.config_entry_id), 10) : 0;
-                return isNaN(n) ? 0 : n;
-              })
-              .filter(function (n) {
-                return n > 0;
-              })
-          : [];
-        handlePostSyncMatchClear(fwId, idsFromApi);
-        if (!baselineOrderByFirewall[fwId]) baselineOrderByFirewall[fwId] = idsFromApi.slice();
-        if (pendingOrderByFirewall[fwId] && pendingOrderByFirewall[fwId].length) {
-          reorderDomRowsToIds(pendingOrderByFirewall[fwId]);
-        }
-        refreshDisplayedRulePositions();
-        applyPendingRowHighlightForFirewall(fwId);
-      }
-      bindSingleFirewallRuleDragRows();
-      updateApplyDockChrome();
-    }
-
-    function applyPendingReorder() {
-      var fwId = selectedSingleFirewallId();
-      if (!fwId) return;
-      var orderIds = pendingOrderByFirewall[fwId];
-      if (!Array.isArray(orderIds) || !orderIds.length) return;
-      if (!ENQUEUE_REORDER_BATCH_URL) {
-        bannerResult(false, "Reorder queue URL is not configured.");
-        return;
-      }
-      if (reorderBusy) return;
-      reorderBusy = true;
-      updateApplyDockChrome();
-      fetch(ENQUEUE_REORDER_BATCH_URL, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-Requested-With": "Ground-Control",
-        },
-        body: JSON.stringify({
-          firewall_id: fwId,
-          ordered_config_entry_ids: orderIds,
-        }),
-      })
-        .then(function (r) {
-          return r.json().then(function (j) {
-            return { ok: r.ok, j: j };
-          });
-        })
-        .then(function (x) {
-          reorderBusy = false;
-          if (!x.ok) {
-            var err = (x.j && (x.j.detail || x.j.message)) || "Failed to queue rule reorder tasks.";
-            bannerResult(false, typeof err === "string" ? err : JSON.stringify(err));
-            updateApplyDockChrome();
-            return;
-          }
-          var n = x.j && x.j.count != null ? parseInt(String(x.j.count), 10) : 0;
-          awaitingSyncByFirewall[fwId] = {
-            order_ids: orderIds.slice(),
-            dirty_ids: (pendingDirtyIdsByFirewall[fwId] || []).slice(),
-          };
-          delete pendingOrderByFirewall[fwId];
-          if (n > 0) {
-            bannerResult(
-              true,
-              n === 1
-                ? "Queued 1 firewall rule reorder task. Highlight clears after sync."
-                : "Queued " + n + " firewall rule reorder tasks. Highlight clears after sync.",
-            );
-            dispatchTaskQueueUpdated();
-          } else {
-            bannerResult(true, "Nothing queued - rule order already matches cache.");
-          }
-          updateApplyDockChrome();
-        })
-        .catch(function () {
-          reorderBusy = false;
-          bannerResult(false, "Network error while queueing rule reorder tasks.");
-          updateApplyDockChrome();
-        });
-    }
-
-    function cancelPendingReorder() {
-      var fwId = selectedSingleFirewallId();
-      if (!fwId) return;
-      var baseline = baselineOrderByFirewall[fwId];
-      if (Array.isArray(baseline) && baseline.length) {
-        reorderDomRowsToIds(baseline);
-      } else {
-        refreshRulesTable();
-        return;
-      }
-      delete pendingOrderByFirewall[fwId];
-      delete pendingDirtyIdsByFirewall[fwId];
-      refreshDisplayedRulePositions();
-      applyPendingRowHighlightForFirewall(fwId);
-      updateApplyDockChrome();
-      bannerResult(true, "Reorder changes were canceled and reset to cached order.");
-    }
-
-    function refreshRulesTable() {
-      if (tableRules && tableRules.refresh) tableRules.refresh();
-    }
-
-    document.addEventListener("gc-firewall-selection-changed", function () {
-      refreshRulesTable();
+    window.gcProtectFirewallPageInit({
+      prefix: "gc-fw",
+      target: "firewall",
+      urls: URLS,
+      reorderEnabled: true,
+      getSelectedFirewallIds: getSelectedFirewallIds,
+      getSelectedConfigurationIds: getSelectedConfigurationIds,
+      topLsKey: "ground-control-fw-protect-top-tab",
+      subLsKeyPrefix: "ground-control-fw-protect-sub-tab-",
     });
-
-    function firewallCacheSyncSelectionHits(ids) {
-      if (!ids || !ids.length) return false;
-      var sel = firewallScopeIdsForFirewallCache();
-      if (!sel || !sel.length) return false;
-      var set = {};
-      sel.forEach(function (id) {
-        set[Number(id)] = true;
-      });
-      return ids.some(function (id) {
-        return set[id];
-      });
-    }
-
-    if (typeof window.gcRegisterConfigCacheTableRefresher === "function") {
-      window.gcRegisterConfigCacheTableRefresher(function (ids) {
-        if (!firewallCacheSyncSelectionHits(ids)) return;
-        refreshRulesTable();
-      });
-    }
-
-    var tableRules = gcCreateNetworkEntityTable({
-      prefix: "gc-fw-rules",
-      apiUrl: URL_RULES,
-      getSelectedIds: firewallScopeIdsForFirewallCache,
-      pageSyncFallbackEntities: ["firewall_rule"],
-      noBoolToggleColIds: ["__position"],
-      valuePillColIds: ["__group"],
-      rowPayloadOnly: true,
-      lsKey: "ground-control-fw-rules-columns-v1",
-      dataRowClass: "gc-fw-rules-data-row",
-      colPickerAttr: "data-gc-fw-rules-col",
-      afterRenderFromApi: afterRulesRender,
-      labels: {
-        countSingular: "rule",
-        countPlural: "rules",
-        emptyCache:
-          "No firewall rules in the cache for the selected firewalls. Sync firewall rules from Inventory.",
-        emptyFilter: "No rows match the current search or filters.",
-        loadError: "Could not load firewall rules.",
-      },
-    });
-
-    if (applyBtn) applyBtn.addEventListener("click", applyPendingReorder);
-    if (cancelBtn) cancelBtn.addEventListener("click", cancelPendingReorder);
-    if (tableRules && typeof tableRules.refresh === "function") tableRules.refresh();
   })();
 </script>
 {% endblock %}

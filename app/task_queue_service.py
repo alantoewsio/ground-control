@@ -58,6 +58,7 @@ from app.firewall_config_sync import (
     ENTITY_DOS_SETTINGS,
     ENTITY_FIREWALL_RULE,
     ENTITY_FIREWALL_RULE_GROUP,
+    ENTITY_NAT_RULE,
     ENTITY_INTERFACE,
     ENTITY_IP_HOST,
     ENTITY_IP_HOSTGROUP,
@@ -86,6 +87,7 @@ from app.hs_flyout_merge import (
     merge_dhcp_relay_form,
     merge_dhcp_server_form,
     merge_dhcp_server_ipv6_form,
+    merge_firewall_rule_form,
     merge_fqdn_host_form,
     merge_fqdn_hostgroup_form,
     merge_gateway_form,
@@ -93,6 +95,7 @@ from app.hs_flyout_merge import (
     merge_ip_hostgroup_form,
     merge_local_service_acl_form,
     merge_mac_host_form,
+    merge_nat_rule_form,
     merge_service_form,
     merge_service_group_form,
     merge_unicast_route_form,
@@ -1424,6 +1427,9 @@ def enqueue_configuration_apply_to_firewalls(
     }
 
 
+# Shared by both Firewall rule reorder and NAT rule reorder.  The ``Position``
+# / ``After`` / ``Before`` keys live at the same top level for both XML roots
+# (``<FirewallRule>`` and ``<NATRule>``) — see the matching XML docs.
 def _firewall_rule_reorder_payload(
     base_payload: dict[str, Any], *, after_rule_name: str | None
 ) -> dict[str, Any]:
@@ -1440,14 +1446,80 @@ def _firewall_rule_reorder_payload(
     return merged
 
 
-def enqueue_firewall_rule_reorder_batch(
+# Whitelist of entity types that share the (Position + After) chained-reorder
+# semantics.  Adding a new ordered entity is as simple as appending it here
+# *and* exposing a route that calls :func:`enqueue_rule_reorder_batch`.
+_REORDERABLE_RULE_ENTITY_TYPES: frozenset[str] = frozenset(
+    {ENTITY_FIREWALL_RULE, ENTITY_NAT_RULE}
+)
+
+
+def _rule_name_from_payload(entry: FirewallConfigEntry) -> tuple[dict[str, Any], str]:
+    """Return ``(parsed_payload, rule_name)`` for a cached rule entry."""
+    try:
+        base = json.loads(entry.payload_json or "{}")
+    except (json.JSONDecodeError, TypeError):
+        base = {}
+    if not isinstance(base, dict):
+        base = {}
+    name = str(base.get("Name") or entry.external_name or "").strip()
+    return base, name
+
+
+def _previous_id_in_order(order: list[int], rid: int) -> int | None:
+    """Return the entry id immediately preceding ``rid`` in ``order``, or None."""
+    try:
+        idx = order.index(rid)
+    except ValueError:
+        return None
+    return order[idx - 1] if idx > 0 else None
+
+
+def enqueue_rule_reorder_batch(
     db: Session,
     *,
     firewall_id: int,
+    entity_type: str,
     ordered_config_entry_ids: list[int],
+    dirty_config_entry_ids: list[int] | None = None,  # noqa: ARG001 — kept for forward-compat
     created_by_user_id: str | None = None,
     created_by_username: str | None = None,
 ) -> list[TaskQueue]:
+    """Queue After-name-diff reorder tasks for an ordered rule entity.
+
+    Sophos persists ``Position`` / ``After.Name`` as real per-rule fields
+    (verified in the reference firewall-config-viewer
+    ``useEditorState.js::normalizeRuleOrder`` which rewrites every rule's
+    ``Position``/``AfterName`` after any reorder).  The firewall does **not**
+    implicitly shift neighbouring rules when a single rule is repositioned —
+    each rule's ``After.Name`` must point to the rule directly preceding it
+    in the desired order, otherwise the next sync re-derives the original
+    chain and the move appears to revert.
+
+    Algorithm:
+
+    1. Derive the *previous* on-device order from each cached payload's
+       ``@gc_sync_index`` (stamped by ``_sync_entity_type`` on every sync).
+    2. For each rule in the new order, compute its new ``After.Name`` (the
+       rule directly above it in the new order, or empty for slot 0 → emit
+       ``Position=Top``) and compare against its old ``After.Name``
+       (the rule directly above it in the old order).
+    3. Emit a task only when those values differ.  In your
+       ``[A,B,C,X,F] → [A,X,B,C,F]`` example this yields exactly three
+       tasks (``X``, ``B``, ``F``); ``A`` is unchanged Top and ``C.After=B``
+       in both orderings so neither needs touching.
+
+    When the cache predates ``@gc_sync_index`` we cannot diff and fall back
+    to chain-everything (the historical safe behaviour).
+
+    ``dirty_config_entry_ids`` is accepted for backward compatibility with
+    the page helper but **intentionally ignored for narrowing** — narrowing
+    by client-side LCS would leave un-flagged rules with a stale
+    ``After.Name`` on the firewall, breaking the move on the next sync.
+    """
+    et = str(entity_type or "").strip()
+    if et not in _REORDERABLE_RULE_ENTITY_TYPES:
+        raise ValueError(f"Entity type {et!r} does not support rule reorder")
     if db.get(Firewall, firewall_id) is None:
         raise ValueError("Firewall not found")
     seen: set[int] = set()
@@ -1462,14 +1534,14 @@ def enqueue_firewall_rule_reorder_batch(
         seen.add(rid)
         ordered_ids.append(rid)
     if not ordered_ids:
-        raise ValueError("No firewall rule entries provided")
+        raise ValueError("No rule entries provided")
 
     rows = (
         db.query(FirewallConfigEntry)
         .filter(
             FirewallConfigEntry.id.in_(ordered_ids),
             FirewallConfigEntry.firewall_id == firewall_id,
-            FirewallConfigEntry.entity_type == ENTITY_FIREWALL_RULE,
+            FirewallConfigEntry.entity_type == et,
         )
         .all()
     )
@@ -1477,31 +1549,67 @@ def enqueue_firewall_rule_reorder_batch(
         int(r.id): r for r in rows if r.id is not None
     }
     if len(by_id) != len(ordered_ids):
-        raise ValueError("Some firewall rule entries were not found for this firewall")
+        raise ValueError("Some rule entries were not found for this firewall")
+
+    # Pre-parse payload + name for every rid so we can reference both the
+    # rule we're emitting a task for and any "previous rule" by name.
+    payloads: dict[int, dict[str, Any]] = {}
+    names: dict[int, str] = {}
+    for rid in ordered_ids:
+        base, rule_name = _rule_name_from_payload(by_id[rid])
+        if not rule_name:
+            raise ValueError(f"Rule entry {rid} has no rule name")
+        payloads[rid] = base
+        names[rid] = rule_name
+
+    # Old on-device order, restricted to this batch, derived from the
+    # @gc_sync_index that ``_sync_entity_type`` writes into payload_json on
+    # every successful sync.  Caches that pre-date the index will yield None
+    # for everyone — in that case we have no reliable "previous After" to
+    # diff against and we fall back to enqueuing the full chain (the safe,
+    # historical behaviour).
+    indexed: list[tuple[int, int]] = []
+    for rid in ordered_ids:
+        raw_idx = payloads[rid].get("@gc_sync_index")
+        try:
+            n = int(raw_idx) if raw_idx is not None else None
+        except (TypeError, ValueError):
+            n = None
+        if n is None or n < 1:
+            indexed = []
+            break
+        indexed.append((n, rid))
+    have_old_order = bool(indexed)
+    old_order = [rid for _, rid in sorted(indexed, key=lambda x: x[0])] if have_old_order else []
 
     tasks: list[TaskQueue] = []
-    previous_rule_name = ""
     for rid in ordered_ids:
         entry = by_id[rid]
-        try:
-            base = json.loads(entry.payload_json or "{}")
-        except (json.JSONDecodeError, TypeError):
-            base = {}
-        if not isinstance(base, dict):
-            base = {}
-        rule_name = str(base.get("Name") or entry.external_name or "").strip()
-        if not rule_name:
-            raise ValueError(f"Firewall rule entry {rid} has no rule name")
+        base = payloads[rid]
+
+        new_prev_id = _previous_id_in_order(ordered_ids, rid)
+        new_after_name = names.get(new_prev_id) if new_prev_id is not None else ""
+
+        if have_old_order:
+            # We can prove what's already on-device for this rule's chain
+            # neighbour; only enqueue when ``After.Name`` actually needs to
+            # change.  This is the optimum-but-correct task count.
+            old_prev_id = _previous_id_in_order(old_order, rid)
+            old_after_name = names.get(old_prev_id) if old_prev_id is not None else ""
+            if old_after_name == new_after_name:
+                continue
+        # else: no @gc_sync_index — caches pre-date the sync change, so we
+        # can't prove what's currently stored for this rule's After.Name.
+        # Fall through and enqueue every rule (historical safe behaviour).
 
         merged = _firewall_rule_reorder_payload(
-            base, after_rule_name=previous_rule_name or None
+            base, after_rule_name=new_after_name or None
         )
         if _task_payload_matches_cache(entry, merged):
-            previous_rule_name = rule_name
             continue
         t = TaskQueue(
             firewall_id=firewall_id,
-            entity_type=ENTITY_FIREWALL_RULE,
+            entity_type=et,
             external_name=entry.external_name,
             status="pending",
             error_message=None,
@@ -1512,12 +1620,51 @@ def enqueue_firewall_rule_reorder_batch(
         db.add(t)
         db.flush()
         tasks.append(t)
-        previous_rule_name = rule_name
     if tasks:
         db.commit()
         for t in tasks:
             db.refresh(t)
     return tasks
+
+
+def enqueue_firewall_rule_reorder_batch(
+    db: Session,
+    *,
+    firewall_id: int,
+    ordered_config_entry_ids: list[int],
+    dirty_config_entry_ids: list[int] | None = None,  # noqa: ARG001
+    created_by_user_id: str | None = None,
+    created_by_username: str | None = None,
+) -> list[TaskQueue]:
+    """Back-compat wrapper around :func:`enqueue_rule_reorder_batch`."""
+    return enqueue_rule_reorder_batch(
+        db,
+        firewall_id=firewall_id,
+        entity_type=ENTITY_FIREWALL_RULE,
+        ordered_config_entry_ids=ordered_config_entry_ids,
+        created_by_user_id=created_by_user_id,
+        created_by_username=created_by_username,
+    )
+
+
+def enqueue_nat_rule_reorder_batch(
+    db: Session,
+    *,
+    firewall_id: int,
+    ordered_config_entry_ids: list[int],
+    dirty_config_entry_ids: list[int] | None = None,  # noqa: ARG001
+    created_by_user_id: str | None = None,
+    created_by_username: str | None = None,
+) -> list[TaskQueue]:
+    """Convenience wrapper around :func:`enqueue_rule_reorder_batch` for NAT rules."""
+    return enqueue_rule_reorder_batch(
+        db,
+        firewall_id=firewall_id,
+        entity_type=ENTITY_NAT_RULE,
+        ordered_config_entry_ids=ordered_config_entry_ids,
+        created_by_user_id=created_by_user_id,
+        created_by_username=created_by_username,
+    )
 
 
 _CONFIG_VIEWER_FW_UNSUPPORTED_DELETE_TYPES = frozenset(
@@ -4074,6 +4221,13 @@ HS_TASK_ENTITY_TYPES = frozenset(
         "dhcp_server",
         "dhcp_server_ipv6",
         "dhcp_relay",
+        # Protect · Firewall ordered policies — share the HS-style flyout merge
+        # + enqueue/apply pipeline.  XML push uses ``HS_XML_TAG`` below.  Note
+        # that firewall_rule reorder still flows via the bespoke
+        # ``enqueue_firewall_rule_reorder_batch`` path (different task shape):
+        # add/edit/delete go through HS, position-only edits go through reorder.
+        "firewall_rule",
+        "nat_rule",
     }
 )
 
@@ -4104,6 +4258,12 @@ HS_XML_TAG: dict[str, str] = {
     "dhcp_server": "DHCPServer",
     "dhcp_server_ipv6": "DHCPServerIpv6",
     "dhcp_relay": "DHCPRelay",
+    # Firewall + NAT rules push under their canonical XML elements per
+    # xml-api-docs/Protect/Firewall/{FirewallRule,NatRule}.md.  Both are
+    # ordered (Position + After) — the merge functions in hs_flyout_merge
+    # honour the form's ``InsertPosition`` / ``InsertAfterRule`` keys.
+    "firewall_rule": "FirewallRule",
+    "nat_rule": "NATRule",
 }
 
 # Identity field per entity_type for the HS-style flyout/create flow.  Most
@@ -4167,6 +4327,10 @@ def merge_hs_flyout_form(
         return merge_dhcp_server_ipv6_form(base, form)
     if entity_type == "dhcp_relay":
         return merge_dhcp_relay_form(base, form)
+    if entity_type == "firewall_rule":
+        return merge_firewall_rule_form(base, form)
+    if entity_type == "nat_rule":
+        return merge_nat_rule_form(base, form)
     raise ValueError(f"Unsupported hosts/services entity type: {entity_type}")
 
 

@@ -36,13 +36,13 @@ def test_dhcp_entity_registered_in_hs_pipeline(et: str) -> None:
     from app.task_queue_service import (
         HS_TASK_ENTITY_TYPES,
         HS_XML_TAG,
+        _task_entity_supported_for_send,
         _task_entity_supports_create,
-        _task_entity_supports_send,
     )
 
     assert et in HS_TASK_ENTITY_TYPES
     assert et in HS_XML_TAG
-    assert _task_entity_supports_send(et)
+    assert _task_entity_supported_for_send(et)
     assert _task_entity_supports_create(et)
 
 

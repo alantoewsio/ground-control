@@ -825,3 +825,363 @@ def merge_dhcp_relay_form(
         else:
             out["DHCPServerIP"] = server_ips
     return out
+
+
+# ---------------------------------------------------------------------------
+# Protect · Firewall : Firewall rule  (XML root <FirewallRule>)
+#
+# Spec: xml-api-docs/Protect/Firewall/FirewallRule.md.  Three policy variants
+# under <PolicyType>:
+#   - User       -> body lives inside <UserPolicy>
+#   - Network    -> body lives inside <NetworkPolicy>
+#   - HTTPBased  -> Web Application Firewall (WAF).  Round-tripping the full
+#                   WAF body via this flyout is unsafe; we preserve the raw
+#                   <HTTPBasedPolicy> block from base verbatim and allow only
+#                   top-level Status / IPFamily / Position / Description /
+#                   Section edits, mirroring the firewall-config-viewer's
+#                   ``disableEdit: PolicyType === 'HTTPBased'`` precedent.
+# Reorder semantics (Position + After/Before) are honoured here AS WELL AS by
+# the bespoke ``enqueue_firewall_rule_reorder_batch`` task path.  Edits that
+# only change the rule's neighbour go through the bespoke reorder path; full
+# add/edit/delete with body changes go through the HS pipeline that calls
+# this merger.
+# ---------------------------------------------------------------------------
+
+_FW_RULE_TOP_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("Status", ("status",)),
+    ("IPFamily", ("ip_family",)),
+    ("PolicyType", ("policy_type",)),
+    ("Section", ("section",)),
+)
+
+# Scalar fields that live inside the active <UserPolicy> / <NetworkPolicy>
+# block.  Form keys may use the schema name verbatim or a snake_case alias.
+_FW_POLICY_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Action", ("action",)),
+    ("LogTraffic", ("log_traffic",)),
+    ("SkipLocalDestined", ("skip_local_destined",)),
+    ("Schedule", ("schedule",)),
+    ("MatchIdentity", ("match_identity",)),
+    ("ShowCaptivePortal", ("show_captive_portal",)),
+    ("DataAccounting", ("data_accounting",)),
+    ("WebFilter", ("web_filter",)),
+    ("WebCategoryBaseQoSPolicy", ("web_category_base_qos_policy",)),
+    ("BlockQuickQuic", ("block_quick_quic",)),
+    ("ScanVirus", ("scan_virus",)),
+    ("ZeroDayProtection", ("zero_day_protection",)),
+    ("ScanFTP", ("scan_ftp",)),
+    ("ProxyMode", ("proxy_mode",)),
+    ("DecryptHTTPS", ("decrypt_https",)),
+    ("ApplicationControl", ("application_control",)),
+    ("ApplicationBaseQoSPolicy", ("application_base_qos_policy",)),
+    ("IntrusionPrevention", ("intrusion_prevention",)),
+    ("NDRActiveThreatIntelligence", ("ndr_active_threat_intelligence",)),
+    ("TrafficShappingPolicy", ("traffic_shapping_policy", "traffic_shaping_policy")),
+    ("DSCPMarking", ("dscp_marking",)),
+    ("ScanSMTP", ("scan_smtp",)),
+    ("ScanSMTPS", ("scan_smtps",)),
+    ("ScanIMAP", ("scan_imap",)),
+    ("ScanIMAPS", ("scan_imaps",)),
+    ("ScanPOP3", ("scan_pop3",)),
+    ("ScanPOP3S", ("scan_pop3s",)),
+    ("SourceSecurityHeartbeat", ("source_security_heartbeat",)),
+    ("MinimumSourceHBPermitted", ("minimum_source_hb_permitted",)),
+    ("DestSecurityHeartbeat", ("dest_security_heartbeat",)),
+    ("MinimumDestinationHBPermitted", ("minimum_destination_hb_permitted",)),
+    ("RewriteSourceAddress", ("rewrite_source_address",)),
+    ("PrimaryGateway", ("primary_gateway",)),
+    ("BackupGateway", ("backup_gateway",)),
+)
+
+# Repeating list-of-strings members under each policy block.  Each tuple is
+# (form_key, snake_alias, container_tag, child_tag).
+_FW_POLICY_LISTS: tuple[tuple[str, str, str, str], ...] = (
+    ("source_zones", "SourceZones", "SourceZones", "Zone"),
+    ("destination_zones", "DestinationZones", "DestinationZones", "Zone"),
+    ("source_networks", "SourceNetworks", "SourceNetworks", "Network"),
+    ("destination_networks", "DestinationNetworks", "DestinationNetworks", "Network"),
+    ("services", "Services", "Services", "Service"),
+    ("identity", "Identity", "Identity", "Member"),
+)
+
+
+def _wrap_string_list(values: list[str], child_tag: str) -> dict[str, Any] | None:
+    cleaned = [str(v).strip() for v in values if str(v).strip()]
+    if not cleaned:
+        return None
+    if len(cleaned) == 1:
+        return {child_tag: cleaned[0]}
+    return {child_tag: cleaned}
+
+
+def _apply_position_overlay(out: dict[str, Any], form: Mapping[str, Any]) -> None:
+    """Translate form's ``InsertPosition`` / ``InsertAfterRule`` / ``InsertBeforeRule``
+    to the canonical XML shape (``Position`` + optional ``After`` / ``Before`` blocks).
+
+    The bulk-add CSV uses ``Position`` directly with values like ``Top`` /
+    ``Bottom`` / ``After:<RuleName>`` (matching the firewall-config-viewer
+    schema); the flyout uses ``InsertPosition`` (``Top`` / ``Bottom`` /
+    ``After`` / ``Before``) plus a separate target-name field.  Both shapes
+    land in the same canonical XML.
+    """
+    insert_pos_keys = ("InsertPosition", "insert_position", "Position", "position")
+    if not any(k in form for k in insert_pos_keys):
+        return
+    raw = ""
+    for k in insert_pos_keys:
+        if k in form and form.get(k) is not None:
+            raw = str(form.get(k)).strip()
+            break
+    if not raw:
+        return
+    target = ""
+    after_keys = ("InsertAfterRule", "insert_after_rule", "AfterName", "after_name")
+    before_keys = ("InsertBeforeRule", "insert_before_rule", "BeforeName", "before_name")
+    if raw.lower().startswith("after:"):
+        target = raw[6:].strip()
+        raw = "After"
+    elif raw.lower().startswith("before:"):
+        target = raw[7:].strip()
+        raw = "Before"
+    else:
+        for k in after_keys:
+            if k in form and form.get(k) is not None:
+                if str(form.get(k)).strip():
+                    target = str(form.get(k)).strip()
+                break
+        if not target:
+            for k in before_keys:
+                if k in form and form.get(k) is not None:
+                    if str(form.get(k)).strip():
+                        target = str(form.get(k)).strip()
+                    break
+    canonical = raw.capitalize()
+    if canonical not in ("Top", "Bottom", "After", "Before"):
+        return
+    out["Position"] = canonical
+    if canonical == "After" and target:
+        out["After"] = {"Name": target}
+        out.pop("Before", None)
+    elif canonical == "Before" and target:
+        out["Before"] = {"Name": target}
+        out.pop("After", None)
+    else:
+        out.pop("After", None)
+        out.pop("Before", None)
+
+
+def _apply_policy_block(
+    out: dict[str, Any], form: Mapping[str, Any], *, policy_tag: str
+) -> None:
+    """Overlay scalars + list members into out[policy_tag], leaving the block
+    unchanged when no relevant form keys are present.
+
+    The base payload may already contain a different policy block (e.g. user
+    flipped from Network to User); in that case we move whatever fields the
+    form provides into the new block but preserve the *other* block as-is so
+    a future edit can flip back without losing data.
+    """
+    block_existing = out.get(policy_tag)
+    if isinstance(block_existing, list) and block_existing:
+        block_existing = block_existing[0]
+    if not isinstance(block_existing, dict):
+        block_existing = {}
+    block = copy.deepcopy(block_existing)
+
+    touched = False
+    for field, aliases in _FW_POLICY_SCALARS:
+        keys = (field, *aliases)
+        if any(k in form for k in keys):
+            touched = True
+            _overlay_scalar(block, form, field=field, aliases=aliases, blank_clears=False)
+
+    if "description" in form or "Description" in form:
+        raw = form.get("description") if "description" in form else form.get("Description")
+        block["Description"] = _blank_desc(str(raw or ""))
+        touched = True
+
+    for primary, snake, container, child in _FW_POLICY_LISTS:
+        values = _form_list_field(form, primary, f"{snake}.{child}")
+        if values is None and snake != primary:
+            values = _form_list_field(form, snake, f"{snake}.{child}")
+        if values is None:
+            continue
+        touched = True
+        wrapped = _wrap_string_list(values, child)
+        if wrapped is None:
+            block[container] = None
+        else:
+            block[container] = wrapped
+
+    if touched:
+        out[policy_tag] = block
+
+
+def merge_firewall_rule_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply Firewall Rule flyout edits onto a cached <FirewallRule> payload.
+
+    The merger is policy-type aware:
+    - For User / Network rules it overlays scalars + list members into the
+      correct <UserPolicy> or <NetworkPolicy> block.
+    - For HTTPBased (WAF) rules it preserves the <HTTPBasedPolicy> block
+      verbatim from base and only allows top-level Status / Position /
+      Description / Section / IPFamily edits.  This mirrors the
+      firewall-config-viewer's editor disableEdit precedent because WAF
+      payloads are not safely round-trippable through a generic flyout.
+
+    Position changes (Top / Bottom / After / Before) are translated to the
+    canonical <Position> + optional <After><Name> / <Before><Name> shape.
+
+    The returned dict is a **deep copy** of base with the overlay applied —
+    no in-place mutation of the cached payload.
+    """
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _FW_RULE_TOP_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    if "description" in form or "Description" in form:
+        # Top-level Description is preserved on FirewallRule even though some
+        # firmware also accepts it inside the policy block; xml-api-docs shows
+        # it at the top level so we mirror that.
+        raw = form.get("description") if "description" in form else form.get("Description")
+        out["Description"] = _blank_desc(str(raw or ""))
+
+    _apply_position_overlay(out, form)
+
+    policy_type = str(out.get("PolicyType") or "").strip()
+    if not policy_type:
+        # Infer from form when base lacks a value.
+        policy_type = str(
+            form.get("PolicyType") or form.get("policy_type") or "Network"
+        ).strip() or "Network"
+        out["PolicyType"] = policy_type
+
+    if policy_type == "HTTPBased":
+        # WAF payloads stay opaque — we deliberately do not call
+        # ``_apply_policy_block`` so the cached <HTTPBasedPolicy> body survives.
+        return out
+
+    policy_tag = "UserPolicy" if policy_type == "User" else "NetworkPolicy"
+    _apply_policy_block(out, form, policy_tag=policy_tag)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Protect · Firewall : NAT rule  (XML root <NATRule>)
+#
+# Spec: xml-api-docs/Protect/Firewall/NatRule.md.  All fields live at the top
+# level; there are no policy variants.  ``InterfaceNATPolicyList`` is a
+# repeating block of <Override> rows used when ``OverrideInterfaceNATPolicy``
+# is Enable.
+# ---------------------------------------------------------------------------
+
+_NAT_RULE_SCALARS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Name", ("name",)),
+    ("Status", ("status",)),
+    ("IPFamily", ("ip_family",)),
+    ("LinkedFirewallrule", ("linked_firewall_rule", "LinkedFirewallRule")),
+    ("TranslatedSource", ("translated_source",)),
+    ("TranslatedDestination", ("translated_destination",)),
+    ("TranslatedService", ("translated_service",)),
+    ("OverrideInterfaceNATPolicy", ("override_interface_nat_policy",)),
+    ("LoopbackRule", ("loopback_rule",)),
+    ("ReflexiveRule", ("reflexive_rule",)),
+)
+
+_NAT_RULE_LIST_MEMBERS: tuple[tuple[str, str, str, str], ...] = (
+    ("original_source_networks", "OriginalSourceNetworks", "OriginalSourceNetworks", "Network"),
+    (
+        "original_destination_networks",
+        "OriginalDestinationNetworks",
+        "OriginalDestinationNetworks",
+        "Network",
+    ),
+    ("original_services", "OriginalServices", "OriginalServices", "Service"),
+    ("inbound_interfaces", "InboundInterfaces", "InboundInterfaces", "Interface"),
+    ("outbound_interfaces", "OutboundInterfaces", "OutboundInterfaces", "Interface"),
+)
+
+# Subfields per <Override> row inside <InterfaceNATPolicyList>.  Sophos uses
+# lower_snake_case subtags here (per xml-api-docs/Protect/Firewall/NatRule.md
+# sample) — preserve them verbatim so xmltodict round-trips correctly.
+_NAT_RULE_OVERRIDE_SUBFIELDS: tuple[str, ...] = (
+    "specific_interface",
+    "specific_translatedsourceid",
+)
+
+
+def _normalize_nat_override_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for sf in _NAT_RULE_OVERRIDE_SUBFIELDS:
+        if sf in row and row[sf] is not None:
+            s = str(row[sf]).strip()
+            if s:
+                out[sf] = s
+    # Tolerate camelCase form input (the JS flyout may post either case).
+    camel_aliases = {
+        "specificInterface": "specific_interface",
+        "specificTranslatedsourceid": "specific_translatedsourceid",
+        "SpecificInterface": "specific_interface",
+        "SpecificTranslatedSourceId": "specific_translatedsourceid",
+    }
+    for camel, snake in camel_aliases.items():
+        if snake in out:
+            continue
+        if camel in row and row[camel] is not None:
+            s = str(row[camel]).strip()
+            if s:
+                out[snake] = s
+    return out
+
+
+def _apply_interface_nat_policy_list(out: dict[str, Any], form: Mapping[str, Any]) -> None:
+    rows = _form_repeating_rows(form, "interface_nat_policy_overrides")
+    if rows is None:
+        rows = _form_repeating_rows(form, "InterfaceNATPolicyList")
+    if rows is None:
+        return
+    cleaned = [_normalize_nat_override_row(r) for r in rows]
+    cleaned = [r for r in cleaned if r]
+    if not cleaned:
+        out["InterfaceNATPolicyList"] = None
+        return
+    if len(cleaned) == 1:
+        out["InterfaceNATPolicyList"] = {"Override": cleaned[0]}
+    else:
+        out["InterfaceNATPolicyList"] = {"Override": cleaned}
+
+
+def merge_nat_rule_form(
+    base: dict[str, Any], form: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply NAT Rule flyout edits onto a cached <NATRule> payload.
+
+    Honours scalar overlay, the five list-of-strings blocks (original src /
+    dst networks, original services, inbound / outbound interfaces) and the
+    <InterfaceNATPolicyList> repeating <Override> block.  Position semantics
+    match merge_firewall_rule_form (Top / Bottom / After / Before).
+
+    Returns a deep copy of base with the overlay applied.
+    """
+    out = copy.deepcopy(base) if isinstance(base, dict) else {}
+    for field, aliases in _NAT_RULE_SCALARS:
+        _overlay_scalar(out, form, field=field, aliases=aliases)
+    _overlay_description(out, form)
+    _apply_position_overlay(out, form)
+
+    for primary, snake, container, child in _NAT_RULE_LIST_MEMBERS:
+        values = _form_list_field(form, primary, f"{snake}.{child}")
+        if values is None and snake != primary:
+            values = _form_list_field(form, snake, f"{snake}.{child}")
+        if values is None:
+            continue
+        wrapped = _wrap_string_list(values, child)
+        if wrapped is None:
+            out[container] = None
+        else:
+            out[container] = wrapped
+
+    _apply_interface_nat_policy_list(out, form)
+    return out

@@ -87,6 +87,26 @@ def _security_policy_names_from_group_payload(data: dict[str, Any]) -> list[str]
     return names
 
 
+def _sync_index_from_payload(data: dict[str, Any]) -> int | None:
+    """Return the 1-based on-device index recorded by sync, if present.
+
+    Sync tags ordered entities (``firewall_rule``, ``nat_rule``) with
+    ``@gc_sync_index`` so the table can render them in the firewall's
+    actual evaluation order — the Sophos GET response intentionally omits
+    ``Position`` / ``After`` (write-only directives), so without this
+    cached index the position column would always fall back to alphabetical
+    even right after a successful drag-to-reorder + send + sync round-trip.
+    """
+    raw = data.get("@gc_sync_index") if isinstance(data, dict) else None
+    if raw is None:
+        return None
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return n if n >= 1 else None
+
+
 def _compute_rule_positions(rule_refs: list[tuple[str, str]]) -> list[int]:
     """
     Compute 1-based intended order from (rule_name, after_name) references.
@@ -268,6 +288,7 @@ def build_firewall_rule_table_payload(db: Session, firewall_ids: list[int]) -> d
                 "cells": c,
                 "__rule_name": c.get("__name", ""),
                 "__after_name": _rule_after_name(data),
+                "__sync_index": _sync_index_from_payload(data),
                 "__firewall_host": (fw.host or "").strip(),
             }
         )
@@ -275,11 +296,20 @@ def build_firewall_rule_table_payload(db: Session, firewall_ids: list[int]) -> d
     rows: list[dict[str, Any]] = []
     for fw_id in firewall_order:
         group = rows_by_firewall[fw_id]
-        refs = [
-            (str(r.get("__rule_name", "")).strip(), str(r.get("__after_name", "")).strip())
-            for r in group
-        ]
-        positions = _compute_rule_positions(refs)
+        # Prefer the on-device index captured by sync — it's the authoritative
+        # rule order on the firewall.  Only fall back to the After-chain graph
+        # for caches synced before the index existed.  When only some rules
+        # carry an index (mixed sync versions), fall back to the chain so we
+        # don't end up with collisions or zero-positions.
+        sync_indices = [r.get("__sync_index") for r in group]
+        if group and all(isinstance(i, int) and i >= 1 for i in sync_indices):
+            positions = [int(i) for i in sync_indices]
+        else:
+            refs = [
+                (str(r.get("__rule_name", "")).strip(), str(r.get("__after_name", "")).strip())
+                for r in group
+            ]
+            positions = _compute_rule_positions(refs)
         for idx, row in enumerate(group):
             p = positions[idx] if idx < len(positions) else (idx + 1)
             row["cells"]["__position"] = str(p)
@@ -292,6 +322,7 @@ def build_firewall_rule_table_payload(db: Session, firewall_ids: list[int]) -> d
                 row["search"] += " " + str(row["__firewall_host"]).lower()
             row.pop("__rule_name", None)
             row.pop("__after_name", None)
+            row.pop("__sync_index", None)
             row.pop("__firewall_host", None)
         group.sort(
             key=lambda r: (

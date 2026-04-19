@@ -480,6 +480,176 @@
       },
     },
 
+    firewall_rule_ipv4: {
+      title: "Firewall rules (IPv4)",
+      apiEntityType: "firewall_rule",
+      format: [
+        "Format:  name, action, source_zones, dest_zones [, source_networks] [, dest_networks] [, services] [, description]",
+        "         action: Accept | Drop | Reject",
+        "         lists: separate members with + (use 'Any' for any)",
+        "",
+        "Examples:",
+        "  AllowLAN-WAN, Accept, LAN, WAN, Any, Any, Any",
+        "  BlockGuest, Drop, Guest, WAN+DMZ, GuestNet, Any, Any, Block guest egress",
+      ].join("\n"),
+      hint: "Name, action and source/destination zones are required. Other policy fields default to 'Any'. Position defaults to Bottom. Edit via the row flyout for advanced policy fields.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 4) return null;
+        var name = f[0], action = f[1], srcZones = f[2], dstZones = f[3];
+        if (!name || !action || !srcZones || !dstZones) return null;
+        if (["Accept", "Drop", "Reject"].indexOf(action) === -1) {
+          return { _error: "Action must be Accept, Drop or Reject" };
+        }
+        function members(s) {
+          return String(s || "").split("+").map(function (x) { return x.trim(); }).filter(Boolean);
+        }
+        var form = {
+          Name: name,
+          name: name,
+          Status: "Enable",
+          IPFamily: "IPv4",
+          PolicyType: "Network",
+          Position: "Bottom",
+          action: action,
+          source_zones: members(srcZones),
+          destination_zones: members(dstZones),
+          source_networks: members(f[4] || "Any"),
+          destination_networks: members(f[5] || "Any"),
+          services: members(f[6] || "Any"),
+        };
+        if (f[7]) form.Description = f[7];
+        return form;
+      },
+    },
+
+    firewall_rule_ipv6: {
+      title: "Firewall rules (IPv6)",
+      apiEntityType: "firewall_rule",
+      format: [
+        "Format:  name, action, source_zones, dest_zones [, source_networks] [, dest_networks] [, services] [, description]",
+        "         action: Accept | Drop | Reject",
+        "         lists: separate members with + (use 'Any' for any)",
+        "",
+        "Examples:",
+        "  V6-AllowLAN-WAN, Accept, LAN, WAN, Any, Any, Any",
+        "  V6-BlockGuest, Drop, Guest, WAN, GuestNet-v6, Any, Any",
+      ].join("\n"),
+      hint: "Same shape as the IPv4 form but tags the rule as IPv6. Source / destination networks should reference IPv6 hosts.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 4) return null;
+        var name = f[0], action = f[1], srcZones = f[2], dstZones = f[3];
+        if (!name || !action || !srcZones || !dstZones) return null;
+        if (["Accept", "Drop", "Reject"].indexOf(action) === -1) {
+          return { _error: "Action must be Accept, Drop or Reject" };
+        }
+        function members(s) {
+          return String(s || "").split("+").map(function (x) { return x.trim(); }).filter(Boolean);
+        }
+        var form = {
+          Name: name,
+          name: name,
+          Status: "Enable",
+          IPFamily: "IPv6",
+          PolicyType: "Network",
+          Position: "Bottom",
+          action: action,
+          source_zones: members(srcZones),
+          destination_zones: members(dstZones),
+          source_networks: members(f[4] || "Any"),
+          destination_networks: members(f[5] || "Any"),
+          services: members(f[6] || "Any"),
+        };
+        if (f[7]) form.Description = f[7];
+        return form;
+      },
+    },
+
+    nat_rule_ipv4: {
+      title: "NAT rules (IPv4)",
+      apiEntityType: "nat_rule",
+      format: [
+        "Format:  name, original_sources, original_dests, original_services, outbound_interfaces, translated_source [, translated_dest] [, translated_service] [, description]",
+        "         lists: separate members with + (use 'Any' for any)",
+        "",
+        "Examples:",
+        "  HostNAT, Internal-Net, Any, Any, Port1, Original",
+        "  WebPub, Any, Public-IP, HTTPS, PortB, Original, WebSrv-Internal, Original, Web publish",
+      ].join("\n"),
+      hint: "Name, original source/dest/service, outbound interface and translated source are required. 'Original' keeps the field unchanged. Edit via the row flyout for advanced overrides.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 6) return null;
+        var name = f[0];
+        if (!name) return null;
+        function members(s) {
+          return String(s || "").split("+").map(function (x) { return x.trim(); }).filter(Boolean);
+        }
+        var form = {
+          Name: name,
+          name: name,
+          Status: "Enable",
+          IPFamily: "IPv4",
+          Position: "Bottom",
+          original_source_networks: members(f[1] || "Any"),
+          original_destination_networks: members(f[2] || "Any"),
+          original_services: members(f[3] || "Any"),
+          outbound_interfaces: members(f[4] || ""),
+          translated_source: f[5] || "Original",
+          translated_destination: f[6] || "Original",
+          translated_service: f[7] || "Original",
+          OverrideInterfaceNATPolicy: "Disable",
+          LoopbackRule: "Disable",
+          ReflexiveRule: "Disable",
+        };
+        if (f[8]) form.Description = f[8];
+        return form;
+      },
+    },
+
+    nat_rule_ipv6: {
+      title: "NAT rules (IPv6)",
+      apiEntityType: "nat_rule",
+      format: [
+        "Format:  name, original_sources, original_dests, original_services, outbound_interfaces, translated_source [, translated_dest] [, translated_service] [, description]",
+        "         lists: separate members with + (use 'Any' for any)",
+        "",
+        "Examples:",
+        "  V6-HostNAT, V6-Internal, Any, Any, Port1, Original",
+        "  V6-WebPub, Any, V6-Public, HTTPS, PortB, Original, V6-WebSrv, Original",
+      ].join("\n"),
+      hint: "Same shape as the IPv4 form but tags the rule as IPv6.",
+      validate: function (line) {
+        var f = parseCsvLine(line);
+        if (f.length < 6) return null;
+        var name = f[0];
+        if (!name) return null;
+        function members(s) {
+          return String(s || "").split("+").map(function (x) { return x.trim(); }).filter(Boolean);
+        }
+        var form = {
+          Name: name,
+          name: name,
+          Status: "Enable",
+          IPFamily: "IPv6",
+          Position: "Bottom",
+          original_source_networks: members(f[1] || "Any"),
+          original_destination_networks: members(f[2] || "Any"),
+          original_services: members(f[3] || "Any"),
+          outbound_interfaces: members(f[4] || ""),
+          translated_source: f[5] || "Original",
+          translated_destination: f[6] || "Original",
+          translated_service: f[7] || "Original",
+          OverrideInterfaceNATPolicy: "Disable",
+          LoopbackRule: "Disable",
+          ReflexiveRule: "Disable",
+        };
+        if (f[8]) form.Description = f[8];
+        return form;
+      },
+    },
+
     acl_rule: {
       title: "Local Service ACL rules",
       identityField: "RuleName",
@@ -750,6 +920,10 @@
         country_group: "EU,Germany+France+Italy\nAPAC,Japan+China",
         service: "HTTPS,TCP,443\nDNS,UDP,53,,Domain Name System\nSSH-Alt,TCP,2222",
         service_group: "WebServices,HTTP+HTTPS\nEmailServices,SMTP+IMAPS",
+        firewall_rule_ipv4: "AllowLAN-WAN,Accept,LAN,WAN,Any,Any,Any\nBlockGuest,Drop,Guest,WAN,GuestNet,Any,Any",
+        firewall_rule_ipv6: "V6-AllowLAN-WAN,Accept,LAN,WAN,Any,Any,Any",
+        nat_rule_ipv4: "HostNAT,Internal-Net,Any,Any,Port1,Original\nWebPub,Any,Public-IP,HTTPS,PortB,Original,WebSrv-Internal,Original",
+        nat_rule_ipv6: "V6-HostNAT,V6-Internal,Any,Any,Port1,Original",
       };
       textareaEl.placeholder = entityPlaceholders[entityKey] || "One entry per line…";
     }
@@ -812,6 +986,15 @@
     var isIpHost = ek === "ip_host" && typeof window.gcHsIpHostEnqueueCreateBatchUrl === "string";
     var url = isIpHost ? window.gcHsIpHostEnqueueCreateBatchUrl : crUrl;
 
+    // Some entries (e.g. firewall_rule_ipv4 / firewall_rule_ipv6) split a
+    // single canonical entity_type into multiple bulk-add variants for UX
+    // (per-IP-family CSV examples).  ``apiEntityType`` lets the modal key
+    // diverge from what we send to the backend.
+    var modalCfg = ENTITY_CONFIGS[ek] || {};
+    var apiEntityType = typeof modalCfg.apiEntityType === "string" && modalCfg.apiEntityType
+      ? modalCfg.apiEntityType
+      : ek;
+
     function submitNext() {
       if (done >= entries.length) {
         finishSubmit();
@@ -820,7 +1003,7 @@
       var entry = entries[done];
       var body = isIpHost
         ? { firewall_ids: ids, form: entry.form }
-        : { entity_type: ek, firewall_ids: ids, form: entry.form };
+        : { entity_type: apiEntityType, firewall_ids: ids, form: entry.form };
 
       fetch(url, {
         method: "POST",

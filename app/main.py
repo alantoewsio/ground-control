@@ -216,6 +216,7 @@ from app.firewall_config_sync import (
 )
 from app.firewall_connectivity import firewall_is_online
 from app.firewall_rule_table import build_firewall_rule_table_payload
+from app.nat_rule_table import build_nat_rule_table_payload
 from app.firewall_ssh import (
     build_firewall_ssh_diagnostics,
     firewall_ssh_terminal_ws,
@@ -357,6 +358,7 @@ from app.task_queue_service import (
     enqueue_configuration_apply_to_firewalls,
     enqueue_dos_settings_update,
     enqueue_firewall_rule_reorder_batch,
+    enqueue_nat_rule_reorder_batch,
     enqueue_hs_deletes_batch,
     enqueue_hs_entity_create_many,
     enqueue_hs_entity_update_batch,
@@ -1223,6 +1225,16 @@ class EnqueueFirewallRuleReorderBatchBody(BaseModel):
     firewall_id: int = Field(...)
     ordered_config_entry_ids: list[int] = Field(
         default_factory=list, max_length=TASK_QUEUE_BATCH_IDS_MAX
+    )
+    # Accepted (forward-compat with older client builds) but **ignored** by
+    # the backend.  Sophos persists ``After.Name`` as a real per-rule field;
+    # narrowing by the client's "rules the user dragged" set would leave the
+    # un-flagged rules with stale ``After.Name`` pointers on the firewall and
+    # the move would appear to revert on the next sync.  The server now runs
+    # an After-name diff against the cached ``@gc_sync_index`` order itself
+    # and emits exactly the rules whose ``After.Name`` actually changed.
+    dirty_config_entry_ids: list[int] | None = Field(
+        default=None, max_length=TASK_QUEUE_BATCH_IDS_MAX
     )
 
 
@@ -5334,6 +5346,13 @@ HOSTS_SERVICES_ENTITY_TYPES: frozenset[str] = frozenset(
         "dhcp_server",
         "dhcp_server_ipv6",
         "dhcp_relay",
+        # Protect · Firewall ordered policies.  Both share the HS-style
+        # add/edit/delete pipeline but keep their bespoke read-only table
+        # endpoints (``api_firewalls_firewall_rules_table`` /
+        # ``api_firewalls_nat_rules_table``) so the per-firewall reorder UX
+        # stays intact.  See xml-api-docs/Protect/Firewall/{FirewallRule,NatRule}.md.
+        "firewall_rule",
+        "nat_rule",
     }
 )
 
@@ -5712,13 +5731,18 @@ def firewalls_intrusion_prevention_page(
     )
 
 
-@app.get("/firewalls/protect/firewall", response_class=HTMLResponse)
+@app.get(
+    "/firewalls/protect/firewall",
+    response_class=HTMLResponse,
+    name="firewalls_protect_firewall_page",
+)
 def firewalls_protect_firewall_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
     _: Annotated[None, Depends(require_browser_session)],
 ):
+    """Protect · Firewall page (per-firewall scope) — Firewall rules + NAT rules tabs."""
     return templates.TemplateResponse(
         request,
         "firewalls_protect_firewall.html",
@@ -5729,9 +5753,47 @@ def firewalls_protect_firewall_page(
             "url_api_firewall_rules_table": str(
                 request.url_for("api_firewalls_firewall_rules_table")
             ),
+            "url_api_nat_rules_table": str(
+                request.url_for("api_firewalls_nat_rules_table")
+            ),
             "url_api_task_queue_enqueue_firewall_rule_reorder_batch": str(
                 request.url_for("api_task_queue_enqueue_firewall_rule_reorder_batch")
             ),
+            "url_api_task_queue_enqueue_nat_rule_reorder_batch": str(
+                request.url_for("api_task_queue_enqueue_nat_rule_reorder_batch")
+            ),
+            **_hs_table_url_context(request),
+        },
+    )
+
+
+@app.get(
+    "/configurations/protect/firewall",
+    response_class=HTMLResponse,
+    name="configurations_protect_firewall_page",
+)
+def configurations_protect_firewall_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    sdb: Annotated[Session, Depends(get_secrets_db)],
+    _: Annotated[None, Depends(require_browser_session)],
+):
+    """Protect · Firewall page (combined / configuration scope) — Firewall + NAT rules.
+
+    Mirrors :func:`firewalls_protect_firewall_page` but writes go through the
+    configuration-scope HS apply pipeline.  The reorder dock is intentionally
+    suppressed here because position is per-firewall semantic and only makes
+    sense in firewall scope.
+    """
+    return templates.TemplateResponse(
+        request,
+        "configurations_protect_firewall.html",
+        {
+            "app_about": APP_ABOUT,
+            "auth_client_state": auth_client_state(request, sdb),
+            **template_nav_firewall_context(request, sdb, db),
+            "top_nav_active": "firewalls",
+            **_hs_table_url_context_configuration(request),
         },
     )
 
@@ -7073,6 +7135,29 @@ def api_task_queue_enqueue_firewall_rule_reorder_batch(
 
 
 @app.post(
+    "/api/task-queue/enqueue-nat-rule-reorder-batch",
+    name="api_task_queue_enqueue_nat_rule_reorder_batch",
+)
+def api_task_queue_enqueue_nat_rule_reorder_batch(
+    body: EnqueueFirewallRuleReorderBatchBody,
+    uid: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Reorder cached ``nat_rule`` entries for a single firewall by After Name."""
+    try:
+        tasks = enqueue_nat_rule_reorder_batch(
+            db,
+            firewall_id=int(body.firewall_id),
+            ordered_config_entry_ids=body.ordered_config_entry_ids,
+            created_by_user_id=uid,
+            created_by_username=users_service.username_for_user_id(uid),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "task_ids": [int(t.id) for t in tasks], "count": len(tasks)}
+
+
+@app.post(
     "/api/task-queue/enqueue-hs-creates-batch",
     name="api_task_queue_enqueue_hs_creates_batch",
 )
@@ -8196,6 +8281,22 @@ def api_firewalls_firewall_rules_table(
     """Cached firewall rules (sync ``firewall_rule`` from Inventory)."""
     ids = _parse_firewall_ids_query(firewall_ids)
     return build_firewall_rule_table_payload(db, ids)
+
+
+@app.get(
+    "/api/firewalls/protect/firewall/nat-rules-table",
+    name="api_firewalls_nat_rules_table",
+)
+def api_firewalls_nat_rules_table(
+    _: Annotated[str, Depends(current_user_id_dep)],
+    db: Annotated[Session, Depends(get_db)],
+    firewall_ids: Annotated[
+        str, Query(description="Comma-separated firewall IDs")
+    ] = "",
+):
+    """Cached NAT rules (sync ``nat_rule`` from Inventory)."""
+    ids = _parse_firewall_ids_query(firewall_ids)
+    return build_nat_rule_table_payload(db, ids)
 
 
 @app.get(

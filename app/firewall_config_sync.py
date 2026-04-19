@@ -64,6 +64,9 @@ ENTITY_USER_ACTIVITY = "useractivity"
 ENTITY_URL_GROUP = "url_group"
 ENTITY_FIREWALL_RULE = "firewall_rule"
 ENTITY_FIREWALL_RULE_GROUP = "rule_group"
+# NAT rules: ``Response/NATRule`` per xml-api-docs/Protect/Firewall/NatRule.md.
+# Identity is ``Name``; reorder semantics mirror firewall_rule (Position + After).
+ENTITY_NAT_RULE = "nat_rule"
 ENTITY_USER = "user"
 ENTITY_USER_GROUP = "user_group"
 ENTITY_ADMIN_PROFILE = "admin_profile"
@@ -105,7 +108,19 @@ def is_full_firewall_config_sync(
 
 @dataclass(frozen=True)
 class SyncEntitySpec:
-    """One syncable object type from sophosfirewall-python (XML list or singleton snapshot)."""
+    """One syncable object type from sophosfirewall-python (XML list or singleton snapshot).
+
+    ``ordered`` marks an entity whose on-device index is meaningful (e.g.
+    ``firewall_rule`` / ``nat_rule``).  Sophos returns these in the actual
+    evaluation order, but the response intentionally omits ``Position`` /
+    ``After`` (they are write-only directives).  When ``ordered=True`` the
+    sync writer injects ``@gc_sync_index`` (1-based) into each cached payload
+    so the table builder can present the rules in the firewall's order even
+    after a fresh sync overwrites the previous ``After`` chain.  The ``@``
+    prefix means existing send-time strip filters
+    (``_payload_dict_for_compare``, ``update_params``) drop it before any
+    XML reaches the firewall.
+    """
 
     id: str
     label: str
@@ -114,6 +129,14 @@ class SyncEntitySpec:
     name_keys: tuple[str, ...] = ("Name",)
     singleton: bool = False
     name_fn: Callable[[dict[str, Any]], str | None] | None = None
+    ordered: bool = False
+
+
+# Cached payload key carrying the 1-based on-device index for ordered entities.
+# Read by ``app.firewall_rule_table`` / ``app.nat_rule_table``; written by
+# :func:`_sync_entity_type` when ``spec.ordered`` is true.  Use the ``@`` prefix
+# so existing strip-on-send logic does not leak it back to the firewall.
+SYNC_INDEX_KEY = "@gc_sync_index"
 
 
 def _spec_get(method: str) -> SophosFetch:
@@ -380,7 +403,28 @@ _SYNC_ENTITY_SPECS: tuple[SyncEntitySpec, ...] = (
         (),
         singleton=True,
     ),
-    SyncEntitySpec(ENTITY_FIREWALL_RULE, "Firewall rules", "FirewallRule", _spec_get("get_rule")),
+    # Firewall rules — ``ordered=True`` so we cache the on-device index;
+    # the page's drag-to-reorder workflow relies on this to display the
+    # firewall's actual rule order rather than alphabetical-by-name.
+    SyncEntitySpec(
+        ENTITY_FIREWALL_RULE,
+        "Firewall rules",
+        "FirewallRule",
+        _spec_get("get_rule"),
+        ordered=True,
+    ),
+    # NAT rules — push/pull via the NATRule top-level XML element.  We use
+    # ``get_tag("NATRule")`` because sophosfirewall-python does not (yet) expose a
+    # bespoke ``get_nat_rule()`` helper across the firmware versions Ground
+    # Control supports.  Identity field is ``Name`` (default); ``ordered=True``
+    # for the same reason as firewall_rule above.
+    SyncEntitySpec(
+        ENTITY_NAT_RULE,
+        "NAT rules",
+        "NATRule",
+        _spec_tag("NATRule"),
+        ordered=True,
+    ),
     SyncEntitySpec(
         "fqdn_hostgroup",
         "FQDN host groups",
@@ -792,8 +836,13 @@ def _sync_entity_type(
     name_fn: Callable[[dict[str, Any]], str | None] | None,
     items: list[dict[str, Any]],
     counts: dict[str, int],
+    ordered: bool = False,
 ) -> None:
     seen: set[str] = set()
+    # 1-based index assigned only to the items we actually persist (i.e. items
+    # that survive the empty-name filter below).  This mirrors what the user
+    # sees in the firewall UI and is what drag-to-reorder targets.
+    next_sync_index = 1
     for item in items:
         if isinstance(item, dict):
             record_entity_payload_field_rows(db, entity_type, item)
@@ -809,6 +858,13 @@ def _sync_entity_type(
             else:
                 continue
         seen.add(name)
+        # For ordered entities (firewall_rule, nat_rule) capture the on-device
+        # index *after* ``record_entity_payload_field_rows`` has already
+        # cataloged the original Sophos shape — we don't want a synthetic
+        # field leaking into the entity-property registry.
+        if ordered and isinstance(item, dict):
+            item[SYNC_INDEX_KEY] = next_sync_index
+            next_sync_index += 1
         payload = _canonical_json(item)
         existing = (
             db.query(FirewallConfigEntry)
@@ -990,6 +1046,7 @@ def run_firewall_config_sync(
                 name_fn=spec.name_fn,
                 items=payloads[spec.id],
                 counts=counts,
+                ordered=spec.ordered,
             )
         if "country_group" in payloads:
             refresh_ref_countries_from_country_group_items(
