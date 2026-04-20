@@ -327,6 +327,7 @@
     document.getElementById("auth-overlay")?.classList.remove("auth-overlay--bootstrapping");
   }
 
+
   function revealAuthenticatedChrome() {
     const overlay = document.getElementById("auth-overlay");
     if (overlay) {
@@ -393,7 +394,10 @@
     if (lead) {
       lead.innerHTML = `This is your first sign-in. Set a password for the <strong>${escapeHtml(u)}</strong> administrator account. Minimum 10 characters. Afterwards you will sign in with that username and password. You can add more local accounts later in <strong>Settings</strong>.`;
     }
-    if (title) title.textContent = "Set administrator password";
+    if (title) {
+      title.textContent = "Set administrator password";
+      title.hidden = false;
+    }
     if (sub) {
       sub.textContent = "";
       sub.hidden = true;
@@ -424,7 +428,10 @@
     const setup = document.getElementById("auth-setup-block");
     const login = document.getElementById("auth-login-block");
     if (!overlay || !setup || !login) return;
-    if (title) title.textContent = "Sign in to Ground Control";
+    if (title) {
+      title.textContent = "Sign in";
+      title.hidden = false;
+    }
     if (sub) {
       sub.textContent = "Use your local account credentials.";
       sub.hidden = false;

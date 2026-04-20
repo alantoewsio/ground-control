@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="/static/favicon.ico" sizes="any" />
+    <link rel="icon" href="/static/sophos-icon-blue.ico" sizes="any" />
     <title>{% block title %}Ground Control{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css" />
     <link rel="stylesheet" href="/static/auth-ui.css" />
@@ -38,101 +38,118 @@
       {% if ac.authenticated %}hidden{% endif %}
       aria-hidden="{{ 'true' if ac.authenticated else 'false' }}"
     >
+      <div class="auth-overlay__chrome" role="presentation">
+        <div class="auth-overlay__chrome-brand">
+          <img
+            src="/static/sophos-icon-blue.ico"
+            alt=""
+            class="auth-overlay__chrome-icon"
+            aria-hidden="true"
+          />
+          <span class="auth-overlay__chrome-title">Sophos Ground Control</span>
+        </div>
+      </div>
       <div class="auth-overlay__stage">
-        <h2 class="auth-overlay__wordmark auth-overlay__wordmark--hero" id="auth-brand-wordmark">
-          GROUND CONTROL
+        <h2 class="auth-overlay__wordmark auth-overlay__wordmark--hero sr-only" id="auth-brand-wordmark">
+          Sophos Ground Control
         </h2>
         <div class="auth-overlay__split">
           <div class="auth-overlay__left">
             <div class="auth-overlay__intro-stack">
-            <div class="auth-overlay__card" role="dialog" aria-modal="true" aria-label="Authentication">
-            <h1 id="auth-overlay-title" class="auth-overlay__card-title" hidden></h1>
-            <p id="auth-overlay-subtitle" class="auth-overlay__card-sub muted" hidden></p>
-            <div
-              id="auth-loading-block"
-              class="auth-overlay__block auth-overlay__loading-block"
-              {% if ac.authenticated %}hidden{% endif %}
-            >
-              <p class="auth-overlay__lead muted auth-overlay__loading-text">Checking sign-in status…</p>
-            </div>
-            <div id="auth-setup-block" class="auth-overlay__block" hidden>
-              <p id="auth-setup-lead" class="auth-overlay__lead muted">
-                <!-- Filled by auth-app.js with admin username -->
-              </p>
-              <form id="auth-setup-form" class="auth-overlay__form" autocomplete="off">
-                <label class="settings-form__field">
-                  <span class="settings-form__label">New password</span>
-                  <input
-                    type="password"
-                    id="auth-setup-password"
-                    class="settings-form__input auth-overlay__input"
-                    required
-                    minlength="10"
-                    maxlength="256"
-                    autocomplete="new-password"
-                  />
-                </label>
-                <label class="settings-form__field">
-                  <span class="settings-form__label">Confirm password</span>
-                  <input
-                    type="password"
-                    id="auth-setup-password-confirm"
-                    class="settings-form__input auth-overlay__input"
-                    required
-                    minlength="10"
-                    maxlength="256"
-                    autocomplete="new-password"
-                  />
-                </label>
-                <p id="auth-setup-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
-                <button type="submit" class="btn btn--primary auth-overlay__submit">Save and continue</button>
-              </form>
-            </div>
-            <div id="auth-login-block" class="auth-overlay__block" hidden>
-              <form id="auth-login-form" class="auth-overlay__form" autocomplete="on">
-                <label class="settings-form__field">
-                  <span class="settings-form__label">Username</span>
-                  <span class="auth-overlay__input-wrap">
-                    <input
-                      type="text"
-                      id="auth-login-username"
-                      class="settings-form__input auth-overlay__input"
-                      required
-                      maxlength="200"
-                      name="username"
-                      autocomplete="username"
-                    />
-                    <span class="auth-overlay__input-icon" aria-hidden="true">
-                      <span class="gc-icon gc-icon--sm">person</span>
-                    </span>
-                  </span>
-                </label>
-                <label class="settings-form__field">
-                  <span class="settings-form__label">Password</span>
-                  <span class="auth-overlay__input-wrap">
-                    <input
-                      type="password"
-                      id="auth-login-password"
-                      class="settings-form__input auth-overlay__input"
-                      required
-                      maxlength="512"
-                      name="password"
-                      autocomplete="current-password"
-                    />
-                    <span class="auth-overlay__input-icon" aria-hidden="true">
-                      <span class="gc-icon gc-icon--sm">lock</span>
-                    </span>
-                  </span>
-                </label>
-                <p id="auth-login-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
-                <button type="submit" class="btn btn--primary auth-overlay__submit">Login</button>
-              </form>
-            </div>
-            </div>
+              <div class="auth-overlay__card" role="dialog" aria-modal="true" aria-label="Authentication">
+                <img
+                  src="/static/sophos-logo-1.png"
+                  alt="Sophos"
+                  class="auth-overlay__brand-logo"
+                />
+                <h1 id="auth-overlay-title" class="auth-overlay__card-title">Sophos Ground Control</h1>
+                <p id="auth-overlay-subtitle" class="auth-overlay__card-sub muted" hidden></p>
+
+                <div
+                  id="auth-loading-block"
+                  class="auth-overlay__block auth-overlay__loading-block"
+                  {% if ac.authenticated %}hidden{% endif %}
+                >
+                  <p class="auth-overlay__lead muted auth-overlay__loading-text">Checking sign-in status…</p>
+                </div>
+                <div id="auth-setup-block" class="auth-overlay__block" hidden>
+                  <p id="auth-setup-lead" class="auth-overlay__lead muted">
+                    <!-- Filled by auth-app.js with admin username -->
+                  </p>
+                  <form id="auth-setup-form" class="auth-overlay__form" autocomplete="off">
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">New password</span>
+                      <input
+                        type="password"
+                        id="auth-setup-password"
+                        class="settings-form__input auth-overlay__input"
+                        required
+                        minlength="10"
+                        maxlength="256"
+                        autocomplete="new-password"
+                      />
+                    </label>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">Confirm password</span>
+                      <input
+                        type="password"
+                        id="auth-setup-password-confirm"
+                        class="settings-form__input auth-overlay__input"
+                        required
+                        minlength="10"
+                        maxlength="256"
+                        autocomplete="new-password"
+                      />
+                    </label>
+                    <p id="auth-setup-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+                    <button type="submit" class="btn btn--primary auth-overlay__submit">Save and continue</button>
+                  </form>
+                </div>
+                <div id="auth-login-block" class="auth-overlay__block" hidden>
+                  <form id="auth-login-form" class="auth-overlay__form" autocomplete="on">
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">Username</span>
+                      <span class="auth-overlay__input-wrap">
+                        <input
+                          type="text"
+                          id="auth-login-username"
+                          class="settings-form__input auth-overlay__input"
+                          required
+                          maxlength="200"
+                          name="username"
+                          autocomplete="username"
+                        />
+                        <span class="auth-overlay__input-icon" aria-hidden="true">
+                          <span class="gc-icon gc-icon--sm">person</span>
+                        </span>
+                      </span>
+                    </label>
+                    <label class="settings-form__field">
+                      <span class="settings-form__label">Password</span>
+                      <span class="auth-overlay__input-wrap">
+                        <input
+                          type="password"
+                          id="auth-login-password"
+                          class="settings-form__input auth-overlay__input"
+                          required
+                          maxlength="512"
+                          name="password"
+                          autocomplete="current-password"
+                        />
+                        <span class="auth-overlay__input-icon" aria-hidden="true">
+                          <span class="gc-icon gc-icon--sm">lock</span>
+                        </span>
+                      </span>
+                    </label>
+                    <p id="auth-login-status" class="settings-form__status muted" role="status" aria-live="polite"></p>
+                    <button type="submit" class="btn btn--primary auth-overlay__submit">Login</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
           <div class="auth-overlay__visual" aria-hidden="true">
-            <img src="/static/Design.png" alt="" class="auth-overlay__visual-image" />
+            <img src="/static/login-image.avif" alt="" class="auth-overlay__visual-image" />
           </div>
         </div>
       </div>
