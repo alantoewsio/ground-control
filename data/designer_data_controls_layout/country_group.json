@@ -1,0 +1,93 @@
+{
+  "node_positions": {
+    "field:220": {
+      "x": 0.0,
+      "y": 160.0
+    },
+    "field:221": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "field:623": {
+      "x": 0.0,
+      "y": 320.0
+    },
+    "field:218": {
+      "x": 0.0,
+      "y": 640.0
+    },
+    "ctrl:220": {
+      "x": 10.0,
+      "y": 280.0
+    },
+    "ctrl:221": {
+      "x": 10.0,
+      "y": 0.0
+    },
+    "ctrl:219": {
+      "x": 10.0,
+      "y": 560.0
+    },
+    "field:219": {
+      "x": 0.0,
+      "y": 480.0
+    },
+    "ctrl:623": {
+      "x": 10.0,
+      "y": 560.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:220",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:220",
+      "target_handle": "value",
+      "edge_id": "gc_mo1fv27w_hmmpee25cp"
+    },
+    {
+      "source_node_id": "ctrl:220",
+      "source_handle": "value",
+      "target_node_id": "field:220",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo1fv27w_ir1p9at6md"
+    },
+    {
+      "source_node_id": "field:221",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:221",
+      "target_handle": "value",
+      "edge_id": "gc_mo1fv27w_lkwwq50kct"
+    },
+    {
+      "source_node_id": "ctrl:221",
+      "source_handle": "value",
+      "target_node_id": "field:221",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo1fv27w_3s0n8a5gpo"
+    },
+    {
+      "source_node_id": "field:623",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:623",
+      "target_handle": "selected",
+      "edge_id": "gc_mo1icw9o_codfhe35hc"
+    },
+    {
+      "source_node_id": "ctrl:623",
+      "source_handle": "selected",
+      "target_node_id": "field:623",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo1icw9o_7zv70xq295"
+    }
+  ],
+  "logic_nodes": [],
+  "control_add_only": {},
+  "member_lookup_data_source": {
+    "ctrl:623": "ref_countries"
+  },
+  "member_lookup_multi": {
+    "ctrl:623": true
+  },
+  "layout_locked": true
+}

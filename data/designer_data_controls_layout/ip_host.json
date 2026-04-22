@@ -1,0 +1,331 @@
+{
+  "node_positions": {
+    "field:118": {
+      "x": 12.0,
+      "y": 115.0
+    },
+    "field:120": {
+      "x": 13.0,
+      "y": 217.0
+    },
+    "field:119": {
+      "x": 14.0,
+      "y": 323.0
+    },
+    "field:122": {
+      "x": 20.0,
+      "y": 428.0
+    },
+    "field:123": {
+      "x": 24.0,
+      "y": 533.0
+    },
+    "field:206": {
+      "x": 30.0,
+      "y": 642.0
+    },
+    "field:205": {
+      "x": 26.0,
+      "y": 753.0
+    },
+    "field:505": {
+      "x": 26.0,
+      "y": 963.0
+    },
+    "field:897": {
+      "x": 27.0,
+      "y": 856.0
+    },
+    "field:117": {
+      "x": 1.0,
+      "y": 1095.0
+    },
+    "field:124": {
+      "x": -15.0,
+      "y": 1083.0
+    },
+    "ctrl:118": {
+      "x": 2.0,
+      "y": 280.0
+    },
+    "ctrl:120": {
+      "x": 17.0,
+      "y": 560.0
+    },
+    "ctrl:119": {
+      "x": 20.0,
+      "y": 840.0
+    },
+    "ctrl:122": {
+      "x": 333.0,
+      "y": 1120.0
+    },
+    "ctrl:206": {
+      "x": 391.0,
+      "y": 1400.0
+    },
+    "ctrl:205": {
+      "x": 389.0,
+      "y": 1680.0
+    },
+    "ctrl:505": {
+      "x": 13.0,
+      "y": 2240.0
+    },
+    "ctrl:897": {
+      "x": 388.0,
+      "y": 1960.0
+    },
+    "logic:or_1": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "ctrl:121": {
+      "x": 11.0,
+      "y": 0.0
+    },
+    "field:121": {
+      "x": 12.0,
+      "y": 13.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:121",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:121",
+      "target_handle": "value",
+      "edge_id": "gc_mo08k5tx_nlfjavthtp"
+    },
+    {
+      "source_node_id": "ctrl:121",
+      "source_handle": "value",
+      "target_node_id": "field:121",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_j306r201gb"
+    },
+    {
+      "source_node_id": "field:118",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:118",
+      "target_handle": "value",
+      "edge_id": "gc_mo08k5tx_y1c7b7plj3"
+    },
+    {
+      "source_node_id": "ctrl:118",
+      "source_handle": "value",
+      "target_node_id": "field:118",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_0wd919kvp5"
+    },
+    {
+      "source_node_id": "field:120",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:120",
+      "target_handle": "selected",
+      "edge_id": "gc_mo08k5tx_v9bkyc5mi5"
+    },
+    {
+      "source_node_id": "ctrl:120",
+      "source_handle": "selected",
+      "target_node_id": "field:120",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_d5yvpe4ooy"
+    },
+    {
+      "source_node_id": "field:119",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:119",
+      "target_handle": "selected",
+      "edge_id": "gc_mo08k5tx_aupnnglpw6"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "selected",
+      "target_node_id": "field:119",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_994iddpwpb"
+    },
+    {
+      "source_node_id": "field:122",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:122",
+      "target_handle": "address",
+      "edge_id": "gc_mo08k5tx_x4yycbv7eu"
+    },
+    {
+      "source_node_id": "ctrl:122",
+      "source_handle": "ip_address",
+      "target_node_id": "field:122",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_g5xizh3rsd"
+    },
+    {
+      "source_node_id": "field:206",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:206",
+      "target_handle": "address",
+      "edge_id": "gc_mo08k5tx_6wr5quuuoh"
+    },
+    {
+      "source_node_id": "ctrl:206",
+      "source_handle": "ip_address",
+      "target_node_id": "field:206",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_hbfvqz5qge"
+    },
+    {
+      "source_node_id": "field:205",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:205",
+      "target_handle": "address",
+      "edge_id": "gc_mo08k5tx_udeeqrbgul"
+    },
+    {
+      "source_node_id": "ctrl:205",
+      "source_handle": "ip_address",
+      "target_node_id": "field:205",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_lnecf5s3xm"
+    },
+    {
+      "source_node_id": "field:897",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:897",
+      "target_handle": "ip_list",
+      "edge_id": "gc_mo08k5tx_n40ndzvts1"
+    },
+    {
+      "source_node_id": "ctrl:897",
+      "source_handle": "ip_list",
+      "target_node_id": "field:897",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_4n3lbljdbd"
+    },
+    {
+      "source_node_id": "field:505",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:505",
+      "target_handle": "selected",
+      "edge_id": "gc_mo08k5tx_9bvnda4265"
+    },
+    {
+      "source_node_id": "ctrl:505",
+      "source_handle": "selected",
+      "target_node_id": "field:505",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_21dw988mpw"
+    },
+    {
+      "source_node_id": "ctrl:120",
+      "source_handle": "selected",
+      "target_node_id": "ctrl:205",
+      "target_handle": "ipfamily",
+      "edge_id": "gc_mo08k5tx_j8ukpl73f4"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "option_ip",
+      "target_node_id": "logic:or_1",
+      "target_handle": "input_a",
+      "edge_id": "gc_mo08k5tx_lu3g8ftz1v"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "option_network",
+      "target_node_id": "logic:or_1",
+      "target_handle": "input_b",
+      "edge_id": "gc_mo08k5tx_0nol797e96"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "option_iprange",
+      "target_node_id": "ctrl:205",
+      "target_handle": "visible",
+      "edge_id": "gc_mo08k5tx_jugvqeptd2"
+    },
+    {
+      "source_node_id": "logic:or_1",
+      "source_handle": "gate",
+      "target_node_id": "ctrl:122",
+      "target_handle": "visible",
+      "edge_id": "gc_mo08k5tx_sujrfi3ail"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "option_iplist",
+      "target_node_id": "ctrl:897",
+      "target_handle": "visible",
+      "edge_id": "gc_mo08k5tx_u1e80ymt2h"
+    },
+    {
+      "source_node_id": "field:123",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:122",
+      "target_handle": "subnet",
+      "edge_id": "gc_mo08k5tx_z2xrhf378v"
+    },
+    {
+      "source_node_id": "ctrl:122",
+      "source_handle": "subnet",
+      "target_node_id": "field:123",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08k5tx_70l2zwuk39"
+    },
+    {
+      "source_node_id": "field:120",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:122",
+      "target_handle": "ipfamily",
+      "edge_id": "gc_mo08k5tx_3v4q3n394k"
+    },
+    {
+      "source_node_id": "field:120",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:206",
+      "target_handle": "ipfamily",
+      "edge_id": "gc_mo08k5tx_fkljqkguhk"
+    },
+    {
+      "source_node_id": "field:120",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:897",
+      "target_handle": "ipfamily",
+      "edge_id": "gc_mo08k5tx_yo83oqp2t8"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "selected",
+      "target_node_id": "ctrl:122",
+      "target_handle": "constraint",
+      "edge_id": "gc_mo08k5tx_7m05nqoinz"
+    },
+    {
+      "source_node_id": "ctrl:119",
+      "source_handle": "option_iprange",
+      "target_node_id": "ctrl:206",
+      "target_handle": "visible",
+      "edge_id": "gc_mo08k5tx_n087tmf84e"
+    }
+  ],
+  "logic_nodes": [
+    {
+      "id": "logic:or_1",
+      "kind": "gate",
+      "op": "or",
+      "true_value": "",
+      "false_value": ""
+    }
+  ],
+  "control_add_only": {
+    "ctrl:119": true,
+    "ctrl:120": true
+  },
+  "member_lookup_data_source": {
+    "ctrl:505": "ip_hostgroup"
+  },
+  "member_lookup_multi": {
+    "ctrl:505": true
+  },
+  "layout_locked": true
+}

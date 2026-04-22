@@ -1,13 +1,13 @@
 {% extends "firewalls_v2_base.html" %}
 {% set _gc_ver = app_about.app_version if app_about is defined else "0.3.3" %}
 {% block title %}{{ fw_v2_page.label }}{% if fw_v2_active_tab %} · {{ fw_v2_active_tab.label }}{% endif %} · {{
-fw_v2_section.label }} · Firewalls v2 · Ground Control{% endblock %}
+fw_v2_section.label }} · Firewalls · Ground Control{% endblock %}
 {% block page_title %}{{ fw_v2_page.label }}{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol class="breadcrumbs__list">
     <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
-    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls-v2">Firewalls v2</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/firewalls-v2">Firewalls</a></li>
     <li class="breadcrumbs__item"><span class="breadcrumbs__link">{{ fw_v2_section.label }}</span></li>
     <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">{{ fw_v2_page.label }}</li>
   </ol>

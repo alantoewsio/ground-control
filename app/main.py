@@ -116,6 +116,7 @@ from app.auth import (
     require_admin_user_id,
     require_authenticated_user_id,
     require_browser_json_session,
+    may_assign_app_user_role,
     user_role_can_use_designer,
     user_role_is_admin,
     session_idle_timeout_seconds,
@@ -1948,9 +1949,17 @@ def api_settings_users_list(
 @app.post("/api/settings/users")
 def api_settings_users_create(
     body: CreateAppUserBody,
-    _: Annotated[str, Depends(admin_user_id_dep)],
+    actor_id: Annotated[str, Depends(admin_user_id_dep)],
     db: Annotated[Session, Depends(get_secrets_db)],
 ):
+    actor = db.get(AppUser, actor_id)
+    if not actor:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    if not may_assign_app_user_role(actor.role, body.role):
+        raise HTTPException(
+            status_code=403,
+            detail="Only SuperAdmin users can assign the SuperAdmin or Designer role.",
+        )
     validate_new_password(body.password)
     uname = body.username.strip()
     if users_service.get_app_user_by_username_db(db, uname):
@@ -1971,7 +1980,7 @@ def api_settings_users_create(
 def api_settings_users_patch(
     user_id: str,
     body: PatchAppUserBody,
-    _: Annotated[str, Depends(admin_user_id_dep)],
+    actor_id: Annotated[str, Depends(admin_user_id_dep)],
     db: Annotated[Session, Depends(get_secrets_db)],
 ):
     profile_updates = _app_user_profile_updates_from_body(body)
@@ -1994,6 +2003,14 @@ def api_settings_users_patch(
         if not row:
             raise HTTPException(status_code=404, detail="User not found.")
     if body.role is not None and body.role != row.role:
+        actor = db.get(AppUser, actor_id)
+        if not actor:
+            raise HTTPException(status_code=401, detail="Not authenticated.")
+        if not may_assign_app_user_role(actor.role, body.role):
+            raise HTTPException(
+                status_code=403,
+                detail="Only SuperAdmin users can assign the SuperAdmin or Designer role.",
+            )
         if (
             user_role_is_admin(row.role)
             and not user_role_is_admin(body.role)
@@ -3802,7 +3819,7 @@ def firewalls_v2_inventory_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
-    _: Annotated[str, Depends(designer_user_id_dep)],
+    _: Annotated[str, Depends(current_user_id_dep)],
     tab: str = "",
 ):
     return templates.TemplateResponse(
@@ -3816,7 +3833,7 @@ def firewalls_v2_inventory_page(
             top_nav_active="firewalls_v2",
             firewalls_layout_base="firewalls_v2_base.html",
             fw_parent_href="/firewalls-v2",
-            fw_parent_label="Firewalls v2",
+            fw_parent_label="Firewalls",
             **_firewalls_v2_shell_context("inventory"),
         ),
     )
@@ -3831,7 +3848,7 @@ def firewalls_v2_object_page(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     sdb: Annotated[Session, Depends(get_secrets_db)],
-    _: Annotated[str, Depends(designer_user_id_dep)],
+    _: Annotated[str, Depends(current_user_id_dep)],
     section_slug: str,
     page_slug: str,
     tab: str | None = Query(None),
@@ -3882,11 +3899,7 @@ def firewalls_v2_object_page(
     ac_fw_v2 = auth_client_state(request, sdb)
     u_fw_v2 = ac_fw_v2.get("user") or {}
     role_fw_v2_cf = str(u_fw_v2.get("role") or "").strip().casefold()
-    can_edit_dc_layout_lock = role_fw_v2_cf in {
-        "designer",
-        "superadmin",
-        "super admin",
-    }
+    can_edit_dc_layout_lock = role_fw_v2_cf == "designer"
     firewalls = db.query(Firewall).order_by(Firewall.id.desc()).all()
     nav_fw_sorted = sorted(
         firewalls,

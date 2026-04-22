@@ -3,9 +3,8 @@
 <div class="gc-fw-v2-object-table-shell gc-designer" data-gc-fw-v2-object-table="1">
   <section class="gc-network-panel gc-designer__section" aria-labelledby="gc-fw-v2-obj-preview-h">
     <h2 id="gc-fw-v2-obj-preview-h" class="gc-designer__h2 gc-sr-only">Preview</h2>
-    {# Design mode + data-table pencil: Designer and SuperAdmin (incl. legacy "Super Admin"). #}
-    {% set _r = (auth_client_state.user.role | default("") | trim | lower) %}
-    {% if _r in ["designer", "superadmin", "super admin"] %}
+    {# Design mode + table-properties pencil: Designer role only (matches GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK). #}
+    {% if fw_v2_can_edit_data_controls_layout_lock | default(false) %}
     <span id="gc-fw-v2-obj-design-mode-marker" hidden data-gc-designer-design-mode-eligible="1"></span>
     {% endif %}
     <div class="gc-designer-data-table" data-gc-designer-control-id="data-table">

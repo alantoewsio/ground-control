@@ -1,0 +1,109 @@
+{
+  "node_positions": {
+    "field:113": {
+      "x": 28.0,
+      "y": 136.0
+    },
+    "field:115": {
+      "x": 28.0,
+      "y": 248.0
+    },
+    "field:114": {
+      "x": 28.0,
+      "y": 360.0
+    },
+    "field:112": {
+      "x": 28.0,
+      "y": 472.0
+    },
+    "field:504": {
+      "x": 28.0,
+      "y": 584.0
+    },
+    "field:109": {
+      "x": 28.0,
+      "y": 136.0
+    },
+    "field:108": {
+      "x": 28.0,
+      "y": 248.0
+    },
+    "field:110": {
+      "x": 28.0,
+      "y": 360.0
+    },
+    "field:503": {
+      "x": 28.0,
+      "y": 472.0
+    },
+    "field:107": {
+      "x": 28.0,
+      "y": 584.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:111",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:111",
+      "target_handle": "value",
+      "edge_id": "gc_mo08na79_cl4aq0uv1p"
+    },
+    {
+      "source_node_id": "ctrl:111",
+      "source_handle": "value",
+      "target_node_id": "field:111",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08na79_8cl52o4iha"
+    },
+    {
+      "source_node_id": "field:109",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:109",
+      "target_handle": "value",
+      "edge_id": "gc_mo08na79_k29fwr56se"
+    },
+    {
+      "source_node_id": "ctrl:109",
+      "source_handle": "value",
+      "target_node_id": "field:109",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08na79_w3t4cb7u9q"
+    },
+    {
+      "source_node_id": "field:108",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:108",
+      "target_handle": "value",
+      "edge_id": "gc_mo08na79_bayva4zttf"
+    },
+    {
+      "source_node_id": "ctrl:108",
+      "source_handle": "value",
+      "target_node_id": "field:108",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08na79_bbbykxbjfm"
+    },
+    {
+      "source_node_id": "field:110",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:110",
+      "target_handle": "selected",
+      "edge_id": "gc_mo08nplp_kc6ant3ox2"
+    },
+    {
+      "source_node_id": "ctrl:110",
+      "source_handle": "selected",
+      "target_node_id": "field:110",
+      "target_handle": "save_value",
+      "edge_id": "gc_mo08nplp_uprd8llkaq"
+    }
+  ],
+  "logic_nodes": [],
+  "control_add_only": {},
+  "member_lookup_data_source": {
+    "ctrl:110": "fqdn_host"
+  },
+  "member_lookup_multi": {},
+  "layout_locked": true
+}

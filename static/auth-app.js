@@ -290,21 +290,43 @@
     return found ? found.label : role ? String(role) : "—";
   }
 
-  function appRoleOptionsHtml(selectedRole) {
+  function appRoleChoicesForSettings(selectedRole, actorRole) {
+    const restrict = normalizeAppRole(actorRole) === "admin";
+    let choices = restrict
+      ? APP_ROLES.filter((r) => r.value !== "SuperAdmin" && r.value !== "Designer")
+      : APP_ROLES.slice();
+    const selNorm = normalizeAppRole(selectedRole);
+    if (
+      restrict &&
+      (selNorm === "SuperAdmin" || selNorm === "Designer") &&
+      !choices.some((r) => r.value === selNorm)
+    ) {
+      const extra = APP_ROLES.find((r) => normalizeAppRole(r.value) === selNorm);
+      if (extra) choices = [extra, ...choices];
+    }
+    return choices;
+  }
+
+  function appRoleOptionsHtml(selectedRole, actorRole) {
+    const choices = appRoleChoicesForSettings(selectedRole, actorRole);
     const selected = normalizeAppRole(selectedRole);
-    return APP_ROLES.map((role) => {
-      const sel = role.value === selected ? " selected" : "";
-      return `<option value="${escapeHtml(role.value)}"${sel}>${escapeHtml(role.label)}</option>`;
-    }).join("");
+    return choices
+      .map((role) => {
+        const sel = role.value === selected ? " selected" : "";
+        return `<option value="${escapeHtml(role.value)}"${sel}>${escapeHtml(role.label)}</option>`;
+      })
+      .join("");
   }
 
   function applyDesignerNavForRole() {
-    const show = isDesignerRole(currentSessionUser?.role);
-    document
-      .querySelectorAll('[data-top-nav="designer"], [data-top-nav="firewalls-v2"]')
-      .forEach((el) => {
-        el.hidden = !show;
-      });
+    const authed = !!currentSessionUser;
+    const showDesignerLink = isDesignerRole(currentSessionUser?.role);
+    document.querySelectorAll('[data-top-nav="firewalls-v2"]').forEach((el) => {
+      el.hidden = !authed;
+    });
+    document.querySelectorAll('[data-top-nav="designer"]').forEach((el) => {
+      el.hidden = !showDesignerLink;
+    });
   }
 
   function applySessionUserToChrome() {
@@ -743,6 +765,10 @@
     const d = document.getElementById("user-form-dialog");
     if (!d) return;
     document.getElementById("user-form")?.reset();
+    const roleSel = document.getElementById("user-form-role");
+    if (roleSel) {
+      roleSel.innerHTML = appRoleOptionsHtml("ReadOnly", currentSessionUser?.role);
+    }
     const st = document.getElementById("user-form-status");
     if (st) {
       st.textContent = "";
@@ -3231,7 +3257,7 @@
     document.getElementById("user-edit-profile-mobile").value = row.mobile != null ? String(row.mobile) : "";
     const roleSel = document.getElementById("user-edit-profile-role");
     if (roleSel) {
-      roleSel.innerHTML = appRoleOptionsHtml(row.role);
+      roleSel.innerHTML = appRoleOptionsHtml(row.role, currentSessionUser?.role);
       roleSel.dataset.previousRole = normalizeAppRole(row.role);
     }
     const st = document.getElementById("user-edit-profile-status");

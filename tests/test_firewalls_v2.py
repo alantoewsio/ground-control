@@ -1,9 +1,9 @@
-"""Firewalls v2 shell (Designer / SuperAdmin) and object navigator pages."""
+"""Firewalls (/firewalls-v2) shell and object navigator pages (all signed-in roles; designer-only table chrome)."""
 
 import pytest
 
 
-def test_firewalls_v2_inventory_forbidden_for_non_designer(authed_client, secrets_session) -> None:
+def test_firewalls_v2_inventory_ok_for_admin(authed_client, secrets_session) -> None:
     from app.secrets_models import DEFAULT_ADMIN_USERNAME, AppUser
 
     row = secrets_session.query(AppUser).filter_by(username=DEFAULT_ADMIN_USERNAME).one()
@@ -14,20 +14,24 @@ def test_firewalls_v2_inventory_forbidden_for_non_designer(authed_client, secret
         follow_redirects=False,
         headers={"x-gc-navigation-preflight": "1"},
     )
-    assert r.status_code == 403
+    assert r.status_code == 200
+    assert b">Firewalls</a>" in r.content
+    assert b"Firewalls (old)</a>" in r.content
 
 
 def test_firewalls_v2_inventory_ok_for_designer(designer_client) -> None:
     r = designer_client.get("/firewalls-v2", follow_redirects=False)
     assert r.status_code == 200
-    assert b"Firewalls v2" in r.content
+    assert b">Firewalls</a>" in r.content
+    assert b"Firewalls (old)</a>" in r.content
     assert b"gc-fw-inv-main-tablist" in r.content
 
 
 def test_firewalls_v2_inventory_ok_for_superadmin(superadmin_client) -> None:
     r = superadmin_client.get("/firewalls-v2", follow_redirects=False)
     assert r.status_code == 200
-    assert b"Firewalls v2" in r.content
+    assert b">Firewalls</a>" in r.content
+    assert b"Firewalls (old)</a>" in r.content
 
 
 def test_firewalls_v2_object_page_ok(designer_client) -> None:
@@ -51,7 +55,8 @@ def test_firewalls_v2_object_page_ok(designer_client) -> None:
     assert b"GC_ENTITY_TYPE_NAV_ICONS" in r.content
     assert b"gc-designer-object-edit-catalog.js" in r.content
     assert b"gc-data-controls-object-edit-layout.js" in r.content
-    assert b"GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK" in r.content
+    assert b"GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK = true" in r.content
+    assert b"gc-fw-v2-obj-design-mode-marker" in r.content
     assert b"gcHsEnqueueDeletesBatchUrl" in r.content
     assert b"gc-designer-object-edit-delete-wrap" in r.content
 
@@ -91,6 +96,15 @@ def test_firewalls_v2_object_page_ok_for_superadmin(superadmin_client) -> None:
     r = superadmin_client.get("/firewalls-v2/o/protect/firewall", follow_redirects=False)
     assert r.status_code == 200
     assert b"gc-fw-v2-object-data-table.js" in r.content
+    assert b"GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK = false" in r.content
+    assert b"gc-fw-v2-obj-design-mode-marker" not in r.content
+
+
+def test_firewalls_v2_object_page_admin_hides_designer_chrome(authed_client) -> None:
+    r = authed_client.get("/firewalls-v2/o/protect/firewall", follow_redirects=False)
+    assert r.status_code == 200
+    assert b"GC_CAN_EDIT_DATA_CONTROLS_LAYOUT_LOCK = false" in r.content
+    assert b"gc-fw-v2-obj-design-mode-marker" not in r.content
 
 
 def test_firewalls_v2_allows_legacy_super_admin_spaced_role(secrets_session, client) -> None:

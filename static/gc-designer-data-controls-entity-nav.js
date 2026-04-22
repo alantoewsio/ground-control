@@ -1707,7 +1707,7 @@
       toggleInput.setAttribute("data-page-key", row.key);
       toggleInput.setAttribute(
         "aria-label",
-        "Hide " + row.nav_section + " · " + row.nav_page + " from Firewalls v2 left navigation",
+        "Hide " + row.nav_section + " · " + row.nav_page + " from Firewalls left navigation",
       );
       var track = document.createElement("span");
       track.className = "gc-toolbar-combine__track";

@@ -244,8 +244,11 @@ def test_api_designer_data_controls_layout_roundtrip(
 ):
     from app import designer_data_controls_layout as layout_store
 
-    p = tmp_path / "dc_layout.json"
-    monkeypatch.setattr(layout_store, "layout_file_path", lambda: p)
+    d = tmp_path / "dc_layout_dir"
+    monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
+    monkeypatch.setattr(
+        layout_store, "layout_file_path", lambda: tmp_path / "dc_layout_legacy.json"
+    )
     et = "zone"
     r0 = designer_client.get(f"/api/designer/data-controls-layout/{et}")
     assert r0.status_code == 200, r0.text
@@ -321,8 +324,11 @@ def test_api_designer_data_controls_layout_keeps_distinct_edges_same_tuple(
     """Multiple wires with the same endpoints must not collapse when edge_id differs."""
     from app import designer_data_controls_layout as layout_store
 
-    p = tmp_path / "dc_layout_dup_edges.json"
-    monkeypatch.setattr(layout_store, "layout_file_path", lambda: p)
+    d = tmp_path / "dc_layout_dup_edges_dir"
+    monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
+    monkeypatch.setattr(
+        layout_store, "layout_file_path", lambda: tmp_path / "dc_layout_dup_legacy.json"
+    )
     et = "zone"
     payload = {
         "layout": {
@@ -368,8 +374,11 @@ def test_api_designer_data_controls_layout_locked_put_blocked_and_patch_unlock(
 ):
     from app import designer_data_controls_layout as layout_store
 
-    p = tmp_path / "dc_layout_lock.json"
-    monkeypatch.setattr(layout_store, "layout_file_path", lambda: p)
+    d = tmp_path / "dc_layout_lock_dir"
+    monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
+    monkeypatch.setattr(
+        layout_store, "layout_file_path", lambda: tmp_path / "dc_layout_lock_legacy.json"
+    )
     et = "svcgrp"
     r_put0 = designer_client.put(
         f"/api/designer/data-controls-layout/{et}",
@@ -398,6 +407,39 @@ def test_api_designer_data_controls_layout_locked_put_blocked_and_patch_unlock(
     )
     assert r_put2.status_code == 200
     assert r_put2.json()["layout"]["node_positions"]["field:1"]["x"] == 9
+
+
+def test_import_legacy_monolith_overwrites_existing_per_entity_layout(monkeypatch, tmp_path):
+    """``import_legacy_monolith_to_per_entity_layout_files`` must replace files for keys in the monolith."""
+    from app import designer_data_controls_layout as layout_store
+
+    out_dir = tmp_path / "layout_out"
+    legacy = tmp_path / "monolith.json"
+    monkeypatch.setattr(layout_store, "layout_dir", lambda: out_dir)
+    monkeypatch.setattr(layout_store, "layout_file_path", lambda: legacy)
+    out_dir.mkdir()
+    stale = layout_store.normalize_layout(
+        {"node_positions": {"field:1": {"x": 1, "y": 2}}, "connections": []}
+    )
+    (out_dir / "zone.json").write_text(json.dumps(stale) + "\n", encoding="utf-8")
+    monolith = {
+        "version": 1,
+        "entity_types": {
+            "zone": {
+                "node_positions": {"field:99": {"x": 9, "y": 9}},
+                "connections": [],
+            }
+        },
+    }
+    legacy.write_text(json.dumps(monolith), encoding="utf-8")
+    r = layout_store.import_legacy_monolith_to_per_entity_layout_files(
+        legacy, delete_legacy=True
+    )
+    assert r.get("ok") is True
+    assert "zone" in r["written"]
+    z = json.loads((out_dir / "zone.json").read_text(encoding="utf-8"))
+    assert z["node_positions"]["field:99"]["x"] == 9
+    assert "field:1" not in z.get("node_positions", {})
 
 
 def test_api_designer_entity_payload_fields_generate_missing_infers_unset_existing(

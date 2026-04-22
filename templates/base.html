@@ -168,17 +168,17 @@
               >Dashboard</a>
               {% set gc_role_key = ((gc_u.role if gc_u else '') | trim | lower) %}
               {% set gc_designer_like_nav = gc_role_key in ['designer', 'superadmin', 'super admin'] %}
-              {% if gc_designer_like_nav %}
+              {% if ac.authenticated %}
               <a
                 href="/firewalls-v2"
                 data-top-nav="firewalls-v2"
                 class="top-bar__nav-link{% if top_nav_active == 'firewalls_v2' %} is-active{% endif %}"
-              >Firewalls v2</a>
+              >Firewalls</a>
               {% endif %}
               <a
                 href="/firewalls"
                 class="top-bar__nav-link{% if top_nav_active == 'firewalls' %} is-active{% endif %}"
-              >Firewalls</a>
+              >Firewalls (old)</a>
               <a
                 href="/address-management"
                 class="top-bar__nav-link{% if top_nav_active == 'address_management' %} is-active{% endif %}"
@@ -384,7 +384,7 @@
         {% set show_app_sidebar = show_firewalls_sidebar or show_firewalls_v2_sidebar or show_configurations_sidebar or show_address_management_sidebar or show_designer_sidebar %}
         <aside
           class="app-sidebar{% if not show_app_sidebar %} app-sidebar--hidden{% endif %}"
-          aria-label="{% if show_firewalls_sidebar %}Firewalls navigation{% elif show_firewalls_v2_sidebar %}Firewalls v2 navigation{% elif show_configurations_sidebar %}Configuration navigation{% elif show_address_management_sidebar %}Address Management navigation{% elif show_designer_sidebar %}Designer navigation{% else %}Main navigation{% endif %}"
+          aria-label="{% if show_firewalls_sidebar %}Firewalls (old) navigation{% elif show_firewalls_v2_sidebar %}Firewalls navigation{% elif show_configurations_sidebar %}Configuration navigation{% elif show_address_management_sidebar %}Address Management navigation{% elif show_designer_sidebar %}Designer navigation{% else %}Main navigation{% endif %}"
         >
           {% block app_sidebar %}{% endblock %}
         </aside>
@@ -1626,12 +1626,13 @@
           </label>
           <label class="settings-form__field">
             <span class="settings-form__label">Role</span>
-            <select id="user-form-role" class="settings-form__input" name="role" required>
-              <option value="admin">Admin</option>
-              <option value="SuperAdmin">SuperAdmin</option>
-              <option value="ReadOnly" selected>ReadOnly</option>
-              <option value="Designer">Designer</option>
-            </select>
+            <select
+              id="user-form-role"
+              class="settings-form__input"
+              name="role"
+              required
+              aria-label="User role"
+            ></select>
           </label>
           <label class="settings-form__field">
             <span class="settings-form__label">Password</span>

@@ -1,13 +1,14 @@
 {% extends firewalls_layout_base|default("firewalls_base.html") %}
 {% set fw_subnav_active = "inventory" %}
 {% set inventory_tab = inventory_tab | default("firewalls") %}
-{% block title %}{% if inventory_tab == "configurations" %}Configurations · Firewalls · Ground Control{% else %}Firewalls · Ground Control{% endif %}{% endblock %}
-{% block page_title %}{% if inventory_tab == "configurations" %}Configurations{% else %}Firewalls{% endif %}{% endblock %}
+{% set fw_inventory_parent_label = fw_parent_label | default('Firewalls (old)') %}
+{% block title %}{% if inventory_tab == "configurations" %}Configurations · {{ fw_inventory_parent_label }} · Ground Control{% else %}{{ fw_inventory_parent_label }} · Ground Control{% endif %}{% endblock %}
+{% block page_title %}{% if inventory_tab == "configurations" %}Configurations{% else %}{{ fw_inventory_parent_label }}{% endif %}{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol class="breadcrumbs__list">
     <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
-    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="{{ fw_parent_href|default('/firewalls') }}">{{ fw_parent_label|default('Firewalls') }}</a></li>
+    <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="{{ fw_parent_href|default('/firewalls') }}">{{ fw_parent_label|default('Firewalls (old)') }}</a></li>
     <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">
       {% if inventory_tab == "configurations" %}Configurations{% else %}Inventory{% endif %}
     </li>

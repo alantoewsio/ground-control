@@ -96,6 +96,19 @@ def user_role_is_admin(role: str | None) -> bool:
     return role_key(role) in ADMIN_ROLE_KEYS
 
 
+def user_role_is_strict_admin(role: str | None) -> bool:
+    """App ``admin`` only (not SuperAdmin)."""
+    return role_key(role) == "admin"
+
+
+def may_assign_app_user_role(actor_role: str | None, new_role: str) -> bool:
+    """Strict admins cannot grant SuperAdmin or Designer; SuperAdmin can."""
+    if not user_role_is_strict_admin(actor_role):
+        return True
+    rk = role_key(new_role)
+    return rk not in {"superadmin", "super admin", "designer"}
+
+
 def user_role_can_use_designer(role: str | None) -> bool:
     return role_key(role) in DESIGNER_ROLE_KEYS
 
