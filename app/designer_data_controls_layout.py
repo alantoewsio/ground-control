@@ -1,8 +1,7 @@
 """Repo-tracked layout graph settings for Designer Data Controls.
 
 Each entity type is stored as its own JSON file under ``data/designer_data_controls_layout/``
-to reduce Git merge conflicts. A legacy monolithic ``designer_data_controls_layout.json``
-is migrated into that directory on first access.
+to reduce Git merge conflicts.
 """
 
 from __future__ import annotations
@@ -16,8 +15,6 @@ from typing import Any
 from app import config
 
 LAYOUT_DIR_RELATIVE = Path("data") / "designer_data_controls_layout"
-# Legacy single-file store (migrated into LAYOUT_DIR_RELATIVE, then removed).
-LEGACY_LAYOUT_FILE_RELATIVE = Path("data") / "designer_data_controls_layout.json"
 ENTITY_TYPE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,31}$")
 
 _NODE_ID_RE = re.compile(r"^[a-zA-Z0-9_.:-]{1,128}$")
@@ -33,11 +30,6 @@ class LayoutMapLockedError(ValueError):
 def layout_dir() -> Path:
     """Directory containing one ``<entity_type>.json`` layout file per object type."""
     return (config.BASE_DIR / LAYOUT_DIR_RELATIVE).resolve()
-
-
-def layout_file_path() -> Path:
-    """Legacy monolithic JSON path; kept for tests and one-time migration."""
-    return (config.BASE_DIR / LEGACY_LAYOUT_FILE_RELATIVE).resolve()
 
 
 def _entity_file_path(entity_type: str) -> Path:
@@ -58,8 +50,6 @@ def _default_layout() -> dict[str, Any]:
 
 # Serialize read-modify-write so concurrent operations do not drop updates.
 _LAYOUT_STORE_LOCK = threading.Lock()
-# Resolved paths of legacy files we have already migrated or confirmed absent.
-_LEGACY_MIGRATION_DONE: set[str] = set()
 
 
 def _atomic_write_json(path: Path, obj: Any) -> None:
@@ -68,45 +58,6 @@ def _atomic_write_json(path: Path, obj: Any) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
-
-
-def _migrate_legacy_to_layout_dir_if_needed() -> None:
-    """If the legacy monolithic file exists, split it into per-entity files and remove it."""
-    legacy = layout_file_path()
-    try:
-        legacy_key = str(legacy.resolve())
-    except OSError:
-        return
-    if legacy_key in _LEGACY_MIGRATION_DONE:
-        return
-    if not legacy.is_file():
-        _LEGACY_MIGRATION_DONE.add(legacy_key)
-        return
-    try:
-        raw = json.loads(legacy.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        _LEGACY_MIGRATION_DONE.add(legacy_key)
-        return
-    if not isinstance(raw, dict):
-        try:
-            legacy.unlink()
-        except OSError:
-            pass
-        _LEGACY_MIGRATION_DONE.add(legacy_key)
-        return
-    entity_types = raw.get("entity_types")
-    if not isinstance(entity_types, dict):
-        try:
-            legacy.unlink()
-        except OSError:
-            pass
-        _LEGACY_MIGRATION_DONE.add(legacy_key)
-        return
-
-    _import_legacy_entity_types_into_layout_dir(
-        entity_types, legacy, delete_legacy=True
-    )
-    _LEGACY_MIGRATION_DONE.add(legacy_key)
 
 
 def _read_entity_layout_raw(entity_type: str) -> dict[str, Any] | None:
@@ -306,98 +257,11 @@ def normalize_layout(value: Any) -> dict[str, Any]:
     }
 
 
-def _import_legacy_entity_types_into_layout_dir(
-    entity_types: dict[str, Any],
-    legacy: Path,
-    *,
-    delete_legacy: bool,
-) -> tuple[list[str], list[str]]:
-    """Write every valid ``entity_types`` entry to per-entity JSON files (overwrites existing).
-
-    Returns ``(written_entity_types, invalid_raw_keys)``.
-    """
-    root = layout_dir()
-    root.mkdir(parents=True, exist_ok=True)
-    written: list[str] = []
-    invalid: list[str] = []
-    for raw_et, v in entity_types.items():
-        et = str(raw_et or "").strip()
-        if not ENTITY_TYPE_RE.match(et):
-            invalid.append(str(raw_et))
-            continue
-        normalized = normalize_layout(v if isinstance(v, dict) else {})
-        _atomic_write_json(root / f"{et}.json", normalized)
-        written.append(et)
-    if delete_legacy:
-        try:
-            legacy.unlink()
-        except OSError:
-            pass
-    return written, invalid
-
-
-def import_legacy_monolith_to_per_entity_layout_files(
-    legacy_path: Path | None = None,
-    *,
-    delete_legacy: bool = True,
-) -> dict[str, Any]:
-    """Import every ``entity_types`` entry from a monolithic layout JSON into per-entity files.
-
-    Each entry is normalized and written to ``<layout_dir>/<entity_type>.json``, overwriting
-    any existing file for that entity type. Intended for one-off migration or restoring from a
-    backup of ``designer_data_controls_layout.json``.
-
-    ``legacy_path`` defaults to :func:`layout_file_path`. If the file is missing, returns
-    ``{"ok": False, "error": "...", "written": [], "invalid_keys": []}``.
-    """
-    legacy = (legacy_path or layout_file_path()).resolve()
-    try:
-        legacy_key = str(legacy)
-    except OSError:
-        return {"ok": False, "error": "cannot resolve legacy path", "written": [], "invalid_keys": []}
-    if not legacy.is_file():
-        return {
-            "ok": False,
-            "error": f"legacy file not found: {legacy}",
-            "written": [],
-            "invalid_keys": [],
-        }
-    try:
-        raw = json.loads(legacy.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return {"ok": False, "error": str(exc), "written": [], "invalid_keys": []}
-    if not isinstance(raw, dict):
-        return {
-            "ok": False,
-            "error": "legacy JSON root must be an object",
-            "written": [],
-            "invalid_keys": [],
-        }
-    entity_types = raw.get("entity_types")
-    if not isinstance(entity_types, dict):
-        return {
-            "ok": False,
-            "error": "legacy JSON must contain an object entity_types",
-            "written": [],
-            "invalid_keys": [],
-        }
-    with _LAYOUT_STORE_LOCK:
-        written, invalid = _import_legacy_entity_types_into_layout_dir(
-            entity_types, legacy, delete_legacy=delete_legacy
-        )
-        if delete_legacy:
-            _LEGACY_MIGRATION_DONE.discard(legacy_key)
-        else:
-            _LEGACY_MIGRATION_DONE.add(legacy_key)
-    return {"ok": True, "written": written, "invalid_keys": invalid}
-
-
 def get_layout_for_entity_type(entity_type: str) -> dict[str, Any]:
     et = str(entity_type or "").strip()
     if not ENTITY_TYPE_RE.match(et):
         raise ValueError("Invalid entity type")
     with _LAYOUT_STORE_LOCK:
-        _migrate_legacy_to_layout_dir_if_needed()
         raw = _read_entity_layout_raw(et)
     return normalize_layout(raw)
 
@@ -407,7 +271,6 @@ def save_layout_for_entity_type(entity_type: str, layout: Any) -> dict[str, Any]
     if not ENTITY_TYPE_RE.match(et):
         raise ValueError("Invalid entity type")
     with _LAYOUT_STORE_LOCK:
-        _migrate_legacy_to_layout_dir_if_needed()
         prev_raw = _read_entity_layout_raw(et)
         prev = normalize_layout(prev_raw if isinstance(prev_raw, dict) else {})
         if prev.get("layout_locked"):
@@ -422,22 +285,21 @@ def save_layout_for_entity_type(entity_type: str, layout: Any) -> dict[str, Any]
 def get_layout_lock_flags() -> dict[str, bool]:
     """``entity_type`` → layout map locked, for all types present in the layout store."""
     with _LAYOUT_STORE_LOCK:
-        _migrate_legacy_to_layout_dir_if_needed()
-    root = layout_dir()
-    if not root.is_dir():
-        return {}
-    out: dict[str, bool] = {}
-    for path in sorted(root.glob("*.json")):
-        et = path.stem
-        if not ENTITY_TYPE_RE.match(et):
-            continue
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(raw, dict):
-            out[et] = _coerce_bool(raw.get("layout_locked"))
-    return out
+        root = layout_dir()
+        if not root.is_dir():
+            return {}
+        out: dict[str, bool] = {}
+        for path in sorted(root.glob("*.json")):
+            et = path.stem
+            if not ENTITY_TYPE_RE.match(et):
+                continue
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(raw, dict):
+                out[et] = _coerce_bool(raw.get("layout_locked"))
+        return out
 
 
 def set_layout_map_locked(entity_type: str, locked: bool) -> dict[str, Any]:
@@ -446,7 +308,6 @@ def set_layout_map_locked(entity_type: str, locked: bool) -> dict[str, Any]:
     if not ENTITY_TYPE_RE.match(et):
         raise ValueError("Invalid entity type")
     with _LAYOUT_STORE_LOCK:
-        _migrate_legacy_to_layout_dir_if_needed()
         prev_raw = _read_entity_layout_raw(et)
         merged = normalize_layout(prev_raw if isinstance(prev_raw, dict) else {})
         merged["layout_locked"] = bool(locked)

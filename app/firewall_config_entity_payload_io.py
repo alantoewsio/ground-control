@@ -48,6 +48,13 @@ def _coerce_optional_str(v: Any) -> str | None:
     return str(v)
 
 
+def _normalize_row_display_type(v: Any) -> str:
+    s = (_coerce_optional_str(v) or "").strip().lower()
+    if s in ("tag", "onoff", "hidden"):
+        return s
+    return "text"
+
+
 def _coerce_optional_positive_int(v: Any) -> int | None:
     if v is None:
         return None
@@ -87,6 +94,7 @@ def export_firewall_config_entity_payload_fields_to_file(
                 "data_entry_type": r.data_entry_type,
                 "data_entry_properties": r.data_entry_properties,
                 "show_as": r.show_as,
+                "display_type": _normalize_row_display_type(r.display_type),
                 "display_order": r.display_order,
                 "help_text": r.help_text,
                 "allowed_options": r.allowed_options,
@@ -135,6 +143,7 @@ def import_firewall_config_entity_payload_fields_from_file(
         if show_as is not None and len(show_as) > 512:
             show_as = show_as[:512]
         disp_ord = _coerce_optional_positive_int(item.get("display_order"))
+        disp_type = _normalize_row_display_type(item.get("display_type"))
         help_t = _coerce_optional_str(item.get("help_text"))
         allow_opt = item.get("allowed_options")
         if allow_opt is None:
@@ -182,6 +191,7 @@ def import_firewall_config_entity_payload_fields_from_file(
                     data_entry_type=det,
                     data_entry_properties=dprops,
                     show_as=show_as,
+                    display_type=disp_type,
                     display_order=disp_ord,
                     help_text=help_t,
                     allowed_options=allow_opt_s,
@@ -195,6 +205,8 @@ def import_firewall_config_entity_payload_fields_from_file(
             row.data_entry_properties = dprops
             if "show_as" in item:
                 row.show_as = show_as
+            if "display_type" in item:
+                row.display_type = disp_type
             if "display_order" in item:
                 row.display_order = disp_ord
             if "help_text" in item:

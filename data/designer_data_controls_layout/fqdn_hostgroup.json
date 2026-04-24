@@ -75,15 +75,31 @@
       "target_node_id": "field:502",
       "target_handle": "save_value",
       "edge_id": "gc_mo1iqmph_b802k71xo3"
+    },
+    {
+      "source_node_id": "field:105",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:105",
+      "target_handle": "selected",
+      "edge_id": "gc_moc1vqha_11n5nt4cb8"
+    },
+    {
+      "source_node_id": "ctrl:105",
+      "source_handle": "selected",
+      "target_node_id": "field:105",
+      "target_handle": "save_value",
+      "edge_id": "gc_moc1vqha_bqgiy488c6"
     }
   ],
   "logic_nodes": [],
   "control_add_only": {},
   "member_lookup_data_source": {
-    "ctrl:502": "fqdn_host"
+    "ctrl:502": "fqdn_host",
+    "ctrl:105": "fqdn_host"
   },
   "member_lookup_multi": {
-    "ctrl:502": true
+    "ctrl:502": true,
+    "ctrl:105": true
   },
-  "layout_locked": true
+  "layout_locked": false
 }

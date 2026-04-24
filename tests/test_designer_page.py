@@ -109,8 +109,8 @@ def test_designer_content_page_removed(designer_client):
 def test_designer_data_controls_page(designer_client):
     r = designer_client.get("/designer/data-controls")
     assert r.status_code == 200
-    assert "Data Controls" in r.text
-    assert "Field catalog" in r.text
+    assert "Layouts" in r.text
+    assert "Table fields" in r.text
     assert "Layout plans" in r.text
     assert "gc-designer-data-controls-tab-layout" in r.text
 
@@ -156,9 +156,11 @@ def test_designer_data_controls_page(designer_client):
     assert "text-single" in r.text
     assert "ip-list" in r.text
     assert "Updated (UTC)" not in r.text
+    assert "gcDesignerDataControlsMergeFieldTextConstraints" in r.text
+    assert "gc-designer-object-edit-catalog.js" in r.text
 
     assert "window.GC_ENTITY_TYPE_NAV_ICONS" in r.text, (
-        "Designer · Data Controls must expose the same entity-type → Material-Symbol "
+        "Designer · Layouts must expose the same entity-type → Material-Symbol "
         "map that Firewalls v2 pages expose, so the flyout member-lookup dropdown "
         "renders per-object-type icons (e.g. globe for fqdn_host) identically in "
         "both places. If this fails, gc_object_edit_flyout_scripts.html is no longer "
@@ -246,9 +248,6 @@ def test_api_designer_data_controls_layout_roundtrip(
 
     d = tmp_path / "dc_layout_dir"
     monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
-    monkeypatch.setattr(
-        layout_store, "layout_file_path", lambda: tmp_path / "dc_layout_legacy.json"
-    )
     et = "zone"
     r0 = designer_client.get(f"/api/designer/data-controls-layout/{et}")
     assert r0.status_code == 200, r0.text
@@ -326,9 +325,6 @@ def test_api_designer_data_controls_layout_keeps_distinct_edges_same_tuple(
 
     d = tmp_path / "dc_layout_dup_edges_dir"
     monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
-    monkeypatch.setattr(
-        layout_store, "layout_file_path", lambda: tmp_path / "dc_layout_dup_legacy.json"
-    )
     et = "zone"
     payload = {
         "layout": {
@@ -376,9 +372,6 @@ def test_api_designer_data_controls_layout_locked_put_blocked_and_patch_unlock(
 
     d = tmp_path / "dc_layout_lock_dir"
     monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
-    monkeypatch.setattr(
-        layout_store, "layout_file_path", lambda: tmp_path / "dc_layout_lock_legacy.json"
-    )
     et = "svcgrp"
     r_put0 = designer_client.put(
         f"/api/designer/data-controls-layout/{et}",
@@ -407,39 +400,6 @@ def test_api_designer_data_controls_layout_locked_put_blocked_and_patch_unlock(
     )
     assert r_put2.status_code == 200
     assert r_put2.json()["layout"]["node_positions"]["field:1"]["x"] == 9
-
-
-def test_import_legacy_monolith_overwrites_existing_per_entity_layout(monkeypatch, tmp_path):
-    """``import_legacy_monolith_to_per_entity_layout_files`` must replace files for keys in the monolith."""
-    from app import designer_data_controls_layout as layout_store
-
-    out_dir = tmp_path / "layout_out"
-    legacy = tmp_path / "monolith.json"
-    monkeypatch.setattr(layout_store, "layout_dir", lambda: out_dir)
-    monkeypatch.setattr(layout_store, "layout_file_path", lambda: legacy)
-    out_dir.mkdir()
-    stale = layout_store.normalize_layout(
-        {"node_positions": {"field:1": {"x": 1, "y": 2}}, "connections": []}
-    )
-    (out_dir / "zone.json").write_text(json.dumps(stale) + "\n", encoding="utf-8")
-    monolith = {
-        "version": 1,
-        "entity_types": {
-            "zone": {
-                "node_positions": {"field:99": {"x": 9, "y": 9}},
-                "connections": [],
-            }
-        },
-    }
-    legacy.write_text(json.dumps(monolith), encoding="utf-8")
-    r = layout_store.import_legacy_monolith_to_per_entity_layout_files(
-        legacy, delete_legacy=True
-    )
-    assert r.get("ok") is True
-    assert "zone" in r["written"]
-    z = json.loads((out_dir / "zone.json").read_text(encoding="utf-8"))
-    assert z["node_positions"]["field:99"]["x"] == 9
-    assert "field:1" not in z.get("node_positions", {})
 
 
 def test_api_designer_entity_payload_fields_generate_missing_infers_unset_existing(
@@ -876,6 +836,68 @@ def test_api_designer_entity_payload_fields_bulk_update_hidden_type(
     assert row.data_entry_type == "Hidden"
 
 
+def test_api_designer_entity_payload_fields_display_type_hidden_roundtrip(
+    designer_client, main_session,
+):
+    from app.models import FirewallConfigEntityPayloadField
+
+    et = "disp_hidden_api_t"
+    main_session.query(FirewallConfigEntityPayloadField).filter(
+        FirewallConfigEntityPayloadField.entity_type == et,
+    ).delete(synchronize_session=False)
+    main_session.commit()
+    row = FirewallConfigEntityPayloadField(
+        entity_type=et,
+        property_name="X",
+        json_value_kind="string",
+        data_entry_type="Hidden",
+        display_type="text",
+    )
+    main_session.add(row)
+    main_session.commit()
+    rid = row.id
+
+    r = designer_client.get(f"/api/designer/entity-payload-fields/{et}")
+    assert r.status_code == 200
+    f0 = next(x for x in r.json()["fields"] if x["property_name"] == "X")
+    assert f0.get("display_type") == "hidden"
+
+    r2 = designer_client.put(
+        f"/api/designer/entity-payload-fields/{et}",
+        json={"updates": [{"id": rid, "display_type": "hidden"}]},
+    )
+    assert r2.status_code == 200, r2.text
+    main_session.refresh(row)
+    assert row.data_entry_type == "Hidden"
+
+    r3 = designer_client.put(
+        f"/api/designer/entity-payload-fields/{et}",
+        json={"updates": [{"id": rid, "display_type": "text"}]},
+    )
+    assert r3.status_code == 200, r3.text
+    main_session.refresh(row)
+    assert row.data_entry_type is None
+    assert row.display_type == "text"
+
+    r4 = designer_client.put(
+        f"/api/designer/entity-payload-fields/{et}",
+        json={"updates": [{"id": rid, "data_entry_type": "text-single", "display_type": "tag"}]},
+    )
+    assert r4.status_code == 200, r4.text
+    main_session.refresh(row)
+    assert row.data_entry_type == "text-single"
+    assert row.display_type == "tag"
+
+    r5 = designer_client.put(
+        f"/api/designer/entity-payload-fields/{et}",
+        json={"updates": [{"id": rid, "display_type": "hidden"}]},
+    )
+    assert r5.status_code == 200, r5.text
+    main_session.refresh(row)
+    assert row.data_entry_type == "Hidden"
+    assert row.display_type == "hidden"
+
+
 def test_api_designer_entity_payload_fields_bulk_update_clears_fields(
     designer_client, main_session,
 ):
@@ -988,6 +1010,7 @@ def test_designer_navigation_page(designer_client):
     assert r.status_code == 200
     assert 'href="/designer/content"' not in r.text
     assert r.text.find('href="/designer/data-controls"') < r.text.find('href="/designer/modals"')
+    assert "Layouts" in r.text
     assert "Navigation" in r.text
     assert "Object Navigation" in r.text
     assert "gc-designer-entity-nav-tbody" in r.text
@@ -1030,6 +1053,7 @@ def test_designer_controls_page(designer_client):
     assert "data-gc-text-charset" in r.text
     assert 'data-gc-designer-control-id="toggle-onoff"' in r.text
     assert 'data-gc-designer-control-id="toggle-checkbox"' in r.text
+    assert 'data-gc-designer-control-id="data-entry-table"' in r.text
     assert 'id="gc-designer-toggle-onoff"' in r.text
     assert 'id="gc-designer-toggle-checkbox"' in r.text
     assert "gc-designer-dd-show-search" in r.text

@@ -124,8 +124,8 @@ class FirewallConfigEntityPayloadField(Base):
     One row per (entity_type, top-level payload_json key) discovered during firewall cache sync.
 
     ``json_value_kind`` is inferred from JSON values (``mixed`` when the same key appears with
-    different kinds across appliances). ``dependent_on``, ``data_entry_type``,
-    ``data_entry_properties``, ``show_as``, ``display_order``, and ``help_text`` are manual / UI
+    different kinds across appliances).     ``dependent_on``, ``data_entry_type``,
+    ``data_entry_properties``, ``show_as``, ``display_type``, ``display_order``, and ``help_text`` are manual / UI
     metadata and stay unset by sync (except ``display_order`` on generated cache rows, which may be
     set to append).
     """
@@ -148,6 +148,8 @@ class FirewallConfigEntityPayloadField(Base):
     data_entry_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     data_entry_properties: Mapped[str | None] = mapped_column(Text, nullable=True)
     show_as: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    #: How the field is presented in object-edit UIs: ``text``, ``tag``, ``onoff``, or ``hidden``.
+    display_type: Mapped[str] = mapped_column(String(16), nullable=False, default="text")
     display_order: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     help_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     allowed_options: Mapped[str | None] = mapped_column(Text, nullable=True)

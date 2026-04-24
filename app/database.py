@@ -868,6 +868,43 @@ def _migrate_postgres_entity_payload_field_data_source_entity_types() -> None:
         )
 
 
+def _migrate_sqlite_entity_payload_field_display_type() -> None:
+    url = config.database_url()
+    if not url.startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "display_type" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN display_type VARCHAR(16) NOT NULL DEFAULT 'text'"
+            )
+        )
+
+
+def _migrate_postgres_entity_payload_field_display_type() -> None:
+    if config.database_url().startswith("sqlite"):
+        return
+    insp = inspect(_engine)
+    if not insp.has_table("firewall_config_entity_payload_fields"):
+        return
+    cols = {c["name"] for c in insp.get_columns("firewall_config_entity_payload_fields")}
+    if "display_type" in cols:
+        return
+    with _engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE firewall_config_entity_payload_fields "
+                "ADD COLUMN display_type VARCHAR(16) NOT NULL DEFAULT 'text'"
+            )
+        )
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=_engine)
     _migrate_sqlite_firewall_columns()
@@ -896,6 +933,8 @@ def init_db() -> None:
     _migrate_postgres_entity_payload_field_allowed_options()
     _migrate_sqlite_entity_payload_field_data_source_entity_types()
     _migrate_postgres_entity_payload_field_data_source_entity_types()
+    _migrate_sqlite_entity_payload_field_display_type()
+    _migrate_postgres_entity_payload_field_display_type()
     _seed_default_ipam_vrf()
     repair_postgresql_serials_to_max_id(
         _engine,

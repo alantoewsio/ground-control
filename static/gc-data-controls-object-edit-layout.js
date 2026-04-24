@@ -42,6 +42,9 @@
   }
 
   function parseJsonObject(raw) {
+    if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
+      return raw;
+    }
     var s = trimStr(raw);
     if (!s) return {};
     try {
@@ -70,6 +73,27 @@
     if (t === "if_value") return "if_value";
     if (t === "csv_array") return "csv_array";
     return "gate";
+  }
+
+  /** First option label for a catalog ``selector`` field (matches object-edit ``renderFields`` merge). */
+  function firstSelectorCatalogLabel(field) {
+    if (!field) return "";
+    var list = [];
+    var ao = Array.isArray(field.allowed_options) ? field.allowed_options : [];
+    for (var ai = 0; ai < ao.length; ai++) {
+      var t0 = trimStr(ao[ai] != null ? String(ao[ai]) : "");
+      if (t0) list.push(t0);
+    }
+    if (!list.length) {
+      var props = parseJsonObject(field.data_entry_properties);
+      if (Array.isArray(props.items)) {
+        for (var ii = 0; ii < props.items.length; ii++) {
+          var t1 = trimStr(props.items[ii] != null ? String(props.items[ii]) : "");
+          if (t1) list.push(t1);
+        }
+      }
+    }
+    return list.length ? list[0] : "";
   }
 
   function parseBoolLike(v) {
@@ -206,12 +230,20 @@
       det === "dropdown-single" ||
       det === "dropdown-multi" ||
       det === "dropdown-shared" ||
-      det === "member-lookup"
+      det === "member-lookup" ||
+      det === "data-entry-table-col-selection" ||
+      det === "data-entry-table-col-time"
     ) {
       return { inputs: ["selected", "visible"], outputs: ["selected"] };
     }
-    if (det === "toggle-onoff" || det === "toggle-checkbox") {
+    if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") {
       return { inputs: ["value", "visible"], outputs: ["on", "off"] };
+    }
+    if (det === "data-entry-table") {
+      return { inputs: ["value", "visible"], outputs: ["value"] };
+    }
+    if (det === "data-entry-table-col-text") {
+      return { inputs: ["value", "visible"], outputs: ["value"] };
     }
     return { inputs: ["value", "visible"], outputs: ["value"] };
   }
@@ -234,10 +266,14 @@
       det === "dropdown-single" ||
       det === "dropdown-multi" ||
       det === "dropdown-shared" ||
-      det === "member-lookup"
+      det === "member-lookup" ||
+      det === "data-entry-table-col-selection" ||
+      det === "data-entry-table-col-time"
     ) {
       return "selected";
     }
+    if (det === "data-entry-table-col-toggle") return "value";
+    if (det === "data-entry-table-col-text") return "value";
     return "value";
   }
 
@@ -255,11 +291,14 @@
       det === "dropdown-single" ||
       det === "dropdown-multi" ||
       det === "dropdown-shared" ||
-      det === "member-lookup"
+      det === "member-lookup" ||
+      det === "data-entry-table-col-selection" ||
+      det === "data-entry-table-col-time"
     ) {
       return "selected";
     }
-    if (det === "toggle-onoff" || det === "toggle-checkbox") return "on";
+    if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") return "on";
+    if (det === "data-entry-table-col-text") return "value";
     return "value";
   }
 
@@ -273,7 +312,10 @@
       if (!fieldNode || !ctrlNode) return;
       if (fieldNode.outputs.indexOf("loaded_value") === -1) return;
       var ctrlIn = defaultControlInputForField(f);
-      if (ctrlNode.inputs.indexOf(ctrlIn) !== -1) {
+      var skipLoadedWire =
+        typeof globalThis.gcDataEntryTableIsColumnField === "function" &&
+        globalThis.gcDataEntryTableIsColumnField(f, fields);
+      if (!skipLoadedWire && ctrlNode.inputs.indexOf(ctrlIn) !== -1) {
         edges.push({
           source_node_id: fieldId,
           source_handle: "loaded_value",
@@ -330,6 +372,8 @@
         id: fieldId,
         field_id: String(f.id || ""),
         data_entry_type: trimStr(f.data_entry_type),
+        json_value_kind: trimStr(f.json_value_kind),
+        property_name: trimStr(f.property_name),
         label: fieldLabel,
         kind: "field",
         inputs: ["save_value"],
@@ -444,7 +488,7 @@
     return out;
   }
 
-  function valueForPropertyFromRow(row, propertyName) {
+  function valueForPropertyFromRow(row, propertyName, fieldsOpt) {
     if (!row) return "";
     var p = trimStr(propertyName);
     if (!p) return "";
@@ -464,6 +508,20 @@
       return String(flat[leaf]);
     }
     if (leaf === "Name" && cells.__name != null) return String(cells.__name);
+    var fieldsList = fieldsOpt;
+    if (!fieldsList || !fieldsList.length) {
+      var stG = globalThis.__gcObjectEditFlyoutState;
+      if (stG && Array.isArray(stG.allFields) && stG.allFields.length) fieldsList = stG.allFields;
+      else if (stG && Array.isArray(stG.fields) && stG.fields.length) fieldsList = stG.fields;
+    }
+    if (
+      fieldsList &&
+      fieldsList.length &&
+      typeof globalThis.gcDataEntryTableColumnFieldValueFromRow === "function"
+    ) {
+      var tcol = globalThis.gcDataEntryTableColumnFieldValueFromRow(row, p, fieldsList);
+      if (tcol != null) return String(tcol);
+    }
     return "";
   }
 
@@ -483,7 +541,7 @@
     return ordered;
   }
 
-  /** Flyout rows follow API field catalog order, not layout canvas Y positions. */
+  /** Flyout rows follow API table-fields order, not layout canvas Y positions. */
   function fieldsForParticipatingIdsInCatalogOrder(fields, participatingIds) {
     var want = {};
     (participatingIds || []).forEach(function (id) {
@@ -503,16 +561,47 @@
     });
   }
 
+  function expandFlyoutFieldsForDataEntryTableChildren(allFields, orderedFields) {
+    var base =
+      orderedFields && orderedFields.length
+        ? orderedFields.slice()
+        : filterFlyoutRenderableFields(allFields);
+    var out = [];
+    var seen = {};
+    function addField(f) {
+      if (!f) return;
+      var id = String(f.id || "");
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      out.push(f);
+    }
+    base.forEach(function (f) {
+      addField(f);
+      if (trimStr(f.data_entry_type).toLowerCase() !== "data-entry-table") return;
+      if (typeof globalThis.gcDataEntryTableColumnFieldsForParent !== "function") return;
+      var cols = globalThis.gcDataEntryTableColumnFieldsForParent(f, allFields || []);
+      cols.forEach(function (c) {
+        if (!filterFlyoutRenderableFields([c]).length) return;
+        addField(c);
+      });
+    });
+    return out;
+  }
+
   function gcDcLayoutOrderedFieldsForFlyout(fields, layout) {
     var L = normalizeLayout(layout);
     var catalog = buildNodeCatalog(fields, L);
     var conns = effectiveConnections(L, fields, catalog);
     var part = fieldIdsParticipating(conns, fields);
+    var ordered;
     if (!part.length) {
-      return { fields: filterFlyoutRenderableFields(fields), connections: conns, nodeCatalog: catalog };
+      ordered = filterFlyoutRenderableFields(fields);
+    } else {
+      ordered = fieldsForParticipatingIdsInCatalogOrder(fields, part);
+      ordered = filterFlyoutRenderableFields(ordered);
     }
-    var ordered = fieldsForParticipatingIdsInCatalogOrder(fields, part);
-    return { fields: filterFlyoutRenderableFields(ordered), connections: conns, nodeCatalog: catalog };
+    ordered = expandFlyoutFieldsForDataEntryTableChildren(fields, ordered);
+    return { fields: ordered, connections: conns, nodeCatalog: catalog };
   }
 
   function computeFlowFromRow(nodeCatalog, connections, fields, row, controlOutputOverrides) {
@@ -529,6 +618,10 @@
     (fields || []).forEach(function (f) {
       fieldById[String(f.id || "")] = f;
     });
+    function isObjectEditFlyoutAddMode() {
+      var stFly = globalThis.__gcObjectEditFlyoutState;
+      return !!(stFly && trimStr(String(stFly.mode || "")).toLowerCase() === "add");
+    }
     Object.keys(nodeCatalog).forEach(function (nodeId) {
       var node = nodeCatalog[nodeId];
       if (!node || node.kind !== "field") return;
@@ -536,7 +629,25 @@
       var fld = fieldById[fid];
       if (!fld) return;
       var prop = trimStr(fld.property_name);
-      values[nodeId + "|loaded_value"] = valueForPropertyFromRow(row, prop);
+      var loaded = valueForPropertyFromRow(row, prop, fields);
+      if (trimStr(String(loaded)) === "" && isObjectEditFlyoutAddMode()) {
+        var detF = trimStr(fld.data_entry_type).toLowerCase();
+        if (
+          detF === "text-single" ||
+          detF === "text-multiline" ||
+          detF === "data-entry-table-col-text"
+        ) {
+          var pdef = parseJsonObject(fld.data_entry_properties);
+          var dv = pdef.defaultValue;
+          if (dv != null && trimStr(String(dv)) !== "") {
+            loaded = String(dv);
+          }
+        } else if (detF === "selector") {
+          var labSel = firstSelectorCatalogLabel(fld);
+          if (trimStr(labSel)) loaded = labSel;
+        }
+      }
+      values[nodeId + "|loaded_value"] = loaded;
     });
 
     function firstControlInput(ctrlId, name) {
@@ -613,6 +724,25 @@
           overrides && Object.prototype.hasOwnProperty.call(overrides, nodeId + "|value")
             ? String(overrides[nodeId + "|value"] == null ? "" : overrides[nodeId + "|value"])
             : null;
+        /* Empty DOM reads must not override layout defaults in add mode (reeval after applyFlow). */
+        if (
+          ovValue !== null &&
+          trimStr(ovValue) === "" &&
+          isObjectEditFlyoutAddMode() &&
+          (det === "text-single" ||
+            det === "text-multiline" ||
+            det === "data-entry-table-col-text")
+        ) {
+          ovValue = null;
+        }
+        if (
+          ovSelected !== null &&
+          trimStr(ovSelected) === "" &&
+          isObjectEditFlyoutAddMode() &&
+          det === "selector"
+        ) {
+          ovSelected = null;
+        }
         var isVisible = visibleFromInput(nodeId);
         visibilityByCtrl[nodeId] = isVisible;
         var base = (ovValue != null ? ovValue : inValue) || (ovSelected != null ? ovSelected : inSelected) || inAddress || "";
@@ -678,7 +808,9 @@
           det === "dropdown-single" ||
           det === "dropdown-multi" ||
           det === "dropdown-shared" ||
-          det === "member-lookup"
+          det === "member-lookup" ||
+          det === "data-entry-table-col-selection" ||
+          det === "data-entry-table-col-time"
         ) {
           var picked = isVisible
             ? (ovSelected != null ? ovSelected : inSelected || base)
@@ -698,12 +830,29 @@
               values[nodeId + "|option_ip_list"] = true;
             }
           }
-        } else if (det === "toggle-onoff" || det === "toggle-checkbox") {
+        } else if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") {
           var truthy = isVisible && !!trimStr(base);
           values[nodeId + "|on"] = truthy ? "on" : "";
           values[nodeId + "|off"] = truthy ? "" : "off";
         } else {
-          values[nodeId + "|value"] = isVisible ? base : "";
+          var outVal = isVisible ? base : "";
+          if (
+            isVisible &&
+            !trimStr(String(base || "")) &&
+            isObjectEditFlyoutAddMode() &&
+            (det === "text-single" ||
+              det === "text-multiline" ||
+              det === "data-entry-table-col-text")
+          ) {
+            var fldC = fieldById[String(node.field_id || "")];
+            if (fldC) {
+              var pc = parseJsonObject(fldC.data_entry_properties);
+              if (pc.defaultValue != null && trimStr(String(pc.defaultValue)) !== "") {
+                outVal = String(pc.defaultValue);
+              }
+            }
+          }
+          values[nodeId + "|value"] = outVal;
         }
       });
     }
@@ -816,6 +965,11 @@
       row.style.display = visible ? "" : "none";
       if (!visible) return;
 
+      var detLower = trimStr(f.data_entry_type).toLowerCase();
+      if (detLower === "data-entry-table") {
+        return;
+      }
+
       function flowSlot(suffix) {
         var k = ctrlId + "|" + suffix;
         var a = Object.prototype.hasOwnProperty.call(inputs, k) ? inputs[k] : undefined;
@@ -843,7 +997,6 @@
         }
       }
 
-      var detLower = trimStr(f.data_entry_type).toLowerCase();
       var isIpDet =
         detLower === "ip-address" || detLower === "ip-ipv4" || detLower === "ip-ipv6";
       var ipInput = visibleIpInputInCatalogRow(row);
@@ -946,6 +1099,26 @@
         } catch (eAc) {}
       }
     });
+    (function applyDataEntryTableFlow() {
+      if (typeof globalThis.gcDataEntryTableColumnFieldsForParent !== "function") return;
+      host.querySelectorAll('[data-gc-det-table-root="1"]').forEach(function (root) {
+        var pid = trimStr(root.getAttribute("data-gc-catalog-field-id"));
+        var pf = fieldMap[pid];
+        if (!pf) return;
+        var cols = globalThis.gcDataEntryTableColumnFieldsForParent(pf, fields);
+        cols.forEach(function (cf) {
+          var cfid = String(cf.id || "");
+          var ctrlC = "ctrl:" + cfid;
+          var visC = Object.prototype.hasOwnProperty.call(visMap, ctrlC) ? !!visMap[ctrlC] : true;
+          root.querySelectorAll('[data-gc-det-col-field-id="' + cfid.replace(/\\/g, "\\\\") + '"]').forEach(
+            function (cell) {
+              cell.hidden = !visC;
+              cell.style.display = visC ? "" : "none";
+            },
+          );
+        });
+      });
+    })();
     applyIpHostRangeFieldVisibility(host, fields, inputs, visMap);
     if (typeof globalThis.gcDesignerApplyObjectEditFlyoutControlLocks === "function") {
       globalThis.gcDesignerApplyObjectEditFlyoutControlLocks();
@@ -958,6 +1131,10 @@
     (fields || []).forEach(function (f) {
       fieldById[String(f.id || "")] = f;
     });
+    function flyoutAddModeCollect() {
+      var st = globalThis.__gcObjectEditFlyoutState;
+      return !!(st && trimStr(String(st.mode || "")).toLowerCase() === "add");
+    }
     if (!fieldsEl) return values;
     fieldsEl.querySelectorAll(".gc-designer-object-edit-catalog-row").forEach(function (rowEl) {
       var fidPre = trimStr(rowEl.getAttribute("data-gc-catalog-field-id"));
@@ -976,6 +1153,7 @@
       var node = nodeCatalog[ctrlId];
       if (!node || node.kind !== "control") return;
       var det = trimStr(f.data_entry_type).toLowerCase();
+      if (det === "data-entry-table") return;
 
       if (det === "ip-address" || det === "ip-ipv4" || det === "ip-ipv6") {
         var ipIn = visibleIpInputInCatalogRow(rowEl);
@@ -1080,14 +1258,16 @@
       }
       var ta = rowEl.querySelector("textarea.settings-form__input");
       if (ta) {
-        values[ctrlId + "|value"] = trimStr(ta.value);
+        var taV = trimStr(ta.value);
+        if (taV !== "" || !flyoutAddModeCollect()) values[ctrlId + "|value"] = taV;
         return;
       }
       var inp2 = rowEl.querySelector(
         "input.settings-form__input:not(.gc-ip-field__input):not([type='hidden']):not(.gc-designer-dd__search)",
       );
       if (inp2 && inp2.type !== "checkbox" && inp2.type !== "radio") {
-        values[ctrlId + "|value"] = trimStr(inp2.value);
+        var i2v = trimStr(inp2.value);
+        if (i2v !== "" || !flyoutAddModeCollect()) values[ctrlId + "|value"] = i2v;
         return;
       }
     });
@@ -1138,6 +1318,68 @@
     });
   }
 
+  /**
+   * Writes indexed flat keys from data-entry-table DOM. Skips connection-based save for
+   * those column fields (see buildSavePayload) because flow uses one ctrl handle per column.
+   */
+  function mergeDataEntryTableFlatPropertiesFromDom(fields, fieldsEl, properties) {
+    if (
+      !fieldsEl ||
+      !properties ||
+      typeof properties !== "object" ||
+      typeof globalThis.gcDataEntryTableColumnFieldsForParent !== "function" ||
+      typeof globalThis.gcDataEntryTableFlatKeyForCell !== "function"
+    ) {
+      return;
+    }
+    var fieldById = {};
+    (fields || []).forEach(function (f) {
+      fieldById[String(f.id || "")] = f;
+    });
+    fieldsEl.querySelectorAll('[data-gc-det-table-root="1"]').forEach(function (root) {
+      var parentRow = root.closest(".gc-designer-object-edit-catalog-row");
+      if (!parentRow || parentRow.hidden || parentRow.style.display === "none") return;
+      var pid = trimStr(root.getAttribute("data-gc-catalog-field-id"));
+      var pf = fieldById[pid];
+      if (!pf || trimStr(pf.data_entry_type).toLowerCase() !== "data-entry-table") return;
+      var parentProp = trimStr(pf.property_name);
+      var cols = globalThis.gcDataEntryTableColumnFieldsForParent(pf, fields);
+      cols.forEach(function (cf) {
+        var pn = trimStr(cf.property_name);
+        if (pn) delete properties[pn];
+      });
+      var tbody =
+        root.querySelector(".gc-data-entry-table__table tbody") || root.querySelector("tbody");
+      if (!tbody) return;
+      var ri = 0;
+      tbody.querySelectorAll("tr[data-gc-det-data-row]").forEach(function (tr) {
+        if (tr.getAttribute("data-gc-det-blank") === "1") return;
+        if (tr.hidden || tr.style.display === "none") return;
+        cols.forEach(function (cf) {
+          var cfid = String(cf.id || "");
+          var td = tr.querySelector('[data-gc-det-col-field-id="' + cfid.replace(/\\/g, "\\\\") + '"]');
+          if (!td || td.hidden || td.style.display === "none") return;
+          var cdet = trimStr(cf.data_entry_type).toLowerCase();
+          var raw = "";
+          if (cdet === "data-entry-table-col-selection" || cdet === "data-entry-table-col-time") {
+            var sel = td.querySelector("select");
+            raw = sel ? String(sel.value || "") : "";
+          } else if (cdet === "data-entry-table-col-toggle") {
+            var cb = td.querySelector('input[type="checkbox"]');
+            raw = cb && cb.checked ? "1" : "";
+          } else {
+            var inp = td.querySelector("input:not([type='hidden'])");
+            raw = inp ? trimStr(inp.value) : "";
+          }
+          var colProp = trimStr(cf.property_name);
+          var fk = globalThis.gcDataEntryTableFlatKeyForCell(parentProp, colProp, ri);
+          if (fk) properties[fk] = raw;
+        });
+        ri += 1;
+      });
+    });
+  }
+
   function buildSavePayload(nodeCatalog, connections, fields, fieldsEl) {
     var values = collectDomControlValues(nodeCatalog, connections, fields, fieldsEl);
     augmentIpListControlValuesFromDom(fields, fieldsEl, values);
@@ -1153,6 +1395,12 @@
       var srcKey = edge.source_node_id + "|" + edge.source_handle;
       var fld = fieldById[m[1]];
       if (!fld || !trimStr(fld.property_name)) return;
+      if (
+        typeof globalThis.gcDataEntryTableIsColumnField === "function" &&
+        globalThis.gcDataEntryTableIsColumnField(fld, fields)
+      ) {
+        return;
+      }
       var pnSave = trimStr(fld.property_name).toLowerCase();
       if (pnSave === "subnet" && edge.source_handle === "ip_address") {
         var skSub = edge.source_node_id + "|subnet";
@@ -1205,6 +1453,7 @@
       if (!Object.prototype.hasOwnProperty.call(values, srcKey)) return;
       properties[trimStr(fld.property_name)] = values[srcKey];
     });
+    mergeDataEntryTableFlatPropertiesFromDom(fields, fieldsEl, properties);
     return { properties: properties };
   }
 

@@ -517,4 +517,56 @@
       </div>
     </div>
   </section>
+
+  <section class="gc-designer__section" aria-labelledby="gc-designer-det-table-h">
+    <h2 id="gc-designer-det-table-h" class="gc-designer__h2">Data entry table</h2>
+    <p class="gc-designer__note">
+      Object-edit flyouts can bind an <code class="mono">object</code> catalog field to
+      <code class="mono">data-entry-table</code> so nested members render as a compact table (same shell classes as
+      Hosts and Services · TCP/UDP service ports). Column members use
+      <code class="mono">data-entry-table-col-text</code>, <code class="mono">data-entry-table-col-selection</code>
+      (dropdown), <code class="mono">data-entry-table-col-time</code> (fixed time dropdown), or
+      <code class="mono">data-entry-table-col-toggle</code>; configure options on selection columns via
+      allowed options / properties JSON like <code class="mono">selector</code>.
+    </p>
+    <div class="gc-designer__sandbox">
+      <span
+        class="gc-designer__control-id gc-designer__control-id--block"
+        title="Reference id for this control"
+        data-gc-designer-control-id="data-entry-table"
+        >data-entry-table</span
+      >
+      <div class="gc-bridge-flyout__members-table-wrap" style="margin-top: 0.75rem; max-width: 36rem">
+        <table
+          class="gc-bridge-flyout__members-table gc-data-entry-table__table data-table data-table--dense"
+          aria-label="Sample data entry table"
+        >
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col">Destination</th>
+              <th scope="col">Protocol</th>
+              <th scope="col" class="gc-bridge-flyout__members-actions-col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="text" class="settings-form__input mono gc-if-flyout__input" value="1:65535" readonly /></td>
+              <td><input type="text" class="settings-form__input mono gc-if-flyout__input" value="443" readonly /></td>
+              <td>
+                <select
+                  class="settings-form__input mono gc-if-flyout__select gc-bridge-flyout__member-select"
+                  disabled
+                >
+                  <option>TCP</option>
+                  <option>UDP</option>
+                </select>
+              </td>
+              <td class="gc-bridge-flyout__members-actions-col"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 </main>

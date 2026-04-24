@@ -5067,6 +5067,10 @@ a.btn-icon {
   box-sizing: border-box;
 }
 
+.gc-designer-object-edit-catalog-row .gc-data-entry-table__table {
+  font-size: 13px;
+}
+
 /* Service flyout: narrower port columns, wider protocol select (add + edit) */
 .gc-hs-svc-tcpudp-table {
   table-layout: fixed;
@@ -11483,19 +11487,6 @@ body.gc-designer-entity-nav__facet-overlay-open {
   align-self: stretch;
 }
 
-.gc-designer-data-controls__generate {
-  margin-top: 6px;
-  margin-bottom: 2px;
-}
-
-.gc-designer-data-controls__generate-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  margin-top: 4px;
-}
-
 .gc-designer-data-controls__check {
   display: inline-flex;
   align-items: center;
@@ -11524,17 +11515,17 @@ body.gc-designer-entity-nav__facet-overlay-open {
   margin-top: 14px;
 }
 
-.gc-designer-data-controls__layout-persist-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
+/* Table fields tab: one dense toolbar row (aligned with Layout plans tab toolbars). */
+.gc-designer-data-controls__catalog-actions-toolbar {
   margin-top: 8px;
+  margin-bottom: 4px;
 }
 
-.gc-designer-data-controls__layout-persist-toolbar--layout {
-  margin-top: 0;
-  margin-bottom: 4px;
+.gc-designer-data-controls__layout-toolbar--main .gc-designer-data-controls__save-status {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.1;
+  max-width: 11rem;
 }
 
 .gc-designer-data-controls__layout-dirty-badge {
@@ -11566,7 +11557,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   overscroll-behavior-x: contain;
 }
 
-/* Field catalog: let wide columns drive table width; scroll inside this wrap (not clipped by page). */
+/* Table fields tab: let wide columns drive table width; scroll inside this wrap (not clipped by page). */
 .gc-designer[data-gc-designer-data-controls="1"] .gc-designer-data-controls__table-wrap {
   margin-left: calc(-1 * var(--page-gutter, 1rem));
   margin-right: calc(-1 * var(--page-gutter, 1rem));
@@ -11594,6 +11585,11 @@ body.gc-designer-entity-nav__facet-overlay-open {
 .gc-designer[data-gc-designer-data-controls="1"] .gc-designer-data-controls__table .gc-designer-data-controls__select-det {
   min-width: 10rem;
   max-width: none;
+}
+
+.gc-designer-data-controls__select-display-type {
+  min-width: 5.5rem;
+  max-width: 10rem;
 }
 
 .gc-designer-catalog-props-sandbox {
@@ -12336,6 +12332,67 @@ body.gc-designer-entity-nav__facet-overlay-open {
   z-index: 1;
 }
 
+/* Layout plan · control display cards: vertical tab = Show as, else property name */
+.gc-designer-data-controls-layout__controls
+  .gc-designer-data-controls-layout__node--in-panel.gc-designer-data-controls-layout__node--control {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: none;
+  padding: 0;
+}
+
+.gc-designer-data-controls-layout__panel-card-shell {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.gc-designer-data-controls-layout__panel-card-tab {
+  flex: 0 0 auto;
+  width: 1.7rem;
+  box-sizing: border-box;
+  border-left: 3px solid #8a4fd1;
+  border-right: 1px solid var(--border-subtle, #e2e8f0);
+  background: linear-gradient(180deg, #faf7ff 0%, #f3edfa 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 1px;
+  user-select: none;
+}
+
+.gc-designer-data-controls-layout__panel-card-tab-inner {
+  display: block;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text, #334155);
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  max-height: 12.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gc-designer-data-controls-layout__panel-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gc-designer-data-controls-layout__panel-card-main > .gc-designer-data-controls-layout__panel-card-top {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .gc-designer-data-controls-layout__logic .gc-designer-data-controls-layout__node--in-panel {
   position: relative;
   width: 100%;
@@ -12476,10 +12533,88 @@ body.gc-designer-entity-nav__facet-overlay-open {
 
 .gc-designer-data-controls-layout__panel-card-top {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(11rem, max-content) minmax(11.5rem, 1fr);
+  grid-template-rows: auto auto;
   align-items: start;
-  gap: 10px 12px;
+  column-gap: 12px;
+  row-gap: 8px;
   padding: 6px 8px 8px;
+}
+
+.gc-designer-data-controls-layout__panel-card-top__pencil-row {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 0;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-card-top__pencil-row {
+  display: none !important;
+}
+
+.gc-designer-data-controls-layout__panel-card-summary-wrap {
+  position: relative;
+  align-self: stretch;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-card-summary {
+  cursor: pointer;
+}
+
+.gc-designer-data-controls-layout__panel-props-toggle--summary-hover {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+  box-shadow: 0 0 0 1px var(--surface, #fff);
+}
+
+.gc-designer-data-controls-layout__panel-card-summary-wrap:hover
+  .gc-designer-data-controls-layout__panel-props-toggle--summary-hover,
+.gc-designer-data-controls-layout__panel-card-summary-wrap:focus-within
+  .gc-designer-data-controls-layout__panel-props-toggle--summary-hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.gc-designer-data-controls-layout__panel-card-top__leading {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+
+.gc-designer-data-controls-layout__panel-props-toggle {
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle, #d5dde8);
+  background: var(--surface-muted, #f8fafc);
+  color: var(--muted, #64748b);
+}
+
+.gc-designer-data-controls-layout__panel-props-toggle:hover {
+  border-color: var(--border-strong, #b8c4d4);
+  background: var(--surface, #fff);
+  color: var(--text, #334155);
 }
 
 .gc-designer-data-controls-layout__panel-drag-handle {
@@ -12490,7 +12625,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   padding: 6px 5px;
   cursor: grab;
   align-self: stretch;
-  min-height: 2.75rem;
+  min-height: 2.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12519,10 +12654,14 @@ body.gc-designer-entity-nav__facet-overlay-open {
 }
 
 .gc-designer-data-controls-layout__panel-io-stack {
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 0;
+  min-width: 11rem;
+  max-width: max-content;
+  box-sizing: border-box;
 }
 
 .gc-designer-data-controls-layout__io-columns {
@@ -12553,6 +12692,75 @@ body.gc-designer-entity-nav__facet-overlay-open {
   align-items: flex-start;
 }
 
+.gc-designer-data-controls-layout__panel-card-side {
+  grid-column: 3;
+  grid-row: 2;
+  min-width: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-card-top {
+  grid-template-rows: auto;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-card-top__leading {
+  grid-row: 1;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-io-stack {
+  grid-row: 1;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-card-side {
+  grid-row: 1;
+}
+
+.gc-designer-data-controls-layout__panel-card-summary {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  min-width: 0;
+  align-self: stretch;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.gc-designer-data-controls-layout__panel-sum-part {
+  white-space: normal;
+}
+
+.gc-designer-data-controls-layout__panel-sum-k {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.gc-designer-data-controls-layout__panel-sum-v {
+  color: #ea580c;
+  font-weight: 500;
+}
+
+.gc-designer-data-controls-layout__panel-sum-sep {
+  color: var(--border-strong, #cbd5e1);
+  font-weight: 400;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-collapsed
+  .gc-designer-data-controls-layout__panel-card-meta {
+  display: none !important;
+}
+
+.gc-designer-data-controls-layout__node--panel-props-expanded
+  .gc-designer-data-controls-layout__panel-card-summary-wrap {
+  display: none !important;
+}
+
 .gc-designer-data-controls-layout__panel-card-meta {
   display: flex;
   flex-direction: column;
@@ -12560,7 +12768,7 @@ body.gc-designer-entity-nav__facet-overlay-open {
   gap: 6px;
   text-align: left;
   min-width: 9rem;
-  max-width: 16rem;
+  max-width: 18rem;
 }
 
 .gc-designer-data-controls-layout__panel-show-as-field {
@@ -12607,6 +12815,48 @@ body.gc-designer-entity-nav__facet-overlay-open {
   font-size: 0.78rem;
 }
 
+.gc-designer-data-controls-layout__panel-text-constraints {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0;
+  width: 100%;
+}
+
+.gc-designer-data-controls-layout__panel-text-constraints__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: flex-end;
+}
+
+.gc-designer-data-controls-layout__panel-text-constraints__minmax {
+  flex: 1 1 6rem;
+  min-width: 5rem;
+  margin: 0;
+}
+
+.gc-designer-data-controls-layout__panel-text-constraints__minmax .settings-form__input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.78rem;
+}
+
+.gc-designer-data-controls-layout__panel-text-constraint-int-toggle {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.gc-designer-data-controls-layout__panel-text-default-field {
+  margin: 0;
+}
+
+.gc-designer-data-controls-layout__panel-text-default-field .settings-form__input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.78rem;
+}
+
 .gc-designer-data-controls-layout__panel-card-type-hint {
   display: block;
   font-size: 0.72rem;
@@ -12623,6 +12873,10 @@ body.gc-designer-entity-nav__facet-overlay-open {
   font-size: 0.78rem;
   line-height: 1.25;
   word-break: break-word;
+}
+
+.gc-designer-data-controls-layout__panel-card-tab .gc-designer-data-controls-layout__panel-card-name {
+  word-break: normal;
 }
 
 .gc-designer-data-controls-layout__node-head-main {
@@ -12782,6 +13036,32 @@ body.gc-designer-entity-nav__facet-overlay-open {
   background: #8a4fd1;
 }
 
+/* Data field cards (not Hidden): unwired connector pills read as “needs wire” */
+.gc-designer-data-controls-layout__node--field.gc-designer-data-controls-layout__node--field-wiring-hint
+  .gc-designer-data-controls-layout__handle:not(.is-wired) {
+  border-color: #f87171;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.gc-designer-data-controls-layout__node--field.gc-designer-data-controls-layout__node--field-wiring-hint
+  .gc-designer-data-controls-layout__handle:not(.is-wired):hover {
+  border-color: #ef4444;
+  background: #fee2e2;
+}
+
+.gc-designer-data-controls-layout__node--field.gc-designer-data-controls-layout__node--field-wiring-hint
+  .gc-designer-data-controls-layout__handle:not(.is-wired)
+  .gc-designer-data-controls-layout__dot {
+  background: #dc2626;
+}
+
+.gc-designer-data-controls-layout__node--field.gc-designer-data-controls-layout__node--field-wiring-hint
+  .gc-designer-data-controls-layout__handle:not(.is-wired)
+  .gc-designer-data-controls-layout__handle-label {
+  color: #991b1b;
+}
+
 .gc-designer-data-controls-layout__edges {
   grid-column: 1 / -1;
   grid-row: 1;
@@ -12888,6 +13168,25 @@ body.gc-designer-entity-nav__facet-overlay-open {
   stroke-width: 3px;
   pointer-events: all;
   cursor: default;
+}
+
+.gc-designer-data-controls-layout__field-trace-leader {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 1.25;
+  stroke-dasharray: 3 5;
+  pointer-events: none;
+}
+
+.gc-designer-data-controls-layout__field-trace-value {
+  fill: #334155;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 2.5px;
+  pointer-events: none;
 }
 
 .gc-designer-data-controls-test-modal__panel {

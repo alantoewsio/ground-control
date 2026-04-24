@@ -1,56 +1,112 @@
 {
   "node_positions": {
     "field:131": {
-      "x": 28.0,
-      "y": 136.0
+      "x": 0.0,
+      "y": 0.0
     },
     "field:132": {
-      "x": 28.0,
-      "y": 248.0
+      "x": 0.0,
+      "y": 1920.0
     },
     "field:133": {
-      "x": 28.0,
-      "y": 360.0
+      "x": 0.0,
+      "y": 320.0
     },
     "field:520": {
-      "x": 28.0,
-      "y": 472.0
+      "x": 0.0,
+      "y": 480.0
     },
     "field:521": {
-      "x": 28.0,
-      "y": 584.0
+      "x": 0.0,
+      "y": 960.0
     },
     "field:522": {
-      "x": 28.0,
-      "y": 696.0
+      "x": 0.0,
+      "y": 800.0
     },
     "field:523": {
-      "x": 28.0,
-      "y": 808.0
+      "x": 0.0,
+      "y": 1120.0
     },
     "field:524": {
-      "x": 28.0,
-      "y": 920.0
+      "x": 0.0,
+      "y": 640.0
     },
     "field:525": {
-      "x": 28.0,
-      "y": 1032.0
+      "x": 0.0,
+      "y": 1280.0
     },
     "field:526": {
-      "x": 28.0,
-      "y": 1144.0
+      "x": 0.0,
+      "y": 1440.0
     },
     "field:527": {
-      "x": 28.0,
-      "y": 1256.0
+      "x": 0.0,
+      "y": 1600.0
     },
     "field:528": {
-      "x": 28.0,
-      "y": 1368.0
+      "x": 0.0,
+      "y": 1760.0
     },
     "field:129": {
-      "x": 28.0,
-      "y": 1480.0
+      "x": 0.0,
+      "y": 2080.0
+    },
+    "field:130": {
+      "x": 0.0,
+      "y": 160.0
+    },
+    "ctrl:130": {
+      "x": 10.0,
+      "y": 280.0
+    },
+    "ctrl:131": {
+      "x": 10.0,
+      "y": 0.0
+    },
+    "ctrl:133": {
+      "x": 10.0,
+      "y": 560.0
+    },
+    "ctrl:132": {
+      "x": 10.0,
+      "y": 840.0
+    },
+    "ctrl:524": {
+      "x": 10.0,
+      "y": 1400.0
+    },
+    "ctrl:522": {
+      "x": 10.0,
+      "y": 1680.0
+    },
+    "ctrl:523": {
+      "x": 10.0,
+      "y": 1120.0
+    },
+    "ctrl:521": {
+      "x": 10.0,
+      "y": 1960.0
+    },
+    "ctrl:525": {
+      "x": 10.0,
+      "y": 2240.0
+    },
+    "ctrl:526": {
+      "x": 10.0,
+      "y": 2520.0
+    },
+    "ctrl:527": {
+      "x": 10.0,
+      "y": 2800.0
+    },
+    "ctrl:528": {
+      "x": 10.0,
+      "y": 3080.0
+    },
+    "ctrl:520": {
+      "x": 10.0,
+      "y": 840.0
     }
   },
   "connections": [
@@ -83,20 +139,6 @@
       "edge_id": "gc_mo1galg2_r52tj4oet4"
     },
     {
-      "source_node_id": "field:521",
-      "source_handle": "loaded_value",
-      "target_node_id": "ctrl:521",
-      "target_handle": "value",
-      "edge_id": "gc_mo1galg2_t5vk69yqyv"
-    },
-    {
-      "source_node_id": "ctrl:521",
-      "source_handle": "value",
-      "target_node_id": "field:521",
-      "target_handle": "save_value",
-      "edge_id": "gc_mo1galg2_mpwofakki0"
-    },
-    {
       "source_node_id": "field:133",
       "source_handle": "loaded_value",
       "target_node_id": "ctrl:133",
@@ -111,16 +153,193 @@
       "edge_id": "gc_mo8n18js_vz7bvbzuse"
     },
     {
+      "source_node_id": "ctrl:522",
+      "source_handle": "value",
+      "target_node_id": "field:522",
+      "target_handle": "save_value",
+      "edge_id": "gc_moabnk4a_0py095qqul"
+    },
+    {
       "source_node_id": "ctrl:133",
-      "source_handle": "option_a",
+      "source_handle": "option_tcporudp",
+      "target_node_id": "ctrl:522",
+      "target_handle": "visible",
+      "edge_id": "gc_moaboflz_yypc9uy24b"
+    },
+    {
+      "source_node_id": "ctrl:524",
+      "source_handle": "value",
+      "target_node_id": "field:524",
+      "target_handle": "save_value",
+      "edge_id": "gc_moabrd8l_y8dv3knm9h"
+    },
+    {
+      "source_node_id": "ctrl:525",
+      "source_handle": "value",
+      "target_node_id": "field:525",
+      "target_handle": "save_value",
+      "edge_id": "gc_moabub9r_y5ddvnyf7d"
+    },
+    {
+      "source_node_id": "ctrl:526",
+      "source_handle": "value",
+      "target_node_id": "field:526",
+      "target_handle": "save_value",
+      "edge_id": "gc_moabudai_u1gxz5jqnd"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_icmp",
+      "target_node_id": "ctrl:525",
+      "target_handle": "visible",
+      "edge_id": "gc_moac1l6h_jqb46x2wv7"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_icmp",
+      "target_node_id": "ctrl:526",
+      "target_handle": "visible",
+      "edge_id": "gc_moac1p7o_vsm52155nd"
+    },
+    {
+      "source_node_id": "ctrl:527",
+      "source_handle": "value",
+      "target_node_id": "field:527",
+      "target_handle": "save_value",
+      "edge_id": "gc_moac26f9_yramzbxapv"
+    },
+    {
+      "source_node_id": "ctrl:528",
+      "source_handle": "value",
+      "target_node_id": "field:528",
+      "target_handle": "save_value",
+      "edge_id": "gc_moac29xq_uttqiomdnb"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_icmpv6",
+      "target_node_id": "ctrl:527",
+      "target_handle": "visible",
+      "edge_id": "gc_moac3a1w_tb2it5yvrm"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_icmpv6",
+      "target_node_id": "ctrl:528",
+      "target_handle": "visible",
+      "edge_id": "gc_moac3fp9_mh63wik865"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_tcporudp",
+      "target_node_id": "ctrl:524",
+      "target_handle": "visible",
+      "edge_id": "gc_moac4ce5_yfvidrjwaj"
+    },
+    {
+      "source_node_id": "field:524",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:524",
+      "target_handle": "value",
+      "edge_id": "gc_mobq6utk_hkuxc5fizg"
+    },
+    {
+      "source_node_id": "field:522",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:522",
+      "target_handle": "value",
+      "edge_id": "gc_mobq71i8_tdiancqo7k"
+    },
+    {
+      "source_node_id": "field:525",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:525",
+      "target_handle": "value",
+      "edge_id": "gc_mobq7cqc_f6y816e11z"
+    },
+    {
+      "source_node_id": "field:526",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:526",
+      "target_handle": "value",
+      "edge_id": "gc_mobq7eyl_59x510183w"
+    },
+    {
+      "source_node_id": "field:527",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:527",
+      "target_handle": "value",
+      "edge_id": "gc_mobq7meo_b4qu42tt54"
+    },
+    {
+      "source_node_id": "field:528",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:528",
+      "target_handle": "value",
+      "edge_id": "gc_mobq7wwe_1tyqedzpsk"
+    },
+    {
+      "source_node_id": "field:520",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:520",
+      "target_handle": "value",
+      "edge_id": "gc_mobqnz40_w323ajh6sg"
+    },
+    {
+      "source_node_id": "ctrl:520",
+      "source_handle": "value",
+      "target_node_id": "field:520",
+      "target_handle": "save_value",
+      "edge_id": "gc_mobqnz40_ac4fx3b59a"
+    },
+    {
+      "source_node_id": "ctrl:523",
+      "source_handle": "selected",
+      "target_node_id": "field:523",
+      "target_handle": "save_value",
+      "edge_id": "gc_mobqwwbz_leacs8f78a"
+    },
+    {
+      "source_node_id": "ctrl:521",
+      "source_handle": "value",
+      "target_node_id": "field:521",
+      "target_handle": "save_value",
+      "edge_id": "gc_mobqx8kh_w48es667rn"
+    },
+    {
+      "source_node_id": "field:521",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:521",
+      "target_handle": "value",
+      "edge_id": "gc_mobrjnir_hacwkzi20v"
+    },
+    {
+      "source_node_id": "field:523",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:523",
+      "target_handle": "selected",
+      "edge_id": "gc_mobrjthi_y86k4zfk5w"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_tcporudp",
+      "target_node_id": "ctrl:523",
+      "target_handle": "visible",
+      "edge_id": "gc_mobrld26_j0vkwzc1rs"
+    },
+    {
+      "source_node_id": "ctrl:133",
+      "source_handle": "option_ip",
       "target_node_id": "ctrl:521",
       "target_handle": "visible",
-      "edge_id": "gc_mo8n25gi_au087pvnt8"
+      "edge_id": "gc_mobrm855_b9wlkbk4ye"
     }
   ],
   "logic_nodes": [],
-  "control_add_only": {},
+  "control_add_only": {
+    "ctrl:133": true
+  },
   "member_lookup_data_source": {},
   "member_lookup_multi": {},
-  "layout_locked": false
+  "layout_locked": true
 }

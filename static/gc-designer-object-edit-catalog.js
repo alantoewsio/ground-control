@@ -52,13 +52,58 @@
   }
 
   function parsePropsJson(raw) {
-    if (raw == null || trimStr(raw) === "") return {};
+    if (raw == null) return {};
+    if (typeof raw === "object" && !Array.isArray(raw)) return raw;
+    if (trimStr(String(raw)) === "") return {};
     try {
       var j = JSON.parse(String(raw));
       return j && typeof j === "object" ? j : {};
     } catch (e) {
       return {};
     }
+  }
+
+  function fillDataEntryTableColTimeSelect(sel, cellVal) {
+    var opts =
+      typeof globalThis.gcDataEntryTableQuarterHourTimeOptions === "function"
+        ? globalThis.gcDataEntryTableQuarterHourTimeOptions()
+        : [];
+    if (!opts.length) {
+      var pad2 = function (n) {
+        var s = String(Number(n) || 0);
+        return s.length >= 2 ? s : "0" + s;
+      };
+      var h;
+      var m;
+      for (h = 0; h < 24; h++) {
+        for (m = 0; m < 60; m += 15) {
+          opts.push(pad2(h) + ":" + pad2(m));
+        }
+      }
+      if (opts.indexOf("23:59") === -1) opts.push("23:59");
+    }
+    var seen = {};
+    opts.forEach(function (v) {
+      seen[v] = true;
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v;
+      sel.appendChild(o);
+    });
+    var cv = cellVal != null ? String(cellVal) : "";
+    var cvt = trimStr(cv);
+    if (cvt && !seen[cvt]) {
+      var o0 = document.createElement("option");
+      o0.value = cv;
+      o0.textContent = cv;
+      sel.appendChild(o0);
+    }
+    if (cvt) sel.value = cv;
+  }
+
+  function isObjectEditFlyoutAddMode() {
+    var st = globalThis.__gcObjectEditFlyoutState;
+    return !!(st && trimStr(String(st.mode || "")).toLowerCase() === "add");
   }
 
   function escapeAttr(s) {
@@ -75,7 +120,7 @@
       .replace(/>/g, "&gt;");
   }
 
-  /** Valid entity_type strings from field catalog ``data_source_entity_types`` (API-shaped). */
+  /** Valid entity_type strings from table fields ``data_source_entity_types`` (API-shaped). */
   function catalogDataSourceEntityTypes(field) {
     if (!field || !Array.isArray(field.data_source_entity_types)) return [];
     var out = [];
@@ -192,14 +237,102 @@
     return inp;
   }
 
+  function usesNewTextConstraints(props) {
+    if (!props || typeof props !== "object") return false;
+    if (props.constraintInteger === true) return true;
+    if (props.constraintMin != null && trimStr(String(props.constraintMin)) !== "") return true;
+    if (props.constraintMax != null && trimStr(String(props.constraintMax)) !== "") return true;
+    return false;
+  }
+
+  function parseOptionalIntBound(raw, allowNegative) {
+    var t = trimStr(raw != null ? String(raw) : "");
+    if (!t) return { ok: true, v: null };
+    var re = allowNegative ? /^-?\d+$/ : /^\d+$/;
+    if (!re.test(t)) return { ok: false, v: null };
+    var n = parseInt(t, 10);
+    if (!allowNegative && n < 0) return { ok: false, v: null };
+    return { ok: true, v: n };
+  }
+
+  function applyAndWireTextConstraints(el, props) {
+    if (!el || !props || typeof props !== "object") return;
+    var intOn = props.constraintInteger === true;
+    var bMin = parseOptionalIntBound(props.constraintMin, intOn);
+    var bMax = parseOptionalIntBound(props.constraintMax, intOn);
+    var vmin = bMin.ok ? bMin.v : null;
+    var vmax = bMax.ok ? bMax.v : null;
+    if (vmin != null && vmax != null && vmin > vmax) {
+      vmin = null;
+      vmax = null;
+    }
+    el.setAttribute("data-gc-text-constraint", "1");
+    el.setAttribute("data-gc-text-constraint-int", intOn ? "1" : "0");
+    if (vmin != null) el.setAttribute("data-gc-text-constraint-min", String(vmin));
+    else el.removeAttribute("data-gc-text-constraint-min");
+    if (vmax != null) el.setAttribute("data-gc-text-constraint-max", String(vmax));
+    else el.removeAttribute("data-gc-text-constraint-max");
+    if (!intOn) {
+      if (vmin != null && vmin >= 0) el.minLength = vmin;
+      else el.removeAttribute("minLength");
+      if (vmax != null && vmax >= 1) el.maxLength = vmax;
+      else el.removeAttribute("maxLength");
+    } else {
+      el.removeAttribute("minLength");
+      el.removeAttribute("maxLength");
+    }
+    function validateTextConstraint() {
+      if (typeof el.setCustomValidity !== "function") return;
+      var raw = "value" in el ? String(el.value != null ? el.value : "") : "";
+      if (intOn) {
+        var t = trimStr(raw);
+        if (!t) {
+          el.setCustomValidity("");
+          return;
+        }
+        if (!/^-?\d+$/.test(t)) {
+          el.setCustomValidity("Enter a whole number.");
+          return;
+        }
+        var n = parseInt(t, 10);
+        if (vmin != null && n < vmin) {
+          el.setCustomValidity("Value must be at least " + vmin + ".");
+          return;
+        }
+        if (vmax != null && n > vmax) {
+          el.setCustomValidity("Value must be at most " + vmax + ".");
+          return;
+        }
+      } else {
+        var len = raw.length;
+        if (vmin != null && len < vmin) {
+          el.setCustomValidity("Enter at least " + vmin + " characters.");
+          return;
+        }
+        if (vmax != null && len > vmax) {
+          el.setCustomValidity("Enter at most " + vmax + " characters.");
+          return;
+        }
+      }
+      el.setCustomValidity("");
+    }
+    el.addEventListener("input", validateTextConstraint);
+    el.addEventListener("blur", validateTextConstraint);
+    validateTextConstraint();
+  }
+
   function buildTextSingle(props) {
     var inp = document.createElement("input");
     inp.type = "text";
     inp.className = "settings-form__input mono";
     inp.autocomplete = "off";
     if (props.value != null) inp.value = String(props.value);
-    if (props.minLength != null) inp.minLength = Math.max(0, parseInt(props.minLength, 10) || 0);
-    if (props.maxLength != null) inp.maxLength = Math.max(1, parseInt(props.maxLength, 10) || 1);
+    if (usesNewTextConstraints(props)) {
+      applyAndWireTextConstraints(inp, props);
+    } else {
+      if (props.minLength != null) inp.minLength = Math.max(0, parseInt(props.minLength, 10) || 0);
+      if (props.maxLength != null) inp.maxLength = Math.max(1, parseInt(props.maxLength, 10) || 1);
+    }
     if (props.charset != null) inp.setAttribute("data-gc-text-charset", String(props.charset));
     return inp;
   }
@@ -221,7 +354,11 @@
     ta.className = "settings-form__input mono";
     ta.rows = 4;
     if (props.value != null) ta.value = String(props.value);
-    if (props.maxLength != null) ta.maxLength = Math.max(1, parseInt(props.maxLength, 10) || 1);
+    if (usesNewTextConstraints(props)) {
+      applyAndWireTextConstraints(ta, props);
+    } else if (props.maxLength != null) {
+      ta.maxLength = Math.max(1, parseInt(props.maxLength, 10) || 1);
+    }
     return ta;
   }
 
@@ -1111,6 +1248,46 @@
         return buildDropdown(props, field.id, true, field);
       case "member-lookup":
         return buildMemberLookup(props, field.id, field);
+      case "data-entry-table-col-text":
+        return buildTextSingle(props);
+      case "data-entry-table-col-selection": {
+        var p2 = Object.assign({}, props);
+        if (field.allowed_options && Array.isArray(field.allowed_options)) {
+          var ao2 = [];
+          field.allowed_options.forEach(function (x) {
+            var t = String(x != null ? x : "").trim();
+            if (t) ao2.push(t);
+          });
+          if (ao2.length) p2.items = ao2;
+        }
+        var selOnly = document.createElement("select");
+        selOnly.className =
+          "settings-form__input mono gc-if-flyout__input gc-if-flyout__select gc-bridge-flyout__member-select";
+        var items = Array.isArray(p2.items) ? p2.items : [""];
+        items.forEach(function (v) {
+          var o = document.createElement("option");
+          o.value = String(v);
+          o.textContent = String(v) || "(empty)";
+          selOnly.appendChild(o);
+        });
+        if (props.value != null && String(props.value) !== "") selOnly.value = String(props.value);
+        return selOnly;
+      }
+      case "data-entry-table-col-time": {
+        var selTime = document.createElement("select");
+        selTime.className =
+          "settings-form__input mono gc-if-flyout__input gc-if-flyout__select gc-bridge-flyout__member-select";
+        fillDataEntryTableColTimeSelect(selTime, props.value);
+        return selTime;
+      }
+      case "data-entry-table-col-toggle": {
+        var cb2 = document.createElement("input");
+        cb2.type = "checkbox";
+        cb2.className = "settings-form__input";
+        cb2.checked = parseBoolLike(props.value);
+        return cb2;
+      }
+      case "data-entry-table":
       case "ip-constraint":
       case "edit-flyout":
       case "tag-save":
@@ -1290,14 +1467,263 @@
     });
   }
 
+  function reevalLayoutFromDataEntryTable() {
+    if (typeof reevalObjectEditLayoutFromCurrentInputs === "function") {
+      reevalObjectEditLayoutFromCurrentInputs();
+    }
+  }
+
+  function wireDataEntryTableEvents(root) {
+    root.addEventListener("input", function (ev) {
+      if (ev.isTrusted === false) return;
+      if (!ev.target.closest || !ev.target.closest("[data-gc-det-table-root]")) return;
+      reevalLayoutFromDataEntryTable();
+    });
+    root.addEventListener("change", function (ev) {
+      if (ev.isTrusted === false) return;
+      if (!ev.target.closest || !ev.target.closest("[data-gc-det-table-root]")) return;
+      reevalLayoutFromDataEntryTable();
+    });
+  }
+
+  function buildTableCellForColumn(colField, cellVal, isBlankTemplateRow) {
+    var det = trimStr(colField.data_entry_type).toLowerCase();
+    var props = parsePropsJson(colField.data_entry_properties);
+    var wrap = document.createElement("div");
+    wrap.className = "gc-data-entry-table__cell-inner";
+    if (det === "data-entry-table-col-selection") {
+      var sel = document.createElement("select");
+      sel.className =
+        "settings-form__input mono gc-if-flyout__input gc-if-flyout__select gc-bridge-flyout__member-select";
+      sel.setAttribute(
+        "aria-label",
+        trimStr(colField.show_as) || trimStr(colField.property_name) || "Value",
+      );
+      var opts = [];
+      if (colField.allowed_options && Array.isArray(colField.allowed_options)) {
+        colField.allowed_options.forEach(function (x) {
+          var t = String(x != null ? x : "").trim();
+          if (t) opts.push(t);
+        });
+      }
+      if (Array.isArray(props.items)) {
+        props.items.forEach(function (x) {
+          var t = trimStr(x != null ? String(x) : "");
+          if (t) opts.push(t);
+        });
+      }
+      if (!opts.length) opts.push("");
+      opts.forEach(function (v) {
+        var o = document.createElement("option");
+        o.value = v;
+        o.textContent = v || "(empty)";
+        sel.appendChild(o);
+      });
+      if (cellVal != null && String(cellVal) !== "") sel.value = String(cellVal);
+      wrap.appendChild(sel);
+      return wrap;
+    }
+    if (det === "data-entry-table-col-time") {
+      var selT = document.createElement("select");
+      selT.className =
+        "settings-form__input mono gc-if-flyout__input gc-if-flyout__select gc-bridge-flyout__member-select";
+      selT.setAttribute(
+        "aria-label",
+        trimStr(colField.show_as) || trimStr(colField.property_name) || "Time",
+      );
+      fillDataEntryTableColTimeSelect(selT, cellVal);
+      wrap.appendChild(selT);
+      return wrap;
+    }
+    if (det === "data-entry-table-col-toggle") {
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "settings-form__input";
+      cb.checked = parseBoolLike(cellVal);
+      cb.setAttribute(
+        "aria-label",
+        trimStr(colField.show_as) || trimStr(colField.property_name) || "",
+      );
+      wrap.appendChild(cb);
+      return wrap;
+    }
+    var textVal = cellVal != null ? String(cellVal) : "";
+    if (
+      det === "data-entry-table-col-text" &&
+      !trimStr(textVal) &&
+      isObjectEditFlyoutAddMode() &&
+      !isBlankTemplateRow
+    ) {
+      var dvCol = props.defaultValue;
+      if (dvCol != null && trimStr(String(dvCol)) !== "") {
+        textVal = String(dvCol);
+      }
+    }
+    var inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "settings-form__input mono gc-if-flyout__input";
+    inp.autocomplete = "off";
+    inp.value = textVal;
+    inp.setAttribute(
+      "aria-label",
+      trimStr(colField.show_as) || trimStr(colField.property_name) || "",
+    );
+    wrap.appendChild(inp);
+    return wrap;
+  }
+
+  function appendDataEntryTableRow(tb, colFields, cells, isBlank) {
+    var tr = document.createElement("tr");
+    tr.setAttribute("data-gc-det-data-row", "1");
+    if (isBlank) tr.setAttribute("data-gc-det-blank", "1");
+    colFields.forEach(function (cf) {
+      var fid = String(cf.id || "");
+      var td = document.createElement("td");
+      td.setAttribute("data-gc-det-col-field-id", fid);
+      var v = cells && Object.prototype.hasOwnProperty.call(cells, fid) ? cells[fid] : "";
+      td.appendChild(buildTableCellForColumn(cf, v, isBlank));
+      tr.appendChild(td);
+    });
+    var tdAct = document.createElement("td");
+    tdAct.className = "gc-bridge-flyout__members-actions-col";
+    var rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "btn-icon gc-bridge-flyout__member-remove gc-data-entry-table__rm";
+    rm.innerHTML = window.gcIcon
+      ? window.gcIcon("delete", { size: "xs", cls: "gc-bridge-flyout__member-trash-svg" })
+      : '<span aria-hidden="true">\u00d7</span>';
+    rm.setAttribute("aria-label", isBlank ? "New row" : "Remove row");
+    if (isBlank) {
+      rm.disabled = true;
+      rm.classList.add("gc-bridge-flyout__member-remove--blank");
+    }
+    tdAct.appendChild(rm);
+    tr.appendChild(tdAct);
+    tb.appendChild(tr);
+  }
+
+  function promoteBlankDataEntryRow(tr, tb, colFields) {
+    tr.removeAttribute("data-gc-det-blank");
+    var rm = tr.querySelector(".gc-data-entry-table__rm");
+    if (rm) {
+      rm.disabled = false;
+      rm.classList.remove("gc-bridge-flyout__member-remove--blank");
+      rm.setAttribute("aria-label", "Remove row");
+    }
+    appendDataEntryTableRow(tb, colFields, {}, true);
+  }
+
+  function bindDataEntryTableRowButtons(wrap, colFields) {
+    var tb = wrap.querySelector(".gc-data-entry-table__table tbody");
+    if (!tb) return;
+    tb.addEventListener("click", function (ev) {
+      var btn = ev.target.closest && ev.target.closest(".gc-data-entry-table__rm");
+      if (!btn || !tb.contains(btn)) return;
+      var tr = btn.closest("tr");
+      if (!tr || tr.getAttribute("data-gc-det-blank") === "1") return;
+      tr.remove();
+      reevalLayoutFromDataEntryTable();
+    });
+    tb.addEventListener("input", function (ev) {
+      if (ev.isTrusted === false) return;
+      var inp = ev.target.closest && ev.target.closest("input");
+      if (!inp || !tb.contains(inp)) return;
+      var tr = inp.closest("tr");
+      if (!tr || tr.getAttribute("data-gc-det-blank") !== "1") return;
+      if (trimStr(inp.value) !== "") promoteBlankDataEntryRow(tr, tb, colFields);
+    });
+    tb.addEventListener("change", function (ev) {
+      if (ev.isTrusted === false) return;
+      var sel = ev.target.closest && ev.target.closest("select");
+      if (!sel || !tb.contains(sel)) return;
+      var tr = sel.closest("tr");
+      if (!tr || tr.getAttribute("data-gc-det-blank") !== "1") return;
+      if (trimStr(sel.value) !== "") promoteBlankDataEntryRow(tr, tb, colFields);
+    });
+  }
+
+  function buildDataEntryTableControl(parentField, columnFields) {
+    var wrap = document.createElement("div");
+    wrap.className = "gc-data-entry-table";
+    wrap.setAttribute("data-gc-det-table-root", "1");
+    wrap.setAttribute("data-gc-catalog-field-id", String(parentField.id || ""));
+    var inner = document.createElement("div");
+    inner.className = "gc-bridge-flyout__members-table-wrap";
+    var table = document.createElement("table");
+    table.className =
+      "gc-bridge-flyout__members-table gc-data-entry-table__table data-table data-table--dense";
+    table.setAttribute(
+      "aria-label",
+      trimStr(parentField.show_as) || trimStr(parentField.property_name) || "Rows",
+    );
+    var cg = document.createElement("colgroup");
+    columnFields.forEach(function () {
+      var col = document.createElement("col");
+      col.className = "gc-data-entry-table__col";
+      cg.appendChild(col);
+    });
+    var cAct = document.createElement("col");
+    cAct.className = "gc-data-entry-table__col-actions";
+    cg.appendChild(cAct);
+    table.appendChild(cg);
+    var thead = document.createElement("thead");
+    var hr = document.createElement("tr");
+    columnFields.forEach(function (cf) {
+      var th = document.createElement("th");
+      th.setAttribute("scope", "col");
+      th.setAttribute("data-gc-det-col-field-id", String(cf.id || ""));
+      th.textContent =
+        trimStr(cf.show_as) !== ""
+          ? trimStr(cf.show_as)
+          : trimStr(cf.property_name) || "Column";
+      hr.appendChild(th);
+    });
+    var tha = document.createElement("th");
+    tha.className = "gc-bridge-flyout__members-actions-col";
+    tha.setAttribute("scope", "col");
+    hr.appendChild(tha);
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tb = document.createElement("tbody");
+    table.appendChild(tb);
+    inner.appendChild(table);
+    wrap.appendChild(inner);
+    var st = globalThis.__gcObjectEditFlyoutState;
+    var rowData = st && st.row && typeof st.row === "object" ? st.row : {};
+    var rows =
+      typeof globalThis.gcDataEntryTableParseRowsFromFlat === "function"
+        ? globalThis.gcDataEntryTableParseRowsFromFlat(rowData, parentField, columnFields)
+        : [];
+    if (!rows.length && !isObjectEditFlyoutAddMode()) {
+      rows = [{ cells: {} }];
+    }
+    rows.forEach(function (r) {
+      appendDataEntryTableRow(tb, columnFields, r.cells, false);
+    });
+    appendDataEntryTableRow(tb, columnFields, {}, true);
+    bindDataEntryTableRowButtons(wrap, columnFields);
+    wireDataEntryTableEvents(wrap);
+    return wrap;
+  }
+
   function renderFields(container, statusEl, fields) {
     container.innerHTML = "";
     var visible = 0;
     var fieldsForRender = dedupeIpFamilyCatalogFields(fields || []);
+    var allFields =
+      globalThis.__gcObjectEditFlyoutState && Array.isArray(globalThis.__gcObjectEditFlyoutState.allFields)
+        ? globalThis.__gcObjectEditFlyoutState.allFields
+        : fields || [];
     var hasSeparateIpFamily = catalogFieldsHaveSeparateIpFamilyRow(fieldsForRender);
     fieldsForRender.forEach(function (f) {
       var det = f.data_entry_type != null ? String(f.data_entry_type) : "";
       if (isSkippableDataEntryType(det)) return;
+      if (
+        typeof globalThis.gcDataEntryTableIsColumnField === "function" &&
+        globalThis.gcDataEntryTableIsColumnField(f, allFields)
+      ) {
+        return;
+      }
       var props = parsePropsJson(f.data_entry_properties);
       var detLower = trimStr(det).toLowerCase();
       if (
@@ -1321,6 +1747,18 @@
         });
         if (ao.length) props.items = ao;
       }
+      if (
+        isObjectEditFlyoutAddMode() &&
+        (detLower === "text-single" ||
+          detLower === "text-multiline" ||
+          detLower === "data-entry-table-col-text")
+      ) {
+        var dvSeed = props.defaultValue;
+        var curPv = props.value != null ? String(props.value) : "";
+        if (dvSeed != null && trimStr(String(dvSeed)) !== "" && !trimStr(curPv)) {
+          props = Object.assign({}, props, { value: String(dvSeed) });
+        }
+      }
       var label =
         f.show_as != null && trimStr(f.show_as) !== ""
           ? trimStr(f.show_as)
@@ -1328,7 +1766,19 @@
             ? String(f.property_name)
             : "Field";
       var help = f.help_text != null ? String(f.help_text) : "";
-      var ctrl = buildControlForType(det, props, f);
+      var ctrl;
+      if (detLower === "data-entry-table") {
+        if (typeof globalThis.gcDataEntryTableColumnFieldsForParent !== "function") {
+          ctrl = buildDefaultText(props);
+        } else {
+          var cols = globalThis.gcDataEntryTableColumnFieldsForParent(f, allFields).filter(function (c) {
+            return !isSkippableDataEntryType(c && c.data_entry_type);
+          });
+          ctrl = buildDataEntryTableControl(f, cols);
+        }
+      } else {
+        ctrl = buildControlForType(det, props, f);
+      }
       if (!ctrl) return;
       var row = document.createElement("div");
       row.className = "settings-form__field gc-designer-object-edit-catalog-row";
@@ -1352,7 +1802,7 @@
     if (statusEl) {
       if (!visible) {
         statusEl.textContent =
-          "No visible fields for this type (all Hidden or empty catalog). Run config sync and use Data Controls to map fields.";
+          "No visible fields for this type (all Hidden or empty catalog). Run config sync and use Designer · Layouts to map fields.";
         statusEl.hidden = false;
       } else {
         statusEl.textContent = "";
@@ -1556,7 +2006,7 @@
     host.hidden = false;
     fieldsEl.innerHTML = "";
     if (statusEl) {
-      statusEl.textContent = "Loading field catalog…";
+      statusEl.textContent = "Loading table fields…";
       statusEl.hidden = false;
     }
     notifyObjectEditCatalogVisibleFieldCount(0);
@@ -1610,21 +2060,6 @@
               };
         var flyoutMode =
           catalogHydrateOpts && trimStr(catalogHydrateOpts.mode).toLowerCase() === "add" ? "add" : "edit";
-        globalThis.__gcObjectEditFlyoutState = {
-          entityType: et,
-          mode: flyoutMode,
-          fields: pack.fields,
-          allFields: catalogFieldsIn,
-          layout: layoutJson,
-          connections: pack.connections,
-          nodeCatalog: pack.nodeCatalog,
-          row:
-            catalogHydrateOpts && catalogHydrateOpts.row && typeof catalogHydrateOpts.row === "object"
-              ? catalogHydrateOpts.row
-              : null,
-        };
-        renderFields(fieldsEl, statusEl, pack.fields);
-        applyMemberLookupLayoutDataSourcesFromLayout(fieldsEl, layoutJson);
         var rowForFlow =
           catalogHydrateOpts && catalogHydrateOpts.row && typeof catalogHydrateOpts.row === "object"
             ? catalogHydrateOpts.row
@@ -1639,6 +2074,18 @@
               : {},
           };
         }
+        globalThis.__gcObjectEditFlyoutState = {
+          entityType: et,
+          mode: flyoutMode,
+          fields: pack.fields,
+          allFields: catalogFieldsIn,
+          layout: layoutJson,
+          connections: pack.connections,
+          nodeCatalog: pack.nodeCatalog,
+          row: rowForFlow,
+        };
+        renderFields(fieldsEl, statusEl, pack.fields);
+        applyMemberLookupLayoutDataSourcesFromLayout(fieldsEl, layoutJson);
         function applyLayoutFlowFromRow() {
           if (
             typeof globalThis.gcDcLayoutApplyFlowFromDesignToObjectEditCatalog !== "function" ||
@@ -1664,6 +2111,7 @@
         ) {
           var lookup = buildRowValueLookup(catalogHydrateOpts);
           applyObjectEditCatalogRowValues(fieldsEl, lookup);
+          applyLayoutFlowFromRow();
           setTimeout(function () {
             if (seq !== hydrateObjectEditCatalogSeq) return;
             applyObjectEditCatalogRowValues(fieldsEl, lookup);
@@ -1688,6 +2136,21 @@
   globalThis.gcDesignerHydrateObjectEditCatalogFields = hydrateObjectEditCatalogFields;
   globalThis.gcDesignerApplyObjectEditFlyoutControlLocks = applyObjectEditFlyoutControlLocks;
   wireObjectEditSelectorReeval();
+
+  globalThis.gcDesignerValidateObjectEditCatalogConstraints = function () {
+    var host = document.getElementById("gc-designer-object-edit-catalog-fields");
+    if (!host) return true;
+    var firstBad = null;
+    host.querySelectorAll("[data-gc-text-constraint]").forEach(function (el) {
+      if (firstBad) return;
+      if (typeof el.checkValidity === "function" && !el.checkValidity()) firstBad = el;
+    });
+    if (firstBad && typeof firstBad.reportValidity === "function") {
+      firstBad.reportValidity();
+      return false;
+    }
+    return true;
+  };
 
   globalThis.gcDesignerObjectEditFlyoutCollectSave = function () {
     var st = globalThis.__gcObjectEditFlyoutState;

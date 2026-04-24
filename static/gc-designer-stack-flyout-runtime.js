@@ -536,6 +536,12 @@
 
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
+        if (
+          typeof globalThis.gcDesignerValidateObjectEditCatalogConstraints === "function" &&
+          !globalThis.gcDesignerValidateObjectEditCatalogConstraints()
+        ) {
+          return;
+        }
         var payload =
           typeof globalThis.gcDesignerObjectEditFlyoutCollectSave === "function"
             ? globalThis.gcDesignerObjectEditFlyoutCollectSave()

@@ -134,6 +134,7 @@ def _process_payload(
                 data_entry_type=inferred_det,
                 data_entry_properties=None,
                 show_as=None,
+                display_type="text",
                 display_order=do,
             )
         )

@@ -1,13 +1,13 @@
 {% extends "designer_base.html" %}
 {% set designer_subnav_active = "data_controls" %}
-{% block title %}Data Controls · Designer · Ground Control{% endblock %}
-{% block page_title %}Data Controls{% endblock %}
+{% block title %}Layouts · Designer · Ground Control{% endblock %}
+{% block page_title %}Layouts{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol class="breadcrumbs__list">
     <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/">Dashboard</a></li>
     <li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/designer/navigation">Designer</a></li>
-    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Data Controls</li>
+    <li class="breadcrumbs__item breadcrumbs__item--current" aria-current="page">Layouts</li>
   </ol>
 </nav>
 {% endblock %}
@@ -22,9 +22,9 @@
 <script type="application/json" id="gc-designer-data-controls-entry-types">{{ designer_catalog_data_entry_types | tojson }}</script>
 <main class="layout single gc-designer gc-designer-data-controls-page" data-gc-designer-data-controls="1">
   <div class="gc-designer-data-controls__main-col">
-  <section class="gc-designer__section gc-designer-data-controls__workspace" aria-label="Data controls editor">
+  <section class="gc-designer__section gc-designer-data-controls__workspace" aria-label="Layouts editor">
     <p class="gc-designer__note gc-designer-data-controls__lead-note">
-      Choose a cached object type to load catalog fields and layout plans. If the list is empty, run a config sync so
+      Choose a cached object type to load table fields and layout plans. If the list is empty, run a config sync so
       fields can be discovered.
     </p>
     <div class="gc-designer-data-controls__editor-shell">
@@ -40,7 +40,7 @@
       </aside>
       <div class="gc-designer-data-controls__editor-main-col">
         <div class="gc-designer-data-controls__tabs-wrap">
-          <div class="gc-tabs gc-designer-data-controls__tabs" role="tablist" aria-label="Data controls tabs">
+          <div class="gc-tabs gc-designer-data-controls__tabs" role="tablist" aria-label="Layouts tabs">
             <button
               type="button"
               class="gc-tabs__tab is-active"
@@ -50,7 +50,7 @@
               aria-controls="gc-designer-data-controls-panel-catalog"
               data-gc-dc-tab="catalog"
             >
-              Field catalog
+              Table fields
             </button>
             <button
               type="button"
@@ -75,40 +75,43 @@
     data-gc-dc-panel="catalog"
     aria-hidden="false"
   >
-    <h2 id="gc-designer-data-controls-fields-h" class="gc-designer__h2">Field catalog</h2>
+    <h2 id="gc-designer-data-controls-fields-h" class="gc-designer__h2">Table fields</h2>
     <p class="gc-designer__note">
-      Scan synced cache entries and add any missing <code class="mono">payload_json</code> keys to the catalog:
+      Scan synced cache entries and add any missing <code class="mono">payload_json</code> keys to this table:
       top-level and nested object keys use dot-separated paths (e.g. <code class="mono">Parent.Child</code>).
-      Existing catalog rows are left unchanged.
+      Existing rows are left unchanged.
     </p>
-    <div class="gc-designer-data-controls__generate settings-form" role="group" aria-labelledby="gc-designer-data-controls-generate-h">
-      <span id="gc-designer-data-controls-generate-h" class="settings-form__label">Generate missing from cache</span>
-      <div class="gc-designer-data-controls__generate-row">
-        <label class="gc-designer-data-controls__check">
-          <input type="checkbox" id="gc-designer-data-controls-gen-fw" checked />
-          <span>Firewall cache</span>
-        </label>
-        <label class="gc-designer-data-controls__check">
-          <input type="checkbox" id="gc-designer-data-controls-gen-cfg" checked />
-          <span>Configuration cache</span>
-        </label>
-        <button type="button" class="button button--secondary" id="gc-designer-data-controls-generate">
-          Generate missing fields
-        </button>
-      </div>
-      <p class="gc-designer-data-controls__generate-status muted" id="gc-designer-data-controls-generate-status" role="status" aria-live="polite"></p>
-    </div>
-    <div class="gc-designer-data-controls__catalog-toolbar">
+    <div
+      class="gc-designer-data-controls__layout-toolbar gc-designer-data-controls__layout-toolbar--main gc-designer-data-controls__catalog-actions-toolbar"
+      role="group"
+      aria-labelledby="gc-designer-data-controls-generate-h"
+    >
+      <span
+        id="gc-designer-data-controls-generate-h"
+        class="gc-designer-data-controls__layout-inline-label"
+        >Generate from cache</span
+      >
+      <label class="gc-designer-data-controls__check">
+        <input type="checkbox" id="gc-designer-data-controls-gen-fw" checked />
+        <span>Firewall</span>
+      </label>
+      <label class="gc-designer-data-controls__check">
+        <input type="checkbox" id="gc-designer-data-controls-gen-cfg" checked />
+        <span>Configuration</span>
+      </label>
+      <button type="button" class="button button--secondary" id="gc-designer-data-controls-generate">
+        Update fields
+      </button>
+      <span
+        class="gc-designer-data-controls__generate-status muted"
+        id="gc-designer-data-controls-generate-status"
+        role="status"
+        aria-live="polite"
+      ></span>
       <button type="button" class="button button--primary" id="gc-designer-data-controls-save" disabled>
         Save changes
       </button>
-      <p class="gc-designer-data-controls__save-status muted" id="gc-designer-data-controls-save-status" role="status" aria-live="polite"></p>
-    </div>
-    <div
-      class="gc-designer-data-controls__layout-persist-toolbar settings-form"
-      role="group"
-      aria-label="Layout wiring and display cards"
-    >
+      <span class="gc-designer-data-controls__save-status muted" id="gc-designer-data-controls-save-status" role="status" aria-live="polite"></span>
       <button
         type="button"
         class="button button--primary gc-dc-layout-persist-btn gc-dc-layout-save"
@@ -123,7 +126,7 @@
         id="gc-designer-data-controls-layout-reload-catalog"
         disabled
       >
-        Reload saved layout
+        Reload
       </button>
       <span
         class="muted gc-designer-data-controls__layout-dirty-badge"
@@ -134,7 +137,7 @@
       </span>
     </div>
     <div class="gc-designer-data-controls__table-wrap">
-      <table class="data-table data-table--dense gc-designer-data-controls__table" aria-label="Fields for selected type">
+      <table class="data-table data-table--dense gc-designer-data-controls__table" aria-label="Table fields for selected type">
         <thead>
           <tr>
             <th scope="col" class="gc-designer-data-controls__th-drag">
@@ -142,24 +145,15 @@
             </th>
             <th scope="col">Property name</th>
             <th scope="col">Show as</th>
+            <th scope="col">Display type</th>
             <th scope="col">JSON value kind</th>
-            <th scope="col">Dependent on</th>
-            <th scope="col">Data entry type</th>
-            <th scope="col">Data source</th>
-            <th
-              scope="col"
-              title='JSON array of strings, e.g. [&quot;On&quot;,&quot;Off&quot;]. When set and type is selector, these become the segment buttons (overrides items in data entry properties).'
-            >
-              Allowed options
-            </th>
-            <th scope="col">Help text</th>
             <th scope="col">Display order</th>
             <th scope="col">Update</th>
           </tr>
         </thead>
         <tbody id="gc-designer-data-controls-tbody">
           <tr>
-            <td colspan="11" class="muted">Select an entity type above.</td>
+            <td colspan="7" class="muted">Select an entity type above.</td>
           </tr>
         </tbody>
       </table>
@@ -308,7 +302,7 @@
         <header class="gc-designer-data-controls-layout__panel-head">
           <h3 class="gc-designer-data-controls-layout__panel-title">Data field cards</h3>
           <p class="muted gc-designer-data-controls-layout__panel-note">
-            Field catalog rows appear here; set a data entry type in Field catalog to add wiring handles.
+            Rows from Table fields appear here; set a data entry type on the Table fields tab to add wiring handles.
           </p>
         </header>
         <div class="gc-designer-data-controls-layout__canvas-wrap">
@@ -381,7 +375,7 @@
         <header class="gc-designer-data-controls-layout__panel-head">
           <h3 class="gc-designer-data-controls-layout__panel-title">Display cards</h3>
           <p class="muted gc-designer-data-controls-layout__panel-note">
-            Controls selected in Field catalog appear here.
+            Controls selected on the Table fields tab appear here.
           </p>
         </header>
         <div
@@ -436,6 +430,7 @@
 </div>
 <script src="/static/gc-designer-data-controls-entity-nav.js"></script>
 <script src="/static/gc-designer-data-controls-field-catalog.js"></script>
+<script src="/static/gc-data-entry-table-runtime.js"></script>
 <script src="/static/gc-designer-data-controls-layout.js"></script>
 <script>
 (function () {
@@ -571,18 +566,48 @@
     });
   }
 
-  function parseEntryTypeValues() {
-    var el = document.getElementById("gc-designer-data-controls-entry-types");
-    if (!el || !el.textContent) return [];
-    try {
-      var a = JSON.parse(el.textContent);
-      return Array.isArray(a) ? a : [];
-    } catch (e) {
-      return [];
-    }
+  var CATALOG_DISPLAY_TYPES = ["text", "tag", "onoff", "hidden"];
+
+  function normalizeCatalogDisplayTypeSlot(raw) {
+    var s = String(raw == null ? "" : raw)
+      .trim()
+      .toLowerCase();
+    if (s === "tag" || s === "onoff" || s === "hidden") return s;
+    return "text";
   }
 
-  var catalogEntryTypeValues = parseEntryTypeValues();
+  /** API row: Hidden data entry maps to display type ``hidden``. */
+  function displayTypeFromField(f) {
+    var det = String(f.data_entry_type != null ? f.data_entry_type : "")
+      .trim()
+      .toLowerCase();
+    if (det === "hidden") return "hidden";
+    return normalizeCatalogDisplayTypeSlot(f.display_type);
+  }
+
+  /** Persist ``data_entry_type`` from Display type + row load snapshot (allowlist uses ``Hidden``). */
+  function dataEntryTypeForCatalogSave(ini, displayTypeNorm) {
+    var dtp = String(displayTypeNorm || "")
+      .trim()
+      .toLowerCase();
+    if (dtp === "hidden") return "Hidden";
+    var idt = String(ini.data_entry_type != null ? ini.data_entry_type : "").trim();
+    if (!idt || idt.toLowerCase() === "hidden") return "";
+    return idt;
+  }
+
+  function fillDisplayTypeSelect(sel, current) {
+    if (!sel) return;
+    sel.innerHTML = "";
+    CATALOG_DISPLAY_TYPES.forEach(function (v) {
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v === "hidden" ? "Hidden" : v;
+      sel.appendChild(o);
+    });
+    sel.value = normalizeCatalogDisplayTypeSlot(current);
+  }
+
   var draggingTr = null;
 
   var ENTRY_PROP_FLYOUT_KIND = {
@@ -736,6 +761,7 @@
       data_entry_properties:
         f.data_entry_properties == null ? "" : String(f.data_entry_properties),
       show_as: f.show_as == null ? "" : String(f.show_as),
+      display_type: displayTypeFromField(f),
       display_order:
         f.display_order == null || f.display_order === ""
           ? ""
@@ -755,25 +781,38 @@
   }
 
   function currentRowState(tr) {
+    var id = String(tr.getAttribute("data-field-id") || "");
+    var ini = rowInitials[id] || {};
     var depIn = tr.querySelector(".gc-designer-data-controls__input-dep");
-    var detSel = tr.querySelector(".gc-designer-data-controls__select-det");
     var propsIn = tr.querySelector(".gc-designer-data-controls__input-props");
     var showIn = tr.querySelector(".gc-designer-data-controls__input-show-as");
+    var dispSel = tr.querySelector(".gc-designer-data-controls__select-display-type");
     var helpTa = tr.querySelector(".gc-designer-data-controls__input-help");
     var ordIn = tr.querySelector(".gc-designer-data-controls__input-order");
     var aoTa = tr.querySelector(".gc-designer-data-controls__input-allowed-options");
     var dsHid = tr.querySelector(".gc-designer-data-controls__input-data-source");
+    var display_type = dispSel
+      ? normalizeCatalogDisplayTypeSlot(dispSel.value)
+      : normalizeCatalogDisplayTypeSlot(ini.display_type);
+    var dataEntryTypeEff = dataEntryTypeForCatalogSave(ini, display_type);
     return {
-      dependent_on: depIn ? depIn.value : "",
-      data_entry_type: detSel ? detSel.value : "",
+      dependent_on: depIn ? depIn.value : String(ini.dependent_on != null ? ini.dependent_on : ""),
+      data_entry_type: dataEntryTypeEff,
       data_entry_properties: propsIn
         ? propsIn.value
-        : String(tr.getAttribute("data-entry-properties") || ""),
+        : String(
+            ini.data_entry_properties != null
+              ? ini.data_entry_properties
+              : tr.getAttribute("data-entry-properties") || "",
+          ),
       show_as: showIn ? showIn.value : "",
-      help_text: helpTa ? helpTa.value : "",
+      display_type: display_type,
+      help_text: helpTa ? helpTa.value : String(ini.help_text != null ? ini.help_text : ""),
       display_order: ordIn ? ordIn.value : "",
-      allowed_options: aoTa ? aoTa.value : "",
-      data_source_entity_types: dsHid ? dsHid.value : "",
+      allowed_options: aoTa ? aoTa.value : String(ini.allowed_options != null ? ini.allowed_options : ""),
+      data_source_entity_types: dsHid
+        ? dsHid.value
+        : String(ini.data_source_entity_types != null ? ini.data_source_entity_types : ""),
     };
   }
 
@@ -796,9 +835,10 @@
     var cur = currentRowState(tr);
     return (
       !strEqEditor(cur.dependent_on, ini.dependent_on) ||
-      !strEqEditor(cur.data_entry_type, ini.data_entry_type) ||
+      !strEqEditor(cur.data_entry_type, dataEntryTypeForCatalogSave(ini, ini.display_type)) ||
       !strEqEditor(cur.data_entry_properties, ini.data_entry_properties) ||
       !strEqEditor(cur.show_as, ini.show_as) ||
+      !strEqEditor(cur.display_type, ini.display_type) ||
       !strEqEditor(cur.help_text, ini.help_text) ||
       !strEqEditor(cur.display_order, ini.display_order) ||
       !strEqEditor(cur.allowed_options, ini.allowed_options) ||
@@ -852,6 +892,7 @@
         data_entry_properties: String(cur.data_entry_properties || ""),
         allowed_options: parseEditorJsonArray(cur.allowed_options),
         show_as: String(cur.show_as || "").trim(),
+        display_type: String(cur.display_type || "text").trim(),
         display_order: String(cur.display_order || "").trim(),
         help_text: String(cur.help_text || ""),
       });
@@ -873,40 +914,6 @@
         }),
       );
     } catch (e) {}
-  }
-
-  function fillDataEntrySelect(sel, current) {
-    if (!sel) return;
-    sel.innerHTML = "";
-    var o0 = document.createElement("option");
-    o0.value = "";
-    o0.textContent = "(None)";
-    sel.appendChild(o0);
-    catalogEntryTypeValues.forEach(function (cid) {
-      var o = document.createElement("option");
-      o.value = cid;
-      o.textContent = cid;
-      sel.appendChild(o);
-    });
-    var cur = String(current || "").trim();
-    if (cur) {
-      var has = false;
-      for (var i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === cur) {
-          has = true;
-          break;
-        }
-      }
-      if (!has) {
-        var leg = document.createElement("option");
-        leg.value = cur;
-        leg.textContent = cur + " (not in Controls)";
-        sel.appendChild(leg);
-      }
-      sel.value = cur;
-    } else {
-      sel.value = "";
-    }
   }
 
   function renumberDisplayOrdersFromDom() {
@@ -948,9 +955,9 @@
     if (!fields || !fields.length) {
       var tr0 = document.createElement("tr");
       var td0 = document.createElement("td");
-      td0.colSpan = 11;
+      td0.colSpan = 7;
       td0.className = "muted";
-      td0.textContent = "No catalogued fields for this type yet (run config sync).";
+      td0.textContent = "No table fields for this type yet (run config sync).";
       tr0.appendChild(td0);
       tbody.appendChild(tr0);
       if (saveBtn) saveBtn.disabled = true;
@@ -1005,86 +1012,22 @@
       tdShow.appendChild(inShow);
       tr.appendChild(tdShow);
 
+      var tdDisp = document.createElement("td");
+      var selDisp = document.createElement("select");
+      selDisp.className =
+        "settings-form__input mono gc-designer-data-controls__select-display-type";
+      selDisp.setAttribute(
+        "aria-label",
+        "Display type for " + String(f.property_name || ""),
+      );
+      fillDisplayTypeSelect(selDisp, displayTypeFromField(f));
+      tdDisp.appendChild(selDisp);
+      tr.appendChild(tdDisp);
+
       var tdKind = document.createElement("td");
       tdKind.className = "mono";
       tdKind.textContent = f.json_value_kind != null ? String(f.json_value_kind) : "—";
       tr.appendChild(tdKind);
-
-      var tdDep = document.createElement("td");
-      var inDep = document.createElement("input");
-      inDep.type = "text";
-      inDep.className = "settings-form__input mono gc-designer-data-controls__input-dep";
-      inDep.value =
-        f.dependent_on == null || f.dependent_on === "" ? "" : String(f.dependent_on);
-      inDep.setAttribute("aria-label", "Dependent on for " + String(f.property_name || ""));
-      tdDep.appendChild(inDep);
-      tr.appendChild(tdDep);
-
-      var tdDet = document.createElement("td");
-      var selDet = document.createElement("select");
-      selDet.className = "settings-form__input mono gc-designer-data-controls__select-det";
-      selDet.setAttribute("aria-label", "Data entry type for " + String(f.property_name || ""));
-      fillDataEntrySelect(selDet, f.data_entry_type);
-      tdDet.appendChild(selDet);
-      tr.appendChild(tdDet);
-
-      var tdDs = document.createElement("td");
-      tdDs.className = "gc-designer-data-controls__td-data-source";
-      var inDs = document.createElement("input");
-      inDs.type = "hidden";
-      inDs.className = "gc-designer-data-controls__input-data-source";
-      inDs.id = "gc-designer-data-controls-ds-" + String(id);
-      var dsSel = sortedEntityTypeList(f.data_source_entity_types);
-      inDs.value = dsSel.length ? JSON.stringify(dsSel) : "";
-      var wrapDs = document.createElement("div");
-      tdDs.appendChild(inDs);
-      tdDs.appendChild(wrapDs);
-      tr.appendChild(tdDs);
-      if (typeof globalThis.gcDesignerDcBindDataSourceUI === "function") {
-        globalThis.gcDesignerDcBindDataSourceUI(
-          wrapDs,
-          inDs,
-          f.data_source_entity_types || [],
-          allCachedEntityTypes,
-          function () {
-            refreshRowDirtyUi(tr);
-            refreshSaveAvailability();
-          },
-        );
-      }
-
-      var tdAo = document.createElement("td");
-      var taAo = document.createElement("textarea");
-      taAo.rows = 2;
-      taAo.className =
-        "settings-form__input mono gc-designer-data-controls__input-allowed-options";
-      taAo.placeholder = '["On","Off"]';
-      taAo.value =
-        f.allowed_options == null ||
-        !Array.isArray(f.allowed_options) ||
-        !f.allowed_options.length
-          ? ""
-          : JSON.stringify(f.allowed_options);
-      taAo.setAttribute(
-        "aria-label",
-        "Allowed selector options (JSON array) for " + String(f.property_name || "")
-      );
-      tdAo.appendChild(taAo);
-      tr.appendChild(tdAo);
-
-      var tdHelp = document.createElement("td");
-      var taHelp = document.createElement("textarea");
-      taHelp.rows = 3;
-      taHelp.className =
-        "settings-form__input mono gc-designer-data-controls__input-help";
-      taHelp.value =
-        f.help_text == null || f.help_text === "" ? "" : String(f.help_text);
-      taHelp.setAttribute(
-        "aria-label",
-        "Help text for " + String(f.property_name || "")
-      );
-      tdHelp.appendChild(taHelp);
-      tr.appendChild(tdHelp);
 
       var tdOrd = document.createElement("td");
       var inOrd = document.createElement("input");
@@ -1121,7 +1064,7 @@
     if (!entityType) {
       if (tbody) {
         tbody.innerHTML =
-          '<tr><td colspan="11" class="muted">Select an entity type above.</td></tr>';
+          '<tr><td colspan="7" class="muted">Select an entity type above.</td></tr>';
       }
       setStatus("");
       emitCatalogChanged();
@@ -1327,6 +1270,7 @@
           ? cur.data_entry_properties.trim()
           : null,
         show_as: cur.show_as.trim() ? cur.show_as.trim() : null,
+        display_type: normalizeCatalogDisplayTypeSlot(cur.display_type),
         help_text: cur.help_text.trim() ? cur.help_text.trim() : null,
         display_order: parseDisplayOrderForSave(cur.display_order),
         allowed_options: ao.value,
@@ -1445,6 +1389,109 @@
     });
   };
 
+  globalThis.gcDesignerDataControlsMergeFieldTextConstraints = function (fieldId, patch) {
+    return new Promise(function (resolve) {
+      var et = getEntityTypeControlValue();
+      var fid = parseInt(String(fieldId || ""), 10);
+      if (!et || !fid || !tbody) {
+        resolve(false);
+        return;
+      }
+      var tr = tbody.querySelector('tr[data-field-id="' + String(fid) + '"]');
+      if (!tr) {
+        resolve(false);
+        return;
+      }
+      var propsTa = tr.querySelector(".gc-designer-data-controls__input-props");
+      var ini = rowInitials[String(fid)] || {};
+      var curText = propsTa && propsTa.value != null ? String(propsTa.value) : String(ini.data_entry_properties || "");
+      var base = parseDataEntryPropertiesObject(curText);
+      var p = patch && typeof patch === "object" ? patch : {};
+      var smin = String(p.constraintMin != null ? p.constraintMin : "").trim();
+      var smax = String(p.constraintMax != null ? p.constraintMax : "").trim();
+      var hasMin = !!smin;
+      var hasMax = !!smax;
+      var intOn = p.constraintInteger === true;
+      if (hasMin) base.constraintMin = smin;
+      else delete base.constraintMin;
+      if (hasMax) base.constraintMax = smax;
+      else delete base.constraintMax;
+      if (intOn) {
+        base.constraintInteger = true;
+      } else if (hasMin || hasMax) {
+        base.constraintInteger = false;
+      } else {
+        delete base.constraintInteger;
+      }
+      var defRaw = p.defaultValue != null ? String(p.defaultValue) : "";
+      var defTrim = defRaw.replace(/^\s+|\s+$/g, "");
+      if (defTrim) {
+        base.defaultValue = defTrim;
+      } else {
+        delete base.defaultValue;
+      }
+      var outStr = "";
+      try {
+        outStr = JSON.stringify(base);
+      } catch (eStr) {
+        resolve(false);
+        return;
+      }
+      if (propsTa) propsTa.value = outStr === "{}" ? "" : outStr;
+      var nextText = propsTa ? String(propsTa.value || "").trim() : "";
+      var prevNorm = String(curText || "").trim();
+      if (nextText === prevNorm) {
+        resolve(true);
+        return;
+      }
+      refreshRowDirtyUi(tr);
+      refreshSaveAvailability();
+      setSaveStatus("Saving…");
+      var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
+      fetch(url, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "Ground-Control",
+        },
+        body: JSON.stringify({
+          updates: [
+            {
+              id: fid,
+              data_entry_properties: nextText ? nextText : null,
+            },
+          ],
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var det = res.j && res.j.detail;
+            setSaveStatus(
+              typeof det === "string"
+                ? det
+                : "Save failed (" + (res.status || "?") + ").",
+            );
+            resolve(false);
+            return;
+          }
+          setSaveStatus("Saved.");
+          loadFields(et);
+          resolve(true);
+        })
+        .catch(function () {
+          setSaveStatus("Save request failed.");
+          resolve(false);
+        });
+    });
+  };
+
   globalThis.gcDesignerDataControlsSetFieldAllowedOptions = function (fieldId, rawText) {
     return new Promise(function (resolve) {
       var et = getEntityTypeControlValue();
@@ -1532,25 +1579,22 @@
         resolve(false);
         return;
       }
-      var detSel = tr.querySelector(".gc-designer-data-controls__select-det");
-      if (!detSel || String(detSel.value || "").trim().toLowerCase() !== "member-lookup") {
-        resolve(false);
-        return;
-      }
-      var propsIn = tr.querySelector(".gc-designer-data-controls__input-props");
-      if (!propsIn) {
+      var iniMl = rowInitials[String(fid)];
+      if (
+        !iniMl ||
+        String(iniMl.data_entry_type || "").trim().toLowerCase() !== "member-lookup"
+      ) {
         resolve(false);
         return;
       }
       var nextOn = !!enabled;
-      var props = parseDataEntryPropertiesObject(propsIn.value);
+      var props = parseDataEntryPropertiesObject(iniMl.data_entry_properties);
       props.multi = nextOn;
       if (!props.source || typeof props.source !== "object" || Array.isArray(props.source)) {
         props.source = {};
       }
       props.source.multi = nextOn;
       var nextText = JSON.stringify(props);
-      propsIn.value = nextText;
       refreshRowDirtyUi(tr);
       refreshSaveAvailability();
       setSaveStatus("Saving…");
@@ -1696,25 +1740,23 @@
         return;
       }
       var detSel = tr.querySelector(".gc-designer-data-controls__select-det");
-      if (!detSel) {
-        resolve(false);
-        return;
-      }
       var v = String(nextVal || "").trim();
-      var has = false;
-      detSel.querySelectorAll("option").forEach(function (opt) {
-        if (String(opt.value || "") === v) has = true;
-      });
-      if (!has && v) {
-        var leg = document.createElement("option");
-        leg.value = v;
-        leg.textContent = v + " (not in Controls)";
-        detSel.appendChild(leg);
+      if (detSel) {
+        var has = false;
+        detSel.querySelectorAll("option").forEach(function (opt) {
+          if (String(opt.value || "") === v) has = true;
+        });
+        if (!has && v) {
+          var leg = document.createElement("option");
+          leg.value = v;
+          leg.textContent = v + " (not in Controls)";
+          detSel.appendChild(leg);
+        }
+        detSel.value = v;
+        syncPropsSetForRow(tr);
+        refreshRowDirtyUi(tr);
+        refreshSaveAvailability();
       }
-      detSel.value = v;
-      syncPropsSetForRow(tr);
-      refreshRowDirtyUi(tr);
-      refreshSaveAvailability();
       setSaveStatus("Saving…");
       var url = "/api/designer/entity-payload-fields/" + encodeURIComponent(et);
       fetch(url, {
@@ -1870,7 +1912,7 @@
             scanned +
             " cache row(s); inserted " +
             ins +
-            " catalog row(s); inferred data entry type on " +
+            " table field row(s); inferred data entry type on " +
             inf +
             " existing row(s)."
         );

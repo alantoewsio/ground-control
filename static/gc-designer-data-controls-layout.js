@@ -73,6 +73,8 @@
     savePending: false,
     fieldReorderDrag: null,
     controlReorderDrag: null,
+    /** Layout · Display cards: `ctrl:*` node ids with property panel expanded (edit pencil). */
+    panelPropsExpanded: {},
   };
 
   var STORAGE_KEY_TEST_BY_ENTITY = "gc.designer.dataControls.testObjectByEntity";
@@ -358,12 +360,20 @@
       det === "dropdown-single" ||
       det === "dropdown-multi" ||
       det === "dropdown-shared" ||
-      det === "member-lookup"
+      det === "member-lookup" ||
+      det === "data-entry-table-col-selection" ||
+      det === "data-entry-table-col-time"
     ) {
       return { inputs: ["selected", "visible"], outputs: ["selected"] };
     }
-    if (det === "toggle-onoff" || det === "toggle-checkbox") {
+    if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") {
       return { inputs: ["value", "visible"], outputs: ["on", "off"] };
+    }
+    if (det === "data-entry-table") {
+      return { inputs: ["value", "visible"], outputs: ["value"] };
+    }
+    if (det === "data-entry-table-col-text") {
+      return { inputs: ["value", "visible"], outputs: ["value"] };
     }
     return { inputs: ["value", "visible"], outputs: ["value"] };
   }
@@ -386,10 +396,14 @@
       det === "dropdown-single" ||
       det === "dropdown-multi" ||
       det === "dropdown-shared" ||
-      det === "member-lookup"
+      det === "member-lookup" ||
+      det === "data-entry-table-col-selection" ||
+      det === "data-entry-table-col-time"
     ) {
       return "selected";
     }
+    if (det === "data-entry-table-col-toggle") return "value";
+    if (det === "data-entry-table-col-text") return "value";
     return "value";
   }
 
@@ -407,11 +421,14 @@
       det === "dropdown-single" ||
       det === "dropdown-multi" ||
       det === "dropdown-shared" ||
-      det === "member-lookup"
+      det === "member-lookup" ||
+      det === "data-entry-table-col-selection" ||
+      det === "data-entry-table-col-time"
     ) {
       return "selected";
     }
-    if (det === "toggle-onoff" || det === "toggle-checkbox") return "on";
+    if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") return "on";
+    if (det === "data-entry-table-col-text") return "value";
     return "value";
   }
 
@@ -736,6 +753,7 @@
         id: fieldId,
         field_id: String(f.id || ""),
         data_entry_type: trimStr(f.data_entry_type),
+        display_type: trimStr(f.display_type) || "text",
         json_value_kind: trimStr(f.json_value_kind),
         show_as: showAs,
         property_name: propName,
@@ -837,9 +855,35 @@
 
   function dataEntryTypeSelectHtml(node) {
     var current = trimStr(node.data_entry_type);
+    var opts = dataEntryTypeOptions;
+    if (
+      node &&
+      node.kind === "field" &&
+      typeof globalThis.gcDataEntryTableParentForFieldProp === "function"
+    ) {
+      var fp = trimStr(node.property_name);
+      var par = globalThis.gcDataEntryTableParentForFieldProp(fp, state.fields, String(node.field_id || ""));
+      if (par) {
+        opts = opts.filter(function (cid) {
+          var c = trimStr(cid).toLowerCase();
+          if (c === "hidden") return true;
+          return c.indexOf("data-entry-table-col-") === 0;
+        });
+      } else {
+        opts = opts.filter(function (cid) {
+          return trimStr(cid).toLowerCase().indexOf("data-entry-table-col-") !== 0;
+        });
+        var jvk = trimStr(node.json_value_kind).toLowerCase();
+        if (jvk !== "object" && jvk !== "mixed") {
+          opts = opts.filter(function (cid) {
+            return trimStr(cid).toLowerCase() !== "data-entry-table";
+          });
+        }
+      }
+    }
     var optionsHtml = '<option value="">(None)</option>';
     var hasCurrent = !current;
-    dataEntryTypeOptions.forEach(function (cid) {
+    opts.forEach(function (cid) {
       var selected = cid === current ? ' selected="selected"' : "";
       if (selected) hasCurrent = true;
       optionsHtml +=
@@ -895,7 +939,10 @@
       if (!fieldNode || !ctrlNode) return;
       if (fieldNode.outputs.indexOf("loaded_value") === -1) return;
       var ctrlIn = defaultControlInputForField(f);
-      if (ctrlNode.inputs.indexOf(ctrlIn) !== -1) {
+      var skipLoadedWire =
+        typeof globalThis.gcDataEntryTableIsColumnField === "function" &&
+        globalThis.gcDataEntryTableIsColumnField(f, state.fields);
+      if (!skipLoadedWire && ctrlNode.inputs.indexOf(ctrlIn) !== -1) {
         edges.push({
           edge_id: genEdgeId(),
           source_node_id: fieldId,
@@ -936,7 +983,11 @@
     if (!fieldNode || !ctrlNode) return [];
     var edges = [];
     var ctrlIn = defaultControlInputForField(field);
+    var skipLoadedWire2 =
+      typeof globalThis.gcDataEntryTableIsColumnField === "function" &&
+      globalThis.gcDataEntryTableIsColumnField(field, state.fields);
     if (
+      !skipLoadedWire2 &&
       fieldNode.outputs.indexOf("loaded_value") !== -1 &&
       ctrlNode.inputs.indexOf(ctrlIn) !== -1
     ) {
@@ -1006,6 +1057,7 @@
       member_lookup_multi: {},
       layout_locked: false,
     };
+    state.panelPropsExpanded = {};
     buildNodeCatalog();
     state.layout.connections = buildDefaultConnections();
     clearSelectedEdges();
@@ -1015,6 +1067,226 @@
   }
 
   var HANDLES_PER_PANEL_COLUMN = 10;
+
+  function fieldRowByIdForSummary(fid) {
+    var want = String(fid || "");
+    var hit = null;
+    (state.fields || []).forEach(function (fx) {
+      if (String(fx.id || "") === want) hit = fx;
+    });
+    return hit;
+  }
+
+  function panelSummarySep() {
+    return '<span class="gc-designer-data-controls-layout__panel-sum-sep"> \u00b7 </span>';
+  }
+
+  function panelSummaryPair(label, valueInnerHtml) {
+    return (
+      '<span class="gc-designer-data-controls-layout__panel-sum-part">' +
+      '<span class="gc-designer-data-controls-layout__panel-sum-k">' +
+      esc(label) +
+      '</span>' +
+      ' <span class="gc-designer-data-controls-layout__panel-sum-v">' +
+      valueInnerHtml +
+      "</span></span>"
+    );
+  }
+
+  function trimSummaryText(s, maxLen) {
+    var t = trimStr(s);
+    var n = typeof maxLen === "number" ? maxLen : 100;
+    if (t.length <= n) return t;
+    return t.slice(0, Math.max(0, n - 1)) + "\u2026";
+  }
+
+  function buildPanelPropertySummaryInnerHtml(node) {
+    if (!node || node.kind !== "control") return "";
+    var parts = [];
+    var showAs = trimStr(node.show_as);
+    parts.push(panelSummaryPair("Show as", showAs ? escHtmlText(showAs) : escHtmlText("\u2014")));
+    var det = trimStr(node.data_entry_type);
+    if (det) parts.push(panelSummaryPair("Type", escHtmlText(det)));
+    var fid = String(node.field_id || "");
+    var fRow = fieldRowByIdForSummary(fid);
+    var detLower = det.toLowerCase();
+    if (
+      fRow &&
+      (detLower === "text-single" ||
+        detLower === "text-multiline" ||
+        detLower === "data-entry-table-col-text")
+    ) {
+      var pj = parseJsonObject(fRow.data_entry_properties);
+      var smin = pj.constraintMin != null ? trimStr(String(pj.constraintMin)) : "";
+      var smax = pj.constraintMax != null ? trimStr(String(pj.constraintMax)) : "";
+      parts.push(panelSummaryPair("Min", smin ? escHtmlText(smin) : escHtmlText("\u2014")));
+      parts.push(panelSummaryPair("Max", smax ? escHtmlText(smax) : escHtmlText("\u2014")));
+      parts.push(
+        panelSummaryPair("Integer", escHtmlText(pj.constraintInteger === true ? "Yes" : "No")),
+      );
+      var dv = pj.defaultValue != null ? trimStr(String(pj.defaultValue)) : "";
+      parts.push(
+        panelSummaryPair(
+          "Default",
+          dv ? escHtmlText(trimSummaryText(dv, 120)) : escHtmlText("\u2014"),
+        ),
+      );
+    }
+    if (detLower === "selector" || detLower === "data-entry-table-col-selection") {
+      var ao = Array.isArray(node.allowed_options) ? node.allowed_options : [];
+      var aoStr = "";
+      if (ao.length) {
+        try {
+          aoStr = JSON.stringify(ao);
+        } catch (eAo) {
+          aoStr = "";
+        }
+      }
+      parts.push(
+        panelSummaryPair(
+          "Allowed",
+          aoStr ? escHtmlText(trimSummaryText(aoStr, 140)) : escHtmlText("\u2014"),
+        ),
+      );
+    }
+    if (detLower === "data-entry-table-col-time") {
+      parts.push(
+        panelSummaryPair(
+          "Values",
+          escHtmlText("00:00–23:45 every 15 min, then 23:59"),
+        ),
+      );
+    }
+    if (detLower === "member-lookup") {
+      var mlMap = ensureMemberLookupDataSourceMap();
+      var srcTok = mlMap[node.id] != null ? trimStr(String(mlMap[node.id])) : "";
+      if (!srcTok && fRow) {
+        var frMp = parseJsonObject(fRow.data_entry_properties);
+        if (frMp.source && frMp.source.entity_type) {
+          srcTok = trimStr(String(frMp.source.entity_type));
+        }
+      }
+      parts.push(
+        panelSummaryPair(
+          "Data source",
+          srcTok ? escHtmlText(trimSummaryText(srcTok, 48)) : escHtmlText("\u2014"),
+        ),
+      );
+      parts.push(panelSummaryPair("Multi-select", node.member_lookup_multi ? "Yes" : "No"));
+    }
+    parts.push(panelSummaryPair("Add only", isControlAddOnly(node.id) ? "Yes" : "No"));
+    return parts.join(panelSummarySep());
+  }
+
+  function syncPanelPropertySummaryFromDom(panelNode) {
+    var sumEl = panelNode.querySelector(".gc-designer-data-controls-layout__panel-card-summary");
+    if (!sumEl) return;
+    var nid = trimStr(panelNode.getAttribute("data-node-id"));
+    var node = state.nodeCatalog[nid];
+    if (!node || node.kind !== "control") return;
+    var parts = [];
+    var showInp = panelNode.querySelector(".gc-designer-data-controls-layout__panel-show-as-input");
+    var showAs = showInp ? trimStr(showInp.value) : trimStr(node.show_as);
+    parts.push(panelSummaryPair("Show as", showAs ? escHtmlText(showAs) : escHtmlText("\u2014")));
+    var det = trimStr(node.data_entry_type);
+    if (det) parts.push(panelSummaryPair("Type", escHtmlText(det)));
+    var fid = String(node.field_id || "");
+    var fRow = fieldRowByIdForSummary(fid);
+    var detLower = det.toLowerCase();
+    if (
+      fRow &&
+      (detLower === "text-single" ||
+        detLower === "text-multiline" ||
+        detLower === "data-entry-table-col-text")
+    ) {
+      var wrap = panelNode.querySelector(".gc-designer-data-controls-layout__panel-text-constraints");
+      var smin = "";
+      var smax = "";
+      var intOn = false;
+      var dvTrim = "";
+      if (wrap) {
+        var minEl = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-min");
+        var maxEl = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-max");
+        var intEl = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-integer");
+        var defEl = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-default-value-input");
+        smin = minEl ? trimStr(minEl.value) : "";
+        smax = maxEl ? trimStr(maxEl.value) : "";
+        intOn = !!(intEl && intEl.checked);
+        dvTrim = defEl ? trimStr(String(defEl.value != null ? defEl.value : "")) : "";
+      } else {
+        var pjFb = parseJsonObject(fRow.data_entry_properties);
+        smin = pjFb.constraintMin != null ? trimStr(String(pjFb.constraintMin)) : "";
+        smax = pjFb.constraintMax != null ? trimStr(String(pjFb.constraintMax)) : "";
+        intOn = pjFb.constraintInteger === true;
+        dvTrim = pjFb.defaultValue != null ? trimStr(String(pjFb.defaultValue)) : "";
+      }
+      parts.push(panelSummaryPair("Min", smin ? escHtmlText(smin) : escHtmlText("\u2014")));
+      parts.push(panelSummaryPair("Max", smax ? escHtmlText(smax) : escHtmlText("\u2014")));
+      parts.push(panelSummaryPair("Integer", escHtmlText(intOn ? "Yes" : "No")));
+      parts.push(
+        panelSummaryPair(
+          "Default",
+          dvTrim ? escHtmlText(trimSummaryText(dvTrim, 120)) : escHtmlText("\u2014"),
+        ),
+      );
+    }
+    if (detLower === "selector" || detLower === "data-entry-table-col-selection") {
+      var ta = panelNode.querySelector(".gc-designer-data-controls-layout__panel-allowed-options-input");
+      var rawAo = ta ? trimStr(ta.value) : "";
+      var disp = rawAo;
+      if (!disp && Array.isArray(node.allowed_options) && node.allowed_options.length) {
+        try {
+          disp = JSON.stringify(node.allowed_options);
+        } catch (e2) {
+          disp = "";
+        }
+      }
+      parts.push(
+        panelSummaryPair(
+          "Allowed",
+          disp ? escHtmlText(trimSummaryText(disp, 140)) : escHtmlText("\u2014"),
+        ),
+      );
+    }
+    if (detLower === "data-entry-table-col-time") {
+      parts.push(
+        panelSummaryPair(
+          "Values",
+          escHtmlText("00:00–23:45 every 15 min, then 23:59"),
+        ),
+      );
+    }
+    if (detLower === "member-lookup") {
+      var selMl = panelNode.querySelector(".gc-designer-data-controls-layout__panel-ml-source-select");
+      var srcTok = selMl && selMl.value != null ? trimStr(String(selMl.value)) : "";
+      if (!srcTok) {
+        var mlMap2 = ensureMemberLookupDataSourceMap();
+        if (mlMap2[nid] != null) srcTok = trimStr(String(mlMap2[nid]));
+      }
+      var mlCb = panelNode.querySelector(".gc-designer-data-controls-layout__panel-ml-multi-input");
+      var multi = mlCb ? !!mlCb.checked : !!node.member_lookup_multi;
+      parts.push(
+        panelSummaryPair(
+          "Data source",
+          srcTok ? escHtmlText(trimSummaryText(srcTok, 48)) : escHtmlText("\u2014"),
+        ),
+      );
+      parts.push(panelSummaryPair("Multi-select", multi ? "Yes" : "No"));
+    }
+    var addCb = panelNode.querySelector(".gc-designer-data-controls-layout__add-only-input");
+    var addOnly = addCb ? !!addCb.checked : isControlAddOnly(nid);
+    parts.push(panelSummaryPair("Add only", addOnly ? "Yes" : "No"));
+    sumEl.innerHTML = parts.join(panelSummarySep());
+  }
+
+  function prunePanelPropsExpanded() {
+    var cat = state.nodeCatalog || {};
+    var m = state.panelPropsExpanded;
+    if (!m || typeof m !== "object") return;
+    Object.keys(m).forEach(function (nid) {
+      if (!cat[nid]) delete m[nid];
+    });
+  }
 
   function nodeHtml(node, opts) {
     opts = opts || {};
@@ -1057,6 +1329,11 @@
       );
     }
     if (node.kind === "field") {
+      var fieldDetLower = trimStr(node.data_entry_type).toLowerCase();
+      var fieldWiringHintClass =
+        fieldDetLower !== "hidden"
+          ? " gc-designer-data-controls-layout__node--field-wiring-hint"
+          : "";
       var propLabel = trimStr(node.property_name) || trimStr(node.label) || "Field";
       var jsonKind = trimStr(node.json_value_kind);
       var jsonKindTagHtml = jsonKind
@@ -1071,7 +1348,9 @@
             "</button>"
           : "";
       return (
-        '<div class="gc-designer-data-controls-layout__node gc-designer-data-controls-layout__node--field" data-node-id="' +
+        '<div class="gc-designer-data-controls-layout__node gc-designer-data-controls-layout__node--field' +
+        fieldWiringHintClass +
+        '" data-node-id="' +
         esc(node.id) +
         '">' +
         '<div class="gc-designer-data-controls-layout__node-field-row">' +
@@ -1193,6 +1472,10 @@
       '<span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>' +
       "</label>";
     if (node.kind === "control" && opts.controlPanel) {
+      var panelTabRaw =
+        trimStr(node.show_as) || trimStr(node.property_name) || trimStr(node.label) || "Control";
+      var panelTabHtml = escHtmlText(panelTabRaw);
+      var panelTabTitleAttr = esc(panelTabRaw);
       var showAsVal = esc(trimStr(node.show_as));
       var propPh = esc(trimStr(node.property_name) || "Property");
       var detHint = trimStr(node.data_entry_type);
@@ -1209,18 +1492,32 @@
             })()
           : "";
       var selectorAllowedHtml = "";
-      if (detLower === "selector") {
+      if (detLower === "selector" || detLower === "data-entry-table-col-selection") {
+        var allowedAria =
+          detLower === "selector"
+            ? "Allowed selector options (JSON array)"
+            : "Allowed options for data entry table column (JSON array)";
+        var allowedPh = detLower === "selector" ? '["On","Off"]' : '["TCP","UDP"]';
         selectorAllowedHtml =
           '<label class="gc-designer-data-controls-layout__panel-allowed-field">' +
           '<span class="gc-designer-data-controls-layout__det-label">Allowed values</span>' +
           '<textarea class="settings-form__input mono gc-designer-data-controls-layout__panel-allowed-options-input" rows="2" data-field-id="' +
           esc(node.field_id || "") +
           '" placeholder="' +
-          esc('["On","Off"]') +
-          '" aria-label="Allowed selector options (JSON array)">' +
+          esc(allowedPh) +
+          '" aria-label="' +
+          esc(allowedAria) +
+          '">' +
           escHtmlText(aoEditorText) +
           "</textarea>" +
           "</label>";
+      }
+      var timeColumnHintHtml = "";
+      if (detLower === "data-entry-table-col-time") {
+        timeColumnHintHtml =
+          '<p class="muted mono gc-designer-data-controls-layout__panel-time-col-hint">' +
+          "Dropdown lists every quarter hour from 00:00 through 23:45, then 23:59." +
+          "</p>";
       }
       var mlSourceHtml = "";
       var mlMultiHtml = "";
@@ -1247,14 +1544,104 @@
           '<span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>' +
           "</label>";
       }
+      var textConstraintPanelHtml = "";
+      if (
+        detLower === "text-single" ||
+        detLower === "text-multiline" ||
+        detLower === "data-entry-table-col-text"
+      ) {
+        var ftc = null;
+        var ftcId = String(node.field_id || "");
+        state.fields.forEach(function (fx) {
+          if (String(fx.id || "") === ftcId) ftc = fx;
+        });
+        var pjTc = parseJsonObject(ftc && ftc.data_entry_properties);
+        var cminTc = pjTc.constraintMin != null ? esc(String(pjTc.constraintMin)) : "";
+        var cmaxTc = pjTc.constraintMax != null ? esc(String(pjTc.constraintMax)) : "";
+        var intTc = !!pjTc.constraintInteger;
+        var dvRaw = pjTc.defaultValue != null ? String(pjTc.defaultValue) : "";
+        var defaultValueFieldHtml =
+          detLower === "text-multiline"
+            ? '<label class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__panel-text-default-field">' +
+              '<span class="gc-designer-data-controls-layout__det-label">Default value</span>' +
+              '<textarea class="settings-form__input mono gc-designer-data-controls-layout__panel-text-default-value-input" rows="2" autocomplete="off" placeholder="When adding an entity, used if the field is empty">' +
+              escHtmlText(dvRaw) +
+              "</textarea>" +
+              "</label>"
+            : '<label class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__panel-text-default-field">' +
+              '<span class="gc-designer-data-controls-layout__det-label">Default value</span>' +
+              '<input type="text" class="settings-form__input mono gc-designer-data-controls-layout__panel-text-default-value-input" value="' +
+              esc(dvRaw) +
+              '" autocomplete="off" placeholder="When adding an entity, used if the field is empty" />' +
+              "</label>";
+        textConstraintPanelHtml =
+          '<div class="gc-designer-data-controls-layout__panel-text-constraints" data-field-id="' +
+          esc(ftcId) +
+          '" title="Integer on: Min/Max are numeric bounds. Integer off: Min/Max are character lengths. Leave blank to skip.">' +
+          '<div class="gc-designer-data-controls-layout__panel-text-constraints__row">' +
+          '<label class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__panel-text-constraints__minmax">' +
+          '<span class="gc-designer-data-controls-layout__det-label">Min</span>' +
+          '<input type="text" inputmode="numeric" class="settings-form__input mono gc-designer-data-controls-layout__panel-text-constraint-min" value="' +
+          cminTc +
+          '" autocomplete="off" />' +
+          "</label>" +
+          '<label class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__panel-text-constraints__minmax">' +
+          '<span class="gc-designer-data-controls-layout__det-label">Max</span>' +
+          '<input type="text" inputmode="numeric" class="settings-form__input mono gc-designer-data-controls-layout__panel-text-constraint-max" value="' +
+          cmaxTc +
+          '" autocomplete="off" />' +
+          "</label>" +
+          "</div>" +
+          '<label class="gc-toolbar-combine gc-designer-data-controls-layout__panel-text-constraint-int-toggle" title="When on, Min/Max limit the numeric value and the field must be a whole number. When off, Min/Max limit string length.">' +
+          '<span class="gc-toolbar-combine__text">Integer</span>' +
+          '<input type="checkbox" class="gc-toolbar-combine__input gc-designer-data-controls-layout__panel-text-constraint-integer"' +
+          (intTc ? ' checked="checked"' : "") +
+          " />" +
+          '<span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>' +
+          "</label>" +
+          defaultValueFieldHtml +
+          "</div>";
+      }
+      var expandedPanel = !!(state.panelPropsExpanded && state.panelPropsExpanded[node.id]);
+      var panelModeClass = expandedPanel
+        ? " gc-designer-data-controls-layout__node--panel-props-expanded"
+        : " gc-designer-data-controls-layout__node--panel-props-collapsed";
+      var summaryInnerHtml = buildPanelPropertySummaryInnerHtml(node);
+      var panelMetaDomId = "gc-dc-panel-meta-" + slug(String(node.id || "n"));
+      var summaryAriaHidden = expandedPanel ? "true" : "false";
+      var metaAriaHidden = expandedPanel ? "false" : "true";
       return (
-        '<div class="gc-designer-data-controls-layout__node gc-designer-data-controls-layout__node--control gc-designer-data-controls-layout__node--in-panel" data-node-id="' +
+        '<div class="gc-designer-data-controls-layout__node gc-designer-data-controls-layout__node--control gc-designer-data-controls-layout__node--in-panel' +
+        panelModeClass +
+        '" data-node-id="' +
         esc(node.id) +
         '">' +
+        '<div class="gc-designer-data-controls-layout__panel-card-shell">' +
+        '<div class="gc-designer-data-controls-layout__panel-card-tab" title="' +
+        panelTabTitleAttr +
+        '">' +
+        '<span class="gc-designer-data-controls-layout__panel-card-tab-inner mono gc-designer-data-controls-layout__panel-card-name">' +
+        panelTabHtml +
+        "</span>" +
+        "</div>" +
+        '<div class="gc-designer-data-controls-layout__panel-card-main">' +
         '<div class="gc-designer-data-controls-layout__panel-card-top">' +
+        '<div class="gc-designer-data-controls-layout__panel-card-top__pencil-row">' +
+        '<button type="button" class="icon-btn gc-designer-data-controls-layout__panel-props-toggle gc-designer-data-controls-layout__panel-props-toggle--corner" data-node-id="' +
+        esc(node.id) +
+        '" aria-expanded="' +
+        (expandedPanel ? "true" : "false") +
+        '" aria-controls="' +
+        esc(panelMetaDomId) +
+        '" title="Collapse property controls" aria-label="Collapse property controls">' +
+        '<span class="gc-icon gc-icon--sm" aria-hidden="true">edit</span>' +
+        "</button>" +
+        "</div>" +
+        '<div class="gc-designer-data-controls-layout__panel-card-top__leading">' +
         '<button type="button" class="gc-designer-data-controls-layout__panel-drag-handle" aria-label="Drag to reorder control" title="Drag to reorder">' +
         '<span class="gc-designer-data-controls-layout__panel-drag-grip" aria-hidden="true"></span>' +
         "</button>" +
+        "</div>" +
         '<div class="gc-designer-data-controls-layout__panel-io-stack">' +
         '<div class="gc-designer-data-controls-layout__io gc-designer-data-controls-layout__io--in gc-designer-data-controls-layout__io--panel-col">' +
         handlesHtml(node.inputs, "in", true) +
@@ -1263,7 +1650,30 @@
         handlesHtml(node.outputs, "out", true) +
         "</div>" +
         "</div>" +
-        '<div class="gc-designer-data-controls-layout__panel-card-meta">' +
+        '<div class="gc-designer-data-controls-layout__panel-card-side">' +
+        '<div class="gc-designer-data-controls-layout__panel-card-summary-wrap">' +
+        '<div role="button" tabindex="0" class="gc-designer-data-controls-layout__panel-card-summary" aria-hidden="' +
+        summaryAriaHidden +
+        '" aria-expanded="' +
+        (expandedPanel ? "true" : "false") +
+        '" aria-controls="' +
+        esc(panelMetaDomId) +
+        '" data-gc-panel-summary-toggle="1">' +
+        summaryInnerHtml +
+        "</div>" +
+        '<button type="button" class="icon-btn gc-designer-data-controls-layout__panel-props-toggle gc-designer-data-controls-layout__panel-props-toggle--summary-hover" data-node-id="' +
+        esc(node.id) +
+        '" aria-controls="' +
+        esc(panelMetaDomId) +
+        '" title="Edit properties" aria-label="Edit display properties">' +
+        '<span class="gc-icon gc-icon--sm" aria-hidden="true">edit</span>' +
+        "</button>" +
+        "</div>" +
+        '<div id="' +
+        esc(panelMetaDomId) +
+        '" class="gc-designer-data-controls-layout__panel-card-meta" aria-hidden="' +
+        metaAriaHidden +
+        '">' +
         '<label class="gc-designer-data-controls-layout__panel-show-as-field">' +
         '<span class="gc-designer-data-controls-layout__det-label">Show as</span>' +
         '<input type="text" class="settings-form__input mono gc-designer-data-controls-layout__panel-show-as-input" data-field-id="' +
@@ -1280,9 +1690,14 @@
             "</span>"
           : "") +
         selectorAllowedHtml +
+        timeColumnHintHtml +
         mlSourceHtml +
         mlMultiHtml +
+        textConstraintPanelHtml +
         addOnlyToggleHtml +
+        "</div>" +
+        "</div>" +
+        "</div>" +
         "</div>" +
         "</div>" +
         "</div>"
@@ -1674,7 +2089,9 @@
           det === "dropdown-single" ||
           det === "dropdown-multi" ||
           det === "dropdown-shared" ||
-          det === "member-lookup"
+          det === "member-lookup" ||
+          det === "data-entry-table-col-selection" ||
+          det === "data-entry-table-col-time"
         ) {
           var picked = isVisible ? inSelected || base : "";
           values[nodeId + "|selected"] = picked;
@@ -1691,7 +2108,7 @@
               values[nodeId + "|option_ip_list"] = true;
             }
           }
-        } else if (det === "toggle-onoff" || det === "toggle-checkbox") {
+        } else if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") {
           var truthy = isVisible && !!trimStr(base);
           values[nodeId + "|on"] = truthy ? "on" : "";
           values[nodeId + "|off"] = truthy ? "" : "off";
@@ -1832,6 +2249,69 @@
         }
       }
     });
+    if (state.showTestValues) {
+      function fieldLoadedValueOutgoingWired(fieldNodeId) {
+        var conns =
+          state.layout && Array.isArray(state.layout.connections) ? state.layout.connections : [];
+        for (var wi = 0; wi < conns.length; wi++) {
+          var we = conns[wi];
+          if (
+            we &&
+            String(we.source_node_id) === fieldNodeId &&
+            String(we.source_handle) === "loaded_value"
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }
+      function fieldTraceDisplayLabel(raw) {
+        var s = String(raw != null ? raw : "");
+        return s.length > 40 ? s.slice(0, 37) + "..." : s;
+      }
+      Object.keys(state.nodeCatalog).forEach(function (fnid) {
+        var fnode = state.nodeCatalog[fnid];
+        if (!fnode || fnode.kind !== "field") return;
+        if (!fnode.outputs || fnode.outputs.indexOf("loaded_value") === -1) return;
+        if (fieldLoadedValueOutgoingWired(fnid)) return;
+        var srcKeyU = fnid + "|loaded_value";
+        var rawV = Object.prototype.hasOwnProperty.call(outputValues, srcKeyU)
+          ? outputValues[srcKeyU]
+          : "";
+        if (rawV == null || trimStr(String(rawV)) === "") return;
+        var hc = handleCenter(fnid, "loaded_value", "out");
+        if (!hc) return;
+        var fullS = String(rawV);
+        var disp = fieldTraceDisplayLabel(fullS);
+        var x0 = hc.x;
+        var y0 = hc.y;
+        var gap = 12;
+        var x1 = x0 + gap;
+        var tx = x1 + 3;
+        html +=
+          '<g class="gc-designer-data-controls-layout__field-trace-g">' +
+          "<title>" +
+          escHtmlText(fullS.length > 200 ? fullS.slice(0, 197) + "…" : fullS) +
+          "</title>" +
+          '<line class="gc-designer-data-controls-layout__field-trace-leader" x1="' +
+          x0.toFixed(1) +
+          '" y1="' +
+          y0.toFixed(1) +
+          '" x2="' +
+          x1.toFixed(1) +
+          '" y2="' +
+          y0.toFixed(1) +
+          '" />' +
+          '<text class="gc-designer-data-controls-layout__field-trace-value mono" dominant-baseline="middle" text-anchor="start" x="' +
+          tx.toFixed(1) +
+          '" y="' +
+          y0.toFixed(1) +
+          '">' +
+          escHtmlText(disp) +
+          "</text>" +
+          "</g>";
+      });
+    }
     if (state.tempEdge) {
       var ts = handleCenter(
         state.tempEdge.source_node_id,
@@ -2173,7 +2653,7 @@
     }
     if (!parts.length) {
       controlsEl.innerHTML =
-        '<p class="muted">No controls mapped yet. Choose a data entry type in Field catalog.</p>';
+        '<p class="muted">No controls mapped yet. Choose a data entry type on the Table fields tab.</p>';
       return;
     }
     controlsEl.innerHTML =
@@ -2529,6 +3009,14 @@
       return String(flat[leaf]);
     }
     if (leaf === "Name" && cells.__name != null) return String(cells.__name);
+    if (
+      state.fields &&
+      state.fields.length &&
+      typeof globalThis.gcDataEntryTableColumnFieldValueFromRow === "function"
+    ) {
+      var tcol = globalThis.gcDataEntryTableColumnFieldValueFromRow(row, p, state.fields);
+      if (tcol != null) return String(tcol);
+    }
     return "";
   }
 
@@ -2813,6 +3301,7 @@
     ensureConnectionEdgeIds(state.layout.connections);
     pruneControlAddOnlyMap();
     pruneMemberLookupDataSourceMap();
+    prunePanelPropsExpanded();
     cleanConnections();
     autoArrangeLogicPanelFromConnections();
     renderCanvasNodes();
@@ -3844,6 +4333,130 @@
     });
   }
 
+  function wireDisplayPanelTextConstraints() {
+    function wrapFromTarget(t) {
+      return t && t.closest ? t.closest(".gc-designer-data-controls-layout__panel-text-constraints") : null;
+    }
+    function saveWrap(wrap) {
+      if (!wrap || !controlsEl.contains(wrap)) return;
+      var fid = trimStr(wrap.getAttribute("data-field-id"));
+      if (!fid) return;
+      if (typeof globalThis.gcDesignerDataControlsMergeFieldTextConstraints !== "function") return;
+      var minIn = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-min");
+      var maxIn = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-max");
+      var intCb = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-integer");
+      var defIn = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-default-value-input");
+      globalThis
+        .gcDesignerDataControlsMergeFieldTextConstraints(fid, {
+          constraintMin: minIn ? String(minIn.value || "") : "",
+          constraintMax: maxIn ? String(maxIn.value || "") : "",
+          constraintInteger: !!(intCb && intCb.checked),
+          defaultValue: defIn ? String(defIn.value != null ? defIn.value : "") : "",
+        })
+        .then(function (ok) {
+          if (!ok) setStatus("Could not save text constraints.");
+        });
+    }
+    controlsEl.addEventListener("change", function (ev) {
+      var wrap = wrapFromTarget(ev.target);
+      if (!wrap) return;
+      saveWrap(wrap);
+    });
+    controlsEl.addEventListener(
+      "focusout",
+      function (ev) {
+        var wrap = wrapFromTarget(ev.target);
+        if (!wrap) return;
+        if (
+          !ev.target.classList ||
+          (!ev.target.classList.contains("gc-designer-data-controls-layout__panel-text-constraint-min") &&
+            !ev.target.classList.contains("gc-designer-data-controls-layout__panel-text-constraint-max") &&
+            !ev.target.classList.contains("gc-designer-data-controls-layout__panel-text-default-value-input"))
+        ) {
+          return;
+        }
+        saveWrap(wrap);
+      },
+      true,
+    );
+  }
+
+  function setPanelPropsExpandedUi(panelNode, nid, wantExpanded) {
+    var cornerBtn = panelNode.querySelector(
+      ".gc-designer-data-controls-layout__panel-props-toggle--corner",
+    );
+    var hoverBtn = panelNode.querySelector(
+      ".gc-designer-data-controls-layout__panel-props-toggle--summary-hover",
+    );
+    var sumEl = panelNode.querySelector(".gc-designer-data-controls-layout__panel-card-summary");
+    var metaEl = panelNode.querySelector(".gc-designer-data-controls-layout__panel-card-meta");
+    if (wantExpanded) {
+      state.panelPropsExpanded[nid] = true;
+      panelNode.classList.remove("gc-designer-data-controls-layout__node--panel-props-collapsed");
+      panelNode.classList.add("gc-designer-data-controls-layout__node--panel-props-expanded");
+      if (cornerBtn) cornerBtn.setAttribute("aria-expanded", "true");
+      if (hoverBtn) hoverBtn.setAttribute("aria-expanded", "true");
+      if (sumEl) {
+        sumEl.setAttribute("aria-hidden", "true");
+        sumEl.setAttribute("aria-expanded", "true");
+      }
+      if (metaEl) metaEl.setAttribute("aria-hidden", "false");
+    } else {
+      syncPanelPropertySummaryFromDom(panelNode);
+      delete state.panelPropsExpanded[nid];
+      panelNode.classList.add("gc-designer-data-controls-layout__node--panel-props-collapsed");
+      panelNode.classList.remove("gc-designer-data-controls-layout__node--panel-props-expanded");
+      if (cornerBtn) cornerBtn.setAttribute("aria-expanded", "false");
+      if (hoverBtn) hoverBtn.setAttribute("aria-expanded", "false");
+      if (sumEl) {
+        sumEl.setAttribute("aria-hidden", "false");
+        sumEl.setAttribute("aria-expanded", "false");
+      }
+      if (metaEl) metaEl.setAttribute("aria-hidden", "true");
+    }
+    syncLayoutHeights();
+    drawEdges();
+  }
+
+  function wirePanelDisplayPropsToggle() {
+    if (!controlsEl) return;
+    controlsEl.addEventListener("click", function (ev) {
+      var corner = ev.target.closest(".gc-designer-data-controls-layout__panel-props-toggle--corner");
+      var hoverP = ev.target.closest(".gc-designer-data-controls-layout__panel-props-toggle--summary-hover");
+      var sumEl = ev.target.closest(".gc-designer-data-controls-layout__panel-card-summary");
+      var tgt = corner || hoverP || sumEl;
+      if (!tgt || !controlsEl.contains(tgt)) return;
+      var panelNode = tgt.closest(".gc-designer-data-controls-layout__node--in-panel");
+      if (!panelNode) return;
+      var nid = trimStr(panelNode.getAttribute("data-node-id"));
+      if (!nid) return;
+      var nowExp = !!(state.panelPropsExpanded && state.panelPropsExpanded[nid]);
+      if (corner) {
+        ev.preventDefault();
+        if (nowExp) setPanelPropsExpandedUi(panelNode, nid, false);
+        return;
+      }
+      if (!panelNode.classList.contains("gc-designer-data-controls-layout__node--panel-props-collapsed")) {
+        return;
+      }
+      ev.preventDefault();
+      setPanelPropsExpandedUi(panelNode, nid, true);
+    });
+    controlsEl.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      var sumEl = ev.target.closest(".gc-designer-data-controls-layout__panel-card-summary");
+      if (!sumEl || !controlsEl.contains(sumEl)) return;
+      var panelNode = sumEl.closest(".gc-designer-data-controls-layout__node--in-panel");
+      if (!panelNode || !panelNode.classList.contains("gc-designer-data-controls-layout__node--panel-props-collapsed")) {
+        return;
+      }
+      ev.preventDefault();
+      var nid = trimStr(panelNode.getAttribute("data-node-id"));
+      if (!nid) return;
+      setPanelPropsExpandedUi(panelNode, nid, true);
+    });
+  }
+
   function wireMemberLookupLayoutSourceSelect() {
     controlsEl.addEventListener("change", function (ev) {
       if (isLayoutMapLocked()) return;
@@ -3952,6 +4565,8 @@
   wireControlCardToggles();
   wireDisplayPanelShowAs();
   wireDisplayPanelAllowedOptions();
+  wireDisplayPanelTextConstraints();
+  wirePanelDisplayPropsToggle();
   wireMemberLookupLayoutSourceSelect();
   wireMemberLookupMultiToggle();
   wireTestPickerUi();

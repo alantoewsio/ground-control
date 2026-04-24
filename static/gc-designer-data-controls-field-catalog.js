@@ -1,5 +1,5 @@
 /**
- * Designer · Data Controls: field catalog "Data source" multi-select (cached entity types)
+ * Designer · Layouts: Table fields "Data source" multi-select (cached entity types)
  * and "Test selection" modal (cached object names for global firewall scope).
  */
 (function (global) {

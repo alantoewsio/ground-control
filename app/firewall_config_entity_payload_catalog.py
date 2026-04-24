@@ -188,6 +188,7 @@ def record_entity_payload_field_rows(
                     data_entry_type=inferred_det,
                     data_entry_properties=inferred_props,
                     show_as=None,
+                    display_type="text",
                     display_order=ord_seq,
                 )
             )

@@ -2723,6 +2723,7 @@ class _EntityPayloadFieldRowUpdate(BaseModel):
     data_entry_type: str | None = None
     data_entry_properties: str | None = None
     show_as: str | None = None
+    display_type: Literal["text", "tag", "onoff", "hidden"] | None = None
     display_order: int | None = Field(default=None, ge=1)
     help_text: str | None = None
     allowed_options: list[str] | None = Field(
@@ -2807,6 +2808,39 @@ def _normalize_catalog_show_as(value: str | None) -> str | None:
     return base[:512]
 
 
+_CATALOG_DISPLAY_TYPE_KEYS = frozenset({"text", "tag", "onoff", "hidden"})
+
+
+def _normalize_catalog_display_type_str(value: str | None) -> str:
+    """Persisted display hint: ``text``, ``tag``, ``onoff``, or ``hidden`` (hidden field)."""
+    if value is None:
+        return "text"
+    s = str(value).strip().lower()
+    if s in _CATALOG_DISPLAY_TYPE_KEYS:
+        return s
+    return "text"
+
+
+def _catalog_display_type_for_api_row(r: FirewallConfigEntityPayloadField) -> str:
+    """API value for Table fields: ``hidden`` when ``data_entry_type`` is Hidden, else column."""
+    det = str(r.data_entry_type or "").strip().casefold()
+    if det == "hidden":
+        return "hidden"
+    return _normalize_catalog_display_type_str(r.display_type)
+
+
+def _sync_data_entry_type_from_display_type_row(
+    row: FirewallConfigEntityPayloadField, display_type: str
+) -> None:
+    """Keep ``data_entry_type`` aligned when only ``display_type`` is bulk-updated."""
+    if display_type == "hidden":
+        row.data_entry_type = "Hidden"
+        return
+    det = str(row.data_entry_type or "").strip().casefold()
+    if det == "hidden":
+        row.data_entry_type = None
+
+
 @app.get(
     "/designer/data-controls",
     response_class=HTMLResponse,
@@ -2818,7 +2852,7 @@ def designer_data_controls_page(
     sdb: Annotated[Session, Depends(get_secrets_db)],
     _: Annotated[str, Depends(designer_user_id_dep)],
 ):
-    """Designer: browse field catalog (``firewall_config_entity_payload_fields``) per cache type."""
+    """Designer: browse table fields (``firewall_config_entity_payload_fields``) per cache type."""
     ctx = _designer_template_context(
         request, sdb, db, designer_subnav_active="data_controls"
     )
@@ -2862,6 +2896,7 @@ def _entity_payload_fields_list_payload(
                 "data_entry_type": r.data_entry_type,
                 "data_entry_properties": r.data_entry_properties,
                 "show_as": r.show_as,
+                "display_type": _catalog_display_type_for_api_row(r),
                 "display_order": r.display_order,
                 "help_text": r.help_text,
                 "allowed_options": _decode_allowed_options_from_db(r.allowed_options),
@@ -2901,7 +2936,7 @@ def api_firewalls_config_ui_entity_payload_fields(
     _: Annotated[str, Depends(current_user_id_dep)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    """Field catalog for object-edit flyout (same rows as Designer Data Controls, read-only)."""
+    """Table fields for object-edit flyout (same rows as Designer Layouts, read-only)."""
     return _entity_payload_fields_list_payload(db, entity_type)
 
 
@@ -3049,7 +3084,7 @@ def api_designer_entity_payload_fields_bulk_update(
 ):
     """
     Persist editor metadata for catalog rows (dependent_on, data_entry_type, data_entry_properties,
-    show_as, display_order, help_text, allowed_options). Only supplied row ids belonging to the path
+    show_as, display_type, display_order, help_text, allowed_options). Only supplied row ids belonging to the path
     ``entity_type`` are updated.
     """
     et = str(entity_type or "").strip()
@@ -3084,6 +3119,11 @@ def api_designer_entity_payload_fields_bulk_update(
             row.data_entry_type = det
         if "show_as" in fs:
             row.show_as = _normalize_catalog_show_as(item.show_as)
+        if "display_type" in fs:
+            dtv = _normalize_catalog_display_type_str(item.display_type)
+            row.display_type = dtv
+            if "data_entry_type" not in fs:
+                _sync_data_entry_type_from_display_type_row(row, dtv)
         if "display_order" in fs:
             row.display_order = item.display_order
         if "help_text" in fs:
