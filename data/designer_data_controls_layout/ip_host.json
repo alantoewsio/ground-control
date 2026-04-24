@@ -78,7 +78,7 @@
     },
     "logic:or_1": {
       "x": 0.0,
-      "y": 0.0
+      "y": 190.0
     },
     "ctrl:121": {
       "x": 11.0,
@@ -87,6 +87,10 @@
     "field:121": {
       "x": 12.0,
       "y": 13.0
+    },
+    "logic:or_2": {
+      "x": 0.0,
+      "y": 0.0
     }
   },
   "connections": [
@@ -161,34 +165,6 @@
       "edge_id": "gc_mo08k5tx_g5xizh3rsd"
     },
     {
-      "source_node_id": "field:206",
-      "source_handle": "loaded_value",
-      "target_node_id": "ctrl:206",
-      "target_handle": "address",
-      "edge_id": "gc_mo08k5tx_6wr5quuuoh"
-    },
-    {
-      "source_node_id": "ctrl:206",
-      "source_handle": "ip_address",
-      "target_node_id": "field:206",
-      "target_handle": "save_value",
-      "edge_id": "gc_mo08k5tx_hbfvqz5qge"
-    },
-    {
-      "source_node_id": "field:205",
-      "source_handle": "loaded_value",
-      "target_node_id": "ctrl:205",
-      "target_handle": "address",
-      "edge_id": "gc_mo08k5tx_udeeqrbgul"
-    },
-    {
-      "source_node_id": "ctrl:205",
-      "source_handle": "ip_address",
-      "target_node_id": "field:205",
-      "target_handle": "save_value",
-      "edge_id": "gc_mo08k5tx_lnecf5s3xm"
-    },
-    {
       "source_node_id": "field:897",
       "source_handle": "loaded_value",
       "target_node_id": "ctrl:897",
@@ -217,13 +193,6 @@
       "edge_id": "gc_mo08k5tx_21dw988mpw"
     },
     {
-      "source_node_id": "ctrl:120",
-      "source_handle": "selected",
-      "target_node_id": "ctrl:205",
-      "target_handle": "ipfamily",
-      "edge_id": "gc_mo08k5tx_j8ukpl73f4"
-    },
-    {
       "source_node_id": "ctrl:119",
       "source_handle": "option_ip",
       "target_node_id": "logic:or_1",
@@ -236,20 +205,6 @@
       "target_node_id": "logic:or_1",
       "target_handle": "input_b",
       "edge_id": "gc_mo08k5tx_0nol797e96"
-    },
-    {
-      "source_node_id": "ctrl:119",
-      "source_handle": "option_iprange",
-      "target_node_id": "ctrl:205",
-      "target_handle": "visible",
-      "edge_id": "gc_mo08k5tx_jugvqeptd2"
-    },
-    {
-      "source_node_id": "logic:or_1",
-      "source_handle": "gate",
-      "target_node_id": "ctrl:122",
-      "target_handle": "visible",
-      "edge_id": "gc_mo08k5tx_sujrfi3ail"
     },
     {
       "source_node_id": "ctrl:119",
@@ -282,13 +237,6 @@
     {
       "source_node_id": "field:120",
       "source_handle": "loaded_value",
-      "target_node_id": "ctrl:206",
-      "target_handle": "ipfamily",
-      "edge_id": "gc_mo08k5tx_fkljqkguhk"
-    },
-    {
-      "source_node_id": "field:120",
-      "source_handle": "loaded_value",
       "target_node_id": "ctrl:897",
       "target_handle": "ipfamily",
       "edge_id": "gc_mo08k5tx_yo83oqp2t8"
@@ -301,16 +249,65 @@
       "edge_id": "gc_mo08k5tx_7m05nqoinz"
     },
     {
+      "source_node_id": "field:206",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:122",
+      "target_handle": "from_ip",
+      "edge_id": "gc_moczdl1k_t7q9zqt9kg"
+    },
+    {
+      "source_node_id": "ctrl:122",
+      "source_handle": "from_ip",
+      "target_node_id": "field:206",
+      "target_handle": "save_value",
+      "edge_id": "gc_moczdrac_upnh1zoeny"
+    },
+    {
+      "source_node_id": "field:205",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:122",
+      "target_handle": "to_ip",
+      "edge_id": "gc_mocze1e3_y437y9uneu"
+    },
+    {
+      "source_node_id": "ctrl:122",
+      "source_handle": "to_ip",
+      "target_node_id": "field:205",
+      "target_handle": "save_value",
+      "edge_id": "gc_moczee26_yq4cylnsoh"
+    },
+    {
+      "source_node_id": "logic:or_1",
+      "source_handle": "gate",
+      "target_node_id": "logic:or_2",
+      "target_handle": "input_b",
+      "edge_id": "gc_moczkj60_idkyr2cv6m"
+    },
+    {
       "source_node_id": "ctrl:119",
       "source_handle": "option_iprange",
-      "target_node_id": "ctrl:206",
+      "target_node_id": "logic:or_2",
+      "target_handle": "input_a",
+      "edge_id": "gc_moczkwcr_9kxt28efh1"
+    },
+    {
+      "source_node_id": "logic:or_2",
+      "source_handle": "gate",
+      "target_node_id": "ctrl:122",
       "target_handle": "visible",
-      "edge_id": "gc_mo08k5tx_n087tmf84e"
+      "edge_id": "gc_moczl3zq_ojzn9vq8t7"
     }
   ],
   "logic_nodes": [
     {
       "id": "logic:or_1",
+      "kind": "gate",
+      "op": "or",
+      "true_value": "",
+      "false_value": ""
+    },
+    {
+      "id": "logic:or_2",
       "kind": "gate",
       "op": "or",
       "true_value": "",

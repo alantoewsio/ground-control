@@ -24,6 +24,9 @@
   var addNotBtn = document.getElementById("gc-designer-data-controls-layout-add-not");
   var addIfValueBtn = document.getElementById("gc-designer-data-controls-layout-add-if-value");
   var addCsvArrayBtn = document.getElementById("gc-designer-data-controls-layout-add-csv-array");
+  var addSwitchAbBtn = document.getElementById("gc-designer-data-controls-layout-add-switch-ab");
+  var addIfEqualsBtn = document.getElementById("gc-designer-data-controls-layout-add-if-equals");
+  var addCustomCardBtn = document.getElementById("gc-designer-data-controls-layout-add-custom-card");
   var lockLayoutCb = document.getElementById("gc-designer-data-controls-layout-locked");
   if (!layoutRoot || !canvasEl || !nodesEl || !edgesSvg || !logicEl || !controlsEl) return;
   var dataEntryTypeOptions = [];
@@ -48,6 +51,7 @@
       node_positions: {},
       connections: [],
       logic_nodes: [],
+      custom_cards: [],
       control_add_only: {},
       member_lookup_data_source: {},
       member_lookup_multi: {},
@@ -60,6 +64,8 @@
     tempEdge: null,
     draggingEdgeKey: "",
     pendingEdgeDrag: null,
+    /** While drawing a connection line: the input handle the pointer is currently snapped to (or null). */
+    snappedHandle: null,
     pendingAutoWireFieldId: "",
     testObjects: [],
     selectedTestObjectName: "",
@@ -73,6 +79,7 @@
     savePending: false,
     fieldReorderDrag: null,
     controlReorderDrag: null,
+    logicReorderDrag: null,
     /** Layout · Display cards: `ctrl:*` node ids with property panel expanded (edit pencil). */
     panelPropsExpanded: {},
   };
@@ -323,8 +330,10 @@
           "constraint",
           "pool",
           "autocorrect",
+          "from_ip",
+          "to_ip",
         ],
-        outputs: ["ip_address", "subnet", "netmask"],
+        outputs: ["ip_address", "subnet", "netmask", "from_ip", "to_ip"],
       };
     }
     if (det === "ip-list") {
@@ -373,6 +382,9 @@
       return { inputs: ["value", "visible"], outputs: ["value"] };
     }
     if (det === "data-entry-table-col-text") {
+      return { inputs: ["value", "visible"], outputs: ["value"] };
+    }
+    if (det === "datetime") {
       return { inputs: ["value", "visible"], outputs: ["value"] };
     }
     return { inputs: ["value", "visible"], outputs: ["value"] };
@@ -442,7 +454,54 @@
     var t = trimStr(kind).toLowerCase();
     if (t === "if_value") return "if_value";
     if (t === "csv_array") return "csv_array";
+    if (t === "switch_ab") return "switch_ab";
+    if (t === "if_equals") return "if_equals";
+    if (t === "bool_text") return "bool_text";
     return "gate";
+  }
+
+  /**
+   * Map `logic:<prefix>_<n>` id prefixes to their authoritative kind/op. Used as a
+   * self-healing fallback so A/B Switch (`logic:sw_*`) and If Value (`logic:eq_*`)
+   * blocks render correctly even if a saved payload has `kind: "gate"` (legacy
+   * data, or a bug that dropped the kind field on save).
+   */
+  var LOGIC_ID_PREFIX_TO_KIND = {
+    and: "gate",
+    or: "gate",
+    not: "gate",
+    if: "if_value",
+    csv: "csv_array",
+    sw: "switch_ab",
+    eq: "if_equals",
+    bt: "bool_text",
+  };
+  var LOGIC_ID_PREFIX_TO_OP = { and: "and", or: "or", not: "not" };
+  var LOGIC_ID_PATTERN = /^logic:([a-z]+)_\d+$/;
+
+  function inferLogicKindAndOpFromId(id) {
+    var m = LOGIC_ID_PATTERN.exec(trimStr(id));
+    if (!m) return { kind: "", op: "" };
+    var prefix = m[1];
+    return {
+      kind: LOGIC_ID_PREFIX_TO_KIND[prefix] || "",
+      op: LOGIC_ID_PREFIX_TO_OP[prefix] || "",
+    };
+  }
+
+  function resolveLogicKindForItem(id, rawKind) {
+    var k = normalizeLogicKind(rawKind);
+    if (k !== "gate") return k;
+    var inf = inferLogicKindAndOpFromId(id);
+    if (inf.kind && inf.kind !== "gate") return inf.kind;
+    return "gate";
+  }
+
+  function normalizeIfEqualsSend(v) {
+    var t = trimStr(v).toLowerCase();
+    if (t === "true") return "true";
+    if (t === "false") return "false";
+    return "loaded_value";
   }
 
   function gcDcSplitCsvToParts(line) {
@@ -515,6 +574,7 @@
         node_positions: {},
         connections: [],
         logic_nodes: [],
+        custom_cards: [],
         control_add_only: {},
         member_lookup_data_source: {},
         member_lookup_multi: {},
@@ -523,6 +583,45 @@
     }
     if (!Array.isArray(state.layout.logic_nodes)) state.layout.logic_nodes = [];
     return state.layout.logic_nodes;
+  }
+
+  function ensureCustomCardsArray() {
+    if (!state.layout || typeof state.layout !== "object") {
+      state.layout = {
+        node_positions: {},
+        connections: [],
+        logic_nodes: [],
+        custom_cards: [],
+        control_add_only: {},
+        member_lookup_data_source: {},
+        member_lookup_multi: {},
+        layout_locked: false,
+      };
+    }
+    if (!Array.isArray(state.layout.custom_cards)) state.layout.custom_cards = [];
+    return state.layout.custom_cards;
+  }
+
+  function nextCustomCardId() {
+    var list = ensureCustomCardsArray();
+    var maxN = 0;
+    list.forEach(function (item) {
+      if (!item || typeof item !== "object") return;
+      var id = trimStr(item.id);
+      var m = /^ctrl:custom_(\d+)$/.exec(id);
+      if (!m) return;
+      var n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > maxN) maxN = n;
+    });
+    return "ctrl:custom_" + String(maxN + 1);
+  }
+
+  function findCustomCard(cardId) {
+    var list = ensureCustomCardsArray();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && String(list[i].id || "") === cardId) return list[i];
+    }
+    return null;
   }
 
   function nextLogicNodeId(op, kind) {
@@ -539,6 +638,42 @@
         if (!isNaN(nc) && nc > maxCsv) maxCsv = nc;
       });
       return "logic:csv_" + String(maxCsv + 1);
+    }
+    if (nodeKind === "switch_ab") {
+      var maxSw = 0;
+      list.forEach(function (item) {
+        if (!item || typeof item !== "object") return;
+        var id = trimStr(item.id);
+        var ms = /^logic:sw_(\d+)$/.exec(id);
+        if (!ms) return;
+        var ns = parseInt(ms[1], 10);
+        if (!isNaN(ns) && ns > maxSw) maxSw = ns;
+      });
+      return "logic:sw_" + String(maxSw + 1);
+    }
+    if (nodeKind === "if_equals") {
+      var maxEq = 0;
+      list.forEach(function (item) {
+        if (!item || typeof item !== "object") return;
+        var id = trimStr(item.id);
+        var me = /^logic:eq_(\d+)$/.exec(id);
+        if (!me) return;
+        var ne = parseInt(me[1], 10);
+        if (!isNaN(ne) && ne > maxEq) maxEq = ne;
+      });
+      return "logic:eq_" + String(maxEq + 1);
+    }
+    if (nodeKind === "bool_text") {
+      var maxBt = 0;
+      list.forEach(function (item) {
+        if (!item || typeof item !== "object") return;
+        var id = trimStr(item.id);
+        var mb = /^logic:bt_(\d+)$/.exec(id);
+        if (!mb) return;
+        var nb = parseInt(mb[1], 10);
+        if (!isNaN(nb) && nb > maxBt) maxBt = nb;
+      });
+      return "logic:bt_" + String(maxBt + 1);
     }
     var prefix = nodeKind === "if_value" ? "if" : normalizeLogicOp(op);
     var maxN = 0;
@@ -649,6 +784,12 @@
         syncLayoutLockCheckbox();
         updatePersistButtonsEnabled();
         updateLayoutRootLockedClass();
+        if (typeof globalThis.gcDesignerDataControlsSetLayoutLockFlag === "function") {
+          globalThis.gcDesignerDataControlsSetLayoutLockFlag(et, !!state.layout.layout_locked);
+        }
+        if (typeof globalThis.gcDesignerDataControlsRefreshLayoutLockIcons === "function") {
+          globalThis.gcDesignerDataControlsRefreshLayoutLockIcons();
+        }
         return true;
       })
       .catch(function () {
@@ -662,6 +803,7 @@
         node_positions: {},
         connections: [],
         logic_nodes: [],
+        custom_cards: [],
         control_add_only: {},
         member_lookup_data_source: {},
         member_lookup_multi: {},
@@ -684,6 +826,7 @@
         node_positions: {},
         connections: [],
         logic_nodes: [],
+        custom_cards: [],
         control_add_only: {},
         member_lookup_data_source: {},
         member_lookup_multi: {},
@@ -706,6 +849,7 @@
         node_positions: {},
         connections: [],
         logic_nodes: [],
+        custom_cards: [],
         control_add_only: {},
         member_lookup_data_source: {},
         member_lookup_multi: {},
@@ -792,12 +936,53 @@
         y: y,
       };
     });
+    ensureCustomCardsArray().forEach(function (card, idx) {
+      if (!card || typeof card !== "object") return;
+      var cid = trimStr(card.id);
+      if (!cid || cid.indexOf("ctrl:custom_") !== 0) return;
+      var det = trimStr(card.data_entry_type) || "toggle-checkbox";
+      var showAs = trimStr(card.show_as);
+      var allowedOpts = Array.isArray(card.allowed_options) ? card.allowed_options : [];
+      var mlMulti = trimStr(det).toLowerCase() === "member-lookup"
+        ? Object.prototype.hasOwnProperty.call(memberLookupMultiMap, cid)
+          ? parseBoolLike(memberLookupMultiMap[cid])
+          : !!card.member_lookup_multi
+        : false;
+      var pseudoField = {
+        data_entry_type: det,
+        allowed_options: allowedOpts,
+        data_entry_properties: card.data_entry_properties || "",
+      };
+      var hs = controlHandleSpec(pseudoField);
+      out[cid] = {
+        id: cid,
+        field_id: "",
+        custom_card_id: cid,
+        is_custom: true,
+        data_entry_type: det,
+        data_entry_properties: card.data_entry_properties || "",
+        show_as: showAs,
+        property_name: "",
+        allowed_options: allowedOpts,
+        member_lookup_multi: mlMulti,
+        label: (showAs || "Custom") + " (" + det + ")",
+        kind: "control",
+        inputs: hs.inputs,
+        outputs: hs.outputs,
+        x: 10,
+        y: 24 + (state.fields.length + idx) * 94,
+      };
+    });
     ensureLogicNodesArray().forEach(function (item, idx) {
       if (!item || typeof item !== "object") return;
       var id = trimStr(item.id);
       if (!id || id.indexOf("logic:") !== 0) return;
-      var nodeKind = normalizeLogicKind(item.kind);
+      var nodeKind = resolveLogicKindForItem(id, item.kind);
       var op = normalizeLogicOp(item.op);
+      /* Heal the in-memory row so a later save round-trips the correct kind
+       * even if the original payload had ``kind: "gate"`` but the id prefix
+       * identifies this as a non-gate block. */
+      if (item.kind !== nodeKind) item.kind = nodeKind;
       if (nodeKind === "csv_array") {
         out[id] = {
           id: id,
@@ -811,6 +996,63 @@
           outputs: ["csv_out", "array_out"],
           true_value: "",
           false_value: "",
+          x: 28,
+          y: 24 + (state.fields.length + idx) * 94,
+        };
+        return;
+      }
+      if (nodeKind === "switch_ab") {
+        out[id] = {
+          id: id,
+          field_id: "",
+          data_entry_type: "",
+          logic_kind: "switch_ab",
+          logic_op: op,
+          label: "A/B Switch",
+          kind: "logic",
+          inputs: ["loaded_value_a", "loaded_value_b", "use_a"],
+          outputs: ["save_value"],
+          true_value: "",
+          false_value: "",
+          x: 28,
+          y: 24 + (state.fields.length + idx) * 94,
+        };
+        return;
+      }
+      if (nodeKind === "if_equals") {
+        out[id] = {
+          id: id,
+          field_id: "",
+          data_entry_type: "",
+          logic_kind: "if_equals",
+          logic_op: op,
+          label: "If Value",
+          kind: "logic",
+          inputs: ["loaded_value"],
+          outputs: ["save_value"],
+          true_value: "",
+          false_value: "",
+          compare_value: String(item.compare_value == null ? "" : item.compare_value),
+          then_send: normalizeIfEqualsSend(item.then_send),
+          else_send: normalizeIfEqualsSend(item.else_send),
+          x: 28,
+          y: 24 + (state.fields.length + idx) * 94,
+        };
+        return;
+      }
+      if (nodeKind === "bool_text") {
+        out[id] = {
+          id: id,
+          field_id: "",
+          data_entry_type: "",
+          logic_kind: "bool_text",
+          logic_op: op,
+          label: "Bool \u2194 Text",
+          kind: "logic",
+          inputs: ["text_in", "bool_in"],
+          outputs: ["bool_out", "text_out"],
+          true_value: trimStr(item.true_value),
+          false_value: trimStr(item.false_value),
           x: 28,
           y: 24 + (state.fields.length + idx) * 94,
         };
@@ -921,6 +1163,22 @@
       if (handleId === "csv_out") return "CSV out";
       if (handleId === "array_in") return "Array in";
       if (handleId === "array_out") return "Array out";
+    }
+    if (node && node.kind === "logic" && node.logic_kind === "switch_ab") {
+      if (handleId === "loaded_value_a") return "loaded_value_a";
+      if (handleId === "loaded_value_b") return "loaded_value_b";
+      if (handleId === "use_a") return "use_a";
+      if (handleId === "save_value") return "save_value";
+    }
+    if (node && node.kind === "logic" && node.logic_kind === "if_equals") {
+      if (handleId === "loaded_value") return "loaded_value";
+      if (handleId === "save_value") return "save_value";
+    }
+    if (node && node.kind === "logic" && node.logic_kind === "bool_text") {
+      if (handleId === "text_in") return "Text in";
+      if (handleId === "text_out") return "Text out";
+      if (handleId === "bool_in") return "Bool in";
+      if (handleId === "bool_out") return "Bool out";
     }
     if (handleId === "ipfamily") return "IPFamily";
     if (handleId === "constraint") return "Constraint";
@@ -1052,6 +1310,7 @@
       node_positions: {},
       connections: [],
       logic_nodes: [],
+      custom_cards: [],
       control_add_only: {},
       member_lookup_data_source: {},
       member_lookup_multi: {},
@@ -1157,6 +1416,12 @@
         ),
       );
     }
+    if (detLower === "datetime") {
+      var pjDtSum = parseJsonObject(
+        node.is_custom ? node.data_entry_properties : fRow && fRow.data_entry_properties,
+      );
+      parts.push(panelSummaryPair("Date only", pjDtSum.dateOnly ? "Yes" : "No"));
+    }
     if (detLower === "member-lookup") {
       var mlMap = ensureMemberLookupDataSourceMap();
       var srcTok = mlMap[node.id] != null ? trimStr(String(mlMap[node.id])) : "";
@@ -1255,6 +1520,24 @@
           escHtmlText("00:00–23:45 every 15 min, then 23:59"),
         ),
       );
+    }
+    if (detLower === "datetime") {
+      var dtWrap = panelNode.querySelector(
+        ".gc-designer-data-controls-layout__panel-datetime-props",
+      );
+      var dtCb = dtWrap
+        ? dtWrap.querySelector(".gc-designer-data-controls-layout__panel-datetime-date-only-input")
+        : null;
+      var dtDateOnly;
+      if (dtCb) {
+        dtDateOnly = !!dtCb.checked;
+      } else {
+        var pjDtSync = parseJsonObject(
+          node.is_custom ? node.data_entry_properties : fRow && fRow.data_entry_properties,
+        );
+        dtDateOnly = !!pjDtSync.dateOnly;
+      }
+      parts.push(panelSummaryPair("Date only", dtDateOnly ? "Yes" : "No"));
     }
     if (detLower === "member-lookup") {
       var selMl = panelNode.querySelector(".gc-designer-data-controls-layout__panel-ml-source-select");
@@ -1382,6 +1665,12 @@
       if (opts && opts.logicPanel) {
         logicClass += " gc-designer-data-controls-layout__node--in-panel";
       }
+      var logicDragHandleHtml =
+        opts && opts.logicPanel
+          ? '<button type="button" class="gc-designer-data-controls-layout__logic-drag-handle" aria-label="Drag to reorder logic block" title="Drag to reorder">' +
+            '<span class="gc-designer-data-controls-layout__logic-drag-grip" aria-hidden="true"></span>' +
+            "</button>"
+          : "";
       if (node.logic_kind === "csv_array") {
         return (
           '<div class="' +
@@ -1390,6 +1679,7 @@
           esc(node.id) +
           '">' +
           '<div class="gc-designer-data-controls-layout__node-head">' +
+          logicDragHandleHtml +
           '<div class="gc-designer-data-controls-layout__node-head-main">' +
           '<span class="mono">' +
           esc(node.label) +
@@ -1412,8 +1702,105 @@
           "</div>"
         );
       }
+      if (node.logic_kind === "bool_text") {
+        var btTrue = esc(String(node.true_value == null ? "" : node.true_value));
+        var btFalse = esc(String(node.false_value == null ? "" : node.false_value));
+        return (
+          '<div class="' +
+          logicClass +
+          ' gc-designer-data-controls-layout__node--bool-text" data-node-id="' +
+          esc(node.id) +
+          '">' +
+          '<div class="gc-designer-data-controls-layout__node-head">' +
+          logicDragHandleHtml +
+          '<div class="gc-designer-data-controls-layout__node-head-main">' +
+          '<span class="mono">' +
+          esc(node.label) +
+          "</span>" +
+          "</div>" +
+          '<button type="button" class="gc-designer-data-controls-layout__node-delete" data-node-id="' +
+          esc(node.id) +
+          '" title="Delete block" aria-label="Delete block">\u00d7</button>' +
+          "</div>" +
+          '<div class="gc-designer-data-controls-layout__node-body gc-designer-data-controls-layout__node-body--bool-text">' +
+          '<div class="gc-designer-data-controls-layout__bool-text-values">' +
+          '<div class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__det-field--bool-text">' +
+          '<span class="gc-designer-data-controls-layout__det-label">True value</span>' +
+          '<input type="text" class="settings-form__input mono gc-designer-data-controls-layout__logic-value" data-logic-id="' +
+          esc(node.id) +
+          '" data-value-side="true" value="' +
+          btTrue +
+          '" />' +
+          "</div>" +
+          '<div class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__det-field--bool-text">' +
+          '<span class="gc-designer-data-controls-layout__det-label">False value</span>' +
+          '<input type="text" class="settings-form__input mono gc-designer-data-controls-layout__logic-value" data-logic-id="' +
+          esc(node.id) +
+          '" data-value-side="false" value="' +
+          btFalse +
+          '" />' +
+          "</div>" +
+          "</div>" +
+          '<div class="gc-designer-data-controls-layout__bool-text-row">' +
+          '<div class="gc-designer-data-controls-layout__bool-text-col gc-designer-data-controls-layout__bool-text-col--left">' +
+          handlesHtml(["text_in"], "in") +
+          handlesHtml(["text_out"], "out") +
+          "</div>" +
+          '<div class="gc-designer-data-controls-layout__bool-text-col gc-designer-data-controls-layout__bool-text-col--right">' +
+          handlesHtml(["bool_out"], "out") +
+          handlesHtml(["bool_in"], "in") +
+          "</div>" +
+          "</div>" +
+          "</div>" +
+          "</div>"
+        );
+      }
       var valueFieldsHtml = "";
-      if (node.logic_kind === "if_value") {
+      if (node.logic_kind === "if_equals") {
+        var cmpVal = esc(String(node.compare_value == null ? "" : node.compare_value));
+        var thenSel = normalizeIfEqualsSend(node.then_send);
+        var elseSel = normalizeIfEqualsSend(node.else_send);
+        function sendSelectHtml(side, current) {
+          var choices = [
+            { v: "true", t: "True" },
+            { v: "false", t: "False" },
+            { v: "loaded_value", t: "loaded_value" },
+          ];
+          var optsHtml = "";
+          for (var i = 0; i < choices.length; i++) {
+            var c = choices[i];
+            var sel = c.v === current ? ' selected="selected"' : "";
+            optsHtml +=
+              '<option value="' + esc(c.v) + '"' + sel + ">" + esc(c.t) + "</option>";
+          }
+          return (
+            '<select class="settings-form__input mono gc-designer-data-controls-layout__logic-send-select" data-logic-id="' +
+            esc(node.id) +
+            '" data-send-side="' +
+            esc(side) +
+            '">' +
+            optsHtml +
+            "</select>"
+          );
+        }
+        valueFieldsHtml =
+          '<div class="gc-designer-data-controls-layout__det-field">' +
+          '<span class="gc-designer-data-controls-layout__det-label">If value is</span>' +
+          '<input type="text" class="settings-form__input mono gc-designer-data-controls-layout__logic-compare-value" data-logic-id="' +
+          esc(node.id) +
+          '" value="' +
+          cmpVal +
+          '" />' +
+          "</div>" +
+          '<div class="gc-designer-data-controls-layout__det-field">' +
+          '<span class="gc-designer-data-controls-layout__det-label">Then send</span>' +
+          sendSelectHtml("then", thenSel) +
+          "</div>" +
+          '<div class="gc-designer-data-controls-layout__det-field">' +
+          '<span class="gc-designer-data-controls-layout__det-label">Else send</span>' +
+          sendSelectHtml("else", elseSel) +
+          "</div>";
+      } else if (node.logic_kind === "if_value") {
         valueFieldsHtml =
           '<div class="gc-designer-data-controls-layout__det-field">' +
           '<span class="gc-designer-data-controls-layout__det-label">True value</span>' +
@@ -1439,6 +1826,7 @@
         esc(node.id) +
         '">' +
         '<div class="gc-designer-data-controls-layout__node-head">' +
+        logicDragHandleHtml +
         '<div class="gc-designer-data-controls-layout__node-head-main">' +
         '<span class="mono">' +
         esc(node.label) +
@@ -1472,12 +1860,22 @@
       '<span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>' +
       "</label>";
     if (node.kind === "control" && opts.controlPanel) {
+      var isCustomCard = !!node.is_custom;
+      var customCardId = isCustomCard ? trimStr(node.custom_card_id || node.id) : "";
+      var customCardAttr = isCustomCard
+        ? ' data-custom-card-id="' + esc(customCardId) + '"'
+        : "";
       var panelTabRaw =
-        trimStr(node.show_as) || trimStr(node.property_name) || trimStr(node.label) || "Control";
+        trimStr(node.show_as) ||
+        trimStr(node.property_name) ||
+        (isCustomCard ? "Custom" : trimStr(node.label)) ||
+        "Control";
       var panelTabHtml = escHtmlText(panelTabRaw);
       var panelTabTitleAttr = esc(panelTabRaw);
       var showAsVal = esc(trimStr(node.show_as));
-      var propPh = esc(trimStr(node.property_name) || "Property");
+      var propPh = esc(
+        trimStr(node.property_name) || (isCustomCard ? "Label shown in flyout" : "Property"),
+      );
       var detHint = trimStr(node.data_entry_type);
       var detLower = detHint.toLowerCase();
       var aoArr = Array.isArray(node.allowed_options) ? node.allowed_options : [];
@@ -1503,7 +1901,9 @@
           '<span class="gc-designer-data-controls-layout__det-label">Allowed values</span>' +
           '<textarea class="settings-form__input mono gc-designer-data-controls-layout__panel-allowed-options-input" rows="2" data-field-id="' +
           esc(node.field_id || "") +
-          '" placeholder="' +
+          '"' +
+          customCardAttr +
+          ' placeholder="' +
           esc(allowedPh) +
           '" aria-label="' +
           esc(allowedAria) +
@@ -1539,10 +1939,40 @@
           '" data-node-id="' +
           esc(node.id || "") +
           '"' +
+          customCardAttr +
           (node.member_lookup_multi ? ' checked="checked"' : "") +
           " />" +
           '<span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>' +
           "</label>";
+      }
+      var datetimePropsPanelHtml = "";
+      if (detLower === "datetime") {
+        var dtPropsSrc = isCustomCard
+          ? node.data_entry_properties
+          : (function () {
+              var ftcDt = null;
+              var ftcIdDt = String(node.field_id || "");
+              state.fields.forEach(function (fx) {
+                if (String(fx.id || "") === ftcIdDt) ftcDt = fx;
+              });
+              return ftcDt && ftcDt.data_entry_properties;
+            })();
+        var pjDt = parseJsonObject(dtPropsSrc);
+        var dateOnlyOn = !!pjDt.dateOnly;
+        datetimePropsPanelHtml =
+          '<div class="gc-designer-data-controls-layout__panel-datetime-props" data-field-id="' +
+          esc(String(node.field_id || "")) +
+          '"' +
+          customCardAttr +
+          ' title="When on, users pick a date only. When off, users pick date and time.">' +
+          '<label class="gc-toolbar-combine gc-designer-data-controls-layout__panel-datetime-date-only-toggle">' +
+          '<span class="gc-toolbar-combine__text">Date only</span>' +
+          '<input type="checkbox" class="gc-toolbar-combine__input gc-designer-data-controls-layout__panel-datetime-date-only-input"' +
+          (dateOnlyOn ? ' checked="checked"' : "") +
+          " />" +
+          '<span class="gc-toolbar-combine__track" aria-hidden="true"><span class="gc-toolbar-combine__thumb"></span></span>' +
+          "</label>" +
+          "</div>";
       }
       var textConstraintPanelHtml = "";
       if (
@@ -1555,7 +1985,8 @@
         state.fields.forEach(function (fx) {
           if (String(fx.id || "") === ftcId) ftc = fx;
         });
-        var pjTc = parseJsonObject(ftc && ftc.data_entry_properties);
+        var textPropsSrc = isCustomCard ? node.data_entry_properties : ftc && ftc.data_entry_properties;
+        var pjTc = parseJsonObject(textPropsSrc);
         var cminTc = pjTc.constraintMin != null ? esc(String(pjTc.constraintMin)) : "";
         var cmaxTc = pjTc.constraintMax != null ? esc(String(pjTc.constraintMax)) : "";
         var intTc = !!pjTc.constraintInteger;
@@ -1577,7 +2008,9 @@
         textConstraintPanelHtml =
           '<div class="gc-designer-data-controls-layout__panel-text-constraints" data-field-id="' +
           esc(ftcId) +
-          '" title="Integer on: Min/Max are numeric bounds. Integer off: Min/Max are character lengths. Leave blank to skip.">' +
+          '"' +
+          customCardAttr +
+          ' title="Integer on: Min/Max are numeric bounds. Integer off: Min/Max are character lengths. Leave blank to skip.">' +
           '<div class="gc-designer-data-controls-layout__panel-text-constraints__row">' +
           '<label class="gc-designer-data-controls-layout__det-field gc-designer-data-controls-layout__panel-text-constraints__minmax">' +
           '<span class="gc-designer-data-controls-layout__det-label">Min</span>' +
@@ -1606,16 +2039,59 @@
       var panelModeClass = expandedPanel
         ? " gc-designer-data-controls-layout__node--panel-props-expanded"
         : " gc-designer-data-controls-layout__node--panel-props-collapsed";
+      var customCardClass = isCustomCard
+        ? " gc-designer-data-controls-layout__node--custom"
+        : "";
       var summaryInnerHtml = buildPanelPropertySummaryInnerHtml(node);
       var panelMetaDomId = "gc-dc-panel-meta-" + slug(String(node.id || "n"));
       var summaryAriaHidden = expandedPanel ? "true" : "false";
       var metaAriaHidden = expandedPanel ? "false" : "true";
+      var customCardDetSelectHtml = "";
+      if (isCustomCard) {
+        var customDetOpts = dataEntryTypeOptions.filter(function (cid) {
+          return trimStr(cid).toLowerCase().indexOf("data-entry-table-col-") !== 0;
+        });
+        var customCurrent = trimStr(node.data_entry_type);
+        var customOptsHtml = "";
+        var customHasCurrent = false;
+        customDetOpts.forEach(function (cid) {
+          var selectedAttr = cid === customCurrent ? ' selected="selected"' : "";
+          if (selectedAttr) customHasCurrent = true;
+          customOptsHtml +=
+            '<option value="' + esc(cid) + '"' + selectedAttr + ">" + esc(cid) + "</option>";
+        });
+        if (!customHasCurrent && customCurrent) {
+          customOptsHtml +=
+            '<option value="' +
+            esc(customCurrent) +
+            '" selected="selected">' +
+            esc(customCurrent) +
+            "</option>";
+        }
+        customCardDetSelectHtml =
+          '<label class="gc-designer-data-controls-layout__det-field">' +
+          '<span class="gc-designer-data-controls-layout__det-label">Data entry type</span>' +
+          '<select class="settings-form__input mono gc-designer-data-controls-layout__custom-det-select" data-custom-card-id="' +
+          esc(customCardId) +
+          '">' +
+          customOptsHtml +
+          "</select>" +
+          "</label>";
+      }
+      var customCardDeleteBtnHtml = isCustomCard
+        ? '<button type="button" class="button button--danger gc-designer-data-controls-layout__custom-card-delete" data-custom-card-id="' +
+          esc(customCardId) +
+          '" title="Delete this display card" aria-label="Delete this display card">Delete</button>'
+        : "";
       return (
         '<div class="gc-designer-data-controls-layout__node gc-designer-data-controls-layout__node--control gc-designer-data-controls-layout__node--in-panel' +
         panelModeClass +
+        customCardClass +
         '" data-node-id="' +
         esc(node.id) +
-        '">' +
+        '"' +
+        customCardAttr +
+        ">" +
         '<div class="gc-designer-data-controls-layout__panel-card-shell">' +
         '<div class="gc-designer-data-controls-layout__panel-card-tab" title="' +
         panelTabTitleAttr +
@@ -1674,17 +2150,20 @@
         '" class="gc-designer-data-controls-layout__panel-card-meta" aria-hidden="' +
         metaAriaHidden +
         '">' +
+        customCardDetSelectHtml +
         '<label class="gc-designer-data-controls-layout__panel-show-as-field">' +
         '<span class="gc-designer-data-controls-layout__det-label">Show as</span>' +
         '<input type="text" class="settings-form__input mono gc-designer-data-controls-layout__panel-show-as-input" data-field-id="' +
         esc(node.field_id || "") +
-        '" value="' +
+        '"' +
+        customCardAttr +
+        ' value="' +
         showAsVal +
         '" placeholder="' +
         propPh +
         '" autocomplete="off" />' +
         "</label>" +
-        (detHint
+        (detHint && !isCustomCard
           ? '<span class="muted mono gc-designer-data-controls-layout__panel-card-type-hint">' +
             esc(detHint) +
             "</span>"
@@ -1694,7 +2173,9 @@
         mlSourceHtml +
         mlMultiHtml +
         textConstraintPanelHtml +
+        datetimePropsPanelHtml +
         addOnlyToggleHtml +
+        customCardDeleteBtnHtml +
         "</div>" +
         "</div>" +
         "</div>" +
@@ -1756,16 +2237,19 @@
   }
 
   function edgeArrowDefs() {
+    /* ``fill="context-stroke"`` makes each arrowhead inherit the stroke color of
+     * the path that references the marker, so random per-edge colors and the
+     * orange selected color all paint the matching arrowhead automatically. */
     return (
       '<defs>' +
       '<marker id="gc-dc-edge-arrow-left" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">' +
-      '<path d="M0,0 L8,3 L0,6 Z" fill="#2f4fab"></path>' +
+      '<path d="M0,0 L8,3 L0,6 Z" fill="context-stroke"></path>' +
       "</marker>" +
       '<marker id="gc-dc-edge-arrow-right" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">' +
-      '<path d="M0,0 L8,3 L0,6 Z" fill="#8a4fd1"></path>' +
+      '<path d="M0,0 L8,3 L0,6 Z" fill="context-stroke"></path>' +
       "</marker>" +
       '<marker id="gc-dc-edge-arrow-selected" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">' +
-      '<path d="M0,0 L8,3 L0,6 Z" fill="#ea580c"></path>' +
+      '<path d="M0,0 L8,3 L0,6 Z" fill="context-stroke"></path>' +
       "</marker>" +
       "</defs>"
     );
@@ -1776,7 +2260,11 @@
     return src && src.kind === "control" ? "right" : "left";
   }
 
-  function drawPath(d, className, key, markerId) {
+  function drawPath(d, className, key, markerId, strokeColor) {
+    var styleAttr = "";
+    if (strokeColor) {
+      styleAttr = ' style="--edge-stroke: ' + esc(strokeColor) + '"';
+    }
     return (
       '<path d="' +
       esc(d) +
@@ -1786,7 +2274,9 @@
       esc(markerId || "gc-dc-edge-arrow-left") +
       ')" data-edge-key="' +
       esc(key || "") +
-      '"></path>'
+      '"' +
+      styleAttr +
+      "></path>"
     );
   }
 
@@ -1851,125 +2341,517 @@
     return out;
   }
 
-  function edgeHorizontalArmPx(a, b) {
-    var span = Math.abs(b.x - a.x);
-    return Math.min(170, Math.max(44, Math.round(span * 0.35)));
+  /**
+   * Determines which side (left/right) a handle exits toward based on its actual
+   * position in the DOM relative to its owning card. Returns +1 (right) or -1 (left).
+   */
+  function handleExitDirectionFromDom(nodeId, handleId, io) {
+    var sel =
+      '.gc-designer-data-controls-layout__handle[data-node-id="' +
+      cssEscape(nodeId) +
+      '"][data-handle-id="' +
+      cssEscape(handleId) +
+      '"][data-io="' +
+      cssEscape(io) +
+      '"]';
+    var el = layoutRoot ? layoutRoot.querySelector(sel) : null;
+    if (!el) return io === "in" ? -1 : 1;
+    var cardEl = el.closest(".gc-designer-data-controls-layout__node[data-node-id]");
+    if (!cardEl) return io === "in" ? -1 : 1;
+    var rootRect = layoutRoot.getBoundingClientRect();
+    var cardRect = cardEl.getBoundingClientRect();
+    var handleRect = el.getBoundingClientRect();
+    var handleCx = handleRect.left + handleRect.width / 2 - rootRect.left;
+    var cardCx = (cardRect.left + cardRect.right) / 2 - rootRect.left;
+    return handleCx >= cardCx ? 1 : -1;
+  }
+
+  function segmentHitsObstacles(p, q, obstacles) {
+    if (!obstacles || !obstacles.length) return false;
+    if (Math.abs(p.y - q.y) < 0.5) {
+      var y = p.y;
+      var xL = Math.min(p.x, q.x);
+      var xR = Math.max(p.x, q.x);
+      for (var i = 0; i < obstacles.length; i++) {
+        var r = obstacles[i];
+        if (y > r.top && y < r.bottom && xL < r.right - 0.5 && xR > r.left + 0.5) {
+          return true;
+        }
+      }
+      return false;
+    }
+    if (Math.abs(p.x - q.x) < 0.5) {
+      var x = p.x;
+      var yT = Math.min(p.y, q.y);
+      var yB = Math.max(p.y, q.y);
+      for (var j = 0; j < obstacles.length; j++) {
+        var rv = obstacles[j];
+        if (x > rv.left && x < rv.right && yT < rv.bottom - 0.5 && yB > rv.top + 0.5) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  function routeClearOfObstacles(pts, obstacles) {
+    for (var i = 1; i < pts.length; i++) {
+      if (segmentHitsObstacles(pts[i - 1], pts[i], obstacles)) return false;
+    }
+    return true;
+  }
+
+  function simplifyCollinearPts(pts) {
+    if (!pts || pts.length < 3) return pts ? pts.slice() : [];
+    var out = [pts[0]];
+    for (var i = 1; i < pts.length - 1; i++) {
+      var prev = out[out.length - 1];
+      var cur = pts[i];
+      var nxt = pts[i + 1];
+      var dx1 = cur.x - prev.x;
+      var dy1 = cur.y - prev.y;
+      var dx2 = nxt.x - cur.x;
+      var dy2 = nxt.y - cur.y;
+      if (Math.abs(dx1) < 0.5 && Math.abs(dy1) < 0.5) continue;
+      if (Math.abs(dx2) < 0.5 && Math.abs(dy2) < 0.5) continue;
+      var h1 = Math.abs(dy1) < 0.5;
+      var h2 = Math.abs(dy2) < 0.5;
+      var v1 = Math.abs(dx1) < 0.5;
+      var v2 = Math.abs(dx2) < 0.5;
+      if ((h1 && h2) || (v1 && v2)) continue;
+      out.push(cur);
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+
+  function polylineToRoundedPathD(pts, r) {
+    if (!pts || !pts.length) return "";
+    var radius = Math.max(0, r == null ? 8 : r);
+    var p0 = pts[0];
+    var d = "M " + p0.x.toFixed(1) + " " + p0.y.toFixed(1);
+    for (var i = 1; i < pts.length - 1; i++) {
+      var prev = pts[i - 1];
+      var cur = pts[i];
+      var nxt = pts[i + 1];
+      var len1 = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+      var len2 = Math.hypot(nxt.x - cur.x, nxt.y - cur.y);
+      var rad = Math.min(radius, len1 / 2, len2 / 2);
+      if (rad < 0.5) {
+        d += " L " + cur.x.toFixed(1) + " " + cur.y.toFixed(1);
+        continue;
+      }
+      var ux1 = (cur.x - prev.x) / (len1 || 1);
+      var uy1 = (cur.y - prev.y) / (len1 || 1);
+      var ux2 = (nxt.x - cur.x) / (len2 || 1);
+      var uy2 = (nxt.y - cur.y) / (len2 || 1);
+      var x1 = cur.x - ux1 * rad;
+      var y1 = cur.y - uy1 * rad;
+      var x2 = cur.x + ux2 * rad;
+      var y2 = cur.y + uy2 * rad;
+      d += " L " + x1.toFixed(1) + " " + y1.toFixed(1);
+      d +=
+        " Q " +
+        cur.x.toFixed(1) +
+        " " +
+        cur.y.toFixed(1) +
+        " " +
+        x2.toFixed(1) +
+        " " +
+        y2.toFixed(1);
+    }
+    var last = pts[pts.length - 1];
+    d += " L " + last.x.toFixed(1) + " " + last.y.toFixed(1);
+    return d;
+  }
+
+  function polylineMidpoint(pts) {
+    if (!pts || !pts.length) return { x: 0, y: 0 };
+    if (pts.length === 1) return { x: pts[0].x, y: pts[0].y };
+    var total = 0;
+    var lens = [];
+    for (var i = 1; i < pts.length; i++) {
+      var l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      lens.push(l);
+      total += l;
+    }
+    if (total <= 0) return { x: pts[0].x, y: pts[0].y };
+    var want = total / 2;
+    var acc = 0;
+    for (var k = 0; k < lens.length; k++) {
+      if (acc + lens[k] >= want) {
+        var t = lens[k] ? (want - acc) / lens[k] : 0;
+        return {
+          x: pts[k].x + (pts[k + 1].x - pts[k].x) * t,
+          y: pts[k].y + (pts[k + 1].y - pts[k].y) * t,
+        };
+      }
+      acc += lens[k];
+    }
+    return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y };
   }
 
   /**
-   * Cubic from handle a to handle b. ``laneY`` offsets only control-point Y so parallel /
-   * obstacle lanes bulge in the middle without detaching M/C endpoints from the real dots.
+   * Returns Y rows where a horizontal span from `pA.x` to `pB.x` is clear of all
+   * obstacles that overlap that X span, prioritizing rows in the gaps between
+   * stacked cards (so wires prefer slipping between cards over crossing them).
    */
-  function edgeBezierGeometryRaw(a, b, laneY) {
-    var lane = Number(laneY) || 0;
-    var ay = a.y;
-    var by = b.y;
-    var arm = edgeHorizontalArmPx(a, b);
-    var c1x;
-    var c2x;
-    if (b.x >= a.x) {
-      c1x = a.x + arm;
-      c2x = b.x - arm;
-    } else {
-      c1x = a.x - arm;
-      c2x = b.x + arm;
+  function horizontalClearRowCandidates(pA, pB, obstacles, prefY) {
+    var spanLeft = Math.min(pA.x, pB.x) + 1;
+    var spanRight = Math.max(pA.x, pB.x) - 1;
+    var relevant = [];
+    for (var i = 0; i < obstacles.length; i++) {
+      var r = obstacles[i];
+      if (r.right > spanLeft && r.left < spanRight) relevant.push(r);
     }
-    return {
-      ax: a.x,
-      ay: ay,
-      bx: b.x,
-      by: by,
-      c1x: c1x,
-      c1y: ay + lane,
-      c2x: c2x,
-      c2y: by + lane,
-    };
+    if (!relevant.length) return [prefY, prefY - 40, prefY + 40];
+
+    var sorted = relevant.slice().sort(function (a, b) {
+      return a.top - b.top;
+    });
+    var merged = [[sorted[0].top, sorted[0].bottom]];
+    for (var j = 1; j < sorted.length; j++) {
+      var last = merged[merged.length - 1];
+      if (sorted[j].top <= last[1] + 2) {
+        last[1] = Math.max(last[1], sorted[j].bottom);
+      } else {
+        merged.push([sorted[j].top, sorted[j].bottom]);
+      }
+    }
+
+    var candidates = [];
+    candidates.push(merged[0][0] - 18);
+    for (var k = 0; k < merged.length - 1; k++) {
+      var bottomK = merged[k][1];
+      var topK1 = merged[k + 1][0];
+      if (topK1 - bottomK >= 14) {
+        candidates.push((bottomK + topK1) / 2);
+      }
+    }
+    candidates.push(merged[merged.length - 1][1] + 18);
+
+    candidates.sort(function (y1, y2) {
+      return Math.abs(y1 - prefY) - Math.abs(y2 - prefY);
+    });
+    return candidates;
   }
 
-  function cubicBezierPoint(g, t) {
-    var omt = 1 - t;
-    var ax = g.ax;
-    var ay = g.ay;
-    var bx = g.bx;
-    var by = g.by;
-    var c1x = g.c1x;
-    var c1y = g.c1y;
-    var c2x = g.c2x;
-    var c2y = g.c2y;
-    return {
-      x:
-        omt * omt * omt * ax +
-        3 * omt * omt * t * c1x +
-        3 * omt * t * t * c2x +
-        t * t * t * bx,
-      y:
-        omt * omt * omt * ay +
-        3 * omt * omt * t * c1y +
-        3 * omt * t * t * c2y +
-        t * t * t * by,
-    };
+  /**
+   * Returns X columns where a vertical span between `yA` and `yB` is clear of
+   * all obstacles whose Y span overlaps the vertical arm. These are the
+   * "column gutters" between columns of stacked cards — we prefer to route
+   * vertical trunks through them rather than over / under the whole stack.
+   */
+  function verticalClearColumnCandidates(yA, yB, obstacles, prefX) {
+    var spanTop = Math.min(yA, yB) + 1;
+    var spanBottom = Math.max(yA, yB) - 1;
+    var relevant = [];
+    for (var i = 0; i < obstacles.length; i++) {
+      var r = obstacles[i];
+      if (r.bottom > spanTop && r.top < spanBottom) relevant.push(r);
+    }
+    if (!relevant.length) return [prefX, prefX - 40, prefX + 40];
+
+    var sorted = relevant.slice().sort(function (a, b) {
+      return a.left - b.left;
+    });
+    var merged = [[sorted[0].left, sorted[0].right]];
+    for (var j = 1; j < sorted.length; j++) {
+      var last = merged[merged.length - 1];
+      if (sorted[j].left <= last[1] + 2) {
+        last[1] = Math.max(last[1], sorted[j].right);
+      } else {
+        merged.push([sorted[j].left, sorted[j].right]);
+      }
+    }
+
+    var candidates = [];
+    candidates.push(merged[0][0] - 18);
+    for (var k = 0; k < merged.length - 1; k++) {
+      var rightK = merged[k][1];
+      var leftK1 = merged[k + 1][0];
+      if (leftK1 - rightK >= 14) {
+        candidates.push((rightK + leftK1) / 2);
+      }
+    }
+    candidates.push(merged[merged.length - 1][1] + 18);
+
+    candidates.sort(function (x1, x2) {
+      return Math.abs(x1 - prefX) - Math.abs(x2 - prefX);
+    });
+    return candidates;
   }
 
-  function countBezierObstacleHits(g, obstacles) {
-    if (!obstacles || !obstacles.length) return 0;
-    var ts = [0.12, 0.28, 0.5, 0.72, 0.88];
-    var hits = 0;
-    for (var i = 0; i < ts.length; i++) {
-      var p = cubicBezierPoint(g, ts[i]);
-      for (var j = 0; j < obstacles.length; j++) {
-        var r = obstacles[j];
-        if (
-          p.x >= r.left &&
-          p.x <= r.right &&
-          p.y >= r.top &&
-          p.y <= r.bottom
-        ) {
-          hits++;
-          break;
+  function polylineLength(pts) {
+    if (!pts || pts.length < 2) return 0;
+    var total = 0;
+    for (var i = 1; i < pts.length; i++) {
+      total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    return total;
+  }
+
+  /**
+   * Computes the valid trunk-X range for a direct H-V-H route given the exit
+   * directions on both ends. Returns null when no geometry would keep both
+   * stubs pointing outward (in that case V-H-V via a clear row is required).
+   */
+  function hvhTrunkRange(pA, pB, dirA, dirB) {
+    /* For HVH to not zig-zag back through either card, the trunk X must be
+     * "past" both stubs in their respective exit directions. */
+    if (dirA > 0 && dirB > 0) {
+      return { min: Math.max(pA.x, pB.x), max: Math.max(pA.x, pB.x) + 240 };
+    }
+    if (dirA < 0 && dirB < 0) {
+      return { min: Math.min(pA.x, pB.x) - 240, max: Math.min(pA.x, pB.x) };
+    }
+    if (dirA > 0 && dirB < 0) {
+      if (pA.x <= pB.x) return { min: pA.x, max: pB.x };
+      return null;
+    }
+    if (pA.x >= pB.x) return { min: pB.x, max: pA.x };
+    return null;
+  }
+
+  /**
+   * Builds an orthogonal (H/V-only) polyline from handle a (exit direction
+   * dirA ±1) to handle b (exit direction dirB ±1). Strategy:
+   *   1. Generate many candidate routes (H-V-H through column gutters, V-H-V
+   *      through row gutters, V-H-V-H and H-V-H-V combining the two).
+   *   2. Keep only those that don't cross any obstacle card.
+   *   3. Of the clear candidates, pick the SHORTEST (minimal wire length).
+   *   4. If nothing is clear, fall back to the nearest gap row / gutter route
+   *      rather than a zig-zag that would flip back through a card.
+   */
+  function orthogonalRoutePoints(a, b, dirA, dirB, obstacles, trunkBump) {
+    var STUB = 24;
+    var bump = Number(trunkBump) || 0;
+    var pA = { x: a.x + dirA * STUB, y: a.y };
+    var pB = { x: b.x + dirB * STUB, y: b.y };
+    var safeObs = obstacles || [];
+    var avgY = (a.y + b.y) / 2;
+    var avgX = (a.x + b.x) / 2;
+
+    function buildHVH(trunkX) {
+      if (Math.abs(a.y - b.y) < 0.5 && Math.abs(pA.x - pB.x) < 0.5) {
+        return simplifyCollinearPts([a, pA, pB, b]);
+      }
+      return simplifyCollinearPts([
+        a,
+        pA,
+        { x: trunkX, y: a.y },
+        { x: trunkX, y: b.y },
+        pB,
+        b,
+      ]);
+    }
+
+    function buildVHV(rowY) {
+      return simplifyCollinearPts([
+        a,
+        pA,
+        { x: pA.x, y: rowY },
+        { x: pB.x, y: rowY },
+        pB,
+        b,
+      ]);
+    }
+
+    function buildVHVH(rowY, trunkX) {
+      return simplifyCollinearPts([
+        a,
+        pA,
+        { x: pA.x, y: rowY },
+        { x: trunkX, y: rowY },
+        { x: trunkX, y: pB.y },
+        pB,
+        b,
+      ]);
+    }
+
+    function buildHVHV(trunkX, rowY) {
+      return simplifyCollinearPts([
+        a,
+        pA,
+        { x: trunkX, y: pA.y },
+        { x: trunkX, y: rowY },
+        { x: pB.x, y: rowY },
+        pB,
+        b,
+      ]);
+    }
+
+    var cands = [];
+
+    /* --- Strategy 1: H-V-H with trunk at a column gutter when possible. --- */
+    var hvh = hvhTrunkRange(pA, pB, dirA, dirB);
+    if (hvh) {
+      var mid = (hvh.min + hvh.max) / 2 + bump;
+      if (mid < hvh.min) mid = hvh.min;
+      if (mid > hvh.max) mid = hvh.max;
+
+      /* Prefer column gutters (clear vertical channels) that fall inside the
+       * trunk's geometrically-valid range — that's the natural home for a
+       * cross-column wire. */
+      var gutterXs = verticalClearColumnCandidates(pA.y, pB.y, safeObs, mid);
+      for (var gi = 0; gi < gutterXs.length; gi++) {
+        var gx = gutterXs[gi];
+        if (gx >= hvh.min - 0.5 && gx <= hvh.max + 0.5) {
+          cands.push(buildHVH(gx));
         }
       }
-    }
-    return hits;
-  }
-
-  function pickLaneYOffset(a, b, baseBump, obstacles) {
-    var base = Number(baseBump) || 0;
-    if (!obstacles || !obstacles.length) return base;
-    var candidates = [0, 20, -20, 40, -40, 60, -60, 80, -80];
-    var bestExtra = 0;
-    var bestHits = 1e9;
-    for (var i = 0; i < candidates.length; i++) {
-      var extra = candidates[i];
-      var g = edgeBezierGeometryRaw(a, b, base + extra);
-      var h = countBezierObstacleHits(g, obstacles);
-      if (h < bestHits || (h === bestHits && Math.abs(extra) < Math.abs(bestExtra))) {
-        bestHits = h;
-        bestExtra = extra;
-        if (bestHits === 0) break;
+      /* Also try the straight midline and a sprinkling of offsets / a sweep so
+       * simple cases still work even with no obvious gutter. */
+      var hvhOffsets = [0, 14, -14, 28, -28, 48, -48, 80, -80];
+      for (var i = 0; i < hvhOffsets.length; i++) {
+        var tx = mid + hvhOffsets[i];
+        if (tx >= hvh.min - 0.5 && tx <= hvh.max + 0.5) {
+          cands.push(buildHVH(tx));
+        }
+      }
+      for (var sx = hvh.min; sx <= hvh.max; sx += 8) {
+        cands.push(buildHVH(sx));
       }
     }
-    return base + bestExtra;
+
+    /* --- Strategy 2: V-H-V through a row gutter. --- */
+    var rowYs = horizontalClearRowCandidates(pA, pB, safeObs, avgY);
+    for (var ri = 0; ri < rowYs.length; ri++) {
+      cands.push(buildVHV(rowYs[ri]));
+    }
+
+    /* --- Strategy 3: V-H-V-H (horizontal along a row gutter, vertical trunk
+     * at a column gutter, return to pB). Useful when pA.x and pB.x columns
+     * are both blocked but there's a clear row + clear column in between. --- */
+    var colXsForJog = verticalClearColumnCandidates(pA.y, pB.y, safeObs, avgX);
+    var topVHVH = Math.min(rowYs.length, 4);
+    var topColsForJog = Math.min(colXsForJog.length, 4);
+    for (var rj = 0; rj < topVHVH; rj++) {
+      for (var cj = 0; cj < topColsForJog; cj++) {
+        cands.push(buildVHVH(rowYs[rj], colXsForJog[cj]));
+      }
+    }
+
+    /* --- Strategy 4: H-V-H-V (mirror) — horizontal from pA to a trunk X,
+     * vertical through a row gutter, then horizontal back to pB. --- */
+    var topHVHV = Math.min(rowYs.length, 4);
+    for (var rk = 0; rk < topHVHV; rk++) {
+      for (var ck = 0; ck < topColsForJog; ck++) {
+        cands.push(buildHVHV(colXsForJog[ck], rowYs[rk]));
+      }
+    }
+
+    /* Score by length and keep the shortest clear candidate. */
+    var bestClear = null;
+    var bestLen = Infinity;
+    for (var ci = 0; ci < cands.length; ci++) {
+      var pts = cands[ci];
+      if (!pts || pts.length < 2) continue;
+      if (!routeClearOfObstacles(pts, safeObs)) continue;
+      var len = polylineLength(pts);
+      if (len < bestLen) {
+        bestLen = len;
+        bestClear = pts;
+      }
+    }
+    if (bestClear) return bestClear;
+
+    /* --- Fallback: prefer the nearest gap row / gutter so we at least avoid
+     * zig-zagging back into a card. --- */
+    if (rowYs.length) return simplifyCollinearPts(buildVHV(rowYs[0]));
+    if (hvh) return simplifyCollinearPts(buildHVH((hvh.min + hvh.max) / 2 + bump));
+    return simplifyCollinearPts(buildVHV(avgY));
   }
 
-  function edgePathFromGeometry(g) {
+  /**
+   * Renders the trace value for an edge as a rounded pill anchored near the
+   * source connector (rather than the middle of the wire, where many labels
+   * would overlap now that orthogonal routing shares trunks). The pill is
+   * filled with the edge's stroke color so each value visually ties back to
+   * its line.
+   */
+  function edgeValuePillHtml(label, srcPt, dirA, key, strokeColor) {
+    var txt = String(label == null ? "" : label);
+    if (!txt.length) return "";
+    /* 6.8px is a practical width per monospace char at 11px. We add ~10px of
+     * horizontal padding and a 16px pill height. */
+    var charW = 6.8;
+    var padX = 5;
+    var rectH = 16;
+    var rectR = 8;
+    var textLen = Math.max(18, txt.length * charW);
+    var rectW = textLen + padX * 2;
+    var dir = dirA >= 0 ? 1 : -1;
+    /* Start the pill just past the connector dot (dot radius ~5px) so it sits
+     * on the stub without covering the handle. */
+    var rectY = srcPt.y - rectH / 2;
+    var rectX;
+    var textX;
+    var anchor;
+    if (dir > 0) {
+      rectX = srcPt.x + 6;
+      textX = rectX + padX;
+      anchor = "start";
+    } else {
+      rectX = srcPt.x - 6 - rectW;
+      textX = rectX + rectW - padX;
+      anchor = "end";
+    }
+    var keyAttr = esc(key || "");
+    var fillAttr = strokeColor ? ' fill="' + esc(strokeColor) + '"' : "";
     return (
-      "M " +
-      g.ax.toFixed(1) +
-      " " +
-      g.ay.toFixed(1) +
-      " C " +
-      g.c1x.toFixed(1) +
-      " " +
-      g.c1y.toFixed(1) +
-      ", " +
-      g.c2x.toFixed(1) +
-      " " +
-      g.c2y.toFixed(1) +
-      ", " +
-      g.bx.toFixed(1) +
-      " " +
-      g.by.toFixed(1)
+      '<g class="gc-designer-data-controls-layout__edge-value-g" data-edge-key="' +
+      keyAttr +
+      '">' +
+      '<rect class="gc-designer-data-controls-layout__edge-value-pill" data-edge-key="' +
+      keyAttr +
+      '" x="' +
+      rectX.toFixed(1) +
+      '" y="' +
+      rectY.toFixed(1) +
+      '" width="' +
+      rectW.toFixed(1) +
+      '" height="' +
+      rectH.toFixed(1) +
+      '" rx="' +
+      rectR +
+      '" ry="' +
+      rectR +
+      '"' +
+      fillAttr +
+      "></rect>" +
+      '<text class="gc-designer-data-controls-layout__edge-value" data-edge-key="' +
+      keyAttr +
+      '" x="' +
+      textX.toFixed(1) +
+      '" y="' +
+      srcPt.y.toFixed(1) +
+      '" text-anchor="' +
+      anchor +
+      '" dominant-baseline="central">' +
+      escHtmlText(txt) +
+      "</text>" +
+      "</g>"
     );
+  }
+
+  /**
+   * Deterministic vibrant color per edge key so each wire is easier to trace.
+   * Skips hues that clash with the orange "selected" color.
+   */
+  function edgeStrokeColorForKey(key) {
+    var s = String(key == null ? "" : key);
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h * 16777619) >>> 0;
+    }
+    var hue = h % 340;
+    if (hue >= 20) hue += 20;
+    var sat = 58 + ((h >>> 8) % 18);
+    var light = 38 + ((h >>> 16) % 12);
+    return "hsl(" + hue + ", " + sat + "%, " + light + "%)";
   }
 
   function computeFlowStateForTest(rowOverride) {
@@ -2040,9 +2922,42 @@
             values[nodeId + "|csv_out"] = gcDcArrayInToCsvOutStr(arrInFlow);
             return;
           }
+          if (node.logic_kind === "bool_text") {
+            var btTextInFlow = firstControlInput(nodeId, "text_in");
+            var btBoolInFlow = firstControlInput(nodeId, "bool_in");
+            var btTextStr = btTextInFlow == null ? "" : String(btTextInFlow);
+            var btTrueVal = node.true_value == null ? "" : String(node.true_value);
+            var btFalseVal = node.false_value == null ? "" : String(node.false_value);
+            values[nodeId + "|bool_out"] = btTextStr === btTrueVal;
+            values[nodeId + "|text_out"] = parseBoolLike(btBoolInFlow) ? btTrueVal : btFalseVal;
+            return;
+          }
+          if (node.logic_kind === "switch_ab") {
+            var swUseA = parseBoolLike(firstControlInput(nodeId, "use_a"));
+            var swA = firstControlInput(nodeId, "loaded_value_a");
+            var swB = firstControlInput(nodeId, "loaded_value_b");
+            var swPicked = swUseA ? swA : swB;
+            values[nodeId + "|save_value"] = swPicked == null ? "" : String(swPicked);
+            return;
+          }
           if (node.logic_kind === "if_value") {
             var cond = parseBoolLike(firstControlInput(nodeId, "input"));
             values[nodeId + "|value"] = cond ? node.true_value || "" : node.false_value || "";
+            return;
+          }
+          if (node.logic_kind === "if_equals") {
+            var eqLoaded = firstControlInput(nodeId, "loaded_value");
+            var eqLoadedStr = eqLoaded == null ? "" : String(eqLoaded);
+            var eqMatch =
+              eqLoadedStr === String(node.compare_value == null ? "" : node.compare_value);
+            var eqChoice = eqMatch
+              ? normalizeIfEqualsSend(node.then_send)
+              : normalizeIfEqualsSend(node.else_send);
+            var eqOut;
+            if (eqChoice === "true") eqOut = true;
+            else if (eqChoice === "false") eqOut = false;
+            else eqOut = eqLoadedStr;
+            values[nodeId + "|save_value"] = eqOut;
             return;
           }
           if (node.logic_op === "not") {
@@ -2074,6 +2989,10 @@
           values[nodeId + "|ip_address"] = isVisible ? ipOnly : "";
           values[nodeId + "|subnet"] = isVisible ? prefix : "";
           values[nodeId + "|netmask"] = isVisible ? prefix : "";
+          var inFromIp = firstControlInput(nodeId, "from_ip");
+          var inToIp = firstControlInput(nodeId, "to_ip");
+          values[nodeId + "|from_ip"] = isVisible ? (inFromIp == null ? "" : String(inFromIp)) : "";
+          values[nodeId + "|to_ip"] = isVisible ? (inToIp == null ? "" : String(inToIp)) : "";
         } else if (det === "ip-list") {
           var inList = firstControlInput(nodeId, "ip_list") || base;
           var listNorm = String(inList || "")
@@ -2109,9 +3028,11 @@
             }
           }
         } else if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") {
-          var truthy = isVisible && !!trimStr(base);
-          values[nodeId + "|on"] = truthy ? "on" : "";
-          values[nodeId + "|off"] = truthy ? "" : "off";
+          /* Toggle outputs mirror selector option_* outputs: booleans, one true / one false,
+           * both false when the control is not visible. */
+          var truthy = !!trimStr(base);
+          values[nodeId + "|on"] = isVisible && truthy;
+          values[nodeId + "|off"] = isVisible && !truthy;
         } else {
           values[nodeId + "|value"] = isVisible ? base : "";
         }
@@ -2194,7 +3115,7 @@
       var arr = tupleGroups[tk];
       if (!arr || arr.length < 2) return;
       arr.forEach(function (e, idx) {
-        parallelBumpByEdgeKey[edgeKey(e)] = (idx - (arr.length - 1) / 2) * 11;
+        parallelBumpByEdgeKey[edgeKey(e)] = (idx - (arr.length - 1) / 2) * 14;
       });
     });
     var allNodeObstacles = layoutNodeObstaclesAll();
@@ -2203,7 +3124,7 @@
       var b = handleCenter(edge.target_node_id, edge.target_handle, "in");
       if (!a || !b) return;
       var key = edgeKey(edge);
-      var baseBump = Object.hasOwn(parallelBumpByEdgeKey, key)
+      var trunkBump = Object.hasOwn(parallelBumpByEdgeKey, key)
         ? parallelBumpByEdgeKey[key]
         : 0;
       var obstacles = layoutObstaclesMinusNodes(
@@ -2211,41 +3132,34 @@
         edge.source_node_id,
         edge.target_node_id,
       );
-      var yTotal = pickLaneYOffset(a, b, baseBump, obstacles);
-      var geom = edgeBezierGeometryRaw(a, b, yTotal);
+      var dirA = handleExitDirectionFromDom(
+        edge.source_node_id,
+        edge.source_handle,
+        "out",
+      );
+      var dirB = handleExitDirectionFromDom(
+        edge.target_node_id,
+        edge.target_handle,
+        "in",
+      );
+      var pts = orthogonalRoutePoints(a, b, dirA, dirB, obstacles, trunkBump);
       var side = sourceSideForNode(edge.source_node_id);
       var sel = isEdgeKeySelected(key);
       var cls =
         "gc-designer-data-controls-layout__edge gc-designer-data-controls-layout__edge--from-" +
         side +
         (sel ? " is-selected" : "");
-      var markerId = sel
-        ? "gc-dc-edge-arrow-selected"
-        : side === "right"
-          ? "gc-dc-edge-arrow-right"
-          : "gc-dc-edge-arrow-left";
-      html += drawPath(edgePathFromGeometry(geom), cls, key, markerId);
-      html += drawEdgeHandle(
-        geom.bx.toFixed(1),
-        geom.by.toFixed(1),
-        key,
-        side,
-        sel,
-      );
+      var markerId =
+        side === "right" ? "gc-dc-edge-arrow-right" : "gc-dc-edge-arrow-left";
+      var strokeColor = edgeStrokeColorForKey(key);
+      var pathD = polylineToRoundedPathD(pts, 10);
+      html += drawPath(pathD, cls, key, markerId, strokeColor);
+      var endPt = pts.length ? pts[pts.length - 1] : b;
+      html += drawEdgeHandle(endPt.x.toFixed(1), endPt.y.toFixed(1), key, side, sel);
       if (state.showTestValues) {
         var lbl = edgeValueLabelText(edge, outputValues);
         if (lbl) {
-          var mid = cubicBezierPoint(geom, 0.5);
-          html +=
-            '<text class="gc-designer-data-controls-layout__edge-value" data-edge-key="' +
-            esc(key || "") +
-            '" x="' +
-            mid.x.toFixed(1) +
-            '" y="' +
-            (mid.y - 5).toFixed(1) +
-            '">' +
-            escHtmlText(lbl) +
-            "</text>";
+          html += edgeValuePillHtml(lbl, a, dirA, key, strokeColor);
         }
       }
     });
@@ -2330,10 +3244,15 @@
           state.tempEdge.source_node_id,
           "",
         );
-        var tempY = pickLaneYOffset(ts, tempB, 0, tempObs);
-        var tempGeom = edgeBezierGeometryRaw(ts, tempB, tempY);
+        var tempDirA = handleExitDirectionFromDom(
+          state.tempEdge.source_node_id,
+          state.tempEdge.source_handle,
+          "out",
+        );
+        var tempDirB = tempB.x >= ts.x ? -1 : 1;
+        var tempPts = orthogonalRoutePoints(ts, tempB, tempDirA, tempDirB, tempObs, 0);
         html += drawPath(
-          edgePathFromGeometry(tempGeom),
+          polylineToRoundedPathD(tempPts, 10),
           "gc-designer-data-controls-layout__edge gc-designer-data-controls-layout__edge--from-" +
             tempSide +
             " gc-designer-data-controls-layout__edge--temp",
@@ -2375,14 +3294,14 @@
     if (!edgesSvg) return;
     edgesSvg.addEventListener("pointerover", function (ev) {
       if (!state.showTestValues) return;
-      var t = ev.target && ev.target.closest ? ev.target.closest(".gc-designer-data-controls-layout__edge-value") : null;
+      var t = ev.target && ev.target.closest ? ev.target.closest(".gc-designer-data-controls-layout__edge-value-g, .gc-designer-data-controls-layout__edge-value") : null;
       if (!t || !edgesSvg.contains(t)) return;
       var k = trimStr(t.getAttribute("data-edge-key") || "");
       if (k) setTestValueHoverEdgeKey(k);
     });
     edgesSvg.addEventListener("pointerout", function (ev) {
       if (!state.showTestValues) return;
-      var t = ev.target && ev.target.closest ? ev.target.closest(".gc-designer-data-controls-layout__edge-value") : null;
+      var t = ev.target && ev.target.closest ? ev.target.closest(".gc-designer-data-controls-layout__edge-value-g, .gc-designer-data-controls-layout__edge-value") : null;
       if (!t || !edgesSvg.contains(t)) return;
       var rel = ev.relatedTarget;
       if (rel && t.contains(rel)) return;
@@ -2469,15 +3388,19 @@
       var n = state.nodeCatalog[id];
       if (n && n.kind === "control") ids.push(id);
     });
+    /* Sort by y first so user-added custom cards can be freely interleaved with
+     * field-backed controls after a drag reorder. Fall back to field display
+     * order (for real fields) and id so the ordering is stable on first load
+     * before any node_positions exist. */
     ids.sort(function (a, b) {
+      var ya = Number(state.nodeCatalog[a].y) || 0;
+      var yb = Number(state.nodeCatalog[b].y) || 0;
+      if (ya !== yb) return ya - yb;
       var fa = state.nodeCatalog[a].field_id;
       var fb = state.nodeCatalog[b].field_id;
       var ra = fieldRankByDisplayOrder(fa);
       var rb = fieldRankByDisplayOrder(fb);
       if (ra !== rb) return ra - rb;
-      var ya = Number(state.nodeCatalog[a].y) || 0;
-      var yb = Number(state.nodeCatalog[b].y) || 0;
-      if (ya !== yb) return ya - yb;
       return String(a).localeCompare(String(b));
     });
     return ids;
@@ -2688,6 +3611,7 @@
     if (!listEl) return orderedFieldIds;
     var items = listEl.querySelectorAll(".gc-designer-data-controls-layout__control-item");
     var step = 280;
+    var customOrder = [];
     Array.prototype.forEach.call(items, function (li, i) {
       var row = li.querySelector(".gc-designer-data-controls-layout__node[data-node-id]");
       if (!row) return;
@@ -2700,7 +3624,32 @@
       storeNodePosition(id, x, node.y);
       var fid = trimStr(node.field_id);
       if (fid) orderedFieldIds.push(fid);
+      if (node.is_custom && node.custom_card_id) {
+        customOrder.push(node.custom_card_id);
+      }
     });
+    /* Mirror the visible order into the custom_cards array so a later render
+     * before any node_positions override still keeps the user's intended order. */
+    if (customOrder.length) {
+      var currentCustoms = ensureCustomCardsArray();
+      var byId = {};
+      currentCustoms.forEach(function (c) {
+        if (c && c.id) byId[String(c.id)] = c;
+      });
+      var reordered = [];
+      var seen = {};
+      customOrder.forEach(function (cid) {
+        if (seen[cid]) return;
+        seen[cid] = true;
+        if (byId[cid]) reordered.push(byId[cid]);
+      });
+      /* Keep any custom cards that were not visible in the DOM (defensive). */
+      currentCustoms.forEach(function (c) {
+        if (!c || !c.id || seen[String(c.id)]) return;
+        reordered.push(c);
+      });
+      state.layout.custom_cards = reordered;
+    }
     return orderedFieldIds;
   }
 
@@ -2871,6 +3820,88 @@
     ) {
       globalThis.gcDesignerDataControlsApplyDisplayOrdersFromPanel(orderedFieldIds);
     }
+  }
+
+  function logicListInsertBeforeForPointer(listEl, clientY) {
+    var dragger = listEl.querySelector(
+      ".gc-designer-data-controls-layout__logic-item.is-logic-reorder-dragging",
+    );
+    var siblings = Array.prototype.filter.call(listEl.children, function (li) {
+      return (
+        li !== dragger &&
+        li.classList &&
+        li.classList.contains("gc-designer-data-controls-layout__logic-item")
+      );
+    });
+    var closest = { offset: Number.NEGATIVE_INFINITY, el: null };
+    for (var i = 0; i < siblings.length; i++) {
+      var box = siblings[i].getBoundingClientRect();
+      var offset = clientY - (box.top + box.height / 2);
+      if (offset < 0 && offset > closest.offset) {
+        closest = { offset: offset, el: siblings[i] };
+      }
+    }
+    return closest.el;
+  }
+
+  function persistLogicPanelOrderFromDom() {
+    var listEl = logicEl.querySelector(".gc-designer-data-controls-layout__logic-list");
+    if (!listEl) return;
+    var items = listEl.querySelectorAll(".gc-designer-data-controls-layout__logic-item");
+    var step = 190;
+    Array.prototype.forEach.call(items, function (li, i) {
+      var row = li.querySelector(".gc-designer-data-controls-layout__node[data-node-id]");
+      if (!row) return;
+      var id = row.getAttribute("data-node-id") || "";
+      var node = state.nodeCatalog[id];
+      if (!node || node.kind !== "logic") return;
+      var x = Number(node.x) || 28;
+      node.x = x;
+      node.y = i * step;
+      storeNodePosition(id, x, node.y);
+    });
+  }
+
+  function beginLogicPanelReorder(ev, dragBtn) {
+    if (isLayoutMapLocked()) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var li = dragBtn.closest(".gc-designer-data-controls-layout__logic-item");
+    var listEl = dragBtn.closest(".gc-designer-data-controls-layout__logic-list");
+    if (!li || !listEl || !logicEl.contains(li)) return;
+    li.classList.add("is-logic-reorder-dragging");
+    state.logicReorderDrag = { listEl: listEl, draggingLi: li };
+    try {
+      document.body.style.userSelect = "none";
+    } catch (e0) {}
+  }
+
+  function applyLogicReorderPointerMove(clientY) {
+    var st = state.logicReorderDrag;
+    if (!st || !st.listEl || !st.draggingLi) return;
+    var before = logicListInsertBeforeForPointer(st.listEl, clientY);
+    if (before == null) {
+      st.listEl.appendChild(st.draggingLi);
+    } else {
+      st.listEl.insertBefore(st.draggingLi, before);
+    }
+    syncLayoutHeights();
+    drawEdges();
+  }
+
+  function endLogicPanelReorder() {
+    if (!state.logicReorderDrag) return;
+    if (state.logicReorderDrag.draggingLi) {
+      state.logicReorderDrag.draggingLi.classList.remove("is-logic-reorder-dragging");
+    }
+    state.logicReorderDrag = null;
+    try {
+      document.body.style.userSelect = "";
+    } catch (e1) {}
+    if (isLayoutMapLocked()) return;
+    persistLogicPanelOrderFromDom();
+    saveLayoutSoon();
+    drawEdges();
   }
 
   function applyNodeTransformsForKind(kind) {
@@ -3330,6 +4361,7 @@
       node_positions: {},
       connections: [],
       logic_nodes: [],
+      custom_cards: [],
       control_add_only: {},
       member_lookup_data_source: {},
       member_lookup_multi: {},
@@ -3366,12 +4398,57 @@
         var id = trimStr(item.id);
         if (!id || id.indexOf("logic:") !== 0 || seenLogic[id]) return;
         seenLogic[id] = true;
-        out.logic_nodes.push({
+        var kindOut = resolveLogicKindForItem(id, item.kind);
+        var opRaw = trimStr(item.op).toLowerCase();
+        var inferredOp = inferLogicKindAndOpFromId(id).op;
+        var opOut =
+          opRaw === "and" || opRaw === "or" || opRaw === "not"
+            ? opRaw
+            : inferredOp || "and";
+        var row = {
           id: id,
-          kind: normalizeLogicKind(item.kind),
-          op: normalizeLogicOp(item.op),
+          kind: kindOut,
+          op: opOut,
           true_value: trimStr(item.true_value),
           false_value: trimStr(item.false_value),
+        };
+        if (kindOut === "if_equals") {
+          row.compare_value = String(item.compare_value == null ? "" : item.compare_value);
+          row.then_send = normalizeIfEqualsSend(item.then_send);
+          row.else_send = normalizeIfEqualsSend(item.else_send);
+        }
+        out.logic_nodes.push(row);
+      });
+    }
+    if (Array.isArray(src.custom_cards)) {
+      var seenCustom = {};
+      src.custom_cards.forEach(function (item) {
+        if (!item || typeof item !== "object") return;
+        var id = trimStr(item.id);
+        if (!id || !/^ctrl:custom_[a-zA-Z0-9_]+$/.test(id) || seenCustom[id]) return;
+        seenCustom[id] = true;
+        var allowedSrc = Array.isArray(item.allowed_options) ? item.allowed_options : [];
+        var allowed = [];
+        allowedSrc.forEach(function (x) {
+          var t = trimStr(x);
+          if (t) allowed.push(t);
+        });
+        var dep = "";
+        if (typeof item.data_entry_properties === "string") dep = item.data_entry_properties;
+        else if (item.data_entry_properties && typeof item.data_entry_properties === "object") {
+          try {
+            dep = JSON.stringify(item.data_entry_properties);
+          } catch (e0) {
+            dep = "";
+          }
+        }
+        out.custom_cards.push({
+          id: id,
+          data_entry_type: trimStr(item.data_entry_type),
+          show_as: trimStr(item.show_as),
+          allowed_options: allowed,
+          data_entry_properties: dep,
+          member_lookup_multi: parseBoolLike(item.member_lookup_multi),
         });
       });
     }
@@ -3427,13 +4504,19 @@
     var nodeOp = normalizeLogicOp(op);
     var id = nextLogicNodeId(nodeOp, nodeKind);
     var maxY = logicNodes.length * 190;
-    logicNodes.push({
+    var newRow = {
       id: id,
       kind: nodeKind,
       op: nodeOp,
       true_value: "",
       false_value: "",
-    });
+    };
+    if (nodeKind === "if_equals") {
+      newRow.compare_value = "";
+      newRow.then_send = "loaded_value";
+      newRow.else_send = "loaded_value";
+    }
+    logicNodes.push(newRow);
     state.layout.node_positions[id] = { x: 0, y: maxY };
     buildNodeCatalog();
     renderAll();
@@ -3446,9 +4529,82 @@
       setStatus("Added CSV ↔ Array block.");
       return;
     }
+    if (nodeKind === "switch_ab") {
+      setStatus("Added A/B Switch block.");
+      return;
+    }
+    if (nodeKind === "if_equals") {
+      setStatus("Added If Value block.");
+      return;
+    }
+    if (nodeKind === "bool_text") {
+      setStatus("Added Bool \u2194 Text block.");
+      return;
+    }
     setStatus(
       "Added " + (nodeOp === "or" ? "OR" : nodeOp === "not" ? "NOT" : "AND") + " block.",
     );
+  }
+
+  function addCustomCard() {
+    if (!trimStr(state.entityType)) {
+      setStatus("Select a cached object type first.");
+      return;
+    }
+    if (isLayoutMapLocked()) {
+      setStatus("Layout map is locked. Turn off Layout locked to edit.");
+      return;
+    }
+    var list = ensureCustomCardsArray();
+    var id = nextCustomCardId();
+    list.push({
+      id: id,
+      data_entry_type: "toggle-checkbox",
+      show_as: "",
+      allowed_options: [],
+      data_entry_properties: "",
+      member_lookup_multi: false,
+    });
+    if (!state.panelPropsExpanded) state.panelPropsExpanded = {};
+    state.panelPropsExpanded[id] = true;
+    buildNodeCatalog();
+    renderAll();
+    saveLayoutSoon();
+    setStatus("Added display card.");
+  }
+
+  function removeCustomCard(cardId) {
+    if (isLayoutMapLocked()) {
+      setStatus("Layout map is locked. Turn off Layout locked to edit.");
+      return;
+    }
+    var id = trimStr(cardId);
+    if (!id || id.indexOf("ctrl:custom_") !== 0) return;
+    var before = ensureCustomCardsArray().length;
+    state.layout.custom_cards = state.layout.custom_cards.filter(function (item) {
+      return String(item && item.id ? item.id : "") !== id;
+    });
+    if (state.layout.node_positions && typeof state.layout.node_positions === "object") {
+      delete state.layout.node_positions[id];
+    }
+    state.layout.connections = state.layout.connections.filter(function (edge) {
+      return edge.source_node_id !== id && edge.target_node_id !== id;
+    });
+    if (state.layout.control_add_only && typeof state.layout.control_add_only === "object") {
+      delete state.layout.control_add_only[id];
+    }
+    if (state.layout.member_lookup_data_source && typeof state.layout.member_lookup_data_source === "object") {
+      delete state.layout.member_lookup_data_source[id];
+    }
+    if (state.panelPropsExpanded && typeof state.panelPropsExpanded === "object") {
+      delete state.panelPropsExpanded[id];
+    }
+    clearSelectedEdges();
+    if (state.layout.custom_cards.length === before) return;
+    buildNodeCatalog();
+    renderAll();
+    saveLayoutSoon();
+    setStatus("Display card deleted.");
   }
 
   function removeLogicNode(logicId) {
@@ -3511,7 +4667,16 @@
       b.disabled = !on;
     });
     if (resetBtn) resetBtn.disabled = !on || locked;
-    [addAndBtn, addOrBtn, addNotBtn, addIfValueBtn, addCsvArrayBtn].forEach(function (b) {
+    [
+      addAndBtn,
+      addOrBtn,
+      addNotBtn,
+      addIfValueBtn,
+      addCsvArrayBtn,
+      addSwitchAbBtn,
+      addIfEqualsBtn,
+      addCustomCardBtn,
+    ].forEach(function (b) {
       if (b) b.disabled = !on || locked;
     });
     syncLayoutLockCheckbox();
@@ -3814,6 +4979,7 @@
         node_positions: {},
         connections: [],
         logic_nodes: [],
+        custom_cards: [],
         control_add_only: {},
         member_lookup_data_source: {},
         member_lookup_multi: {},
@@ -3838,6 +5004,7 @@
           node_positions: {},
           connections: [],
           logic_nodes: [],
+          custom_cards: [],
           control_add_only: {},
           member_lookup_data_source: {},
           member_lookup_multi: {},
@@ -3943,18 +5110,105 @@
     drawEdges();
   }
 
+  /** Pixel radius within which the floating connection endpoint snaps to a nearby input handle. */
+  var EDGE_SNAP_RADIUS_PX = 22;
+  /** Hysteresis: once snapped, only release when the pointer moves beyond this larger radius. */
+  var EDGE_SNAP_RELEASE_RADIUS_PX = 32;
+
+  function clearHandleSnapHighlight() {
+    if (!layoutRoot) return;
+    var prev = layoutRoot.querySelectorAll(".gc-designer-data-controls-layout__handle.is-snap-target");
+    Array.prototype.forEach.call(prev, function (el) {
+      el.classList.remove("is-snap-target");
+    });
+  }
+
+  function setHandleSnapHighlight(btn) {
+    clearHandleSnapHighlight();
+    if (btn && btn.classList) btn.classList.add("is-snap-target");
+  }
+
+  /**
+   * Find the closest input handle within snap range of the pointer. If the pointer is already
+   * snapped to a handle, keep that handle until the pointer moves beyond the release radius,
+   * to avoid jitter when sliding across nearby handles.
+   * Returns `{ btn, nodeId, handleId, x, y }` or `null`.
+   */
+  function findSnapTargetForPointer(clientX, clientY, sourceNodeId) {
+    if (!layoutRoot) return null;
+    var rootRect = layoutRoot.getBoundingClientRect();
+    var px = clientX - rootRect.left;
+    var py = clientY - rootRect.top;
+    var prev = state.snappedHandle;
+    if (prev && prev.btn && layoutRoot.contains(prev.btn)) {
+      var pc = handleCenter(prev.nodeId, prev.handleId, "in");
+      if (pc) {
+        var pdx = pc.x - px;
+        var pdy = pc.y - py;
+        if (Math.sqrt(pdx * pdx + pdy * pdy) <= EDGE_SNAP_RELEASE_RADIUS_PX) {
+          return { btn: prev.btn, nodeId: prev.nodeId, handleId: prev.handleId, x: pc.x, y: pc.y };
+        }
+      }
+    }
+    var handles = layoutRoot.querySelectorAll(
+      '.gc-designer-data-controls-layout__handle[data-io="in"]',
+    );
+    var best = null;
+    var bestDist = EDGE_SNAP_RADIUS_PX;
+    Array.prototype.forEach.call(handles, function (btn) {
+      var nid = btn.getAttribute("data-node-id") || "";
+      var hid = btn.getAttribute("data-handle-id") || "";
+      if (!nid || !hid) return;
+      if (nid === sourceNodeId) return; /* no self-connect */
+      var c = handleCenter(nid, hid, "in");
+      if (!c) return;
+      var dx = c.x - px;
+      var dy = c.y - py;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d <= bestDist) {
+        bestDist = d;
+        best = { btn: btn, nodeId: nid, handleId: hid, x: c.x, y: c.y };
+      }
+    });
+    return best;
+  }
+
   function updateTempEdgeFromPointer(clientX, clientY) {
     if (!state.tempEdge) return;
     var rootRect = layoutRoot.getBoundingClientRect();
-    state.tempEdge.x = clientX - rootRect.left;
-    state.tempEdge.y = clientY - rootRect.top;
+    var px = clientX - rootRect.left;
+    var py = clientY - rootRect.top;
+    var src = state.activeDragConnection
+      ? state.activeDragConnection.source_node_id
+      : state.tempEdge.source_node_id;
+    var snap = findSnapTargetForPointer(clientX, clientY, src);
+    if (snap) {
+      state.tempEdge.x = snap.x;
+      state.tempEdge.y = snap.y;
+      state.snappedHandle = snap;
+      setHandleSnapHighlight(snap.btn);
+    } else {
+      state.tempEdge.x = px;
+      state.tempEdge.y = py;
+      if (state.snappedHandle) {
+        state.snappedHandle = null;
+        clearHandleSnapHighlight();
+      }
+    }
   }
 
   function finishConnection(targetHandleBtn) {
     if (!state.activeDragConnection) return;
+    /* If the pointer is within snap range of an input handle, prefer that handle even
+     * when the user releases slightly off of it. */
+    if (!targetHandleBtn && state.snappedHandle && state.snappedHandle.btn) {
+      targetHandleBtn = state.snappedHandle.btn;
+    }
     if (isLayoutMapLocked()) {
       state.activeDragConnection = null;
       state.tempEdge = null;
+      state.snappedHandle = null;
+      clearHandleSnapHighlight();
       state.draggingEdgeKey = "";
       drawEdges();
       return;
@@ -3963,6 +5217,8 @@
     if (!targetHandleBtn) {
       state.activeDragConnection = null;
       state.tempEdge = null;
+      state.snappedHandle = null;
+      clearHandleSnapHighlight();
       if (wasRetarget) {
         clearSelectedEdges();
         state.draggingEdgeKey = "";
@@ -3984,6 +5240,8 @@
     });
     state.activeDragConnection = null;
     state.tempEdge = null;
+    state.snappedHandle = null;
+    clearHandleSnapHighlight();
     state.draggingEdgeKey = "";
     if (!exists) {
       edge.edge_id = genEdgeId();
@@ -4030,6 +5288,7 @@
     if (isLayoutMapLocked()) return;
     if (ev.target.closest(".gc-designer-data-controls-layout__handle")) return;
     if (ev.target.closest(".gc-designer-data-controls-layout__field-drag-handle")) return;
+    if (ev.target.closest(".gc-designer-data-controls-layout__logic-drag-handle")) return;
     if (ev.target.closest(".gc-designer-data-controls-layout__det-field")) return;
     if (ev.target.closest(".gc-designer-data-controls-layout__add-only-toggle")) return;
     if (ev.target.closest(".gc-designer-data-controls-layout__panel-ml-multi-toggle")) return;
@@ -4073,6 +5332,11 @@
       var dragH = ev.target.closest(".gc-designer-data-controls-layout__panel-drag-handle");
       if (dragH && controlsEl.contains(dragH)) {
         beginControlPanelReorder(ev, dragH);
+        return;
+      }
+      var logicDragH = ev.target.closest(".gc-designer-data-controls-layout__logic-drag-handle");
+      if (logicDragH && logicEl.contains(logicDragH)) {
+        beginLogicPanelReorder(ev, logicDragH);
         return;
       }
       var handleBtn = ev.target.closest(".gc-designer-data-controls-layout__handle");
@@ -4128,6 +5392,10 @@
         applyControlReorderPointerMove(ev.clientY);
         return;
       }
+      if (state.logicReorderDrag) {
+        applyLogicReorderPointerMove(ev.clientY);
+        return;
+      }
       if (state.pendingEdgeDrag && !state.activeDragConnection) {
         var pdx = ev.clientX - state.pendingEdgeDrag.start_x;
         var pdy = ev.clientY - state.pendingEdgeDrag.start_y;
@@ -4178,6 +5446,10 @@
       }
       if (state.controlReorderDrag) {
         endControlPanelReorder();
+        return;
+      }
+      if (state.logicReorderDrag) {
+        endLogicPanelReorder();
         return;
       }
       if (state.pendingEdgeDrag && !state.activeDragConnection) {
@@ -4236,20 +5508,62 @@
         var logicIn = ev.target.closest
           ? ev.target.closest(".gc-designer-data-controls-layout__logic-value")
           : null;
-        if (!logicIn) return;
-        var logicId = logicIn.getAttribute("data-logic-id") || "";
-        var side = logicIn.getAttribute("data-value-side") || "";
-        if (!logicId || (side !== "true" && side !== "false")) return;
-        var list = ensureLogicNodesArray();
-        list.forEach(function (item) {
-          if (!item || String(item.id || "") !== logicId) return;
-          if (side === "true") item.true_value = String(logicIn.value || "");
-          else item.false_value = String(logicIn.value || "");
+        if (logicIn) {
+          var logicId = logicIn.getAttribute("data-logic-id") || "";
+          var side = logicIn.getAttribute("data-value-side") || "";
+          if (!logicId || (side !== "true" && side !== "false")) return;
+          var list = ensureLogicNodesArray();
+          list.forEach(function (item) {
+            if (!item || String(item.id || "") !== logicId) return;
+            if (side === "true") item.true_value = String(logicIn.value || "");
+            else item.false_value = String(logicIn.value || "");
+          });
+          var node = state.nodeCatalog[logicId];
+          if (node && node.kind === "logic") {
+            if (side === "true") node.true_value = String(logicIn.value || "");
+            else node.false_value = String(logicIn.value || "");
+          }
+          saveLayoutSoon();
+          return;
+        }
+        var cmpIn = ev.target.closest
+          ? ev.target.closest(".gc-designer-data-controls-layout__logic-compare-value")
+          : null;
+        if (cmpIn) {
+          var cmpId = cmpIn.getAttribute("data-logic-id") || "";
+          if (!cmpId) return;
+          var cmpList = ensureLogicNodesArray();
+          cmpList.forEach(function (item) {
+            if (!item || String(item.id || "") !== cmpId) return;
+            item.compare_value = String(cmpIn.value || "");
+          });
+          var cmpNode = state.nodeCatalog[cmpId];
+          if (cmpNode && cmpNode.kind === "logic") {
+            cmpNode.compare_value = String(cmpIn.value || "");
+          }
+          saveLayoutSoon();
+        }
+      });
+      hostEl.addEventListener("change", function (ev) {
+        if (isLayoutMapLocked()) return;
+        var sendSel = ev.target.closest
+          ? ev.target.closest(".gc-designer-data-controls-layout__logic-send-select")
+          : null;
+        if (!sendSel) return;
+        var sendId = sendSel.getAttribute("data-logic-id") || "";
+        var sendSide = sendSel.getAttribute("data-send-side") || "";
+        if (!sendId || (sendSide !== "then" && sendSide !== "else")) return;
+        var sendVal = normalizeIfEqualsSend(sendSel.value);
+        var sendList = ensureLogicNodesArray();
+        sendList.forEach(function (item) {
+          if (!item || String(item.id || "") !== sendId) return;
+          if (sendSide === "then") item.then_send = sendVal;
+          else item.else_send = sendVal;
         });
-        var node = state.nodeCatalog[logicId];
-        if (node && node.kind === "logic") {
-          if (side === "true") node.true_value = String(logicIn.value || "");
-          else node.false_value = String(logicIn.value || "");
+        var sendNode = state.nodeCatalog[sendId];
+        if (sendNode && sendNode.kind === "logic") {
+          if (sendSide === "then") sendNode.then_send = sendVal;
+          else sendNode.else_send = sendVal;
         }
         saveLayoutSoon();
       });
@@ -4536,6 +5850,15 @@
           if (typeof globalThis.gcInvalidateDataControlsLayoutLocksCache === "function") {
             globalThis.gcInvalidateDataControlsLayoutLocksCache();
           }
+          /* Mirror the disable path: immediately reflect the new lock state in the
+           * Object-type selector (and any other surfaces listening on the locks map)
+           * so the padlock icon appears without requiring a page reload. */
+          if (typeof globalThis.gcDesignerDataControlsSetLayoutLockFlag === "function") {
+            globalThis.gcDesignerDataControlsSetLayoutLockFlag(et, true);
+          }
+          if (typeof globalThis.gcDesignerDataControlsRefreshLayoutLockIcons === "function") {
+            globalThis.gcDesignerDataControlsRefreshLayoutLockIcons();
+          }
           setStatus("Layout locked and saved.");
         });
         return;
@@ -4579,6 +5902,211 @@
     });
     resetBtn.disabled = true;
   }
+  if (addCustomCardBtn) {
+    addCustomCardBtn.addEventListener("click", function () {
+      addCustomCard();
+    });
+  }
+  (function wireCustomCardInteractions() {
+    if (!controlsEl) return;
+    controlsEl.addEventListener("click", function (ev) {
+      var delBtn = ev.target.closest
+        ? ev.target.closest(".gc-designer-data-controls-layout__custom-card-delete")
+        : null;
+      if (!delBtn || !controlsEl.contains(delBtn)) return;
+      ev.preventDefault();
+      var cid = trimStr(delBtn.getAttribute("data-custom-card-id"));
+      if (!cid) return;
+      removeCustomCard(cid);
+    });
+    controlsEl.addEventListener("change", function (ev) {
+      if (isLayoutMapLocked()) return;
+      var sel = ev.target.closest
+        ? ev.target.closest(".gc-designer-data-controls-layout__custom-det-select")
+        : null;
+      if (!sel || !controlsEl.contains(sel)) return;
+      var cid = trimStr(sel.getAttribute("data-custom-card-id"));
+      if (!cid) return;
+      var card = findCustomCard(cid);
+      if (!card) return;
+      card.data_entry_type = trimStr(sel.value);
+      buildNodeCatalog();
+      renderAll();
+      saveLayoutSoon();
+      setStatus("Saving layout…");
+    });
+    controlsEl.addEventListener("change", function (ev) {
+      if (isLayoutMapLocked()) return;
+      var inp = ev.target.closest
+        ? ev.target.closest(".gc-designer-data-controls-layout__panel-show-as-input")
+        : null;
+      if (!inp || !controlsEl.contains(inp)) return;
+      var cid = trimStr(inp.getAttribute("data-custom-card-id"));
+      if (!cid) return;
+      var card = findCustomCard(cid);
+      if (!card) return;
+      card.show_as = String(inp.value || "");
+      var node = state.nodeCatalog[cid];
+      if (node) {
+        node.show_as = card.show_as;
+        node.label = (card.show_as || "Custom") + " (" + (card.data_entry_type || "") + ")";
+      }
+      var tabEl = inp.closest(".gc-designer-data-controls-layout__node--in-panel");
+      if (tabEl) {
+        var tabInner = tabEl.querySelector(".gc-designer-data-controls-layout__panel-card-name");
+        if (tabInner) tabInner.textContent = card.show_as || "Custom";
+        var tabWrap = tabEl.querySelector(".gc-designer-data-controls-layout__panel-card-tab");
+        if (tabWrap) tabWrap.setAttribute("title", card.show_as || "Custom");
+      }
+      saveLayoutSoon();
+    });
+    controlsEl.addEventListener("change", function (ev) {
+      if (isLayoutMapLocked()) return;
+      var ta = ev.target.closest
+        ? ev.target.closest(".gc-designer-data-controls-layout__panel-allowed-options-input")
+        : null;
+      if (!ta || !controlsEl.contains(ta)) return;
+      var cid = trimStr(ta.getAttribute("data-custom-card-id"));
+      if (!cid) return;
+      var card = findCustomCard(cid);
+      if (!card) return;
+      var raw = String(ta.value || "").trim();
+      var parsed = [];
+      if (raw) {
+        try {
+          var j = JSON.parse(raw);
+          if (Array.isArray(j)) {
+            j.forEach(function (x) {
+              var t = trimStr(x);
+              if (t) parsed.push(t);
+            });
+          }
+        } catch (e0) {
+          parsed = raw
+            .split(",")
+            .map(function (s) {
+              return trimStr(s);
+            })
+            .filter(Boolean);
+        }
+      }
+      card.allowed_options = parsed;
+      buildNodeCatalog();
+      renderAll();
+      saveLayoutSoon();
+    });
+    controlsEl.addEventListener("change", function (ev) {
+      if (isLayoutMapLocked()) return;
+      var inp = ev.target.closest
+        ? ev.target.closest(".gc-designer-data-controls-layout__panel-ml-multi-input")
+        : null;
+      if (!inp || !controlsEl.contains(inp)) return;
+      var cid = trimStr(inp.getAttribute("data-custom-card-id"));
+      if (!cid) return;
+      var card = findCustomCard(cid);
+      if (!card) return;
+      card.member_lookup_multi = !!inp.checked;
+    });
+    function applyCustomCardTextConstraintsFromWrap(wrap) {
+      var cid = trimStr(wrap.getAttribute("data-custom-card-id"));
+      if (!cid) return false;
+      var card = findCustomCard(cid);
+      if (!card) return false;
+      var minIn = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-min");
+      var maxIn = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-max");
+      var intCb = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-constraint-integer");
+      var defIn = wrap.querySelector(".gc-designer-data-controls-layout__panel-text-default-value-input");
+      var obj = {};
+      try {
+        if (typeof card.data_entry_properties === "string" && card.data_entry_properties) {
+          var parsed = JSON.parse(card.data_entry_properties);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) obj = parsed;
+        }
+      } catch (e0) {}
+      function setOrDel(k, v) {
+        if (v === "" || v == null) delete obj[k];
+        else obj[k] = v;
+      }
+      if (minIn) setOrDel("constraintMin", trimStr(minIn.value));
+      if (maxIn) setOrDel("constraintMax", trimStr(maxIn.value));
+      if (intCb) {
+        if (intCb.checked) obj.constraintInteger = true;
+        else delete obj.constraintInteger;
+      }
+      if (defIn) setOrDel("defaultValue", String(defIn.value || ""));
+      try {
+        card.data_entry_properties = JSON.stringify(obj);
+      } catch (e1) {
+        card.data_entry_properties = "";
+      }
+      var node = state.nodeCatalog[cid];
+      if (node) node.data_entry_properties = card.data_entry_properties;
+      return true;
+    }
+    controlsEl.addEventListener("change", function (ev) {
+      if (isLayoutMapLocked()) return;
+      var target = ev.target;
+      if (!target || !target.closest) return;
+      if (
+        !target.classList.contains("gc-designer-data-controls-layout__panel-text-constraint-min") &&
+        !target.classList.contains("gc-designer-data-controls-layout__panel-text-constraint-max") &&
+        !target.classList.contains("gc-designer-data-controls-layout__panel-text-constraint-integer") &&
+        !target.classList.contains("gc-designer-data-controls-layout__panel-text-default-value-input")
+      ) {
+        return;
+      }
+      var wrap = target.closest(".gc-designer-data-controls-layout__panel-text-constraints");
+      if (!wrap || !controlsEl.contains(wrap)) return;
+      if (!wrap.hasAttribute("data-custom-card-id")) return;
+      if (!applyCustomCardTextConstraintsFromWrap(wrap)) return;
+      saveLayoutSoon();
+    });
+    function applyCustomCardDatetimePropsFromWrap(wrap) {
+      var cid = trimStr(wrap.getAttribute("data-custom-card-id"));
+      if (!cid) return false;
+      var card = findCustomCard(cid);
+      if (!card) return false;
+      var cb = wrap.querySelector(
+        ".gc-designer-data-controls-layout__panel-datetime-date-only-input",
+      );
+      var obj = {};
+      try {
+        if (typeof card.data_entry_properties === "string" && card.data_entry_properties) {
+          var parsed = JSON.parse(card.data_entry_properties);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) obj = parsed;
+        }
+      } catch (e0) {}
+      if (cb && cb.checked) obj.dateOnly = true;
+      else delete obj.dateOnly;
+      try {
+        card.data_entry_properties = JSON.stringify(obj);
+      } catch (e1) {
+        card.data_entry_properties = "";
+      }
+      var node = state.nodeCatalog[cid];
+      if (node) node.data_entry_properties = card.data_entry_properties;
+      return true;
+    }
+    controlsEl.addEventListener("change", function (ev) {
+      if (isLayoutMapLocked()) return;
+      var target = ev.target;
+      if (!target || !target.classList) return;
+      if (
+        !target.classList.contains(
+          "gc-designer-data-controls-layout__panel-datetime-date-only-input",
+        )
+      ) {
+        return;
+      }
+      var wrap = target.closest(".gc-designer-data-controls-layout__panel-datetime-props");
+      if (!wrap || !controlsEl.contains(wrap)) return;
+      if (!wrap.hasAttribute("data-custom-card-id")) return;
+      if (!applyCustomCardDatetimePropsFromWrap(wrap)) return;
+      /* Re-render so the summary + "Date only" line update immediately. */
+      renderAll();
+      saveLayoutSoon();
+    });
+  })();
   (function wireLogicToolboxAddButtons() {
     var host =
       layoutRoot && layoutRoot.querySelector
@@ -4610,6 +6138,18 @@
         addLogicNode("and", "csv_array");
         return;
       }
+      if (bid === "gc-designer-data-controls-layout-add-switch-ab") {
+        addLogicNode("and", "switch_ab");
+        return;
+      }
+      if (bid === "gc-designer-data-controls-layout-add-if-equals") {
+        addLogicNode("and", "if_equals");
+        return;
+      }
+      if (bid === "gc-designer-data-controls-layout-add-bool-text") {
+        addLogicNode("and", "bool_text");
+        return;
+      }
     });
   })();
   setActiveTab("catalog");
@@ -4623,11 +6163,13 @@
   window.addEventListener("blur", function () {
     if (state.fieldReorderDrag) endFieldPanelReorder();
     if (state.controlReorderDrag) endControlPanelReorder();
+    if (state.logicReorderDrag) endLogicPanelReorder();
   });
 
   window.addEventListener("pagehide", function () {
     if (state.fieldReorderDrag) endFieldPanelReorder();
     if (state.controlReorderDrag) endControlPanelReorder();
+    if (state.logicReorderDrag) endLogicPanelReorder();
     if (state.saveTimer) {
       window.clearTimeout(state.saveTimer);
       state.saveTimer = 0;

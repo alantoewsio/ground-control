@@ -251,7 +251,8 @@
     if (prefix < 0 || prefix > 32) return false;
     var mask = cidrMask4(prefix);
     if (mask === null) return false;
-    return (ipv4ToInt(ipStr) & mask) === ipv4ToInt(ipStr);
+    var ip = ipv4ToInt(ipStr);
+    return ((ip & mask) >>> 0) === ip;
   }
 
   function normalizeIpv4Network(ipStr, prefix) {
@@ -654,7 +655,8 @@
       }
       if (!IPV4_RE.test(hp) || !Number.isFinite(pfxV) || pfxV < 0 || pfxV > 32) return s;
       var nv = normalizeIpv4Network(hp, pfxV);
-      return nv != null ? nv : s;
+      if (nv == null) return s;
+      return ix0 === -1 ? nv : nv + "/" + pfxV;
     }
     if (!opts.autocorrect) return s;
     var ix = s.lastIndexOf("/");
@@ -692,7 +694,8 @@
       var hostV = zoneV !== -1 ? leftV.slice(0, zoneV) : leftV;
       var zoneSufV = zoneV !== -1 ? leftV.slice(zoneV) : "";
       var nv6 = normalizeIpv6Network(hostV.trim(), pfxV6);
-      return nv6 != null ? nv6 + zoneSufV : s;
+      if (nv6 == null) return s;
+      return ixv === -1 ? nv6 + zoneSufV : nv6 + zoneSufV + "/" + pfxV6;
     }
     if (!opts.autocorrect) return s;
     var ix = s.lastIndexOf("/");
@@ -1741,15 +1744,15 @@
     var x = s.toLowerCase();
     if (x === "ip") return "none";
     if (x === "assignment") return "cidr-subnet";
-    if (x === "iprange") return "ip-range";
+    if (x === "iprange" || x === "ip range" || x === "ip-range") return "value-range";
     if (x === "interface address") return "value-cidr";
-    if (x === "network") return "network-only";
+    if (x === "network") return "value-cidr";
     if (
       x === "none" ||
       x === "cidr-subnet" ||
-      x === "ip-range" ||
       x === "network-only" ||
-      x === "value-cidr"
+      x === "value-cidr" ||
+      x === "value-range"
     ) {
       return x;
     }

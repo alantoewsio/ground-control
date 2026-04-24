@@ -1,20 +1,20 @@
 {
   "node_positions": {
     "field:105": {
-      "x": 23.0,
-      "y": 136.0
+      "x": 0.0,
+      "y": 480.0
     },
     "field:106": {
-      "x": 28.0,
-      "y": 248.0
+      "x": 0.0,
+      "y": 0.0
     },
     "field:502": {
-      "x": 28.0,
-      "y": 360.0
+      "x": 0.0,
+      "y": 320.0
     },
     "field:103": {
-      "x": 26.0,
-      "y": 488.0
+      "x": 0.0,
+      "y": 640.0
     },
     "ctrl:104": {
       "x": 10.0,
@@ -29,8 +29,8 @@
       "y": 560.0
     },
     "field:104": {
-      "x": 23.0,
-      "y": 21.0
+      "x": 0.0,
+      "y": 160.0
     }
   },
   "connections": [
@@ -67,39 +67,24 @@
       "source_handle": "loaded_value",
       "target_node_id": "ctrl:502",
       "target_handle": "selected",
-      "edge_id": "gc_mo1iqmph_icvj6luse4"
+      "edge_id": "gc_mocuwd6v_av7pu4ob4b"
     },
     {
       "source_node_id": "ctrl:502",
       "source_handle": "selected",
       "target_node_id": "field:502",
       "target_handle": "save_value",
-      "edge_id": "gc_mo1iqmph_b802k71xo3"
-    },
-    {
-      "source_node_id": "field:105",
-      "source_handle": "loaded_value",
-      "target_node_id": "ctrl:105",
-      "target_handle": "selected",
-      "edge_id": "gc_moc1vqha_11n5nt4cb8"
-    },
-    {
-      "source_node_id": "ctrl:105",
-      "source_handle": "selected",
-      "target_node_id": "field:105",
-      "target_handle": "save_value",
-      "edge_id": "gc_moc1vqha_bqgiy488c6"
+      "edge_id": "gc_mocuwd6v_0xghpzgibs"
     }
   ],
   "logic_nodes": [],
   "control_add_only": {},
   "member_lookup_data_source": {
-    "ctrl:502": "fqdn_host",
-    "ctrl:105": "fqdn_host"
+    "ctrl:502": "fqdn_host"
   },
   "member_lookup_multi": {
     "ctrl:502": true,
     "ctrl:105": true
   },
-  "layout_locked": false
+  "layout_locked": true
 }

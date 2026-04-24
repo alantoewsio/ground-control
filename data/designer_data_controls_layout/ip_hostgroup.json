@@ -1,20 +1,20 @@
 {
   "node_positions": {
     "field:113": {
-      "x": 6.0,
-      "y": 152.0
+      "x": 0.0,
+      "y": 160.0
     },
     "field:114": {
-      "x": 10.0,
-      "y": 384.0
+      "x": 0.0,
+      "y": 640.0
     },
     "field:112": {
-      "x": 1.0,
-      "y": 562.0
+      "x": 0.0,
+      "y": 800.0
     },
     "field:504": {
-      "x": 317.0,
-      "y": 553.0
+      "x": 0.0,
+      "y": 480.0
     },
     "ctrl:113": {
       "x": 371.0,
@@ -33,12 +33,12 @@
       "y": 112.0
     },
     "field:115": {
-      "x": 3.0,
-      "y": 275.0
+      "x": 0.0,
+      "y": 320.0
     },
     "field:116": {
-      "x": 6.0,
-      "y": 12.0
+      "x": 0.0,
+      "y": 0.0
     }
   },
   "connections": [
@@ -48,13 +48,6 @@
       "target_node_id": "ctrl:113",
       "target_handle": "value",
       "edge_id": "gc_mo08lx08_qs8as6rhvs"
-    },
-    {
-      "source_node_id": "field:114",
-      "source_handle": "loaded_value",
-      "target_node_id": "ctrl:114",
-      "target_handle": "selected",
-      "edge_id": "gc_mo08lx08_em8k0qletn"
     },
     {
       "source_node_id": "field:116",
@@ -90,6 +83,20 @@
       "target_node_id": "field:113",
       "target_handle": "save_value",
       "edge_id": "gc_mo08lx08_9jtlxaarqd"
+    },
+    {
+      "source_node_id": "field:504",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:504",
+      "target_handle": "selected",
+      "edge_id": "gc_mocunppl_rkedybmv09"
+    },
+    {
+      "source_node_id": "ctrl:504",
+      "source_handle": "selected",
+      "target_node_id": "field:504",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocunppl_gn3pon9d6d"
     }
   ],
   "logic_nodes": [],
@@ -97,8 +104,11 @@
     "ctrl:115": true
   },
   "member_lookup_data_source": {
-    "ctrl:114": "ip_host"
+    "ctrl:504": "ip_host"
   },
-  "member_lookup_multi": {},
+  "member_lookup_multi": {
+    "ctrl:114": true,
+    "ctrl:504": true
+  },
   "layout_locked": true
 }

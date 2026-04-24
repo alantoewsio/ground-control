@@ -5,6 +5,7 @@ from __future__ import annotations
 DESIGNER_NAMED_CONTROL_IDS: frozenset[str] = frozenset(
     {
         "data-entry-table",
+        "datetime",
         "dropdown-multi",
         "dropdown-shared",
         "dropdown-single",

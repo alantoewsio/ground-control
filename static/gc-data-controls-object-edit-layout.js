@@ -72,7 +72,38 @@
     var t = trimStr(kind).toLowerCase();
     if (t === "if_value") return "if_value";
     if (t === "csv_array") return "csv_array";
+    if (t === "switch_ab") return "switch_ab";
+    if (t === "if_equals") return "if_equals";
+    if (t === "bool_text") return "bool_text";
     return "gate";
+  }
+
+  /** Map `logic:<prefix>_<n>` id prefix → authoritative kind; fallback when `kind` is lost. */
+  var LOGIC_ID_PREFIX_TO_KIND = {
+    and: "gate",
+    or: "gate",
+    not: "gate",
+    if: "if_value",
+    csv: "csv_array",
+    sw: "switch_ab",
+    eq: "if_equals",
+    bt: "bool_text",
+  };
+  var LOGIC_ID_PATTERN = /^logic:([a-z]+)_\d+$/;
+
+  function resolveLogicKindForItem(id, rawKind) {
+    var k = normalizeLogicKind(rawKind);
+    if (k !== "gate") return k;
+    var m = LOGIC_ID_PATTERN.exec(trimStr(id));
+    if (!m) return "gate";
+    return LOGIC_ID_PREFIX_TO_KIND[m[1]] || "gate";
+  }
+
+  function normalizeIfEqualsSend(v) {
+    var t = trimStr(v).toLowerCase();
+    if (t === "true") return "true";
+    if (t === "false") return "false";
+    return "loaded_value";
   }
 
   /** First option label for a catalog ``selector`` field (matches object-edit ``renderFields`` merge). */
@@ -193,8 +224,10 @@
           "constraint",
           "pool",
           "autocorrect",
+          "from_ip",
+          "to_ip",
         ],
-        outputs: ["ip_address", "subnet", "netmask"],
+        outputs: ["ip_address", "subnet", "netmask", "from_ip", "to_ip"],
       };
     }
     if (det === "ip-list") {
@@ -243,6 +276,9 @@
       return { inputs: ["value", "visible"], outputs: ["value"] };
     }
     if (det === "data-entry-table-col-text") {
+      return { inputs: ["value", "visible"], outputs: ["value"] };
+    }
+    if (det === "datetime") {
       return { inputs: ["value", "visible"], outputs: ["value"] };
     }
     return { inputs: ["value", "visible"], outputs: ["value"] };
@@ -345,6 +381,7 @@
       node_positions: L.node_positions && typeof L.node_positions === "object" ? L.node_positions : {},
       connections: Array.isArray(L.connections) ? L.connections : [],
       logic_nodes: Array.isArray(L.logic_nodes) ? L.logic_nodes : [],
+      custom_cards: Array.isArray(L.custom_cards) ? L.custom_cards : [],
       control_add_only:
         L.control_add_only &&
         typeof L.control_add_only === "object" &&
@@ -365,6 +402,9 @@
     var out = {};
     var fieldY = 24;
     (fields || []).forEach(function (f) {
+      /* Custom card pseudo-fields are materialized from L.custom_cards below; skip here to avoid
+       * generating spurious field:custom_* nodes without a catalog backing. */
+      if (f && f.is_custom) return;
       var y = fieldY;
       var fieldId = "field:" + String(f.id || "");
       var fieldLabel = trimStr(f.show_as) || trimStr(f.property_name) || "Field";
@@ -399,11 +439,44 @@
         y: y,
       };
     });
+    (L.custom_cards || []).forEach(function (card, idx) {
+      if (!card || typeof card !== "object") return;
+      var cid = trimStr(card.id);
+      if (!cid || cid.indexOf("ctrl:custom_") !== 0) return;
+      var cdet = trimStr(card.data_entry_type) || "toggle-checkbox";
+      if (isSkippableDataEntryType(cdet)) return;
+      var cShowAs = trimStr(card.show_as);
+      var cAllowed = Array.isArray(card.allowed_options) ? card.allowed_options : [];
+      var cPseudo = {
+        data_entry_type: cdet,
+        allowed_options: cAllowed,
+        data_entry_properties: card.data_entry_properties || "",
+      };
+      var cHs = controlHandleSpec(cPseudo);
+      out[cid] = {
+        id: cid,
+        field_id: "",
+        custom_card_id: cid,
+        is_custom: true,
+        data_entry_type: cdet,
+        data_entry_properties: card.data_entry_properties || "",
+        show_as: cShowAs,
+        property_name: "",
+        allowed_options: cAllowed,
+        member_lookup_multi: !!card.member_lookup_multi,
+        label: (cShowAs || "Custom") + " (" + cdet + ")",
+        kind: "control",
+        inputs: cHs.inputs,
+        outputs: cHs.outputs,
+        x: 10,
+        y: 24 + ((fields || []).length + idx) * 94,
+      };
+    });
     L.logic_nodes.forEach(function (item, idx) {
       if (!item || typeof item !== "object") return;
       var id = trimStr(item.id);
       if (!id || id.indexOf("logic:") !== 0) return;
-      var nodeKind = normalizeLogicKind(item.kind);
+      var nodeKind = resolveLogicKindForItem(id, item.kind);
       var op = normalizeLogicOp(item.op);
       if (nodeKind === "csv_array") {
         out[id] = {
@@ -418,6 +491,63 @@
           outputs: ["csv_out", "array_out"],
           true_value: "",
           false_value: "",
+          x: 28,
+          y: 24 + ((fields || []).length + idx) * 94,
+        };
+        return;
+      }
+      if (nodeKind === "switch_ab") {
+        out[id] = {
+          id: id,
+          field_id: "",
+          data_entry_type: "",
+          logic_kind: "switch_ab",
+          logic_op: op,
+          label: "A/B Switch",
+          kind: "logic",
+          inputs: ["loaded_value_a", "loaded_value_b", "use_a"],
+          outputs: ["save_value"],
+          true_value: "",
+          false_value: "",
+          x: 28,
+          y: 24 + ((fields || []).length + idx) * 94,
+        };
+        return;
+      }
+      if (nodeKind === "if_equals") {
+        out[id] = {
+          id: id,
+          field_id: "",
+          data_entry_type: "",
+          logic_kind: "if_equals",
+          logic_op: op,
+          label: "If Value",
+          kind: "logic",
+          inputs: ["loaded_value"],
+          outputs: ["save_value"],
+          true_value: "",
+          false_value: "",
+          compare_value: String(item.compare_value == null ? "" : item.compare_value),
+          then_send: normalizeIfEqualsSend(item.then_send),
+          else_send: normalizeIfEqualsSend(item.else_send),
+          x: 28,
+          y: 24 + ((fields || []).length + idx) * 94,
+        };
+        return;
+      }
+      if (nodeKind === "bool_text") {
+        out[id] = {
+          id: id,
+          field_id: "",
+          data_entry_type: "",
+          logic_kind: "bool_text",
+          logic_op: op,
+          label: "Bool \u2194 Text",
+          kind: "logic",
+          inputs: ["text_in", "bool_in"],
+          outputs: ["bool_out", "text_out"],
+          true_value: trimStr(item.true_value),
+          false_value: trimStr(item.false_value),
           x: 28,
           y: 24 + ((fields || []).length + idx) * 94,
         };
@@ -588,19 +718,81 @@
     return out;
   }
 
+  function customCardPseudoFieldsFromLayout(L) {
+    var out = [];
+    (L && Array.isArray(L.custom_cards) ? L.custom_cards : []).forEach(function (card) {
+      if (!card || typeof card !== "object") return;
+      var cid = trimStr(card.id);
+      if (!cid || cid.indexOf("ctrl:custom_") !== 0) return;
+      var cdet = trimStr(card.data_entry_type) || "toggle-checkbox";
+      if (isSkippableDataEntryType(cdet)) return;
+      var cAllowed = Array.isArray(card.allowed_options) ? card.allowed_options : [];
+      out.push({
+        id: cid.slice("ctrl:".length),
+        property_name: "",
+        show_as: trimStr(card.show_as),
+        data_entry_type: cdet,
+        data_entry_properties: card.data_entry_properties || "",
+        allowed_options: cAllowed,
+        member_lookup_multi: !!card.member_lookup_multi,
+        help_text: "",
+        is_custom: true,
+        custom_card_id: cid,
+      });
+    });
+    return out;
+  }
+
   function gcDcLayoutOrderedFieldsForFlyout(fields, layout) {
     var L = normalizeLayout(layout);
-    var catalog = buildNodeCatalog(fields, L);
-    var conns = effectiveConnections(L, fields, catalog);
-    var part = fieldIdsParticipating(conns, fields);
+    var customFields = customCardPseudoFieldsFromLayout(L);
+    var fieldsWithCustom = (fields || []).concat(customFields);
+    var catalog = buildNodeCatalog(fieldsWithCustom, L);
+    var conns = effectiveConnections(L, fieldsWithCustom, catalog);
+    var part = fieldIdsParticipating(conns, fieldsWithCustom);
     var ordered;
     if (!part.length) {
-      ordered = filterFlyoutRenderableFields(fields);
+      ordered = filterFlyoutRenderableFields(fieldsWithCustom);
     } else {
-      ordered = fieldsForParticipatingIdsInCatalogOrder(fields, part);
+      ordered = fieldsForParticipatingIdsInCatalogOrder(fieldsWithCustom, part);
       ordered = filterFlyoutRenderableFields(ordered);
+      /* Custom cards are not expected to participate in every default edge; always include them. */
+      var orderedIds = {};
+      ordered.forEach(function (f) {
+        orderedIds[String(f.id || "")] = true;
+      });
+      customFields.forEach(function (cf) {
+        if (!orderedIds[String(cf.id || "")]) ordered.push(cf);
+      });
     }
-    ordered = expandFlyoutFieldsForDataEntryTableChildren(fields, ordered);
+    /* Sort the merged list by the layout canvas y coordinate so user-added custom cards
+     * interleave with real fields the way they appear in the Designer. buildNodeCatalog
+     * already assigns a default y (API order * step) and overlays node_positions, so every
+     * control node has a meaningful y. Fall back to API order (real fields) and then the
+     * current position for stability when two items share a y. */
+    var apiIndex = {};
+    (fields || []).forEach(function (f, i) {
+      apiIndex[String(f.id || "")] = i;
+    });
+    ordered = ordered
+      .map(function (f, i) {
+        var fid = String(f && f.id != null ? f.id : "");
+        var node = catalog["ctrl:" + fid];
+        var y = node && typeof node.y === "number" ? node.y : Number.POSITIVE_INFINITY;
+        var rank = Object.prototype.hasOwnProperty.call(apiIndex, fid)
+          ? apiIndex[fid]
+          : Number.POSITIVE_INFINITY;
+        return { f: f, y: y, rank: rank, idx: i };
+      })
+      .sort(function (a, b) {
+        if (a.y !== b.y) return a.y - b.y;
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        return a.idx - b.idx;
+      })
+      .map(function (entry) {
+        return entry.f;
+      });
+    ordered = expandFlyoutFieldsForDataEntryTableChildren(fieldsWithCustom, ordered);
     return { fields: ordered, connections: conns, nodeCatalog: catalog };
   }
 
@@ -693,6 +885,39 @@
             var arrInRow = firstControlInput(nodeId, "array_in");
             values[nodeId + "|array_out"] = gcDcCsvInToArrayOutStr(csvInRow);
             values[nodeId + "|csv_out"] = gcDcArrayInToCsvOutStr(arrInRow);
+            return;
+          }
+          if (node.logic_kind === "bool_text") {
+            var btTextInRow = firstControlInput(nodeId, "text_in");
+            var btBoolInRow = firstControlInput(nodeId, "bool_in");
+            var btTextRowStr = btTextInRow == null ? "" : String(btTextInRow);
+            var btTrueRow = node.true_value == null ? "" : String(node.true_value);
+            var btFalseRow = node.false_value == null ? "" : String(node.false_value);
+            values[nodeId + "|bool_out"] = btTextRowStr === btTrueRow;
+            values[nodeId + "|text_out"] = parseBoolLike(btBoolInRow) ? btTrueRow : btFalseRow;
+            return;
+          }
+          if (node.logic_kind === "switch_ab") {
+            var swUseA = parseBoolLike(firstControlInput(nodeId, "use_a"));
+            var swA = firstControlInput(nodeId, "loaded_value_a");
+            var swB = firstControlInput(nodeId, "loaded_value_b");
+            var swPicked = swUseA ? swA : swB;
+            values[nodeId + "|save_value"] = swPicked == null ? "" : String(swPicked);
+            return;
+          }
+          if (node.logic_kind === "if_equals") {
+            var eqLoaded = firstControlInput(nodeId, "loaded_value");
+            var eqLoadedStr = eqLoaded == null ? "" : String(eqLoaded);
+            var eqMatch =
+              eqLoadedStr === String(node.compare_value == null ? "" : node.compare_value);
+            var eqChoice = eqMatch
+              ? normalizeIfEqualsSend(node.then_send)
+              : normalizeIfEqualsSend(node.else_send);
+            var eqOut;
+            if (eqChoice === "true") eqOut = true;
+            else if (eqChoice === "false") eqOut = false;
+            else eqOut = eqLoadedStr;
+            values[nodeId + "|save_value"] = eqOut;
             return;
           }
           if (node.logic_kind === "if_value") {
@@ -793,6 +1018,20 @@
           );
           values[nodeId + "|subnet"] = snFlow.subnet;
           values[nodeId + "|netmask"] = snFlow.netmask;
+          var ovFrom =
+            overrides && Object.prototype.hasOwnProperty.call(overrides, nodeId + "|from_ip")
+              ? String(overrides[nodeId + "|from_ip"] == null ? "" : overrides[nodeId + "|from_ip"])
+              : null;
+          var ovTo =
+            overrides && Object.prototype.hasOwnProperty.call(overrides, nodeId + "|to_ip")
+              ? String(overrides[nodeId + "|to_ip"] == null ? "" : overrides[nodeId + "|to_ip"])
+              : null;
+          var inFromFlow = firstControlInput(nodeId, "from_ip");
+          var inToFlow = firstControlInput(nodeId, "to_ip");
+          var fromOut = ovFrom != null ? ovFrom : (inFromFlow == null ? "" : String(inFromFlow));
+          var toOut = ovTo != null ? ovTo : (inToFlow == null ? "" : String(inToFlow));
+          values[nodeId + "|from_ip"] = isVisible ? fromOut : "";
+          values[nodeId + "|to_ip"] = isVisible ? toOut : "";
         } else if (det === "ip-list") {
           var inList = firstControlInput(nodeId, "ip_list") || base;
           var listNorm = String(inList || "")
@@ -832,8 +1071,10 @@
           }
         } else if (det === "toggle-onoff" || det === "toggle-checkbox" || det === "data-entry-table-col-toggle") {
           var truthy = isVisible && !!trimStr(base);
-          values[nodeId + "|on"] = truthy ? "on" : "";
-          values[nodeId + "|off"] = truthy ? "" : "off";
+          /* Toggle outputs mirror selector option_* outputs: booleans, one true / one false,
+           * both false when the control is not visible. */
+          values[nodeId + "|on"] = isVisible && truthy;
+          values[nodeId + "|off"] = isVisible && !truthy;
         } else {
           var outVal = isVisible ? base : "";
           if (
@@ -986,6 +1227,10 @@
       var inNetmask = inputs[ctrlId + "|netmask"];
       var inIpFamily = inputs[ctrlId + "|ipfamily"];
       var inAutocorrect = inputs[ctrlId + "|autocorrect"];
+      var inConstraint = inputs[ctrlId + "|constraint"];
+      var inPool = inputs[ctrlId + "|pool"];
+      var inFromIp = inputs[ctrlId + "|from_ip"];
+      var inToIp = inputs[ctrlId + "|to_ip"];
 
       var selector = row.querySelector("[data-gc-option-selector]");
       if (selector && typeof globalThis.gcOptionSelectorSetSelection === "function") {
@@ -1006,7 +1251,33 @@
         if (inIpFamily != null && trimStr(String(inIpFamily)) !== "") {
           famHint = String(inIpFamily);
         }
-        if (typeof globalThis.gcFormatWiredIpDisplayCidr === "function") {
+        var ipBridgeR =
+          (typeof window !== "undefined" &&
+            window.__gcDesignerControlsBridge &&
+            window.__gcDesignerControlsBridge.ip) ||
+          null;
+        var normalizedConstraint =
+          ipBridgeR && typeof ipBridgeR.normalizeWireConstraintValue === "function"
+            ? ipBridgeR.normalizeWireConstraintValue(inConstraint == null ? "" : String(inConstraint))
+            : "";
+        if (normalizedConstraint === "value-range" && ipBridgeR) {
+          var fromStr = inFromIp == null ? "" : trimStr(String(inFromIp));
+          var toStr = inToIp == null ? "" : trimStr(String(inToIp));
+          if (fromStr || toStr) {
+            var useV6 =
+              (fromStr && fromStr.indexOf(":") >= 0) ||
+              (toStr && toStr.indexOf(":") >= 0) ||
+              famHint.toLowerCase() === "ipv6";
+            var formatted = "";
+            if (useV6 && typeof ipBridgeR.formatIpv6RangeCompact === "function") {
+              formatted = ipBridgeR.formatIpv6RangeCompact(fromStr, toStr || fromStr);
+            } else if (typeof ipBridgeR.formatIpv4RangeCompact === "function") {
+              formatted = ipBridgeR.formatIpv4RangeCompact(fromStr, toStr || fromStr);
+            }
+            if (formatted) ipLine = formatted;
+          }
+        }
+        if (!ipLine && typeof globalThis.gcFormatWiredIpDisplayCidr === "function") {
           ipLine = globalThis.gcFormatWiredIpDisplayCidr(
             inAddress,
             inSubnet,
@@ -1055,10 +1326,37 @@
         }
       }
 
+      var dtHostRow = row.querySelector('[data-gc-obj-edit-datetime="1"]');
+      if (dtHostRow && inValue != null && String(inValue) !== "") {
+        var dtInpRow = dtHostRow.querySelector("input");
+        if (dtInpRow) {
+          var dtDateOnly = dtHostRow.getAttribute("data-date-only") === "1";
+          var sIn = trimStr(String(inValue));
+          var normIn = sIn.replace(" ", "T");
+          var mIn = normIn.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+          if (mIn) {
+            if (dtDateOnly) {
+              dtInpRow.value = mIn[1];
+            } else if (mIn[2]) {
+              dtInpRow.value =
+                mIn[1] + "T" + mIn[2] + ":" + mIn[3] + ":" + (mIn[4] != null ? mIn[4] : "00");
+            } else {
+              dtInpRow.value = mIn[1] + "T00:00:00";
+            }
+            try {
+              dtInpRow.dispatchEvent(new Event("input", { bubbles: true }));
+              dtInpRow.dispatchEvent(new Event("change", { bubbles: true }));
+            } catch (eDt) {}
+          }
+        }
+      }
+
       var textInput = row.querySelector(
         "input.settings-form__input:not(.gc-ip-field__input):not([type='hidden']):not(.gc-designer-dd__search)",
       );
-      if (textInput && inValue != null && String(inValue) !== "") {
+      /* Skip the generic text input branch when the row is a datetime picker; its <input> is
+       * already handled above and expects ISO "T" format, not the exposed "YYYY-MM-DD HH:MM:SS". */
+      if (textInput && !dtHostRow && inValue != null && String(inValue) !== "") {
         textInput.value = String(inValue);
         try {
           textInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1086,8 +1384,30 @@
       }
 
       var detIp = trimStr(f.data_entry_type).toLowerCase();
+      var isIpDet =
+        detIp === "ip-address" || detIp === "ip-ipv4" || detIp === "ip-ipv6";
+      if (isIpDet) {
+        var bridge =
+          (typeof window !== "undefined" && window.__gcDesignerControlsBridge) ||
+          null;
+        var ipBridge = bridge && bridge.ip ? bridge.ip : null;
+        var applyConstraints =
+          (ipBridge && typeof ipBridge.applyCatalogIpWireConstraints === "function"
+            ? ipBridge.applyCatalogIpWireConstraints
+            : null) ||
+          (typeof globalThis.gcDesignerApplyCatalogIpWireConstraints === "function"
+            ? globalThis.gcDesignerApplyCatalogIpWireConstraints
+            : null);
+        if (applyConstraints) {
+          var constraintRaw = inConstraint == null ? "" : String(inConstraint);
+          var poolRaw = inPool == null ? "" : String(inPool);
+          try {
+            applyConstraints(row, constraintRaw, poolRaw);
+          } catch (eWc) {}
+        }
+      }
       if (
-        (detIp === "ip-address" || detIp === "ip-ipv4" || detIp === "ip-ipv6") &&
+        isIpDet &&
         typeof globalThis.gcDesignerApplyCatalogIpAutocorrect === "function"
       ) {
         var acOn = true;
@@ -1139,6 +1459,18 @@
     fieldsEl.querySelectorAll(".gc-designer-object-edit-catalog-row").forEach(function (rowEl) {
       var fidPre = trimStr(rowEl.getAttribute("data-gc-catalog-field-id"));
       var fPre = fieldById[fidPre];
+      var ctrlIdPre = "ctrl:" + fidPre;
+      var nodePre = nodeCatalog ? nodeCatalog[ctrlIdPre] : null;
+      /* Custom cards have no catalog field entry; fall back to nodeCatalog for det/allowed options. */
+      if (!fPre && nodePre && nodePre.is_custom) {
+        fPre = {
+          id: fidPre,
+          property_name: "",
+          data_entry_type: nodePre.data_entry_type || "",
+          data_entry_properties: nodePre.data_entry_properties || "",
+          allowed_options: Array.isArray(nodePre.allowed_options) ? nodePre.allowed_options : [],
+        };
+      }
       var detPre = fPre ? trimStr(fPre.data_entry_type).toLowerCase() : "";
       var isIpLikeDet =
         detPre === "ip-list" ||
@@ -1149,8 +1481,8 @@
       var fid = fidPre;
       var f = fPre;
       if (!f) return;
-      var ctrlId = "ctrl:" + fid;
-      var node = nodeCatalog[ctrlId];
+      var ctrlId = ctrlIdPre;
+      var node = nodePre;
       if (!node || node.kind !== "control") return;
       var det = trimStr(f.data_entry_type).toLowerCase();
       if (det === "data-entry-table") return;
@@ -1159,10 +1491,30 @@
         var ipIn = visibleIpInputInCatalogRow(rowEl);
         var rawAddr = ipIn ? trimStr(ipIn.value) : "";
         var pnDom = trimStr(f.property_name).toLowerCase();
+        var isRangeMode =
+          !!ipIn && ipIn.getAttribute("data-gc-ip-require-value-range") === "true";
+        var ipBridgeC =
+          (typeof window !== "undefined" &&
+            window.__gcDesignerControlsBridge &&
+            window.__gcDesignerControlsBridge.ip) ||
+          null;
+        var rangeParsed = null;
+        if (isRangeMode && ipBridgeC && rawAddr) {
+          var looksV6 = rawAddr.indexOf(":") >= 0;
+          if (looksV6 && typeof ipBridgeC.parseIpv6RangeCompact === "function") {
+            rangeParsed = ipBridgeC.parseIpv6RangeCompact(rawAddr);
+          } else if (!looksV6 && typeof ipBridgeC.parseIpv4RangeCompact === "function") {
+            rangeParsed = ipBridgeC.parseIpv4RangeCompact(rawAddr);
+          }
+        }
         if (pnDom === "subnet" || pnDom === "netmask") {
           values[ctrlId + "|ip_address"] = "";
           values[ctrlId + "|subnet"] = rawAddr;
           values[ctrlId + "|netmask"] = rawAddr;
+        } else if (isRangeMode) {
+          values[ctrlId + "|ip_address"] = rawAddr;
+          values[ctrlId + "|subnet"] = "";
+          values[ctrlId + "|netmask"] = "";
         } else {
           var ipOnly = rawAddr;
           var prefix = "";
@@ -1173,6 +1525,10 @@
           values[ctrlId + "|ip_address"] = ipOnly;
           values[ctrlId + "|subnet"] = prefix;
           values[ctrlId + "|netmask"] = prefix;
+        }
+        if (isRangeMode) {
+          values[ctrlId + "|from_ip"] = rangeParsed ? rangeParsed.from : "";
+          values[ctrlId + "|to_ip"] = rangeParsed ? rangeParsed.to : "";
         }
         var ipFamForNorm = "";
         if (det === "ip-ipv4") {
@@ -1254,6 +1610,48 @@
       if (tagRoot && tagRoot._gcDesignerTagApi && tagRoot._gcDesignerTagApi.getTags) {
         var tags = tagRoot._gcDesignerTagApi.getTags() || [];
         values[ctrlId + "|value"] = tags.join("\x1e");
+        return;
+      }
+      if (det === "datetime") {
+        var dtHost = rowEl.querySelector('[data-gc-obj-edit-datetime="1"]');
+        var dtInp = dtHost ? dtHost.querySelector("input") : null;
+        var dtRaw = dtInp ? trimStr(dtInp.value) : "";
+        var dateOnly = !!(dtHost && dtHost.getAttribute("data-date-only") === "1");
+        var emit = "";
+        if (dtRaw) {
+          if (dateOnly) {
+            /* <input type="date"> emits "YYYY-MM-DD" already. */
+            emit = dtRaw;
+          } else {
+            /* <input type="datetime-local"> emits "YYYY-MM-DDTHH:MM" or "YYYY-MM-DDTHH:MM:SS"
+             * depending on step. Normalize to the requested "YYYY-MM-DD HH:MM:SS" form. */
+            var m = dtRaw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+            if (m) {
+              emit = m[1] + " " + m[2] + ":" + m[3] + ":" + (m[4] != null ? m[4] : "00");
+            } else {
+              emit = dtRaw.replace("T", " ");
+            }
+          }
+        }
+        values[ctrlId + "|value"] = emit;
+        return;
+      }
+      if (det === "toggle-onoff" || det === "toggle-checkbox") {
+        var onoffBtn = rowEl.querySelector(
+          '[data-gc-obj-edit-toggle-onoff="1"] button.gc-table-toggle',
+        );
+        var cbInput = rowEl.querySelector(
+          '[data-gc-obj-edit-toggle-checkbox="1"] input[type="checkbox"]',
+        );
+        var isOn = false;
+        if (det === "toggle-onoff" && onoffBtn) {
+          isOn = onoffBtn.getAttribute("aria-checked") === "true";
+        } else if (cbInput) {
+          isOn = !!cbInput.checked;
+        }
+        values[ctrlId + "|on"] = !!isOn;
+        values[ctrlId + "|off"] = !isOn;
+        values[ctrlId + "|value"] = isOn ? "1" : "";
         return;
       }
       var ta = rowEl.querySelector("textarea.settings-form__input");

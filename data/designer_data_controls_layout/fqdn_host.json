@@ -21,24 +21,28 @@
       "y": 584.0
     },
     "field:109": {
-      "x": 28.0,
-      "y": 136.0
+      "x": 0.0,
+      "y": 160.0
     },
     "field:108": {
-      "x": 28.0,
-      "y": 248.0
+      "x": 0.0,
+      "y": 320.0
     },
     "field:110": {
-      "x": 28.0,
-      "y": 360.0
+      "x": 0.0,
+      "y": 640.0
     },
     "field:503": {
-      "x": 28.0,
-      "y": 472.0
+      "x": 0.0,
+      "y": 480.0
     },
     "field:107": {
-      "x": 28.0,
-      "y": 584.0
+      "x": 0.0,
+      "y": 800.0
+    },
+    "field:111": {
+      "x": 0.0,
+      "y": 0.0
     }
   },
   "connections": [
@@ -85,25 +89,27 @@
       "edge_id": "gc_mo08na79_bbbykxbjfm"
     },
     {
-      "source_node_id": "field:110",
+      "source_node_id": "field:503",
       "source_handle": "loaded_value",
-      "target_node_id": "ctrl:110",
+      "target_node_id": "ctrl:503",
       "target_handle": "selected",
-      "edge_id": "gc_mo08nplp_kc6ant3ox2"
+      "edge_id": "gc_mocus0g7_cvkeji2hmn"
     },
     {
-      "source_node_id": "ctrl:110",
+      "source_node_id": "ctrl:503",
       "source_handle": "selected",
-      "target_node_id": "field:110",
+      "target_node_id": "field:503",
       "target_handle": "save_value",
-      "edge_id": "gc_mo08nplp_uprd8llkaq"
+      "edge_id": "gc_mocus0g7_liwr0vhlje"
     }
   ],
   "logic_nodes": [],
   "control_add_only": {},
   "member_lookup_data_source": {
-    "ctrl:110": "fqdn_host"
+    "ctrl:503": "fqdn_hostgroup"
   },
-  "member_lookup_multi": {},
+  "member_lookup_multi": {
+    "ctrl:503": true
+  },
   "layout_locked": true
 }

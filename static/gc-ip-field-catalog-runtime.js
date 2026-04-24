@@ -39,6 +39,99 @@
     return { network: raw & mask, mask: mask, prefix: prefix };
   }
 
+  /**
+   * Parse a compact IPv4 range string of the form "a.b.c.d-<suffix>" where <suffix> is
+   * 1–4 dot-separated octets. The suffix replaces the trailing N octets of the "from"
+   * address to produce the "to" address.
+   *   "1.1.1.1-200"       → { from: "1.1.1.1", to: "1.1.1.200" }
+   *   "1.1.1.1-2.200"     → { from: "1.1.1.1", to: "1.1.2.200" }
+   *   "1.1.1.1-2.1.2.200" → { from: "1.1.1.1", to: "2.1.2.200" }
+   *   "1.1.1.1-2.2.2.2"   → { from: "1.1.1.1", to: "2.2.2.2" } (full form)
+   * Returns null if the input is not a well-formed compact IPv4 range.
+   */
+  function parseIpv4RangeCompact(s) {
+    var raw = String(s == null ? "" : s).trim();
+    if (!raw) return null;
+    var sep = raw.indexOf("-");
+    if (sep <= 0 || sep === raw.length - 1) return null;
+    var fromRaw = raw.slice(0, sep).trim();
+    var sufRaw = raw.slice(sep + 1).trim();
+    if (!IPV4_RE.test(fromRaw)) return null;
+    var sufParts = sufRaw.split(".");
+    if (sufParts.length < 1 || sufParts.length > 4) return null;
+    var sufOcts = new Array(sufParts.length);
+    for (var i = 0; i < sufParts.length; i++) {
+      var piece = sufParts[i];
+      if (!/^\d{1,3}$/.test(piece)) return null;
+      var v = parseInt(piece, 10);
+      if (!Number.isFinite(v) || v < 0 || v > 255) return null;
+      sufOcts[i] = v;
+    }
+    var fromOcts = fromRaw.split(".").map(function (x) { return parseInt(x, 10); });
+    var toOcts = fromOcts.slice();
+    var startIdx = 4 - sufOcts.length;
+    for (var j = 0; j < sufOcts.length; j++) {
+      toOcts[startIdx + j] = sufOcts[j];
+    }
+    var toIp = toOcts.join(".");
+    if (!IPV4_RE.test(toIp)) return null;
+    return { from: fromRaw, to: toIp };
+  }
+
+  /**
+   * Format two IPv4 addresses as a compact "from-<suffix>" range, where <suffix> includes
+   * only the octets from the first differing one to the end. If from==to, returns just
+   * the address. If either input is invalid, returns "".
+   */
+  function formatIpv4RangeCompact(fromIp, toIp) {
+    var f = String(fromIp == null ? "" : fromIp).trim();
+    var t = String(toIp == null ? "" : toIp).trim();
+    if (!f && !t) return "";
+    if (!IPV4_RE.test(f) || !IPV4_RE.test(t)) return "";
+    if (f === t) return f;
+    var fo = f.split(".");
+    var to = t.split(".");
+    var diff = 4;
+    for (var i = 0; i < 4; i++) {
+      if (fo[i] !== to[i]) { diff = i; break; }
+    }
+    if (diff === 4) return f;
+    return f + "-" + to.slice(diff).join(".");
+  }
+
+  /**
+   * IPv6 full-form range: "<from>-<to>". Both halves must be valid IPv6. No group-level
+   * compression is applied (unlike IPv4), to avoid ambiguity with colon notation.
+   */
+  function parseIpv6RangeCompact(s) {
+    var raw = String(s == null ? "" : s).trim();
+    if (!raw) return null;
+    var sep = raw.indexOf("-");
+    if (sep <= 0 || sep === raw.length - 1) return null;
+    var fromRaw = raw.slice(0, sep).trim();
+    var toRaw = raw.slice(sep + 1).trim();
+    if (!isValidIpv6Shape(fromRaw) || !isValidIpv6Shape(toRaw)) return null;
+    return { from: fromRaw, to: toRaw };
+  }
+
+  function formatIpv6RangeCompact(fromIp, toIp) {
+    var f = String(fromIp == null ? "" : fromIp).trim();
+    var t = String(toIp == null ? "" : toIp).trim();
+    if (!f && !t) return "";
+    if (!isValidIpv6Shape(f) || !isValidIpv6Shape(t)) return "";
+    if (f === t) return f;
+    return f + "-" + t;
+  }
+
+  /** Compare two IPv4 dotted strings numerically; returns -1, 0, or 1. */
+  function compareIpv4(a, b) {
+    var ai = ipv4ToInt(a) >>> 0;
+    var bi = ipv4ToInt(b) >>> 0;
+    if (ai < bi) return -1;
+    if (ai > bi) return 1;
+    return 0;
+  }
+
   /** Contiguous IPv4 netmask → prefix length, or null if not a valid mask. */
   function ipv4NetmaskToPrefix(maskStr) {
     if (!maskStr || !IPV4_RE.test(maskStr)) return null;
@@ -135,7 +228,8 @@
     if (prefix < 0 || prefix > 32) return false;
     var mask = cidrMask4(prefix);
     if (mask === null) return false;
-    return (ipv4ToInt(ipStr) & mask) === ipv4ToInt(ipStr);
+    var ip = ipv4ToInt(ipStr);
+    return ((ip & mask) >>> 0) === ip;
   }
 
   function normalizeIpv4Network(ipStr, prefix) {
@@ -275,6 +369,7 @@
       storedPrefix: el.getAttribute("data-gc-ip-prefix-length") || "",
       requireNetwork: el.getAttribute("data-gc-ip-require-network") === "true",
       requireValueCidr: el.getAttribute("data-gc-ip-require-value-cidr") === "true",
+      requireValueRange: el.getAttribute("data-gc-ip-require-value-range") === "true",
       autocorrect: el.getAttribute("data-gc-ip-autocorrect") === "true",
     };
   }
@@ -300,6 +395,7 @@
     var boolKeys = [
       ["requireNetwork", "data-gc-ip-require-network"],
       ["requireValueCidr", "data-gc-ip-require-value-cidr"],
+      ["requireValueRange", "data-gc-ip-require-value-range"],
       ["autocorrect", "data-gc-ip-autocorrect"],
     ];
     boolKeys.forEach(function (pair) {
@@ -334,6 +430,22 @@
   function validateIpv4(val, opts) {
     var s = String(val || "").trim();
     if (!s) return { ok: true, msg: "" };
+    if (opts.requireValueRange) {
+      var rng = parseIpv4RangeCompact(s);
+      if (!rng) {
+        return {
+          ok: false,
+          msg: "Enter IPv4 range as from-to (e.g. 10.1.2.1-10 or 10.1.2.1-3.10).",
+        };
+      }
+      if (compareIpv4(rng.from, rng.to) > 0) {
+        return {
+          ok: false,
+          msg: "Range start (" + rng.from + ") must be ≤ end (" + rng.to + ").",
+        };
+      }
+      return { ok: true, msg: "" };
+    }
     var ix = s.lastIndexOf("/");
     var host;
     var userPfx = null;
@@ -433,6 +545,27 @@
   function validateIpv6(val, opts) {
     var s = String(val || "").trim();
     if (!s) return { ok: true, msg: "" };
+    if (opts.requireValueRange) {
+      var rng6 = parseIpv6RangeCompact(s);
+      if (!rng6) {
+        return {
+          ok: false,
+          msg: "Enter IPv6 range as <from>-<to> (e.g. 2001:db8::1-2001:db8::200).",
+        };
+      }
+      var fromWords = expandIpv6Hextets(rng6.from);
+      var toWords = expandIpv6Hextets(rng6.to);
+      if (!fromWords || !toWords) {
+        return { ok: false, msg: "Invalid IPv6 address in range." };
+      }
+      if (hextetsToBigInt(fromWords) > hextetsToBigInt(toWords)) {
+        return {
+          ok: false,
+          msg: "Range start (" + rng6.from + ") must be ≤ end (" + rng6.to + ").",
+        };
+      }
+      return { ok: true, msg: "" };
+    }
     var ix = s.lastIndexOf("/");
     var left;
     var userPfx6 = null;
@@ -525,6 +658,15 @@
 
   function autocorrectIpv4Value(s, opts) {
     s = String(s || "");
+    if (opts.requireValueRange) {
+      var trimmed = s.trim();
+      if (!trimmed) return s;
+      var rng = parseIpv4RangeCompact(trimmed);
+      if (!rng) return s;
+      if (compareIpv4(rng.from, rng.to) > 0) return s;
+      var compact = formatIpv4RangeCompact(rng.from, rng.to);
+      return compact || s;
+    }
     if (opts.requireValueCidr) {
       var ix0 = s.lastIndexOf("/");
       var hp;
@@ -538,7 +680,8 @@
       }
       if (!IPV4_RE.test(hp) || !Number.isFinite(pfxV) || pfxV < 0 || pfxV > 32) return s;
       var nv = normalizeIpv4Network(hp, pfxV);
-      return nv != null ? nv : s;
+      if (nv == null) return s;
+      return ix0 === -1 ? nv : nv + "/" + pfxV;
     }
     if (!opts.autocorrect) return s;
     var ix = s.lastIndexOf("/");
@@ -560,6 +703,9 @@
 
   function autocorrectIpv6Value(s, opts) {
     s = String(s || "");
+    if (opts.requireValueRange) {
+      return s;
+    }
     if (opts.requireValueCidr) {
       var ixv = s.lastIndexOf("/");
       var leftV;
@@ -576,7 +722,8 @@
       var hostV = zoneV !== -1 ? leftV.slice(0, zoneV) : leftV;
       var zoneSufV = zoneV !== -1 ? leftV.slice(zoneV) : "";
       var nv6 = normalizeIpv6Network(hostV.trim(), pfxV6);
-      return nv6 != null ? nv6 + zoneSufV : s;
+      if (nv6 == null) return s;
+      return ixv === -1 ? nv6 + zoneSufV : nv6 + zoneSufV + "/" + pfxV6;
     }
     if (!opts.autocorrect) return s;
     var ix = s.lastIndexOf("/");
@@ -600,12 +747,22 @@
   }
 
   function canShowAutocorrectPreview(opts) {
-    return !!(opts && (opts.autocorrect || opts.requireValueCidr));
+    return !!(opts && (opts.autocorrect || opts.requireValueCidr || opts.requireValueRange));
   }
 
   function computeCorrectionTarget(raw, family, opts) {
     if (!canShowAutocorrectPreview(opts)) return null;
     if (!String(raw || "").trim()) return null;
+    if (opts.requireValueRange) {
+      if (family !== "ipv4") return null;
+      var rng = parseIpv4RangeCompact(raw);
+      if (!rng) return null;
+      if (compareIpv4(rng.from, rng.to) > 0) return null;
+      var compact = formatIpv4RangeCompact(rng.from, rng.to);
+      var before = String(raw).trim();
+      if (!compact || compact === before) return null;
+      return compact;
+    }
     if (opts.requireValueCidr) {
       var ix = String(raw).lastIndexOf("/");
       var hp;
@@ -768,6 +925,8 @@
       }
     } else if (opts.requireValueCidr) {
       ex = "10.1.0.0/16";
+    } else if (opts.requireValueRange) {
+      ex = "10.1.2.1-10";
     } else if (opts.autocorrect && opts.prefix) {
       var p2 = parseInt(opts.prefix, 10);
       if (Number.isFinite(p2) && p2 >= 0 && p2 <= 32) {
@@ -794,6 +953,8 @@
       }
     } else if (opts.requireValueCidr) {
       ex = "2001:db8::/32";
+    } else if (opts.requireValueRange) {
+      ex = "2001:db8::1-2001:db8::200";
     } else if (opts.autocorrect && opts.prefix) {
       var p2 = parseInt(opts.prefix, 10);
       if (Number.isFinite(p2) && p2 >= 0 && p2 <= 128) {
@@ -1098,6 +1259,130 @@
       if (v != null && String(v) !== "") el.setAttribute(k, String(v));
     });
   }
+  /**
+   * Map a layout-wired constraint label (HostType selector pill, e.g. "IP", "Network",
+   * "IPRange", "IPList") or a pre-normalized mode string to the internal IP-field mode.
+   *
+   * Per Ground Control product spec:
+   *   - "ip"               → "none"          (validate as a single IP, no prefix / range)
+   *   - "network"          → "value-cidr"    (user enters addr/prefix; autocorrect snaps
+   *                                           to the network address and shows mask pill)
+   *   - "iprange"          → "value-range"   (user enters "from-suffix" compact range;
+   *                                           from_ip/to_ip I/O handles carry the pair)
+   *   - "assignment"       → "cidr-subnet"
+   *   - "interface address"→ "value-cidr"
+   * Already-internal mode strings ("none", "cidr-subnet", "network-only", "value-cidr",
+   * "value-range") pass through unchanged.
+   */
+  function normalizeIpConstraintWireToInternal(raw) {
+    var s = String(raw == null ? "" : raw).replace(/^\s+|\s+$/g, "");
+    if (!s) return "none";
+    var x = s.toLowerCase();
+    if (x === "ip") return "none";
+    if (x === "assignment") return "cidr-subnet";
+    if (x === "iprange" || x === "ip range" || x === "ip-range") return "value-range";
+    if (x === "interface address") return "value-cidr";
+    if (x === "network") return "value-cidr";
+    if (
+      x === "none" ||
+      x === "cidr-subnet" ||
+      x === "network-only" ||
+      x === "value-cidr" ||
+      x === "value-range"
+    ) {
+      return x;
+    }
+    return "none";
+  }
+
+  var CATALOG_WIRE_CONSTRAINT_ATTRS = [
+    "data-gc-ip-within-cidr",
+    "data-gc-ip-range-lo",
+    "data-gc-ip-range-hi",
+    "data-gc-ip-require-network",
+    "data-gc-ip-require-value-cidr",
+    "data-gc-ip-require-value-range",
+    "data-gc-ip-cidr-prefix-min",
+    "data-gc-ip-cidr-prefix-max",
+    "data-gc-ip-prefix",
+  ];
+
+  function clearCatalogIpWireConstraintAttrs(inp) {
+    if (!inp) return;
+    CATALOG_WIRE_CONSTRAINT_ATTRS.forEach(function (a) {
+      inp.removeAttribute(a);
+    });
+  }
+
+  function catalogIpInputFamily(inp) {
+    if (!inp) return "ipv4";
+    var panel = inp.closest ? inp.closest('[data-gc-obj-edit-ip-panel]') : null;
+    if (panel) {
+      var p = trimStrIp(panel.getAttribute("data-gc-obj-edit-ip-panel"));
+      if (p === "ipv6") return "ipv6";
+      if (p === "ipv4") return "ipv4";
+    }
+    var id = String(inp.id || "");
+    if (id.indexOf("ipv6") !== -1) return "ipv6";
+    if (id.indexOf("ipv4") !== -1) return "ipv4";
+    return "ipv4";
+  }
+
+  function placeholderForCatalogIpInput(inp) {
+    var fam = catalogIpInputFamily(inp);
+    var opts = readOptsFromInput(inp);
+    return fam === "ipv6" ? exampleIpv6Placeholder(opts) : exampleIpv4Placeholder(opts);
+  }
+
+  /**
+   * Apply a wired "constraint" value (and optional "pool" CIDR) onto every
+   * .gc-ip-field__input in the given catalog row. Updates attrs, placeholder hint, and
+   * re-runs validation on blur. Called from the object-edit flyout layout flow when
+   * ctrl:N|constraint is wired from e.g. a HostType selector.
+   */
+  function applyCatalogIpWireConstraints(row, constraintRaw, poolRaw) {
+    if (!row || !row.querySelectorAll) return false;
+    var inputs = row.querySelectorAll("input.gc-ip-field__input");
+    if (!inputs || !inputs.length) return false;
+    var rawTrim = trimStrIp(constraintRaw);
+    var mode = normalizeIpConstraintWireToInternal(constraintRaw);
+    var pool = trimStrIp(poolRaw);
+    if (!rawTrim && pool) mode = "cidr-subnet";
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      clearCatalogIpWireConstraintAttrs(inp);
+      if (mode === "cidr-subnet") {
+        if (pool) inp.setAttribute("data-gc-ip-within-cidr", pool);
+      } else if (mode === "network-only") {
+        inp.setAttribute("data-gc-ip-require-network", "true");
+      } else if (mode === "value-cidr") {
+        inp.setAttribute("data-gc-ip-require-value-cidr", "true");
+      } else if (mode === "value-range") {
+        inp.setAttribute("data-gc-ip-require-value-range", "true");
+      }
+      var ph = placeholderForCatalogIpInput(inp);
+      if (ph) inp.placeholder = ph;
+    }
+    for (var j = 0; j < inputs.length; j++) {
+      try {
+        inputs[j].dispatchEvent(new Event("blur"));
+      } catch (eBl) {}
+    }
+    return true;
+  }
+
+  function applyCatalogIpAutocorrect(row, acOn) {
+    if (!row || !row.querySelectorAll) return false;
+    var list = row.querySelectorAll("input.gc-ip-field__input");
+    if (!list || !list.length) return false;
+    for (var ia = 0; ia < list.length; ia++) {
+      var inpAc = list[ia];
+      if (acOn) inpAc.setAttribute("data-gc-ip-autocorrect", "true");
+      else inpAc.removeAttribute("data-gc-ip-autocorrect");
+    }
+    return true;
+  }
+
   window.__gcDesignerControlsBridge = window.__gcDesignerControlsBridge || {};
   window.__gcDesignerControlsBridge.ip = {
     readAllGcIpAttrs: readAllGcIpAttrs,
@@ -1105,13 +1390,31 @@
     writeAllGcIpAttrs: writeAllGcIpAttrs,
     hasAppliedIpConstraints: hasAppliedIpConstraints,
     readOptsFromInput: readOptsFromInput,
+    writeOptsToInput: writeOptsToInput,
     formatWiredIpDisplayCidr: gcFormatWiredIpDisplayCidr,
+    normalizeWireConstraintValue: normalizeIpConstraintWireToInternal,
+    applyCatalogIpWireConstraints: applyCatalogIpWireConstraints,
+    applyCatalogIpAutocorrect: applyCatalogIpAutocorrect,
+    parseIpv4RangeCompact: parseIpv4RangeCompact,
+    formatIpv4RangeCompact: formatIpv4RangeCompact,
+    parseIpv6RangeCompact: parseIpv6RangeCompact,
+    formatIpv6RangeCompact: formatIpv6RangeCompact,
+    compareIpv4: compareIpv4,
     wireCatalogIpInput: function (input, errEl, okEl, previewEl, maskPillEl, family) {
       wireIpField(input, errEl, okEl, previewEl, maskPillEl, family, function () {
         return readOptsFromInput(input);
       });
     }
   };
+  if (typeof globalThis.gcDesignerNormalizeIpConstraintWireValue !== "function") {
+    globalThis.gcDesignerNormalizeIpConstraintWireValue = normalizeIpConstraintWireToInternal;
+  }
+  if (typeof globalThis.gcDesignerApplyCatalogIpWireConstraints !== "function") {
+    globalThis.gcDesignerApplyCatalogIpWireConstraints = applyCatalogIpWireConstraints;
+  }
+  if (typeof globalThis.gcDesignerApplyCatalogIpAutocorrect !== "function") {
+    globalThis.gcDesignerApplyCatalogIpAutocorrect = applyCatalogIpAutocorrect;
+  }
   globalThis.gcFormatWiredIpDisplayCidr = gcFormatWiredIpDisplayCidr;
 
   /**

@@ -317,6 +317,94 @@ def test_api_designer_data_controls_layout_roundtrip(
     assert j2["layout"]["member_lookup_multi"] == {"ctrl:1": True, "ctrl:2": False}
 
 
+def test_api_designer_data_controls_layout_logic_kinds_roundtrip(
+    designer_client, monkeypatch, tmp_path,
+):
+    """A/B Switch, If Value, CSV↔Array logic blocks must preserve their ``kind`` across save/load."""
+    from app import designer_data_controls_layout as layout_store
+
+    d = tmp_path / "dc_layout_logic_kinds_dir"
+    monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
+    et = "zone"
+    payload = {
+        "layout": {
+            "logic_nodes": [
+                {"id": "logic:sw_1", "kind": "switch_ab", "op": "and"},
+                {
+                    "id": "logic:eq_1",
+                    "kind": "if_equals",
+                    "op": "and",
+                    "compare_value": "42",
+                    "then_send": "true",
+                    "else_send": "loaded_value",
+                },
+                {"id": "logic:csv_1", "kind": "csv_array", "op": "and"},
+                {
+                    "id": "logic:bt_1",
+                    "kind": "bool_text",
+                    "op": "and",
+                    "true_value": "yes",
+                    "false_value": "no",
+                },
+            ],
+        }
+    }
+    r1 = designer_client.put(f"/api/designer/data-controls-layout/{et}", json=payload)
+    assert r1.status_code == 200, r1.text
+    r2 = designer_client.get(f"/api/designer/data-controls-layout/{et}")
+    assert r2.status_code == 200, r2.text
+    nodes = r2.json()["layout"]["logic_nodes"]
+    kinds = {n["id"]: n["kind"] for n in nodes}
+    assert kinds == {
+        "logic:sw_1": "switch_ab",
+        "logic:eq_1": "if_equals",
+        "logic:csv_1": "csv_array",
+        "logic:bt_1": "bool_text",
+    }
+    eq = next(n for n in nodes if n["id"] == "logic:eq_1")
+    assert eq["compare_value"] == "42"
+    assert eq["then_send"] == "true"
+    assert eq["else_send"] == "loaded_value"
+    bt = next(n for n in nodes if n["id"] == "logic:bt_1")
+    assert bt["true_value"] == "yes"
+    assert bt["false_value"] == "no"
+
+
+def test_api_designer_data_controls_layout_self_heals_logic_kind_from_id(
+    designer_client, monkeypatch, tmp_path,
+):
+    """Legacy payloads that claim ``kind: "gate"`` but whose id prefix identifies them
+    as A/B Switch (``logic:sw_``) or If Value (``logic:eq_``) must be self-healed to
+    the correct kind on save — otherwise they would render as plain AND blocks."""
+    from app import designer_data_controls_layout as layout_store
+
+    d = tmp_path / "dc_layout_self_heal_dir"
+    monkeypatch.setattr(layout_store, "layout_dir", lambda: d)
+    et = "zone"
+    payload = {
+        "layout": {
+            "logic_nodes": [
+                {"id": "logic:sw_2", "kind": "gate", "op": "and"},
+                {"id": "logic:eq_3", "kind": "gate", "op": "and"},
+                {"id": "logic:if_4", "kind": "gate", "op": "and"},
+                {"id": "logic:and_5", "kind": "gate", "op": "and"},
+                {"id": "logic:bt_6", "kind": "gate", "op": "and"},
+            ],
+        }
+    }
+    r = designer_client.put(f"/api/designer/data-controls-layout/{et}", json=payload)
+    assert r.status_code == 200, r.text
+    nodes = r.json()["layout"]["logic_nodes"]
+    kinds = {n["id"]: n["kind"] for n in nodes}
+    assert kinds == {
+        "logic:sw_2": "switch_ab",
+        "logic:eq_3": "if_equals",
+        "logic:if_4": "if_value",
+        "logic:and_5": "gate",
+        "logic:bt_6": "bool_text",
+    }
+
+
 def test_api_designer_data_controls_layout_keeps_distinct_edges_same_tuple(
     designer_client, monkeypatch, tmp_path,
 ):

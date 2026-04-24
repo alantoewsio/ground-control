@@ -20,7 +20,38 @@ ENTITY_TYPE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,31}$")
 _NODE_ID_RE = re.compile(r"^[a-zA-Z0-9_.:-]{1,128}$")
 _HANDLE_ID_RE = re.compile(r"^[a-zA-Z0-9_.:-]{1,128}$")
 _LOGIC_OPS = {"and", "or", "not"}
-_LOGIC_KINDS = {"gate", "if_value", "csv_array"}
+_LOGIC_KINDS = {"gate", "if_value", "csv_array", "switch_ab", "if_equals", "bool_text"}
+_IF_EQUALS_SEND_CHOICES = {"true", "false", "loaded_value"}
+
+# Map from ``logic:<prefix>_<n>`` id prefix to the authoritative ``kind`` value.
+# Used as a self-healing fallback when a saved payload has lost the ``kind`` field
+# (e.g. legacy data, or a client bug that dropped it).
+_LOGIC_ID_PREFIX_TO_KIND = {
+    "and": "gate",
+    "or": "gate",
+    "not": "gate",
+    "if": "if_value",
+    "csv": "csv_array",
+    "sw": "switch_ab",
+    "eq": "if_equals",
+    "bt": "bool_text",
+}
+_LOGIC_ID_PREFIX_TO_OP = {
+    "and": "and",
+    "or": "or",
+    "not": "not",
+}
+_LOGIC_ID_PATTERN = re.compile(r"^logic:([a-z]+)_\d+$")
+
+
+def _infer_logic_kind_and_op_from_id(node_id: str) -> tuple[str | None, str | None]:
+    """Return ``(kind, op)`` derived from a ``logic:<prefix>_<n>`` id, or ``(None, None)``."""
+    m = _LOGIC_ID_PATTERN.match(node_id or "")
+    if not m:
+        return None, None
+    prefix = m.group(1)
+    return _LOGIC_ID_PREFIX_TO_KIND.get(prefix), _LOGIC_ID_PREFIX_TO_OP.get(prefix)
+_CUSTOM_CARD_ID_RE = re.compile(r"^ctrl:custom_[a-zA-Z0-9_]{1,48}$")
 
 
 class LayoutMapLockedError(ValueError):
@@ -41,6 +72,7 @@ def _default_layout() -> dict[str, Any]:
         "node_positions": {},
         "connections": [],
         "logic_nodes": [],
+        "custom_cards": [],
         "control_add_only": {},
         "member_lookup_data_source": {},
         "member_lookup_multi": {},
@@ -157,20 +189,87 @@ def _normalize_logic_nodes(value: Any) -> list[dict[str, str]]:
             continue
         if not node_id.startswith("logic:"):
             continue
+        inferred_kind, inferred_op = _infer_logic_kind_and_op_from_id(node_id)
         if kind not in _LOGIC_KINDS:
             kind = "gate"
+        # Self-healing: if the id prefix says this is a non-gate block (if_value,
+        # csv_array, switch_ab, if_equals) but the payload claims ``kind == "gate"``,
+        # trust the id. This protects against legacy payloads saved before these
+        # kinds were recognized and against any client-side bug that drops ``kind``.
+        if kind == "gate" and inferred_kind and inferred_kind != "gate":
+            kind = inferred_kind
         if op not in _LOGIC_OPS:
-            op = "and"
+            op = inferred_op or "and"
         if node_id in seen:
             continue
         seen.add(node_id)
+        row: dict[str, str] = {
+            "id": node_id,
+            "kind": kind,
+            "op": op,
+            "true_value": str(item.get("true_value") or ""),
+            "false_value": str(item.get("false_value") or ""),
+        }
+        if kind == "if_equals":
+            then_raw = str(item.get("then_send") or "").strip().lower()
+            else_raw = str(item.get("else_send") or "").strip().lower()
+            row["compare_value"] = str(item.get("compare_value") or "")
+            row["then_send"] = (
+                then_raw if then_raw in _IF_EQUALS_SEND_CHOICES else "loaded_value"
+            )
+            row["else_send"] = (
+                else_raw if else_raw in _IF_EQUALS_SEND_CHOICES else "loaded_value"
+            )
+        out.append(row)
+    return out
+
+
+def _normalize_custom_cards(value: Any) -> list[dict[str, Any]]:
+    """User-added Display cards. Each entry owns its data entry type and per-type props.
+
+    Shape: ``{id, data_entry_type, show_as, allowed_options, data_entry_properties,
+    member_lookup_multi}``. ``id`` must match ``ctrl:custom_<slug>``.
+    """
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in value[:300]:
+        if not isinstance(item, dict):
+            continue
+        node_id = str(item.get("id") or "").strip()
+        if not _CUSTOM_CARD_ID_RE.match(node_id):
+            continue
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        det = str(item.get("data_entry_type") or "").strip()
+        show_as = str(item.get("show_as") or "").strip()
+        allowed_raw = item.get("allowed_options")
+        allowed: list[str] = []
+        if isinstance(allowed_raw, list):
+            for opt in allowed_raw[:64]:
+                s = str(opt or "").strip()
+                if s:
+                    allowed.append(s)
+        dep_raw = item.get("data_entry_properties")
+        if isinstance(dep_raw, str):
+            dep = dep_raw
+        elif isinstance(dep_raw, dict):
+            try:
+                dep = json.dumps(dep_raw)
+            except (TypeError, ValueError):
+                dep = ""
+        else:
+            dep = ""
         out.append(
             {
                 "id": node_id,
-                "kind": kind,
-                "op": op,
-                "true_value": str(item.get("true_value") or ""),
-                "false_value": str(item.get("false_value") or ""),
+                "data_entry_type": det,
+                "show_as": show_as,
+                "allowed_options": allowed,
+                "data_entry_properties": dep,
+                "member_lookup_multi": bool(item.get("member_lookup_multi")),
             }
         )
     return out
@@ -246,6 +345,7 @@ def normalize_layout(value: Any) -> dict[str, Any]:
         "node_positions": _normalize_node_positions(data.get("node_positions")),
         "connections": _normalize_connections(data.get("connections")),
         "logic_nodes": _normalize_logic_nodes(data.get("logic_nodes")),
+        "custom_cards": _normalize_custom_cards(data.get("custom_cards")),
         "control_add_only": _normalize_control_add_only(data.get("control_add_only")),
         "member_lookup_data_source": _normalize_member_lookup_data_source(
             data.get("member_lookup_data_source")

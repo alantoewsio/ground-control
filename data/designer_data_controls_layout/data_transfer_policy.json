@@ -1,0 +1,543 @@
+{
+  "node_positions": {
+    "field:320": {
+      "x": 0.0,
+      "y": 2080.0
+    },
+    "field:321": {
+      "x": 0.0,
+      "y": 800.0
+    },
+    "field:332": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "field:322": {
+      "x": 0.0,
+      "y": 960.0
+    },
+    "field:323": {
+      "x": 0.0,
+      "y": 1120.0
+    },
+    "field:324": {
+      "x": 0.0,
+      "y": 640.0
+    },
+    "field:325": {
+      "x": 0.0,
+      "y": 480.0
+    },
+    "field:326": {
+      "x": 0.0,
+      "y": 1280.0
+    },
+    "field:327": {
+      "x": 0.0,
+      "y": 160.0
+    },
+    "field:328": {
+      "x": 0.0,
+      "y": 1440.0
+    },
+    "field:329": {
+      "x": 0.0,
+      "y": 1600.0
+    },
+    "field:330": {
+      "x": 0.0,
+      "y": 1760.0
+    },
+    "field:331": {
+      "x": 0.0,
+      "y": 1920.0
+    },
+    "field:333": {
+      "x": 0.0,
+      "y": 320.0
+    },
+    "ctrl:332": {
+      "x": 10.0,
+      "y": 0.0
+    },
+    "ctrl:327": {
+      "x": 10.0,
+      "y": 280.0
+    },
+    "ctrl:333": {
+      "x": 10.0,
+      "y": 560.0
+    },
+    "ctrl:325": {
+      "x": 10.0,
+      "y": 840.0
+    },
+    "ctrl:324": {
+      "x": 10.0,
+      "y": 1120.0
+    },
+    "ctrl:321": {
+      "x": 10.0,
+      "y": 1400.0
+    },
+    "ctrl:322": {
+      "x": 10.0,
+      "y": 1680.0
+    },
+    "ctrl:323": {
+      "x": 10.0,
+      "y": 2240.0
+    },
+    "ctrl:326": {
+      "x": 10.0,
+      "y": 1960.0
+    },
+    "logic:and_1": {
+      "x": 0.0,
+      "y": 380.0
+    },
+    "ctrl:328": {
+      "x": 10.0,
+      "y": 2520.0
+    },
+    "ctrl:329": {
+      "x": 10.0,
+      "y": 2800.0
+    },
+    "logic:bt_1": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "logic:bt_2": {
+      "x": 0.0,
+      "y": 570.0
+    },
+    "logic:bt_3": {
+      "x": 0.0,
+      "y": 760.0
+    },
+    "logic:bt_4": {
+      "x": 0.0,
+      "y": 950.0
+    },
+    "logic:bt_5": {
+      "x": 0.0,
+      "y": 190.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:327",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:327",
+      "target_handle": "value",
+      "edge_id": "gc_mod5ezbu_0b706gwxfe"
+    },
+    {
+      "source_node_id": "ctrl:327",
+      "source_handle": "value",
+      "target_node_id": "field:327",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5ezbu_16chmuhvo8"
+    },
+    {
+      "source_node_id": "field:332",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:332",
+      "target_handle": "value",
+      "edge_id": "gc_mod5ezbu_trt9bpj434"
+    },
+    {
+      "source_node_id": "ctrl:332",
+      "source_handle": "value",
+      "target_node_id": "field:332",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5ezbu_syo7p95ou3"
+    },
+    {
+      "source_node_id": "field:333",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:333",
+      "target_handle": "selected",
+      "edge_id": "gc_mod5q6va_qhaqt3iq1a"
+    },
+    {
+      "source_node_id": "ctrl:333",
+      "source_handle": "selected",
+      "target_node_id": "field:333",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5q6va_wkv4py18jf"
+    },
+    {
+      "source_node_id": "field:325",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:325",
+      "target_handle": "selected",
+      "edge_id": "gc_mod5s38b_79jh3wgqdt"
+    },
+    {
+      "source_node_id": "ctrl:325",
+      "source_handle": "selected",
+      "target_node_id": "field:325",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5s38b_qk7blivw0t"
+    },
+    {
+      "source_node_id": "field:324",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:324",
+      "target_handle": "selected",
+      "edge_id": "gc_mod5tez4_hab3cw63aq"
+    },
+    {
+      "source_node_id": "ctrl:324",
+      "source_handle": "selected",
+      "target_node_id": "field:324",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5tez4_bxirxofee3"
+    },
+    {
+      "source_node_id": "field:322",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:322",
+      "target_handle": "value",
+      "edge_id": "gc_mod5wuem_k1dgfxivjg"
+    },
+    {
+      "source_node_id": "ctrl:322",
+      "source_handle": "value",
+      "target_node_id": "field:322",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5wuem_a38l9zx9ka"
+    },
+    {
+      "source_node_id": "ctrl:321",
+      "source_handle": "off",
+      "target_node_id": "ctrl:322",
+      "target_handle": "visible",
+      "edge_id": "gc_mod5x150_h8eo7uxmfd"
+    },
+    {
+      "source_node_id": "ctrl:333",
+      "source_handle": "option_individualdatatransfer",
+      "target_node_id": "ctrl:323",
+      "target_handle": "visible",
+      "edge_id": "gc_mod62go1_x14pa44zq3"
+    },
+    {
+      "source_node_id": "ctrl:333",
+      "source_handle": "option_individualdatatransfer",
+      "target_node_id": "ctrl:326",
+      "target_handle": "visible",
+      "edge_id": "gc_mod62kt5_xq53f4duhm"
+    },
+    {
+      "source_node_id": "ctrl:333",
+      "source_handle": "option_totaldatatransfer",
+      "target_node_id": "logic:and_1",
+      "target_handle": "input_a",
+      "edge_id": "gc_mod65cmp_vwkobvz1dh"
+    },
+    {
+      "source_node_id": "ctrl:325",
+      "source_handle": "option_cyclic",
+      "target_node_id": "logic:and_1",
+      "target_handle": "input_b",
+      "edge_id": "gc_mod65i98_5xggob7bx4"
+    },
+    {
+      "source_node_id": "logic:and_1",
+      "source_handle": "gate",
+      "target_node_id": "ctrl:321",
+      "target_handle": "visible",
+      "edge_id": "gc_mod65qqn_tyujofrrx2"
+    },
+    {
+      "source_node_id": "ctrl:325",
+      "source_handle": "option_cyclic",
+      "target_node_id": "ctrl:324",
+      "target_handle": "visible",
+      "edge_id": "gc_mod66yjj_qquczf3i2u"
+    },
+    {
+      "source_node_id": "logic:and_1",
+      "source_handle": "gate",
+      "target_node_id": "ctrl:328",
+      "target_handle": "visible",
+      "edge_id": "gc_mod6bznj_nukp8o5i5q"
+    },
+    {
+      "source_node_id": "field:329",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:329",
+      "target_handle": "value",
+      "edge_id": "gc_mod6ivha_32m4e67u2a"
+    },
+    {
+      "source_node_id": "ctrl:329",
+      "source_handle": "value",
+      "target_node_id": "field:329",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod6ivha_dlzunugl7j"
+    },
+    {
+      "source_node_id": "field:321",
+      "source_handle": "loaded_value",
+      "target_node_id": "logic:bt_1",
+      "target_handle": "text_in",
+      "edge_id": "gc_mod72hz2_sjhr1qdo5u"
+    },
+    {
+      "source_node_id": "logic:bt_1",
+      "source_handle": "text_out",
+      "target_node_id": "field:321",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod72l2r_61uak5673c"
+    },
+    {
+      "source_node_id": "logic:bt_1",
+      "source_handle": "bool_out",
+      "target_node_id": "ctrl:321",
+      "target_handle": "value",
+      "edge_id": "gc_mod72veu_5l7mz2qrzp"
+    },
+    {
+      "source_node_id": "ctrl:321",
+      "source_handle": "on",
+      "target_node_id": "logic:bt_1",
+      "target_handle": "bool_in",
+      "edge_id": "gc_mod72zt5_3enmi8yr8d"
+    },
+    {
+      "source_node_id": "field:326",
+      "source_handle": "loaded_value",
+      "target_node_id": "logic:bt_2",
+      "target_handle": "text_in",
+      "edge_id": "gc_mod73n6f_ocrun7tqdj"
+    },
+    {
+      "source_node_id": "logic:bt_2",
+      "source_handle": "text_out",
+      "target_node_id": "field:326",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod73tgg_jcqo8k8yj1"
+    },
+    {
+      "source_node_id": "logic:bt_2",
+      "source_handle": "bool_out",
+      "target_node_id": "ctrl:326",
+      "target_handle": "value",
+      "edge_id": "gc_mod74ca4_utm6cw8tj4"
+    },
+    {
+      "source_node_id": "ctrl:326",
+      "source_handle": "on",
+      "target_node_id": "logic:bt_2",
+      "target_handle": "bool_in",
+      "edge_id": "gc_mod74gjh_sanhhyn1kg"
+    },
+    {
+      "source_node_id": "field:330",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:330",
+      "target_handle": "value",
+      "edge_id": "gc_mod7ohzc_8qmy0yrsea"
+    },
+    {
+      "source_node_id": "ctrl:330",
+      "source_handle": "value",
+      "target_node_id": "field:330",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod7ohzc_svnktjy0gz"
+    },
+    {
+      "source_node_id": "field:323",
+      "source_handle": "loaded_value",
+      "target_node_id": "logic:bt_3",
+      "target_handle": "text_in",
+      "edge_id": "gc_mod83gvg_mn7s4xryyt"
+    },
+    {
+      "source_node_id": "logic:bt_3",
+      "source_handle": "text_out",
+      "target_node_id": "field:323",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod83jqd_vxa4ebmksr"
+    },
+    {
+      "source_node_id": "ctrl:323",
+      "source_handle": "on",
+      "target_node_id": "logic:bt_3",
+      "target_handle": "bool_in",
+      "edge_id": "gc_mod83tt3_6rtllxy7cd"
+    },
+    {
+      "source_node_id": "logic:bt_3",
+      "source_handle": "bool_out",
+      "target_node_id": "ctrl:323",
+      "target_handle": "value",
+      "edge_id": "gc_mod83z6l_qitdx4grzt"
+    },
+    {
+      "source_node_id": "field:328",
+      "source_handle": "loaded_value",
+      "target_node_id": "logic:bt_4",
+      "target_handle": "text_in",
+      "edge_id": "gc_mod86k87_j28635idvk"
+    },
+    {
+      "source_node_id": "logic:bt_4",
+      "source_handle": "text_out",
+      "target_node_id": "field:328",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod86mor_bactw5onqt"
+    },
+    {
+      "source_node_id": "logic:bt_4",
+      "source_handle": "bool_out",
+      "target_node_id": "ctrl:328",
+      "target_handle": "value",
+      "edge_id": "gc_mod86ww3_4trq1ah4sx"
+    },
+    {
+      "source_node_id": "ctrl:328",
+      "source_handle": "value",
+      "target_node_id": "logic:bt_4",
+      "target_handle": "bool_in",
+      "edge_id": "gc_mod870e3_iw4xlb45e8"
+    },
+    {
+      "source_node_id": "field:331",
+      "source_handle": "loaded_value",
+      "target_node_id": "logic:bt_5",
+      "target_handle": "text_in",
+      "edge_id": "gc_mod88khh_qaefx7yn0k"
+    },
+    {
+      "source_node_id": "logic:bt_5",
+      "source_handle": "text_out",
+      "target_node_id": "field:331",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod88o2g_7v30zs2irs"
+    },
+    {
+      "source_node_id": "logic:bt_5",
+      "source_handle": "bool_out",
+      "target_node_id": "ctrl:331",
+      "target_handle": "value",
+      "edge_id": "gc_mod88rmz_wzs03immeo"
+    },
+    {
+      "source_node_id": "ctrl:331",
+      "source_handle": "on",
+      "target_node_id": "logic:bt_5",
+      "target_handle": "bool_in",
+      "edge_id": "gc_mod89tz7_5urlwn3m9w"
+    },
+    {
+      "source_node_id": "field:911",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:911",
+      "target_handle": "value",
+      "edge_id": "gc_modagn3t_j8iy33nzx2"
+    },
+    {
+      "source_node_id": "ctrl:911",
+      "source_handle": "value",
+      "target_node_id": "field:911",
+      "target_handle": "save_value",
+      "edge_id": "gc_modagn3t_063pbpp48o"
+    },
+    {
+      "source_node_id": "field:912",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:912",
+      "target_handle": "value",
+      "edge_id": "gc_modagozx_vs16zd7vba"
+    },
+    {
+      "source_node_id": "ctrl:912",
+      "source_handle": "value",
+      "target_node_id": "field:912",
+      "target_handle": "save_value",
+      "edge_id": "gc_modagozx_fa2hzin3f9"
+    },
+    {
+      "source_node_id": "field:913",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:913",
+      "target_handle": "value",
+      "edge_id": "gc_modagshk_nkwhfyv1a6"
+    },
+    {
+      "source_node_id": "ctrl:913",
+      "source_handle": "value",
+      "target_node_id": "field:913",
+      "target_handle": "save_value",
+      "edge_id": "gc_modagshk_vx9zpnsa06"
+    },
+    {
+      "source_node_id": "field:914",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:914",
+      "target_handle": "value",
+      "edge_id": "gc_modaguxn_ptiela7lhy"
+    },
+    {
+      "source_node_id": "ctrl:914",
+      "source_handle": "value",
+      "target_node_id": "field:914",
+      "target_handle": "save_value",
+      "edge_id": "gc_modaguxn_2aa1bmglj1"
+    }
+  ],
+  "logic_nodes": [
+    {
+      "id": "logic:and_1",
+      "kind": "gate",
+      "op": "and",
+      "true_value": "",
+      "false_value": ""
+    },
+    {
+      "id": "logic:bt_1",
+      "kind": "bool_text",
+      "op": "and",
+      "true_value": "Unlimited",
+      "false_value": ""
+    },
+    {
+      "id": "logic:bt_2",
+      "kind": "bool_text",
+      "op": "and",
+      "true_value": "Unlimited",
+      "false_value": ""
+    },
+    {
+      "id": "logic:bt_3",
+      "kind": "bool_text",
+      "op": "and",
+      "true_value": "Unlimited",
+      "false_value": ""
+    },
+    {
+      "id": "logic:bt_4",
+      "kind": "bool_text",
+      "op": "and",
+      "true_value": "Unlimited",
+      "false_value": ""
+    },
+    {
+      "id": "logic:bt_5",
+      "kind": "bool_text",
+      "op": "and",
+      "true_value": "Unlimited",
+      "false_value": ""
+    }
+  ],
+  "custom_cards": [],
+  "control_add_only": {},
+  "member_lookup_data_source": {},
+  "member_lookup_multi": {},
+  "layout_locked": false
+}

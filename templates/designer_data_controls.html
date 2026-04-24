@@ -364,6 +364,33 @@
             >
               <span class="gc-material-symbol" aria-hidden="true">data_array</span>
             </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-switch-ab"
+              title="Add A/B Switch block"
+              aria-label="Add A/B Switch block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">alt_route</span>
+            </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-if-equals"
+              title="Add If Value block"
+              aria-label="Add If Value block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">compare_arrows</span>
+            </button>
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-bool-text"
+              title="Add Bool &#x2194; Text block"
+              aria-label="Add Bool to Text block"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">toggle_on</span>
+            </button>
           </div>
         </header>
         <div
@@ -374,8 +401,19 @@
       <aside class="gc-designer-data-controls-layout__panel" aria-label="Display cards">
         <header class="gc-designer-data-controls-layout__panel-head">
           <h3 class="gc-designer-data-controls-layout__panel-title">Display cards</h3>
+          <div class="gc-designer-data-controls-layout__controls-toolbox" aria-label="Display cards toolbox">
+            <button
+              type="button"
+              class="gc-designer-data-controls-layout__logic-toolbox-btn"
+              id="gc-designer-data-controls-layout-add-custom-card"
+              title="Add user-defined display card"
+              aria-label="Add user-defined display card"
+            >
+              <span class="gc-material-symbol" aria-hidden="true">add</span>
+            </button>
+          </div>
           <p class="muted gc-designer-data-controls-layout__panel-note">
-            Controls selected on the Table fields tab appear here.
+            Controls selected on the Table fields tab appear here. Use Add to create user-defined display cards.
           </p>
         </header>
         <div
@@ -538,6 +576,39 @@
       applyLayoutLockIconsToObjectTypeSelector();
     });
   }
+
+  globalThis.gcDesignerDataControlsSetLayoutLockFlag = function (entityType, locked) {
+    var et = trimStr(entityType);
+    if (!et) return;
+    layoutLockFlagsByEntityType[et] = !!locked;
+    applyLayoutLockIconsToObjectTypeSelector();
+  };
+  globalThis.gcDesignerDataControlsRefreshLayoutLockIcons = function () {
+    refreshObjectTypeSelectorLayoutLockIcons();
+  };
+
+  var GC_DC_BASE_DOCUMENT_TITLE = (document && document.title) || "Layouts · Designer · Ground Control";
+  function getSelectedEntityTypeLabel() {
+    if (!typeSel) return "";
+    var sel = typeSel.querySelector(".gc-designer-object-selector-list__radio:checked");
+    if (!sel) return "";
+    var row = sel.closest
+      ? sel.closest(".gc-designer-object-selector-list__row")
+      : null;
+    var lab = row ? row.querySelector(".gc-designer-object-selector-list__label") : null;
+    var text = lab ? trimStr(lab.textContent) : "";
+    return text || trimStr(sel.value);
+  }
+  function updateDocumentTitleForEntity() {
+    var label = getSelectedEntityTypeLabel();
+    try {
+      document.title = label
+        ? label + " · " + GC_DC_BASE_DOCUMENT_TITLE
+        : GC_DC_BASE_DOCUMENT_TITLE;
+    } catch (e) {}
+  }
+  globalThis.gcDesignerDataControlsUpdateDocumentTitleForEntity =
+    updateDocumentTitleForEntity;
 
   function wireTabPersistence() {
     document.querySelectorAll("[data-gc-dc-tab]").forEach(function (btn) {
@@ -1124,6 +1195,7 @@
     globalThis.gcDesignerHydrateObjectSelectorListSingle(typeSel, function () {
       syncAllCachedEntityTypesFromTypeSelect();
       refreshObjectTypeSelectorLayoutLockIcons();
+      updateDocumentTitleForEntity();
       if (appliedSavedEntityType) return;
       appliedSavedEntityType = true;
       var saved = readStoredUiValue(STORAGE_KEY_ENTITY);
@@ -1437,8 +1509,12 @@
         resolve(false);
         return;
       }
-      if (propsTa) propsTa.value = outStr === "{}" ? "" : outStr;
-      var nextText = propsTa ? String(propsTa.value || "").trim() : "";
+      /* The fields table no longer renders a props textarea per row; fall back to the
+       * freshly-serialized merge result so we don't accidentally overwrite the row's
+       * data_entry_properties with null. When the textarea does exist, keep it in
+       * sync so dirty/save UI stays consistent. */
+      var nextText = outStr === "{}" ? "" : outStr;
+      if (propsTa) propsTa.value = nextText;
       var prevNorm = String(curText || "").trim();
       if (nextText === prevNorm) {
         resolve(true);
@@ -1835,16 +1911,19 @@
         cf.then(function (ok) {
           if (!ok) {
             revertTypeSelectTo(prev);
+            updateDocumentTitleForEntity();
             return;
           }
           writeStoredUiValue(STORAGE_KEY_ENTITY, cur);
           loadFields(cur);
+          updateDocumentTitleForEntity();
           emitCatalogChanged();
         });
         return;
       }
       writeStoredUiValue(STORAGE_KEY_ENTITY, cur);
       loadFields(cur);
+      updateDocumentTitleForEntity();
       emitCatalogChanged();
     });
   }

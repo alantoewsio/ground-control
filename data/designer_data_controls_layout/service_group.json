@@ -22,15 +22,19 @@
     },
     "field:137": {
       "x": 0.0,
-      "y": 320.0
+      "y": 480.0
     },
     "field:529": {
       "x": 0.0,
-      "y": 480.0
+      "y": 320.0
     },
     "field:134": {
       "x": 0.0,
       "y": 640.0
+    },
+    "ctrl:529": {
+      "x": 10.0,
+      "y": 560.0
     }
   },
   "connections": [
@@ -63,27 +67,29 @@
       "edge_id": "gc_moab7hg9_w9scjtm8kt"
     },
     {
-      "source_node_id": "field:137",
+      "source_node_id": "field:529",
       "source_handle": "loaded_value",
-      "target_node_id": "ctrl:137",
+      "target_node_id": "ctrl:529",
       "target_handle": "selected",
-      "edge_id": "gc_moab8orv_7pfu78u55z"
+      "edge_id": "gc_mocvo0ii_qszg85x7zh"
     },
     {
-      "source_node_id": "ctrl:137",
+      "source_node_id": "ctrl:529",
       "source_handle": "selected",
-      "target_node_id": "field:137",
+      "target_node_id": "field:529",
       "target_handle": "save_value",
-      "edge_id": "gc_moab8orv_hj2pqxahdg"
+      "edge_id": "gc_mocvo0ii_15415bcqz1"
     }
   ],
   "logic_nodes": [],
+  "custom_cards": [],
   "control_add_only": {},
   "member_lookup_data_source": {
-    "ctrl:137": "service"
+    "ctrl:529": "service"
   },
   "member_lookup_multi": {
-    "ctrl:137": true
+    "ctrl:137": true,
+    "ctrl:529": true
   },
   "layout_locked": true
 }

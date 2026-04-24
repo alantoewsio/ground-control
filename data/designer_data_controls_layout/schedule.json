@@ -1,9 +1,238 @@
 {
-  "node_positions": {},
-  "connections": [],
+  "node_positions": {
+    "field:301": {
+      "x": 0.0,
+      "y": 160.0
+    },
+    "field:302": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "field:300": {
+      "x": 0.0,
+      "y": 1440.0
+    },
+    "field:303": {
+      "x": 0.0,
+      "y": 1600.0
+    },
+    "field:304": {
+      "x": 0.0,
+      "y": 320.0
+    },
+    "field:680": {
+      "x": 0.0,
+      "y": 800.0
+    },
+    "field:681": {
+      "x": 0.0,
+      "y": 960.0
+    },
+    "field:682": {
+      "x": 0.0,
+      "y": 1120.0
+    },
+    "field:683": {
+      "x": 0.0,
+      "y": 1280.0
+    },
+    "ctrl:302": {
+      "x": 10.0,
+      "y": 0.0
+    },
+    "ctrl:301": {
+      "x": 10.0,
+      "y": 280.0
+    },
+    "ctrl:304": {
+      "x": 10.0,
+      "y": 560.0
+    },
+    "ctrl:303": {
+      "x": 10.0,
+      "y": 840.0
+    },
+    "ctrl:681": {
+      "x": 10.0,
+      "y": 1680.0
+    },
+    "ctrl:682": {
+      "x": 10.0,
+      "y": 1960.0
+    },
+    "field:909": {
+      "x": 0.0,
+      "y": 640.0
+    },
+    "field:910": {
+      "x": 0.0,
+      "y": 480.0
+    },
+    "ctrl:680": {
+      "x": 10.0,
+      "y": 1400.0
+    },
+    "ctrl:683": {
+      "x": 10.0,
+      "y": 2240.0
+    },
+    "ctrl:910": {
+      "x": 10.0,
+      "y": 840.0
+    },
+    "ctrl:909": {
+      "x": 10.0,
+      "y": 1120.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:301",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:301",
+      "target_handle": "value",
+      "edge_id": "gc_mod48tgc_xygarg45l9"
+    },
+    {
+      "source_node_id": "ctrl:301",
+      "source_handle": "value",
+      "target_node_id": "field:301",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod48tgc_ccigyi6959"
+    },
+    {
+      "source_node_id": "field:302",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:302",
+      "target_handle": "value",
+      "edge_id": "gc_mod48tgc_e27eqjtvjl"
+    },
+    {
+      "source_node_id": "ctrl:302",
+      "source_handle": "value",
+      "target_node_id": "field:302",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod48tgc_h2fshctgpk"
+    },
+    {
+      "source_node_id": "field:304",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:304",
+      "target_handle": "selected",
+      "edge_id": "gc_mod4dbo4_jtmv1q7dn7"
+    },
+    {
+      "source_node_id": "ctrl:304",
+      "source_handle": "selected",
+      "target_node_id": "field:304",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod4dbo4_ao806p2xrl"
+    },
+    {
+      "source_node_id": "ctrl:681",
+      "source_handle": "selected",
+      "target_node_id": "field:681",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod4pqva_butet1ghnf"
+    },
+    {
+      "source_node_id": "field:681",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:681",
+      "target_handle": "selected",
+      "edge_id": "gc_mod4t4ny_fkb4nzcr1j"
+    },
+    {
+      "source_node_id": "ctrl:682",
+      "source_handle": "selected",
+      "target_node_id": "field:682",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod4udmp_t8p2hlaad3"
+    },
+    {
+      "source_node_id": "field:682",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:682",
+      "target_handle": "selected",
+      "edge_id": "gc_mod4ukvy_ng1s7rzto7"
+    },
+    {
+      "source_node_id": "field:680",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:680",
+      "target_handle": "value",
+      "edge_id": "gc_mod54zbe_1dkx30zh8e"
+    },
+    {
+      "source_node_id": "ctrl:680",
+      "source_handle": "value",
+      "target_node_id": "field:680",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod54zbe_1vw12b0nhv"
+    },
+    {
+      "source_node_id": "ctrl:683",
+      "source_handle": "selected",
+      "target_node_id": "field:683",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod55bia_2y30a3gbai"
+    },
+    {
+      "source_node_id": "field:683",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:683",
+      "target_handle": "selected",
+      "edge_id": "gc_mod55fp6_s3x3ehc01f"
+    },
+    {
+      "source_node_id": "field:910",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:910",
+      "target_handle": "value",
+      "edge_id": "gc_mod59urr_c5o1adgo3u"
+    },
+    {
+      "source_node_id": "ctrl:910",
+      "source_handle": "value",
+      "target_node_id": "field:910",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod59urr_47o5hzev6k"
+    },
+    {
+      "source_node_id": "field:909",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:909",
+      "target_handle": "value",
+      "edge_id": "gc_mod5a5pa_u34cgt6f7a"
+    },
+    {
+      "source_node_id": "ctrl:909",
+      "source_handle": "value",
+      "target_node_id": "field:909",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod5a5pa_y1j25kzjc8"
+    },
+    {
+      "source_node_id": "ctrl:304",
+      "source_handle": "option_onetime",
+      "target_node_id": "ctrl:910",
+      "target_handle": "visible",
+      "edge_id": "gc_mod5b2tw_z0nzkmc29u"
+    },
+    {
+      "source_node_id": "ctrl:304",
+      "source_handle": "option_onetime",
+      "target_node_id": "ctrl:909",
+      "target_handle": "visible",
+      "edge_id": "gc_mod5b59f_no4bfwlvr5"
+    }
+  ],
   "logic_nodes": [],
-  "control_add_only": {},
+  "custom_cards": [],
+  "control_add_only": {
+    "ctrl:304": true
+  },
   "member_lookup_data_source": {},
   "member_lookup_multi": {},
-  "layout_locked": false
+  "layout_locked": true
 }

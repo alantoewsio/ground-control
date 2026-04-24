@@ -1287,6 +1287,12 @@
         cb2.checked = parseBoolLike(props.value);
         return cb2;
       }
+      case "toggle-checkbox":
+        return buildToggleCheckboxControl(props);
+      case "toggle-onoff":
+        return buildToggleOnOffControl(props);
+      case "datetime":
+        return buildDatetimeControl(props);
       case "data-entry-table":
       case "ip-constraint":
       case "edit-flyout":
@@ -1295,6 +1301,115 @@
       default:
         return buildDefaultText(props);
     }
+  }
+
+  function buildToggleCheckboxControl(props) {
+    var host = document.createElement("div");
+    host.className = "gc-obj-edit-toggle-checkbox";
+    host.setAttribute("data-gc-obj-edit-toggle-checkbox", "1");
+    var label = document.createElement("label");
+    label.className = "gc-toolbar-combine";
+    var txt = document.createElement("span");
+    txt.className = "gc-toolbar-combine__text";
+    var labelText = trimStr(props && props.toggleText);
+    if (labelText) txt.textContent = labelText;
+    var input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "gc-toolbar-combine__input";
+    input.autocomplete = "off";
+    input.checked = parseBoolLike(props && props.value);
+    var track = document.createElement("span");
+    track.className = "gc-toolbar-combine__track";
+    track.setAttribute("aria-hidden", "true");
+    var thumb = document.createElement("span");
+    thumb.className = "gc-toolbar-combine__thumb";
+    track.appendChild(thumb);
+    if (labelText) label.appendChild(txt);
+    label.appendChild(input);
+    label.appendChild(track);
+    host.appendChild(label);
+    return host;
+  }
+
+  function buildToggleOnOffControl(props) {
+    var host = document.createElement("div");
+    host.className = "gc-obj-edit-toggle-onoff";
+    host.setAttribute("data-gc-obj-edit-toggle-onoff", "1");
+    host.style.display = "inline-flex";
+    host.style.alignItems = "center";
+    host.style.gap = "0.6rem";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "gc-table-toggle";
+    btn.setAttribute("role", "switch");
+    var initOn = parseBoolLike(props && props.value);
+    btn.setAttribute("aria-checked", initOn ? "true" : "false");
+    if (initOn) btn.classList.add("gc-table-toggle--on");
+    var track = document.createElement("span");
+    track.className = "gc-table-toggle__track";
+    track.setAttribute("aria-hidden", "true");
+    var thumb = document.createElement("span");
+    thumb.className = "gc-table-toggle__thumb";
+    track.appendChild(thumb);
+    btn.appendChild(track);
+    var stateLbl = document.createElement("span");
+    stateLbl.className = "muted";
+    stateLbl.textContent = initOn ? "On" : "Off";
+    btn.addEventListener("click", function () {
+      var nextOn = btn.getAttribute("aria-checked") !== "true";
+      btn.setAttribute("aria-checked", nextOn ? "true" : "false");
+      btn.classList.toggle("gc-table-toggle--on", nextOn);
+      stateLbl.textContent = nextOn ? "On" : "Off";
+      try {
+        btn.dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (eTog) {}
+    });
+    host.appendChild(btn);
+    host.appendChild(stateLbl);
+    return host;
+  }
+
+  function normalizeDatetimeText(raw) {
+    /* Accept "YYYY-MM-DD HH:MM:SS", "YYYY-MM-DDTHH:MM:SS", "YYYY-MM-DD HH:MM", or "YYYY-MM-DD".
+     * Returns an object { iso, date, dateTime } where iso uses "T" (native picker format)
+     * and dateTime uses a space separator with trailing ":00" seconds when missing. */
+    var s = trimStr(raw);
+    if (!s) return { iso: "", date: "", dateTime: "" };
+    var norm = s.replace(" ", "T");
+    var m = norm.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (!m) return { iso: "", date: "", dateTime: "" };
+    var datePart = m[1];
+    if (!m[2]) return { iso: datePart, date: datePart, dateTime: datePart };
+    var hh = m[2];
+    var mm = m[3];
+    var ss = m[4] != null ? m[4] : "00";
+    return {
+      iso: datePart + "T" + hh + ":" + mm + ":" + ss,
+      date: datePart,
+      dateTime: datePart + " " + hh + ":" + mm + ":" + ss,
+    };
+  }
+
+  function buildDatetimeControl(props) {
+    var dateOnly = !!(props && props.dateOnly);
+    var host = document.createElement("div");
+    host.className = "gc-obj-edit-datetime";
+    host.setAttribute("data-gc-obj-edit-datetime", "1");
+    host.setAttribute("data-date-only", dateOnly ? "1" : "0");
+    var inp = document.createElement("input");
+    inp.type = dateOnly ? "date" : "datetime-local";
+    inp.className = "settings-form__input mono";
+    inp.autocomplete = "off";
+    if (!dateOnly) inp.step = "1";
+    var raw = props && props.value != null ? String(props.value) : "";
+    var parsed = normalizeDatetimeText(raw);
+    if (dateOnly) {
+      if (parsed.date) inp.value = parsed.date;
+    } else {
+      if (parsed.iso) inp.value = parsed.iso;
+    }
+    host.appendChild(inp);
+    return host;
   }
 
   function buildRowValueLookup(catalogHydrateOpts) {
@@ -1961,13 +2076,20 @@
     });
 
     document.addEventListener("change", function (ev) {
-      var sel =
-        ev.target && ev.target.closest
-          ? ev.target.closest("select.gc-option-selector__native")
-          : null;
-      if (!sel) return;
+      var tgt = ev.target;
+      if (!tgt || !tgt.closest) return;
       var host = document.getElementById("gc-designer-object-edit-catalog-fields");
-      if (!host || !host.contains(sel)) return;
+      if (!host || !host.contains(tgt)) return;
+      var sel = tgt.closest("select.gc-option-selector__native");
+      /* toggle-checkbox rows wrap an <input type="checkbox">; toggle-onoff buttons
+       * dispatch a bubbling "change" when clicked. Re-evaluate the layout flow so
+       * controls wired to the toggle output (e.g. |visible) reflect the new state. */
+      var cbToggle = tgt.closest('[data-gc-obj-edit-toggle-checkbox="1"]');
+      var ooToggle = tgt.closest('[data-gc-obj-edit-toggle-onoff="1"]');
+      /* Datetime pickers emit a bubbling "change" when committed; re-eval so any
+       * downstream wiring (e.g. |visible on a target control) reflects the new value. */
+      var dtHost = tgt.closest('[data-gc-obj-edit-datetime="1"]');
+      if (!sel && !cbToggle && !ooToggle && !dtHost) return;
       reevalObjectEditLayoutFromCurrentInputs();
     });
   }

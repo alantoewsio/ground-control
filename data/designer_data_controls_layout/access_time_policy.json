@@ -1,0 +1,207 @@
+{
+  "node_positions": {
+    "field:306": {
+      "x": 0.0,
+      "y": 160.0
+    },
+    "field:307": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "field:308": {
+      "x": 0.0,
+      "y": 480.0
+    },
+    "field:309": {
+      "x": 0.0,
+      "y": 320.0
+    },
+    "field:305": {
+      "x": 0.0,
+      "y": 640.0
+    },
+    "ctrl:307": {
+      "x": 10.0,
+      "y": 0.0
+    },
+    "ctrl:306": {
+      "x": 10.0,
+      "y": 280.0
+    },
+    "ctrl:309": {
+      "x": 10.0,
+      "y": 560.0
+    },
+    "ctrl:custom_1": {
+      "x": 10.0,
+      "y": 840.0
+    },
+    "ctrl:308": {
+      "x": 10.0,
+      "y": 1120.0
+    },
+    "logic:if_1": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "logic:sw_1": {
+      "x": 0.0,
+      "y": 190.0
+    },
+    "logic:eq_1": {
+      "x": 0.0,
+      "y": 380.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:306",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:306",
+      "target_handle": "value",
+      "edge_id": "gc_mocws39v_whxtxrgf2f"
+    },
+    {
+      "source_node_id": "ctrl:306",
+      "source_handle": "value",
+      "target_node_id": "field:306",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocws39v_oe4kzoapcf"
+    },
+    {
+      "source_node_id": "field:307",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:307",
+      "target_handle": "value",
+      "edge_id": "gc_mocws39v_lj5ktrzpnb"
+    },
+    {
+      "source_node_id": "ctrl:307",
+      "source_handle": "value",
+      "target_node_id": "field:307",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocws39v_ac5wv7n2wv"
+    },
+    {
+      "source_node_id": "field:309",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:309",
+      "target_handle": "selected",
+      "edge_id": "gc_mocxqeaw_v646rjy0eb"
+    },
+    {
+      "source_node_id": "ctrl:309",
+      "source_handle": "selected",
+      "target_node_id": "field:309",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocxqeaw_9kdb858uis"
+    },
+    {
+      "source_node_id": "field:308",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:308",
+      "target_handle": "selected",
+      "edge_id": "gc_mod1de2r_x5zx8901ev"
+    },
+    {
+      "source_node_id": "field:308",
+      "source_handle": "loaded_value",
+      "target_node_id": "logic:eq_1",
+      "target_handle": "loaded_value",
+      "edge_id": "gc_mod3u3my_j5xawa94pn"
+    },
+    {
+      "source_node_id": "logic:eq_1",
+      "source_handle": "save_value",
+      "target_node_id": "ctrl:custom_1",
+      "target_handle": "value",
+      "edge_id": "gc_mod3ubic_4ao0scloyh"
+    },
+    {
+      "source_node_id": "ctrl:custom_1",
+      "source_handle": "off",
+      "target_node_id": "ctrl:308",
+      "target_handle": "visible",
+      "edge_id": "gc_mod3upp6_k011rmkexs"
+    },
+    {
+      "source_node_id": "ctrl:308",
+      "source_handle": "selected",
+      "target_node_id": "logic:sw_1",
+      "target_handle": "loaded_value_b",
+      "edge_id": "gc_mod3v1cc_i6tq0tm1e3"
+    },
+    {
+      "source_node_id": "ctrl:custom_1",
+      "source_handle": "on",
+      "target_node_id": "logic:sw_1",
+      "target_handle": "use_a",
+      "edge_id": "gc_mod3v3fj_4ysiia7oba"
+    },
+    {
+      "source_node_id": "ctrl:custom_1",
+      "source_handle": "on",
+      "target_node_id": "logic:if_1",
+      "target_handle": "input",
+      "edge_id": "gc_mod3vwvk_d4o1zdm21z"
+    },
+    {
+      "source_node_id": "logic:if_1",
+      "source_handle": "value",
+      "target_node_id": "logic:sw_1",
+      "target_handle": "loaded_value_a",
+      "edge_id": "gc_mod3vz8q_1s2b2r805g"
+    },
+    {
+      "source_node_id": "logic:sw_1",
+      "source_handle": "save_value",
+      "target_node_id": "field:308",
+      "target_handle": "save_value",
+      "edge_id": "gc_mod3wrfy_8x68dhpksd"
+    }
+  ],
+  "logic_nodes": [
+    {
+      "id": "logic:if_1",
+      "kind": "if_value",
+      "op": "and",
+      "true_value": "All The Time",
+      "false_value": ""
+    },
+    {
+      "id": "logic:sw_1",
+      "kind": "switch_ab",
+      "op": "and",
+      "true_value": "",
+      "false_value": ""
+    },
+    {
+      "id": "logic:eq_1",
+      "kind": "if_equals",
+      "op": "and",
+      "true_value": "",
+      "false_value": "",
+      "compare_value": "All The Time",
+      "then_send": "true",
+      "else_send": "false"
+    }
+  ],
+  "custom_cards": [
+    {
+      "id": "ctrl:custom_1",
+      "data_entry_type": "toggle-checkbox",
+      "show_as": "All the time",
+      "allowed_options": [],
+      "data_entry_properties": "",
+      "member_lookup_multi": false
+    }
+  ],
+  "control_add_only": {
+    "ctrl:309": true
+  },
+  "member_lookup_data_source": {
+    "ctrl:308": "schedule"
+  },
+  "member_lookup_multi": {},
+  "layout_locked": true
+}

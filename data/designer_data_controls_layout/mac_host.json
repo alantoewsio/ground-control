@@ -1,9 +1,146 @@
 {
-  "node_positions": {},
-  "connections": [],
+  "node_positions": {
+    "field:213": {
+      "x": 0.0,
+      "y": 960.0
+    },
+    "field:214": {
+      "x": 0.0,
+      "y": 160.0
+    },
+    "field:217": {
+      "x": 0.0,
+      "y": 320.0
+    },
+    "field:215": {
+      "x": 0.0,
+      "y": 480.0
+    },
+    "field:369": {
+      "x": 0.0,
+      "y": 640.0
+    },
+    "field:216": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "field:742": {
+      "x": 0.0,
+      "y": 800.0
+    }
+  },
+  "connections": [
+    {
+      "source_node_id": "field:214",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:214",
+      "target_handle": "value",
+      "edge_id": "gc_mocvoyrq_t1rxjb30r0"
+    },
+    {
+      "source_node_id": "ctrl:214",
+      "source_handle": "value",
+      "target_node_id": "field:214",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocvoyrr_th9bhas1aq"
+    },
+    {
+      "source_node_id": "field:216",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:216",
+      "target_handle": "value",
+      "edge_id": "gc_mocvoyrr_8qrzrxttrv"
+    },
+    {
+      "source_node_id": "ctrl:216",
+      "source_handle": "value",
+      "target_node_id": "field:216",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocvoyrr_x42y0clk90"
+    },
+    {
+      "source_node_id": "field:217",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:217",
+      "target_handle": "selected",
+      "edge_id": "gc_mocvprg5_froonrouyo"
+    },
+    {
+      "source_node_id": "ctrl:217",
+      "source_handle": "selected",
+      "target_node_id": "field:217",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocvprg5_vz4od5etyy"
+    },
+    {
+      "source_node_id": "field:215",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:215",
+      "target_handle": "value",
+      "edge_id": "gc_mocvvycl_2uh8bkz5xt"
+    },
+    {
+      "source_node_id": "ctrl:215",
+      "source_handle": "value",
+      "target_node_id": "field:215",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocvvycl_yi7b80el72"
+    },
+    {
+      "source_node_id": "field:369",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:369",
+      "target_handle": "value",
+      "edge_id": "gc_mocvwews_0hmr76zgok"
+    },
+    {
+      "source_node_id": "ctrl:369",
+      "source_handle": "value",
+      "target_node_id": "field:369",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocvwews_ktb1dm64m"
+    },
+    {
+      "source_node_id": "ctrl:742",
+      "source_handle": "value",
+      "target_node_id": "field:742",
+      "target_handle": "save_value",
+      "edge_id": "gc_mocvwkkz_gu44cdytk4"
+    },
+    {
+      "source_node_id": "ctrl:217",
+      "source_handle": "option_macaddress",
+      "target_node_id": "ctrl:215",
+      "target_handle": "visible",
+      "edge_id": "gc_mocvya9y_yboh6vsraa"
+    },
+    {
+      "source_node_id": "ctrl:217",
+      "source_handle": "option_maclist",
+      "target_node_id": "ctrl:742",
+      "target_handle": "visible",
+      "edge_id": "gc_mocvygpz_1l425a7ror"
+    },
+    {
+      "source_node_id": "ctrl:217",
+      "source_handle": "option_maclist",
+      "target_node_id": "ctrl:369",
+      "target_handle": "visible",
+      "edge_id": "gc_mocvyjyf_lyi1sfnmf1"
+    },
+    {
+      "source_node_id": "field:742",
+      "source_handle": "loaded_value",
+      "target_node_id": "ctrl:742",
+      "target_handle": "value",
+      "edge_id": "gc_mocw50dy_7bhyddgay7"
+    }
+  ],
   "logic_nodes": [],
-  "control_add_only": {},
+  "control_add_only": {
+    "ctrl:217": true
+  },
   "member_lookup_data_source": {},
   "member_lookup_multi": {},
-  "layout_locked": false
+  "layout_locked": true
 }
